@@ -48,8 +48,59 @@ Reality Plane; **Knowledge** and **Identity** are the Knowledge Plane;
 **Intelligence** and **Execution** are the Execution Plane; **Infrastructure**
 underlies them all. (`SYSTEM_OVERVIEW.md`, `RUNTIME_LOOP.md`.)
 
-Every contract below defines exactly four sections: **Purpose**,
-**Responsibilities**, **Invariants**, **Dependencies**.
+---
+
+## Contract Kinds
+
+Every kernel contract declares exactly one **kind**. The kind tells you how the
+contract relates to time and persistence.
+
+- **State** — persistent information; the durable record of what *is*. Stored,
+  referenced, and recomputable or immutable. *(e.g. Observation, Evidence,
+  Belief, Entity, Goal, Project, Action.)*
+- **Transition** — a pure transformation; a *verb*: reasoning, planning,
+  decision, reflection, learning. A transition is **not stored**; only its
+  **outputs**, which are State, are stored.
+- **Service** — runtime infrastructure that provides a capability. Neither state
+  nor transition. *(e.g. Journal, Storage, Synchronization, ModelRouter,
+  Encryption, Scheduler.)*
+
+> **The kernel contains only State and Service contracts. No Transition is a
+> kernel contract.** Transitions belong to the Runtime Loop (`RUNTIME_LOOP.md`),
+> not to the permanent contract surface. This reinforces the separation between
+> architecture (stable) and execution (continuous).
+
+### Why Decision is not a kernel contract
+
+`Decision` is intentionally absent. The kernel contains stable entities; a
+Decision is not an entity — it is a **transition** between two stable entities:
+
+```
+Plan  →  Decision  →  Action
+```
+
+A Decision is the execution of Policy over a plan. It is never stored as a kernel
+object; its result is captured as State and provenance:
+
+- an **Event** in the Event Journal,
+- **provenance** in the Evidence Graph,
+- an **Action** in the Execution Plane.
+
+The runtime may represent a Decision object internally. The kernel does not. The
+same reasoning applies to Reasoning, Planning, Reflection, and Learning: the
+*services* that perform them (`Reasoner`, `Planner`, `Reflector`, and the loop's
+learning cycle) are kernel contracts; the *transitions* themselves are not; their
+*outputs* (`Belief`, `Prediction`, `Action`, …) are State.
+
+### Classification
+
+| Kind | Count | Contracts |
+| --- | --- | --- |
+| **State** | 15 | Event, Observation, Attachment, Evidence, Entity, Fact, Belief, Prediction, DigitalTwin, Relationship, Project, Goal, Context, Action, Policy |
+| **Service** | 14 | Sensor, Memory, Retriever, Reasoner, Planner, Reflector, Capability, Scheduler, Agent, Journal, Storage, Synchronization, ModelRouter, Encryption |
+
+Every contract below declares its kind, then defines exactly four sections:
+**Purpose**, **Responsibilities**, **Invariants**, **Dependencies**.
 
 ---
 
@@ -58,6 +109,7 @@ Every contract below defines exactly four sections: **Purpose**,
 How information enters Orb.
 
 ## Event
+*Kind — State.*
 
 **Purpose** — The immutable atomic unit of history. Everything that ever happens
 in Orb is ultimately an Event.
@@ -78,6 +130,7 @@ in Orb is ultimately an Event.
 **Dependencies** — None. The Event is the kernel's atom.
 
 ## Observation
+*Kind — State.*
 
 **Purpose** — A recorded statement that something occurred in reality. The entry
 point of all knowledge.
@@ -96,6 +149,7 @@ point of all knowledge.
 **Dependencies** — Event, Attachment, Sensor.
 
 ## Sensor
+*Kind — Service.*
 
 **Purpose** — The boundary through which information from the Reality Plane enters
 Orb.
@@ -116,6 +170,7 @@ Orb.
 **Dependencies** — Observation, Attachment.
 
 ## Attachment
+*Kind — State.*
 
 **Purpose** — Immutable raw content (a photo, audio clip, file, message body)
 that an Observation or Evidence refers to.
@@ -139,6 +194,7 @@ that an Observation or Evidence refers to.
 How Orb understands reality.
 
 ## Evidence
+*Kind — State.*
 
 **Purpose** — A signal that supports or contradicts an Observation. The grounding
 of all interpretation.
@@ -156,6 +212,7 @@ of all interpretation.
 **Dependencies** — Observation, Event, Attachment.
 
 ## Entity
+*Kind — State.*
 
 **Purpose** — A resolved subject of interpretation: a person, place,
 organization, device, or thing.
@@ -173,6 +230,7 @@ organization, device, or thing.
 **Dependencies** — Evidence, Belief.
 
 ## Fact
+*Kind — State.*
 
 **Purpose** — An interpretation currently treated as settled given the evidence —
 settled until contradicted, not eternal truth.
@@ -190,6 +248,7 @@ settled until contradicted, not eternal truth.
 **Dependencies** — Evidence, Entity.
 
 ## Belief
+*Kind — State.*
 
 **Purpose** — An interpretation held with uncertainty.
 
@@ -207,6 +266,7 @@ settled until contradicted, not eternal truth.
 **Dependencies** — Evidence, Entity, Reasoner.
 
 ## Prediction
+*Kind — State.*
 
 **Purpose** — A belief about the future: an interpretation projected forward in
 time.
@@ -230,6 +290,7 @@ time.
 How Orb models the user.
 
 ## DigitalTwin
+*Kind — State.*
 
 **Purpose** — Orb's current best model of the user and their world.
 
@@ -247,6 +308,7 @@ How Orb models the user.
 **Dependencies** — Entity, Fact, Belief, Relationship, Project, Goal, Context.
 
 ## Relationship
+*Kind — State.*
 
 **Purpose** — A modeled connection between entities (knows, works-with,
 located-at, and so on).
@@ -262,6 +324,7 @@ located-at, and so on).
 **Dependencies** — Entity, Belief.
 
 ## Project
+*Kind — State.*
 
 **Purpose** — A coherent body of the user's ongoing work or intent that spans
 time.
@@ -277,6 +340,7 @@ time.
 **Dependencies** — Goal, Entity, Belief.
 
 ## Goal
+*Kind — State.*
 
 **Purpose** — A desired future state the user, or Orb on their behalf, intends to
 bring about.
@@ -294,6 +358,7 @@ bring about.
 **Dependencies** — Belief, Context.
 
 ## Context
+*Kind — State.*
 
 **Purpose** — The current situational frame: what is salient now — time, place,
 activity, attention.
@@ -314,9 +379,12 @@ activity, attention.
 
 # 4. Intelligence
 
-How Orb reasons.
+How Orb reasons. Every contract in this domain is a **Service**: it *performs* a
+transition (reasoning, retrieval, planning, reflection) but is not itself the
+transition. The transitions are not kernel contracts; their outputs are State.
 
 ## Memory
+*Kind — Service.*
 
 **Purpose** — The unified read interface over history and interpretation that
 intelligence draws upon.
@@ -332,6 +400,7 @@ intelligence draws upon.
 **Dependencies** — Journal, Evidence, DigitalTwin.
 
 ## Retriever
+*Kind — Service.*
 
 **Purpose** — Selects the relevant subset of memory for a reasoning task.
 
@@ -347,9 +416,11 @@ intelligence draws upon.
 **Dependencies** — Memory, Context.
 
 ## Reasoner
+*Kind — Service.*
 
 **Purpose** — Derives new interpretation from evidence. The seat of model-backed
-intelligence.
+intelligence. (Performs the *Reasoning* transition; the transition is not a
+kernel contract — its outputs, Beliefs, are.)
 
 **Responsibilities**
 - Consume interpretation and evidence and produce interpretation.
@@ -365,9 +436,11 @@ intelligence.
 **Dependencies** — Memory, ModelRouter, Belief, Evidence.
 
 ## Planner
+*Kind — Service.*
 
-**Purpose** — Produces explainable decisions: ordered intended actions toward a
-goal.
+**Purpose** — Produces explainable plans: ordered intended actions toward a goal.
+(Performs the *Planning* transition; the resulting *Decision* is a transition,
+captured only as Event, provenance, and Action.)
 
 **Responsibilities**
 - Consume interpretation plus a goal and emit a plan of intended actions.
@@ -375,16 +448,18 @@ goal.
 - Record reasoning provenance and consider alternatives.
 
 **Invariants**
-- Produces interpretation (a decision), not execution.
+- Produces a plan (interpretation), not execution.
 - Every plan is explainable and grounded.
 - Planning never acts; execution requires permission.
 
 **Dependencies** — Goal, Memory, Reasoner, Capability.
 
 ## Reflector
+*Kind — Service.*
 
 **Purpose** — Compares expected outcomes against actual observations and feeds
-learning.
+learning. (Performs the *Reflection* and *Learning* transitions; their outputs
+are revised Beliefs and new Observations.)
 
 **Responsibilities**
 - Evaluate predictions and decisions against later observations.
@@ -405,6 +480,7 @@ learning.
 How Orb affects the world.
 
 ## Capability
+*Kind — Service.*
 
 **Purpose** — A permissioned ability to affect the world. The only path from Orb
 to Reality.
@@ -422,13 +498,14 @@ to Reality.
 **Dependencies** — Action, Policy.
 
 ## Action
+*Kind — State.*
 
-**Purpose** — The execution of a decision through a capability. The unit of
-effect on Reality.
+**Purpose** — The recorded execution of a decision through a capability. The
+unit of effect on Reality, captured as history.
 
 **Responsibilities**
 - Bind to the decision that triggered it.
-- Invoke a capability to produce an effect.
+- Record the capability invoked and the effect produced.
 - Produce a recorded outcome observation.
 
 **Invariants**
@@ -436,16 +513,17 @@ effect on Reality.
 - Recorded back as an observation; never silent.
 - Irreversible effects require explicit, scoped authorization.
 
-**Dependencies** — Capability, Planner, Policy.
+**Dependencies** — Capability, Policy.
 
 ## Policy
+*Kind — State.*
 
-**Purpose** — The rules that govern what may be done, by whom, and under what
-authorization.
+**Purpose** — The declarative rules that govern what may be done, by whom, and
+under what authorization.
 
 **Responsibilities**
 - Define permission tiers and authorization requirements.
-- Gate capabilities and actions.
+- Provide the rules that gate capabilities and actions.
 - Encode the constraints that preserve human agency.
 
 **Invariants**
@@ -457,6 +535,7 @@ authorization.
 **Dependencies** — Capability.
 
 ## Scheduler
+*Kind — Service.*
 
 **Purpose** — Owns execution: selects and dispatches runtime work across the
 loop.
@@ -474,6 +553,7 @@ loop.
 **Dependencies** — Agent, Policy.
 
 ## Agent
+*Kind — Service.*
 
 **Purpose** — A worker that advances loop stages under the scheduler's direction.
 
@@ -492,9 +572,11 @@ loop.
 
 # 6. Infrastructure
 
-The services every runtime depends upon.
+The services every runtime depends upon. Every contract in this domain is a
+**Service**.
 
 ## Journal
+*Kind — Service.*
 
 **Purpose** — The append-only log of events. The single source of truth.
 
@@ -511,6 +593,7 @@ The services every runtime depends upon.
 **Dependencies** — Event, Storage, Encryption.
 
 ## Storage
+*Kind — Service.*
 
 **Purpose** — Durable on-device persistence for the journal and its derived
 projections.
@@ -528,6 +611,7 @@ projections.
 **Dependencies** — Encryption.
 
 ## Synchronization
+*Kind — Service.*
 
 **Purpose** — Replicates immutable lanes between equal-peer devices without
 authority.
@@ -546,6 +630,7 @@ authority.
 **Dependencies** — Journal, Event, Encryption.
 
 ## ModelRouter
+*Kind — Service.*
 
 **Purpose** — Selects and routes reasoning to interchangeable model backends.
 
@@ -562,6 +647,7 @@ authority.
 **Dependencies** — Policy, Encryption.
 
 ## Encryption
+*Kind — Service.*
 
 **Purpose** — Protects data at rest and in transit. The cryptographic substrate
 of trust.
@@ -582,15 +668,18 @@ of trust.
 
 ## Kernel-Wide Properties
 
+- **Two kinds only.** Every kernel contract is **State** (persistent information)
+  or **Service** (runtime infrastructure). Transitions are not kernel contracts;
+  they live in the Runtime Loop, and only their outputs — State — are stored.
 - **Truth flows one way.** Reality → Knowledge → Identity inform Intelligence,
   which drives Execution, which acts on Reality and is observed anew. No contract
   short-circuits the loop.
-- **History is sacred.** Every contract that touches history may only append.
-  Interpretation contracts are always recomputable.
+- **History is sacred.** Every State contract that touches history may only
+  append; interpretation State is always recomputable.
 - **Nothing hardcodes a model or a provider.** Intelligence and Infrastructure
-  are model-independent by contract.
-- **Everything is grounded.** Every Knowledge and Identity contract references
-  evidence; every Execution contract records its effect.
+  services are model-independent by contract.
+- **Everything is grounded.** Every Knowledge and Identity State contract
+  references evidence; every Execution effect is recorded.
 - **The kernel is closed under the constitution.** No contract may be specified or
   implemented in a way that violates `CONSTITUTION.md`.
 
