@@ -98,7 +98,60 @@ replaying the journal.
 
 ---
 
-## 5. Determinism Boundary
+## 5. The Three Planes
+
+Orthogonal to the History/Interpretation split, Orb is organized into three
+**planes**. This separation appears consistently throughout the architecture.
+
+| Plane | Contains |
+| --- | --- |
+| **Reality Plane** | The external world: sensors, files, messages, calendar, location, audio, browser. |
+| **Knowledge Plane** | Event Journal, Evidence Graph, Digital Twin, Beliefs, Predictions. |
+| **Execution Plane** | Agents, Capabilities, Actions, Schedulers, Policies. |
+
+Information flows continuously between the planes:
+
+```
+Reality ──Sense/Observe──▶ Knowledge ──Plan──▶ Execution ──Act──▶ Reality
+   ▲                                                                  │
+   └──────────── recorded back as Observation (Reflect/Learn) ────────┘
+```
+
+Only the **Execution Plane** acts on Reality, and only through permissioned
+Capabilities. The **Knowledge Plane** holds no power to act and never reaches
+into Reality directly. The **Execution Plane** holds no truth; it reads Knowledge
+and writes back only by producing new observations.
+
+The History plane (§2) lives entirely within the Knowledge Plane; the
+Interpretation plane spans Knowledge (beliefs) and Execution (decisions).
+
+---
+
+## 6. Dynamics: The Runtime Loop
+
+Orb is **not a database**. It is a continuously running runtime — a
+**continuous-observation system, not a request-response system**. Everything in
+Orb exists to serve one or more stages of a single, never-ending loop that moves
+information between the three planes:
+
+```
+Sense → Observe → Record → Extract → Link → Understand → Plan → Act → Reflect → Learn → (Sense …)
+```
+
+The runtime — not agents — owns execution and scheduling. *Agents do not wake
+randomly; the runtime schedules work and agents are workers.* A user request is
+not a special path; it is simply another signal that enters at **Sense**.
+
+> Constitutional invariant: *Nothing is "live." Everything is eventually observed;
+> everything eventually becomes evidence, knowledge, and action.*
+
+The full execution model — scheduling, priorities, event propagation, background
+execution, retries, idempotency, reflection, learning, and maintenance — is
+defined in `RUNTIME_LOOP.md`.
+
+---
+
+## 7. Determinism Boundary
 
 There is exactly one boundary in Orb where determinism ends:
 
@@ -118,7 +171,7 @@ model is non-deterministic; the *record that it ran and produced X* is permanent
 
 ---
 
-## 6. Distribution Model (summary)
+## 8. Distribution Model (summary)
 
 Orb is fundamentally a distributed system of **equal peers** (e.g. a Mac and a
 Pixel). No device is authoritative.
@@ -133,7 +186,7 @@ Full treatment in `EVENT_MODEL.md` and `SYNC_PROTOCOL.md`.
 
 ---
 
-## 7. Model Independence (summary)
+## 9. Model Independence (summary)
 
 Reasoning engines are interchangeable. A model is invoked through a `Reasoner`
 interface and contributes intelligence, but never defines the architecture.
@@ -142,10 +195,11 @@ history — including the outputs of prior models — intact. See `AGENT_RUNTIME
 
 ---
 
-## 8. Document Map
+## 10. Document Map
 
 | Document | Defines |
 | --- | --- |
+| `RUNTIME_LOOP.md` | The continuous execution model, scheduling, and the three planes in motion. |
 | `EVENT_MODEL.md` | The event, lanes, HLC ordering, model-output provenance. |
 | `EVIDENCE_GRAPH.md` | How observations link to evidence and provenance. |
 | `DIGITAL_TWIN.md` | The recomputable interpretation layer (facts, beliefs, entities). |
@@ -158,7 +212,7 @@ history — including the outputs of prior models — intact. See `AGENT_RUNTIME
 
 ---
 
-## 9. Invariants Asserted Here
+## 11. Invariants Asserted Here
 
 1. The Event Journal is the only source of truth.
 2. History is immutable and append-only.
@@ -166,3 +220,7 @@ history — including the outputs of prior models — intact. See `AGENT_RUNTIME
 4. No device is authoritative.
 5. Model outputs are observations, not truth.
 6. Every interpretation traces to evidence; every decision is explainable.
+7. Orb is a continuous-observation runtime, not request-response; nothing is
+   "live" — everything is eventually observed, recorded, understood, and acted on.
+8. Information flows Reality → Knowledge → Execution → Reality; only the Execution
+   Plane acts on Reality, and only through permissioned Capabilities.
