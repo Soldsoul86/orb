@@ -5,7 +5,7 @@ Contract:   Event
 Domain:     Reality
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: (none — the kernel's atom)
 ```
 

@@ -5,7 +5,7 @@ Contract:   Observation
 Domain:     Reality
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Event, Attachment
 ```
 
@@ -42,7 +42,30 @@ Whether it *means* anything (that John matters, that the time is right) is
 interpretation, decided later and revisably, never by the Observation itself.
 
 Every Observation is realized as an Event; the Observation is the *meaning of an
-Event whose type is observation*.
+Event whose type is observation*. But the converse does not hold: **Observations
+originate from reality; Events originate from runtime activity.** Many
+Observations produce Events; not every Event produces an Observation. A reasoning
+step, a plan, or an Action's *issuance* are runtime activity — recorded as Events,
+not Observations. Reality is updated only when a Sensor *confirms* something
+occurred. Orb never assumes an Action changed reality.
+
+### Confidence of Reality
+
+An Observation owns **confidence, not truth**. Truth never exists inside Orb;
+what exists is *how strongly a source vouches for what it perceived*. Every
+Observation carries a `confidence` in `[0, 1]` — the **Confidence of Reality** —
+naming the reliability of the perception at the moment it was recorded:
+
+| Source                         | Typical confidence |
+| ------------------------------ | ------------------ |
+| GPS fix                        | ~0.97              |
+| OCR of a document              | ~0.74              |
+| LLM-extracted claim            | ~0.41              |
+| Direct manual entry by user    | 1.00               |
+
+Confidence is *recorded*, never *resolved*: it is part of history, not a verdict.
+A high confidence is still not truth, and a low confidence is still faithfully
+kept — interpretation (Evidence → Belief) weighs confidence later, revisably.
 
 ---
 
@@ -87,8 +110,15 @@ the earlier one. The earlier Observation's state never changes.
    provenance of its Event.
 5. **References, never copies.** Raw content is referenced as Attachments by
    content hash, never inlined mutably.
-6. **History plane only.** An Observation contains no interpretation, belief, or
-   confidence.
+6. **Originates from reality.** Observations originate from reality; Events
+   originate from runtime activity. Many Observations produce Events; not every
+   Event produces an Observation. Reality is updated only through observation —
+   Orb never assumes an Action changed reality; the loop closes only when a Sensor
+   confirms it.
+7. **Carries confidence, not truth.** Every Observation records a `confidence` in
+   `[0, 1]` (the Confidence of Reality) describing the reliability of the
+   perception. It never records resolved truth, belief, or interpretation;
+   confidence is faithfully kept and never silently upgraded to certainty.
 
 Upholds Constitution Articles I (History) and II (Truth and Interpretation).
 
@@ -154,6 +184,14 @@ Observation; asserting truth from within an Observation.
   is contradicted today by GPS placing the user elsewhere at 1 PM. A new
   Observation records the GPS fact; the calendar Observation is untouched; the
   Evidence Graph records the contradiction; the Twin revises its belief.
-- **An action outcome.** After Orb sends a message, the act is recorded back as an
-  Observation ("message sent to John at 4:10 PM, ref #..."), closing the runtime
-  loop.
+- **An action outcome.** After Orb sends a message, the act of *issuing* it is a
+  runtime Event. Reality is only updated when a Sensor later *confirms* delivery —
+  recorded as an Observation ("message delivered to John at 4:10 PM, ref #...")
+  attributed to the action-outcome sensor. The loop closes on confirmation, not on
+  issuance.
+- **Confidence of Reality.** The same place can be observed at different
+  confidences: a GPS fix records "device at 12.97°N, 77.59°E" with `confidence
+  0.97`; an OCR of a printed itinerary records the same address at `0.74`; an
+  LLM-extracted "user seems to be in Bangalore" at `0.41`; the user typing their
+  own location records `1.00`. All four are kept faithfully; none is "true."
+  Interpretation weighs them later.

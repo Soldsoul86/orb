@@ -160,5 +160,23 @@ pressure of short-term convenience.
 
 ---
 
+## Article XI — Reality and Confidence
+
+40. **Observations originate from reality; Events originate from runtime
+    activity.** Many Observations produce Events; not every Event produces an
+    Observation. A reasoning step, a plan, or the issuance of an Action are
+    runtime activity recorded as Events — they are not, in themselves,
+    Observations. *(`Observation.md`)*
+41. **Reality is updated only through observation.** Orb never assumes an Action
+    changed reality. The runtime loop closes only when a Sensor confirms that
+    reality occurred as expected; an issued Action that is never confirmed never
+    updates reality. *(`RUNTIME_LOOP.md`)*
+42. **An Observation owns confidence, not truth.** Every Observation carries a
+    Confidence of Reality in `[0, 1]` describing the reliability of its
+    perception. Truth never exists inside Orb; confidence is recorded faithfully,
+    never resolved into certainty and never silently upgraded. *(`Observation.md`)*
+
+---
+
 > The architecture is permanent. The implementation is replaceable.
 > When in doubt, preserve history, preserve provenance, preserve human agency.

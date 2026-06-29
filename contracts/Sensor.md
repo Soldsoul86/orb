@@ -5,7 +5,7 @@ Contract:   Sensor
 Domain:     Reality
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Observation, Attachment
 ```
 

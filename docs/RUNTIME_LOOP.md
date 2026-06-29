@@ -56,6 +56,42 @@ The loop is **continuous and never terminates**. It is not triggered by a user
 request; it runs because Orb is always observing. A user request is just another
 signal that enters at **Sense**.
 
+> **The loop closes only when reality confirms execution.** *Act* issues an
+> effect, but issuing is runtime activity (an Event), not a change to reality.
+> Orb never assumes an Action changed the world. Reality is updated only when a
+> Sensor *observes* the effect — the new Observation re-enters at **Sense**, and
+> only then is the loop closed for that intent. An issued Action that is never
+> confirmed leaves reality un-updated; *Reflect* records the gap. (Constitution
+> Article XI; `Observation.md`.)
+
+---
+
+## 2a. The Three Loops
+
+The single loop above is the **outer skin** of three nested feedback loops that
+together make Orb adaptive. Each runs at a different timescale and over a
+different substrate, but all are expressed through the same stages and the same
+immutable journal.
+
+| Loop | Question it answers | Path | Substrate |
+| --- | --- | --- | --- |
+| **External (reality) loop** | Did the world change as intended? | Reality → Observation → Knowledge → Action → Reality | the world + observations |
+| **Learning (belief) loop** | What should I now believe? | Events → Evidence → Beliefs → Predictions → new Beliefs | the Digital Twin |
+| **Self-improvement (runtime) loop** | How should I run better? | Runtime → Reflection → Optimization → Runtime | the runtime itself |
+
+- The **external loop** is the fastest-visible: sense, act, re-sense. It closes
+  only on confirmation (above), never on issuance.
+- The **learning loop** is slower and internal: accumulated Evidence revises
+  Beliefs, which sharpen Predictions, which become Evidence to revise again. It
+  rewrites understanding, never history (`DIGITAL_TWIN.md` §Belief Revision).
+- The **self-improvement loop** is slowest: Reflection on the runtime's own
+  behavior (latency, deferral, accuracy of expectation) feeds optimization of how
+  the runtime schedules and acts — improving the machine that runs the other two.
+
+These three are not separate machinery; they are three *readings* of the one
+loop, each closing through history. This section names them; their full treatment
+is deferred to a dedicated document.
+
 ---
 
 ## 3. The Three Planes

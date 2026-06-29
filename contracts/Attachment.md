@@ -5,7 +5,7 @@ Contract:   Attachment
 Domain:     Reality
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Storage, Encryption
 ```
 

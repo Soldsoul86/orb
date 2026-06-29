@@ -66,19 +66,19 @@ State (15) and Service (14), grouped by domain. Status tracks Phase 3b review.
 ### 1. Reality
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [Event](Event.md) | State | Draft |
-| [Observation](Observation.md) | State | Draft |
-| [Attachment](Attachment.md) | State | Draft |
-| [Sensor](Sensor.md) | Service | Draft |
+| [Event](Event.md) | State | Accepted |
+| [Observation](Observation.md) | State | Accepted |
+| [Attachment](Attachment.md) | State | Accepted |
+| [Sensor](Sensor.md) | Service | Accepted |
 
 ### 2. Knowledge
 | Contract | Kind | Status |
 | --- | --- | --- |
-| Evidence | State | _pending_ |
-| Entity | State | _pending_ |
-| Fact | State | _pending_ |
-| Belief | State | _pending_ |
-| Prediction | State | _pending_ |
+| [Evidence](Evidence.md) | State | Draft |
+| [Entity](Entity.md) | State | Draft |
+| [Fact](Fact.md) | State | Draft |
+| [Belief](Belief.md) | State | Draft |
+| [Prediction](Prediction.md) | State | Draft |
 
 ### 3. Identity
 | Contract | Kind | Status |

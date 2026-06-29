@@ -139,12 +139,19 @@ point of all knowledge.
 - Assert that something happened, without asserting it is true.
 - Attribute itself to the source/sensor that produced it.
 - Reference any raw Attachments it concerns.
+- Carry a **Confidence of Reality** (`[0, 1]`) describing the reliability of the
+  perception (e.g. GPS ~0.97, OCR ~0.74, LLM-extracted ~0.41, manual 1.00).
 - Become part of history by being recorded as an Event.
 
 **Invariants**
 - Immutable; belongs to the History plane.
 - Records occurrence, never resolved truth.
 - Always traceable to its source and its causal/temporal placement.
+- **Originates from reality.** Observations originate from reality; Events
+  originate from runtime activity. Many Observations produce Events; not every
+  Event produces an Observation. Reality is updated only through observation.
+- **Owns confidence, not truth.** Carries a Confidence of Reality; truth never
+  exists inside Orb. (Constitution Article XI.)
 
 **Dependencies** — Event, Attachment. (Attributed to a *source identity* — a
 value, not the `Sensor` contract — which may be a Sensor, an Action, or an import.
