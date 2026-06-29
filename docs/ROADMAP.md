@@ -29,34 +29,36 @@ Repository structure and governance, versioned from day one.
 
 ---
 
-## Phase 1 — Architectural Documents  ◀ current
+## Phase 1 — Architectural Documents  ✅ complete
 
-The ten `/docs` specifications that define the architecture, with the three
-frozen decisions incorporated (HLC ordering, replay-vs-determinism, license
-deferred).
+The `/docs` specifications that define the architecture, with the three frozen
+decisions incorporated (HLC ordering, replay-vs-determinism, license deferred).
 
-- `SYSTEM_OVERVIEW`, `EVENT_MODEL`, `EVIDENCE_GRAPH`, `DIGITAL_TWIN`,
-  `AGENT_RUNTIME`, `CAPABILITY_MODEL`, `STORAGE`, `SYNC_PROTOCOL`, `SECURITY`,
-  `ROADMAP`.
+- `SYSTEM_OVERVIEW`, `RUNTIME_LOOP`, `EVENT_MODEL`, `EVIDENCE_GRAPH`,
+  `DIGITAL_TWIN`, `AGENT_RUNTIME`, `CAPABILITY_MODEL`, `STORAGE`,
+  `SYNC_PROTOCOL`, `SECURITY`, `ROADMAP`.
+- **Amendment:** `RUNTIME_LOOP.md` added to define the system's *dynamics* — the
+  continuous Sense→…→Learn loop, the three planes (Reality / Knowledge /
+  Execution), and "nothing is live." `SYSTEM_OVERVIEW` updated to reference them.
 
-**Gate:** documents reviewed and accepted before any constitution ratification or
-code. *Awaiting review.*
+**Gate:** documents reviewed and accepted. *Passed.*
 
 ---
 
-## Phase 2 — Constitution
+## Phase 2 — Constitution  ✅ complete
 
-Ratify `CONSTITUTION.md`: the immutable laws of Orb. Includes the laws decided
-during Phase 1 framing (separate history from interpretation; Orb stores no
-truth; replay reproduces history not intelligence; model outputs are
-observations; devices are equal peers).
+`CONSTITUTION.md` ratified: 36 laws across nine articles (History; Truth and
+Interpretation; Models and Reasoning; Distribution; The Runtime; The Three
+Planes; Capabilities and Human Agency; Ownership and Trust; Engineering).
+Includes the laws decided during Phase 1 framing and the continuous-observation /
+three-planes invariants from the Phase 1 amendment.
 
 **Gate:** constitution ratified. It changes rarely thereafter; everything follows
-it.
+it. *Passed.*
 
 ---
 
-## Phase 3 — Contracts
+## Phase 3 — Contracts  ◀ current
 
 Freeze interfaces only — no business logic — so the shape is fixed before
 implementation:

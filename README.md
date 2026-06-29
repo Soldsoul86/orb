@@ -15,8 +15,10 @@ Its architecture is local-first, model-independent and built to evolve for decad
 
 ## Status
 
-**Phase 0 — Foundation.** Repository structure and governing documents only.
-No implementation yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) once authored.
+**Phase 3 — Contracts (current).** Phases 0–2 complete: repository foundation,
+the eleven architecture documents in [`docs/`](docs/), and the ratified
+[`CONSTITUTION.md`](CONSTITUTION.md). Next: freeze interfaces before any
+implementation. No executable code yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Governing Documents
 
