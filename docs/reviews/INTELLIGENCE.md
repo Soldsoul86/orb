@@ -2,14 +2,47 @@
 
 > Phase 3b architectural review. The Intelligence domain answers one question:
 > **how does Orb transform knowledge into understanding, decisions, and plans?**
-> **Status: Design proposal — held for acceptance.** This is a design-judgment
-> review, not a spec-writing pass: its recommendations *remove* two already-drafted
-> contracts (one of which ripples into the frozen Identity domain) and *add* one, so
-> no spec is written and `KERNEL.md` is not mutated until you accept the shape below.
+> **Status: Accepted — decisions frozen; reviewer clarifications applied.** The kernel,
+> the four contract specs (`InferenceRecord`, `Retriever`, `Reasoner`, `Planner`), and
+> all doc counts are updated to match.
 >
 > Candidate contracts evaluated (per the directive, "do not assume all five belong"):
 > **Retriever, Reasoner, Planner, InferenceRecord, Claim** — plus the two contracts
-> the draft kernel currently parks in this domain, **Memory** and **Reflector**.
+> the draft kernel parked in this domain, **Memory** and **Reflector**.
+
+---
+
+## 0. Acceptance — decisions frozen
+
+The reviewer accepted the review and froze these decisions:
+
+- ✅ **Remove `Memory`** — *memory is an emergent property of the Knowledge Plane, not a
+  kernel contract.* (Semantic = Evidence Graph + Twin; episodic = Journal; working =
+  ephemeral; recall = `Retriever`.)
+- ✅ **Remove `Reflector`** — reflection is a *behavior*, not a noun: `Prediction` →
+  `Observation` → difference → `Reasoner` → `InferenceRecord` → belief update. No
+  dedicated state.
+- ✅ **Keep `InferenceRecord` as the only State contract** — what survives twenty years
+  is not the model or the prompt but *"on this date, using this evidence, this reasoning
+  produced this conclusion."* That is history; history is State.
+- ✅ **Keep `Retriever`, `Reasoner`, `Planner` as Services** — orthogonal questions:
+  *what should I remember? / what does it mean? / what should I do?*
+- ✅ **Defer `Claim` to AD-1 (v2)** and **a durable `Plan` to AD-2.**
+
+Four clarifications were applied (all reflected below and in the contracts):
+
+1. **"Stores process" is refined to "stores reasoning provenance."** The process itself
+   is gone once execution finishes; what remains forever is *Evidence → Reasoning →
+   Decision → Confidence → Model metadata → Timestamp.* That is provenance, not process.
+2. **`InferenceRecord` is an explicit output of the `Reasoner` and an explicit input to
+   the `Planner`.** The pipeline is frozen with provenance in the middle (§1, §4).
+3. **`Planner` produces Intent/Plan; it never binds Capabilities or Actions.** The flow
+   is `Planner → Intent → Agent → Capability → Action → Observation`. The Planner does
+   not know whether an email goes via Gmail or Outlook — it expresses intent, not
+   execution detail — keeping Intelligence independent of the Execution Plane.
+4. **One kernel sentence permanently defines the domain** (now in `KERNEL.md` §4):
+   *"The Intelligence Plane owns no truth. It transforms knowledge into understanding and
+   records the provenance of that transformation."*
 
 ---
 
@@ -21,11 +54,16 @@ from all three: it is **the transformation layer** — the active process that t
 standing knowledge into understanding, decisions, and plans. It is where the runtime
 *thinks*.
 
-The defining property follows from that, and it is the spine of the whole domain:
+The defining property follows from that, and it is the spine of the whole domain — and
+the permanent sentence now frozen into `KERNEL.md` §4:
 
-> **Intelligence owns no truth. It stores process, not products.**
+> **The Intelligence Plane owns no truth. It transforms knowledge into understanding and
+> records the provenance of that transformation.**
 
-Every *product* of thinking already has a home in an accepted domain:
+It stores **reasoning provenance, not process** — the process is gone the instant a run
+finishes; what remains forever is *Evidence → Reasoning → Decision → Confidence → Model
+metadata → Timestamp.* Every *product* of thinking already has a home in an accepted
+domain:
 
 - an **understanding** is a **Belief** or a **Fact** (Knowledge);
 - an expectation is a **Prediction** (Knowledge);
@@ -48,20 +86,31 @@ domain is a **Service** — a running capability that reads durable state, invok
 model through the `ModelRouter`, writes its products into other domains, and leaves
 behind only Inference Records.
 
-The pipeline the domain implements, end to end:
+The pipeline the domain implements, end to end — with provenance made explicit in the
+middle (clarification 2): the `Planner` consumes the **recorded** decision, never
+transient reasoning.
 
 ```
-Situation        Relevance         Understanding/Decision      Plan
-(LiveContext) → (Retriever)    →   (Reasoner)              →  (Planner)  →  [Execution]
- Identity        Intelligence       Intelligence               Intelligence
-   "what          "given that,       "what does it mean,         "how, concretely,
-   matters         what history       and what should            could that be
-   now?"           is relevant?"      we conclude/decide?"        carried out?"
+Situation        Relevance      Understanding/Decision   (recorded)        Plan
+(LiveContext) → (Retriever) →   (Reasoner)            → InferenceRecord → (Planner) → [Execution]
+ Identity        Intelligence    Intelligence            Intelligence       Intelligence
+   "what          "given that,    "what does it mean,     "the durable       "how, as intent"
+   matters         what history    and what should         record of how
+   now?"           is relevant?"   we conclude/decide?"    we decided"
 ```
 
-Each stage consumes the previous stage's output and the durable planes beneath it,
-and each stage's *reasoning* is recorded as an Inference Record. The products flow
-**outward** (Beliefs, Predictions, Decisions→Actions); the provenance stays here.
+Each stage consumes the previous stage's output and the durable planes beneath it; the
+`Reasoner` *emits* an `InferenceRecord` for every run, and the `Planner` *consumes* it.
+The products flow **outward** (Beliefs, Predictions, Decisions→Actions); the provenance
+stays here. And the chain does not end at the Planner — it produces *intent*, which
+Execution carries (clarification 3):
+
+```
+Planner → Intent → Agent → Capability → Action → Observation
+```
+
+The Planner expresses *what* to do; the `Agent` binds *how* (which capability/provider)
+and gates it through Policy. Intelligence never binds capabilities and never acts.
 
 ---
 
@@ -97,7 +146,7 @@ The two boundaries flagged in the Identity review are resolved here:
   above — *situation* vs. *relevance-within-situation*. They are not merged.
 - **Identity Q3 (IdentityEvolution ↔ InferenceRecord):** confirmed — IdentityEvolution
   **references** an Inference Record (the reasoning that drove a self-model change);
-  it never embeds or duplicates it. The forthcoming `InferenceRecord` contract is the
+  it never embeds or duplicates it. The `InferenceRecord` contract defined here is the
   referent that Identity already points to.
 
 The clean statement of the domain's outer edges:
@@ -259,9 +308,15 @@ InferenceRecord → Evidence*        (references inputs & outputs by identity; s
 Retriever (Service) → LiveContext*, Evidence*, DigitalTwin*, Journal*
 Reasoner  (Service) → Retriever, DigitalTwin*, Belief*, Evidence*, ModelRouter*
                        ⇒ emits: InferenceRecord, Belief*, Prediction*, IdentityEvolution*
-Planner   (Service) → Reasoner, Goal*
-                       ⇒ emits: InferenceRecord ; exposes decisions ⇒ [Execution]
+Planner   (Service) → InferenceRecord, Goal*   (consumes recorded reasoning, not the live Reasoner)
+                       ⇒ emits: InferenceRecord ; exposes intent ⇒ [Execution: Agent]
 ```
+
+> *Clarification 2 applied — provenance in the middle.* The `Planner` depends on the
+> **`InferenceRecord`** (a State contract), not on the live `Reasoner`. A plan is always
+> traceable to the *recorded* decision it sequenced; planning never consumes transient
+> reasoning. This both preserves auditability and removes the only Service→Service edge
+> the Planner would otherwise have had.
 
 ```
    accepted planes (State):   Evidence  Belief  Goal  DigitalTwin   Journal/ModelRouter
@@ -277,14 +332,16 @@ Planner   (Service) → Reasoner, Goal*
    │       │ (referenced by)          │                        ▼
    │  IdentityEvolution*              ▼                   LiveContext* (Identity)
    │  (Identity, accepted)      ┌──────────┐
-   │                            │ Planner  │── decisions ──▶ [Execution: Agent]
+   │   InferenceRecord ────────▶│ Planner  │── intent ──▶ [Execution: Agent]
    │                            └──────────┘
 ```
 
-The single State node (`InferenceRecord`) is a sink with one backward edge. The three
-Services form a clean linear consumption chain `LiveContext → Retriever → Reasoner →
-Planner`, each also reading durable planes directly. **Execution depends backward on
-Intelligence** (Agent → Planner/Reasoner), never the reverse.
+The single State node (`InferenceRecord`) is the domain's pivot: the `Reasoner` emits it,
+and the `Planner` consumes it — so the chain is `LiveContext → Retriever → Reasoner →
+InferenceRecord → Planner`, with provenance recorded in the middle. Each Service also
+reads durable planes directly. **Execution depends backward on Intelligence** (Agent →
+Planner/Reasoner) and carries the Planner's *intent* outward to Capability/Action, never
+the reverse.
 
 ---
 
@@ -370,26 +427,28 @@ Net: four permanent contracts, each replaceable in implementation, none in contr
 
 **Totals: 30 contracts — 17 State, 13 Service** (down from 31 = 16 State + 15 Service).
 
-Dependency re-pointing required in `KERNEL.md` once accepted:
+Dependency re-pointing applied in `KERNEL.md`:
 
 1. `Reasoner` deps → `Retriever, DigitalTwin, Belief, Evidence, ModelRouter`;
    **produces `InferenceRecord`** (replaces the prose "produces Inference Records"
    with a named State contract).
 2. `Retriever` deps → `LiveContext, Evidence, DigitalTwin, Journal` (was `Memory,
    LiveContext`).
-3. `Planner` deps → `Reasoner, Goal` (drop `Memory`; **drop `Capability`** — capability
-   binding moves to Execution's Agent, per §2/Art. VI §25).
+3. `Planner` deps → **`InferenceRecord, Goal`** (clarification 2: consumes *recorded*
+   reasoning, not the live `Reasoner`; drop `Memory`; **drop `Capability`** — capability
+   binding moves to Execution's Agent, per §2/Art. VI §25 — clarification 3).
 4. **Remove `Memory`** and re-point its former dependents:
    - `LiveContext` (Identity, **frozen**) dep `Memory → DigitalTwin`.
    - `Agent` (Execution) dep list drops `Memory` (Agent → `Scheduler, Reasoner,
-     Planner, Capability`).
-5. **Remove `Reflector`** (leaf — no dependents); document the reflection loop in
-   `RUNTIME_LOOP.md` as a scheduled Reasoner invocation.
-6. Add `InferenceRecord` to the Identity domain's forward references (`IdentityEvolution
-   → … InferenceRecord`) — this *closes* the Identity follow-up Q3, turning a
-   "(forthcoming)" reference into a real contract.
+     Planner, Capability`); the Agent is also named as the binder of plan intent.
+5. **Remove `Reflector`** (leaf — no dependents); the reflection loop is documented in
+   `RUNTIME_LOOP.md` §11 as a scheduled `Reasoner` invocation over a
+   `Prediction`↔`Observation` gap.
+6. `IdentityEvolution` (Identity, frozen) dep `InferenceRecord (forthcoming)` →
+   `InferenceRecord` — this *closes* Identity follow-up Q3, turning a "(forthcoming)"
+   reference into a real contract.
 
-Downstream doc count updates (on acceptance): `README.md`, `ROADMAP.md`,
+Downstream doc counts updated: `contracts/README.md`, `ROADMAP.md`,
 `SYSTEM_OVERVIEW.md` → "30 contracts (17 State, 13 Service)".
 
 ---
@@ -435,28 +494,29 @@ principles, not a new source of them.
 
 ## Recommendation
 
-**Design proposal — held for acceptance.** The Intelligence domain resolves to the
-**smallest kernel that still implements the full transform** knowledge → understanding
-→ decisions → plans:
+**Accepted — decisions frozen; clarifications applied.** The Intelligence domain resolves
+to the **smallest kernel that still implements the full transform** knowledge →
+understanding → decisions → plans:
 
 - **ACCEPT** `InferenceRecord` *(State)*, `Retriever`, `Reasoner`, `Planner`
-  *(Service)* — four contracts.
-- **REMOVE** `Memory` (a synonym for the Knowledge Plane; recall = Retriever) and
-  `Reflector` (composed behavior, not a contract).
-- **REJECT for v1** `Claim` (AD-1) and a durable `Plan` contract (AD-2).
-- **Kernel shrinks 31 → 30** (17 State, 13 Service). **No Constitution amendment.**
-- **Resolves Identity follow-ups Q2** (LiveContext ↔ Retriever boundary drawn:
+  *(Service)* — four contracts, specs written under `contracts/`.
+- **REMOVE** `Memory` (an emergent property of the Knowledge Plane; recall = Retriever)
+  and `Reflector` (composed behavior, not a contract).
+- **REJECT for v1** `Claim` (AD-1) and a durable `Plan` contract (AD-2); reflection
+  re-promotion tracked as AD-3.
+- **Kernel shrank 31 → 30** (17 State, 13 Service). **No Constitution amendment** — the
+  domain is pure application of existing law (a permanent kernel sentence, not a new
+  article, defines it).
+- **Resolved Identity follow-ups Q2** (LiveContext ↔ Retriever boundary drawn:
   *situation* vs. *relevance-within-situation*) **and Q3** (IdentityEvolution
   *references* InferenceRecord).
 
-**Two cross-domain ripples require your approval because they touch the frozen Identity
-domain and Execution:**
-1. `LiveContext` (Identity) dependency `Memory → DigitalTwin`.
-2. `Agent` (Execution) drops `Memory`; `Planner` drops `Capability` (binding deferred
-   to Agent).
+The four clarifications are applied throughout: provenance not process; `InferenceRecord`
+as explicit Reasoner output and Planner input; Planner emits intent and never binds
+capabilities; and the frozen kernel sentence. The two cross-domain ripples were applied
+to the frozen Identity domain and Execution: `LiveContext` dep `Memory → DigitalTwin`;
+`IdentityEvolution` dep `(forthcoming) → InferenceRecord`; `Agent` drops `Memory`;
+`Planner` drops `Capability` (binding deferred to the Agent).
 
-Per the standing cadence, **`KERNEL.md`, the contract specs (`InferenceRecord.md`,
-`Retriever.md`, `Reasoner.md`, `Planner.md`), and the doc counts are NOT mutated until
-you accept this shape.** On acceptance I will write the four specs, apply the kernel
-changes and re-pointings in §8, update `RUNTIME_LOOP.md` for the reflection loop, and
-refresh the counts — then hold before the Execution domain.
+**Next:** the **Execution** domain review — held for your go-ahead per the standing
+cadence.

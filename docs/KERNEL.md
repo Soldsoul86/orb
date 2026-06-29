@@ -39,7 +39,7 @@ of an existing one.
 | 1 | **Reality** | How information enters Orb | Sensor, Observation, Attachment, Event |
 | 2 | **Knowledge** | How Orb understands reality | Evidence, Entity, Fact, Belief, Prediction |
 | 3 | **Identity** | How Orb models the user | DigitalTwin, Relationship, Project, Goal, ContextSnapshot, LiveContext, IdentityEvolution |
-| 4 | **Intelligence** | How Orb reasons | Memory, Retriever, Reasoner, Planner, Reflector |
+| 4 | **Intelligence** | How Orb reasons | InferenceRecord, Retriever, Reasoner, Planner |
 | 5 | **Execution** | How Orb affects the world | Capability, Action, Policy, Scheduler, Agent |
 | 6 | **Infrastructure** | The services every runtime depends upon | Journal, Storage, Synchronization, ModelRouter, Encryption |
 
@@ -88,16 +88,19 @@ object; its result is captured as State and provenance:
 
 The runtime may represent a Decision object internally. The kernel does not. The
 same reasoning applies to Reasoning, Planning, Reflection, and Learning: the
-*services* that perform them (`Reasoner`, `Planner`, `Reflector`, and the loop's
-learning cycle) are kernel contracts; the *transitions* themselves are not; their
-*outputs* (`Belief`, `Prediction`, `Action`, …) are State.
+*services* that perform them (`Reasoner`, `Planner`, and the loop's reflection and
+learning cycles) are kernel contracts where a permanent capability is named, but the
+*transitions* themselves are not, and not every behavior earns a contract —
+**Reflection is composed behavior** (the `Scheduler` triggers the `Reasoner` over a
+`Prediction`↔`Observation` gap), not a kernel type (`RUNTIME_LOOP.md` §11). The
+transitions' *outputs* (`Belief`, `Prediction`, `Action`, …) are State.
 
 ### Classification
 
 | Kind | Count | Contracts |
 | --- | --- | --- |
-| **State** | 16 | Event, Observation, Attachment, Evidence, Entity, Fact, Belief, Prediction, DigitalTwin, Relationship, Project, Goal, ContextSnapshot, IdentityEvolution, Action, Policy |
-| **Service** | 15 | Sensor, Memory, Retriever, Reasoner, Planner, Reflector, LiveContext, Capability, Scheduler, Agent, Journal, Storage, Synchronization, ModelRouter, Encryption |
+| **State** | 17 | Event, Observation, Attachment, Evidence, Entity, Fact, Belief, Prediction, DigitalTwin, Relationship, Project, Goal, ContextSnapshot, IdentityEvolution, InferenceRecord, Action, Policy |
+| **Service** | 13 | Sensor, Retriever, Reasoner, Planner, LiveContext, Capability, Scheduler, Agent, Journal, Storage, Synchronization, ModelRouter, Encryption |
 
 Every contract below declares its kind, then defines exactly four sections:
 **Purpose**, **Responsibilities**, **Invariants**, **Dependencies**.
@@ -496,10 +499,12 @@ of `ContextSnapshot`.
   on demand. The durable record it produces is the `ContextSnapshot`.
 - Read-only over the Twin; introduces no truth; owns no durable state.
 
-**Dependencies** — DigitalTwin, Memory. (A Service may read State; it produces, but
-does not depend on, `ContextSnapshot`. Its responsibilities sit close to `Retriever` —
-LiveContext assembles the *frame*, Retriever ranks *memory within* it — and the two
-are kept distinct in the Intelligence review.)
+**Dependencies** — DigitalTwin. (A Service may read State; it assembles the salient
+frame directly from the Twin — there is no `Memory` contract (memory is an emergent
+property of the Knowledge Plane). It produces, but does not depend on,
+`ContextSnapshot`. Its boundary with `Retriever` is drawn in the Intelligence review:
+LiveContext assembles the *frame* ("what matters now"); Retriever ranks *history
+within* it ("given that, what is relevant").)
 
 ## IdentityEvolution
 *Kind — State.*
@@ -524,124 +529,152 @@ evidence-grounded, explainable transition of identity.
 - Immutable: the entire record (before, after, evidence, inference, confidence,
   timestamp). Derived: none. Ephemeral: none.
 
-**Dependencies** — Evidence, InferenceRecord *(forthcoming — Intelligence domain)*.
-(References its subject of change by identity, as Evidence references what it bears
-upon; it never depends on the DigitalTwin, so the Twin may aggregate it without a
-cycle.)
+**Dependencies** — Evidence, InferenceRecord. (References its subject of change by
+identity, as Evidence references what it bears upon; it never depends on the
+DigitalTwin, so the Twin may aggregate it without a cycle. The `InferenceRecord` it
+references is the Intelligence-domain State contract — the reasoning that drove the
+change, referenced never duplicated.)
 
 ---
 
 # 4. Intelligence
 
-How Orb reasons. Every contract in this domain is a **Service**: it *performs* a
-transition (reasoning, retrieval, planning, reflection) but is not itself the
-transition. The transitions are not kernel contracts; their outputs are State.
+How Orb reasons — the transformation layer that turns standing knowledge into
+understanding, decisions, and plans.
 
-## Memory
-*Kind — Service.*
+> **The Intelligence Plane owns no truth. It transforms knowledge into
+> understanding and records the provenance of that transformation.**
 
-**Purpose** — The unified read interface over history and interpretation that
-intelligence draws upon.
+Every *product* of thinking lives in another domain (an understanding is a
+`Belief`/`Fact`; an expectation is a `Prediction`; a self-model revision is an
+`IdentityEvolution`; an acted decision becomes an `Action` then an `Observation`).
+What Intelligence keeps for itself is **reasoning provenance** — the immutable record
+of *how* a model arrived at a conclusion — because *replay reproduces history, not
+intelligence* (Art. III §13): a model run cannot be re-executed faithfully, so the
+fact that it ran and produced X must be recorded. That record is the one **State**
+contract here, `InferenceRecord`; the other three contracts are **Services** that
+perform transitions (retrieval, reasoning, planning) and own no durable state.
+
+Two non-contracts are deliberately excluded. **Memory is an emergent property of the
+Knowledge Plane, not a kernel contract** — semantic memory is the Evidence Graph and
+Twin, episodic memory is the Journal, working memory is ephemeral; recall is the
+`Retriever`. **Reflection is composed behavior, not a contract** — the `Scheduler`
+triggers the `Reasoner` over a `Prediction`↔`Observation` gap (`RUNTIME_LOOP.md` §11).
+
+The domain implements one pipeline, with provenance made explicit:
+
+```
+LiveContext → Retriever → Reasoner → InferenceRecord → Planner → [Execution]
+ "what          "what        "what does it     (recorded     "how, as
+ matters         history       mean / decide?"   reasoning)    intent"
+ now?"           is relevant?"
+```
+
+The Planner consumes **recorded** reasoning (the `InferenceRecord`), never transient
+reasoning — preserving replayability and auditability — and produces *intent*, never
+execution: capability binding belongs to Execution's `Agent` (Art. VI §25).
+
+## InferenceRecord
+*Kind — State.*
+
+**Purpose** — The immutable provenance of a single act of reasoning: the permanent
+record that a specific model run, over specific inputs and referenced evidence,
+produced a specific output. The domain's only durable contract.
 
 **Responsibilities**
-- Provide read access to the journal, the evidence graph, and the digital twin.
-- Serve retrieval and reasoning.
+- Record the **inputs** consumed and the **Evidence referenced** (by identity).
+- Record the **model/provider**, **parameters**, and **prompt-template version**.
+- Record the **output** produced, the **confidence**, and the **timestamp**.
+- Be referenced by the products it justified (`Belief`, `Prediction`,
+  `IdentityEvolution`) — they point at it; it never points at them.
 
 **Invariants**
-- Read-only over truth; owns no state; is not a private store.
-- Everything it returns is traceable to events.
+- Immutable history; append-only; never edited (Art. I, Art. III §12).
+- **Stores reasoning provenance, never current truth** — it witnesses that a run
+  happened and what it produced; it is never the source of any derived value, which
+  stays recomputable from Evidence/Beliefs.
+- Distinct from Evidence: Evidence is *external* grounding; an InferenceRecord is the
+  machine's *internal* interpretation of it. The two are never conflated.
+- Preserved, not recomputed: replay restores the recorded output; it never re-runs
+  the model (Art. III §13).
 
-**Dependencies** — Journal, Evidence, DigitalTwin.
+**Dependencies** — Evidence. (References its inputs, referenced evidence, and output
+by identity — as Evidence references what it bears upon — so the only State→State edge
+is to Evidence; its products depend on *it*, never the reverse, keeping the graph a
+DAG under Art. X §40.)
 
 ## Retriever
 *Kind — Service.*
 
-**Purpose** — Selects the relevant subset of memory for a reasoning task.
+**Purpose** — Given the current situation, surface the relevant slice of history.
+Answers *"given what matters now, what historical information is relevant?"*
 
 **Responsibilities**
-- Query memory by relevance, recency, and causality.
-- Return grounded, provenance-bearing results.
+- Consume the situational frame from `LiveContext`.
+- Rank historical information (Evidence, Observations, prior interpretation) by
+  relevance, recency, and causality.
+- Return grounded, provenance-bearing references.
 
 **Invariants**
-- Read-only and side-effect free.
-- Deterministic given the same inputs and index.
-- Returns only grounded references; introduces no truth.
+- Read-only and side-effect free; returns only grounded references; introduces no
+  truth.
+- **Selects, never reasons** (that is the Reasoner) and **never determines the
+  situation** (that is `LiveContext`).
+- Owns no durable state: indices and scoring models are ephemeral, rebuilt from the
+  journal.
 
-**Dependencies** — Memory, LiveContext. (Retrieval is scoped by the live frame
-`LiveContext` assembles; the two services' boundary is drawn in the Intelligence
-review.)
+**Dependencies** — LiveContext, Evidence, DigitalTwin, Journal. (Scoped by the live
+frame `LiveContext` assembles; reads durable history directly. `LiveContext` does not
+depend on `Retriever`, so the two Services close no cycle.)
 
 ## Reasoner
 *Kind — Service.*
 
-**Purpose** — Derives new interpretation from evidence. The seat of model-backed
-intelligence. (Performs the *Reasoning* transition; the transition is not a
-kernel contract — its outputs, Beliefs, are.)
+**Purpose** — Derives new interpretation, decisions, and belief revisions from
+evidence and retrieved history. The model-independent seat of intelligence. (Performs
+the *Reasoning* transition; the transition is not a kernel contract — its outputs are.)
 
 **Responsibilities**
-- Consume interpretation and evidence and produce interpretation.
-- Record every derivation as an **Inference Record** — the immutable account of
-  *how* evidence was interpreted, carrying full model provenance (provider, model
-  version, prompt template version, input references, parameters, timestamp,
-  environment). The Inference Record is distinct from Evidence: Evidence is
-  external grounding (observation, attachment, external source); an Inference
-  Record is the machine's interpretation of it.
-- Remain interchangeable.
+- Consume Evidence, Beliefs, the DigitalTwin, and retrieved history; produce
+  inferences, belief revisions, and decisions.
+- **Emit an `InferenceRecord` for every run** — the recorded provenance of how the
+  evidence was interpreted.
+- Invoke models only through the `ModelRouter`; remain interchangeable.
 
 **Invariants**
 - Model-independent: no provider is hardcoded; a local implementation is always
-  viable.
-- Every derivation is recorded as an Inference Record with provenance; conclusions
-  enter history as State, never as a live dependency.
+  viable (Art. III §11).
+- Every derivation is recorded as an `InferenceRecord` with full provenance;
+  conclusions enter history as State, never as a live dependency.
 - Produces interpretation, never truth.
 
-**Dependencies** — Memory, ModelRouter, Belief, Evidence.
-
-> **Inference Record (forthcoming State contract).** The renaming of "model-output
-> evidence" to a distinct *Inference Record* (Knowledge decision 4) means the
-> Reasoner's recorded derivations are their own kind of State, not Evidence. The
-> formal `InferenceRecord` contract is specified together with the Reasoner in the
-> **Intelligence** domain review (it is the Reasoner's durable output), at which
-> point the kernel's State count grows by one under Article X (addition, never
-> mutation). Knowledge-domain contracts already reference it by name.
+**Dependencies** — Retriever, DigitalTwin, Belief, Evidence, ModelRouter. (Produces
+`InferenceRecord`, `Belief`, `Prediction`, and `IdentityEvolution` into their own
+domains — production edges, not dependencies; no State depends on the Reasoner.)
 
 ## Planner
 *Kind — Service.*
 
-**Purpose** — Produces explainable plans: ordered intended actions toward a goal.
-(Performs the *Planning* transition; the resulting *Decision* is a transition,
-captured only as Event, provenance, and Action.)
+**Purpose** — Turns a recorded decision into an executable plan: ordered intent toward
+a goal. (Performs the *Planning* transition; the resulting *Decision* is captured as
+provenance and, once acted, as an Action.)
 
 **Responsibilities**
-- Consume interpretation plus a goal and emit a plan of intended actions.
-- Name the capabilities each action requires.
-- Record reasoning provenance and consider alternatives.
+- Consume recorded reasoning (an `InferenceRecord`) and a `Goal`; emit a plan of
+  intended actions — *intent*, never execution.
+- Record planning provenance as an `InferenceRecord`.
+- Consider alternatives and keep every plan explainable and grounded.
 
 **Invariants**
-- Produces a plan (interpretation), not execution.
-- Every plan is explainable and grounded.
-- Planning never acts; execution requires permission.
+- Produces intent (a plan), never execution; planning never acts.
+- **Consumes recorded reasoning, not transient reasoning** — it depends on the
+  `InferenceRecord`, preserving replayability and auditability.
+- **Never binds capabilities or actions** — it expresses *what* to do, not *how* it
+  is carried out; capability binding and permission gating belong to Execution's
+  `Agent` (Art. VI §25), keeping Intelligence independent of the Execution Plane.
 
-**Dependencies** — Goal, Memory, Reasoner, Capability.
-
-## Reflector
-*Kind — Service.*
-
-**Purpose** — Compares expected outcomes against actual observations and feeds
-learning. (Performs the *Reflection* and *Learning* transitions; their outputs
-are revised Beliefs and new Observations.)
-
-**Responsibilities**
-- Evaluate predictions and decisions against later observations.
-- Record the delta between expected and actual.
-- Trigger belief revision.
-
-**Invariants**
-- Produces new observations and interpretation; never mutates prior history.
-- Runs continuously and periodically.
-- Keeps Orb honest: outcomes are observed, not assumed.
-
-**Dependencies** — Prediction, Action, Observation, Belief.
+**Dependencies** — InferenceRecord, Goal. (Consumes recorded reasoning and the target
+outcome; does not depend on the live `Reasoner` or on `Capability`.)
 
 ---
 
@@ -729,14 +762,17 @@ loop.
 
 **Responsibilities**
 - Execute scheduled work using reasoners, planners, and capabilities.
-- Read the world through memory.
+- Read the world through the Knowledge Plane (Journal, Evidence Graph, Twin) and the
+  `Retriever` — never through a dedicated "Memory" contract, which does not exist.
+- **Bind a plan's intent to concrete capabilities** and gate it through Policy — the
+  step the `Planner` deliberately leaves undone (Art. VI §25).
 - Produce events.
 
 **Invariants**
 - Owns no durable state; does not wake itself; restartable without loss.
 - All of its memory lives in events and projections.
 
-**Dependencies** — Memory, Scheduler, Reasoner, Planner, Capability.
+**Dependencies** — Scheduler, Reasoner, Planner, Capability.
 
 ---
 

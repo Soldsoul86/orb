@@ -97,9 +97,9 @@ With **Belief → Fact** added (decision 2), the domain collapses to a clean lin
 spine: `Evidence → Entity → Fact → Belief → Prediction`. (Entity, Fact, and Belief
 each also reference Evidence directly; the spine shows the strongest edge.) All
 cross-domain edges point *backward* into Reality (already accepted), never forward.
-The forthcoming `InferenceRecord` (decision 4) is produced by the Reasoner and
-references Knowledge State as inputs/outputs; it is a sink — nothing in Knowledge
-depends on it — so it cannot introduce a cycle.
+The `InferenceRecord` (decision 4; now an accepted Intelligence-domain State contract)
+is produced by the Reasoner and references Knowledge State as inputs/outputs; it is a
+sink — nothing in Knowledge depends on it — so it cannot introduce a cycle.
 
 ---
 

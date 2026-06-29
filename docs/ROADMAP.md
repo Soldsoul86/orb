@@ -66,16 +66,17 @@ it. *Passed.*
 Expanded: rather than freeze loose interfaces, define the **Orb Kernel** — the
 minimal, permanent contract surface every implementation must preserve.
 
-**3a — `KERNEL.md` (current).** Six domains, 31 contracts, each with exactly four
+**3a — `KERNEL.md` (current).** Six domains, 30 contracts, each with exactly four
 sections (Purpose, Responsibilities, Invariants, Dependencies). No methods,
 fields, or language. Governed by Article X (kernel evolves through addition,
-never mutation; v1 contracts permanent).
+never mutation; v1 contracts permanent). *(Count is post-review: the Intelligence
+domain review removed `Memory` and `Reflector` and added `InferenceRecord`, net 31 → 30.)*
 
 - Reality: `Sensor`, `Observation`, `Attachment`, `Event`
 - Knowledge: `Evidence`, `Entity`, `Fact`, `Belief`, `Prediction`
 - Identity: `DigitalTwin`, `Relationship`, `Project`, `Goal`, `ContextSnapshot`,
   `LiveContext`, `IdentityEvolution`
-- Intelligence: `Memory`, `Retriever`, `Reasoner`, `Planner`, `Reflector`
+- Intelligence: `InferenceRecord`, `Retriever`, `Reasoner`, `Planner`
 - Execution: `Capability`, `Action`, `Policy`, `Scheduler`, `Agent`
 - Infrastructure: `Journal`, `Storage`, `Synchronization`, `ModelRouter`,
   `Encryption`

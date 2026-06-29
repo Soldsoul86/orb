@@ -415,8 +415,11 @@ ContextSnapshot, IdentityEvolution — State; LiveContext — Service), **acycli
 State graph, with **DigitalTwin as the single top aggregate and architectural pivot**,
 **no State depending on any running process** (Art. X §40), every contract carrying the
 Immutable/Derived/Ephemeral decomposition and an explicit replay test, and every contract
-passing the 20-year test. Kernel totals updated to **31 contracts (16 State, 15
-Service)**.
+passing the 20-year test. Kernel totals at the close of this review were **31 contracts
+(16 State, 15 Service)**. *(Superseded by the subsequent Intelligence review, which
+removed `Memory` and `Reflector` and added `InferenceRecord` — net **30 contracts, 17
+State, 13 Service**. The two Identity follow-ups that carried forward, Q2 and Q3, were
+both resolved there.)*
 
 **Held for confirmation of the three follow-ups above** (facet promotion; LiveContext↔
 Retriever boundary; IdentityEvolution↔InferenceRecord reference) — none blocks

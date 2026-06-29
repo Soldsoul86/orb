@@ -6,7 +6,7 @@ Domain:     Identity
 Kind:       State
 Version:    v1
 Status:     Draft
-Depends on: Evidence, InferenceRecord (forthcoming — Intelligence domain)
+Depends on: Evidence, InferenceRecord
 ```
 
 > An IdentityEvolution is the immutable record of *why the model changed* — a

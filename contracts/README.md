@@ -1,7 +1,7 @@
 # Orb Contract Specifications
 
 This directory holds one specification per kernel contract. The kernel
-(`../docs/KERNEL.md`) names the 31 contracts and states their Purpose,
+(`../docs/KERNEL.md`) names the 30 contracts and states their Purpose,
 Responsibilities, Invariants, and Dependencies. **These specifications define
 each contract in depth** — its behavior over time and its guarantees — without yet
 committing to a programming language.
@@ -61,7 +61,7 @@ those belong to the implementation interfaces written after acceptance.
 
 ## Contracts Index
 
-State (16) and Service (15), grouped by domain. Status tracks Phase 3b review.
+State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 
 ### 1. Reality
 | Contract | Kind | Status |
@@ -94,11 +94,10 @@ State (16) and Service (15), grouped by domain. Status tracks Phase 3b review.
 ### 4. Intelligence
 | Contract | Kind | Status |
 | --- | --- | --- |
-| Memory | Service | _pending_ |
-| Retriever | Service | _pending_ |
-| Reasoner | Service | _pending_ |
-| Planner | Service | _pending_ |
-| Reflector | Service | _pending_ |
+| [InferenceRecord](InferenceRecord.md) | State | Draft |
+| [Retriever](Retriever.md) | Service | Draft |
+| [Reasoner](Reasoner.md) | Service | Draft |
+| [Planner](Planner.md) | Service | Draft |
 
 ### 5. Execution
 | Contract | Kind | Status |

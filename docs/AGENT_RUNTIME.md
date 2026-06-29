@@ -44,10 +44,12 @@ interface and never leaks upward.**
 
 ### Planner
 
-A `Planner` consumes interpretation plus a goal and produces a **Decision**: an
-ordered, explainable plan of intended Actions, each naming the Capability it
-requires. Planning is interpretation — it is recomputable and non-authoritative
-until executed.
+A `Planner` consumes a recorded decision (an `InferenceRecord`) plus a goal and
+produces an ordered, explainable plan of **intended actions** — *intent*, not
+execution. The Planner does **not** name or bind the Capability each action requires:
+it expresses *what* to do; the `Agent` binds *how* (which capability/provider) and
+gates it through Policy (`KERNEL.md` §4–5). Planning is interpretation — recomputable
+and non-authoritative until executed.
 
 ### Agent
 
@@ -56,11 +58,13 @@ agent is **stateless with respect to truth**: it owns no durable state of its
 own. Anything an agent "remembers" lives in the journal as events (its inputs)
 and in projections (the Twin). Restarting an agent loses nothing.
 
-### Memory
+### Reading history (not a "Memory" contract)
 
-`Memory` is the agent's read interface over history and interpretation — the
-journal, Evidence Graph, and Twin — never a private store. Agents read Memory;
-they do not own it.
+An agent's access to history and interpretation — the journal, Evidence Graph, and
+Twin — is **read access to the Knowledge Plane**, plus the `Retriever` for relevance
+ranking. It is **not** a dedicated `Memory` contract: *memory is an emergent property
+of the Knowledge Plane, not a kernel type* (the Intelligence domain review removed the
+`Memory` contract — `KERNEL.md` §4). Agents read; they never own a private store.
 
 ---
 
@@ -120,9 +124,10 @@ The runtime extends human judgment; it does not replace it.
 
 ## 7. The Action Loop
 
-1. Planner emits a Decision (interpretation).
+1. Planner emits a plan as **intent** (interpretation); the `Agent` binds it to a
+   concrete **Capability** and gates it through Policy.
 2. Human/policy authorizes it per the required permission tier.
-3. The runtime invokes the named **Capability** to perform the **Action**.
+3. The runtime invokes the bound **Capability** to perform the **Action**.
 4. The Action's occurrence and outcome are appended to the journal as new
    **Observation** events.
 5. **Reflection** compares outcome to expectation; **Continuous Learning** folds
@@ -148,6 +153,7 @@ The agent never persists the loop's state itself — every step is in the journa
 ## 9. Out of Scope
 
 - The permission tiers and capability surface → `CAPABILITY_MODEL.md`.
-- The frozen interfaces (`Reasoner`, `Planner`, `Agent`, `Memory`, `Action`) →
-  Phase 3 contracts.
+- The frozen contracts (`Reasoner`, `Planner`, `Agent`, `Action`, and the
+  `InferenceRecord` that records reasoning provenance) → Phase 3 contracts. *(There is
+  no `Memory` contract — see §3.)*
 - Security of remote model calls → `SECURITY.md`.

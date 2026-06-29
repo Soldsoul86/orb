@@ -6,7 +6,7 @@ Domain:     Identity
 Kind:       Service
 Version:    v1
 Status:     Draft
-Depends on: DigitalTwin, Memory
+Depends on: DigitalTwin
 ```
 
 > LiveContext is the *process* that assembles the current situational frame — what is
@@ -59,13 +59,13 @@ recomputed from the durable Twin; its durable output (snapshots) survives as the
 
 1. **Idle** — no frame requested; the Service holds nothing.
 2. **Assembling** — a situation (a task, an observation, a query) triggers
-   recomputation of the salient slice from the Twin and Memory.
+   recomputation of the salient slice from the Twin.
 3. **Serving** — the assembled frame is offered to Retriever/Planner for the moment.
 4. **Snapshotting** — on demand (e.g. a decision is framed), the current frame is
    emitted as an immutable `ContextSnapshot`.
 5. **Dissolving** — the moment passes; the frame is discarded; the Service returns to
    Idle holding nothing.
-6. **Degraded** — if the Twin or Memory is unavailable, LiveContext yields a reduced or
+6. **Degraded** — if the Twin is unavailable, LiveContext yields a reduced or
    empty frame rather than inventing one; it never fabricates salience.
 
 ---
@@ -76,7 +76,7 @@ recomputed from the durable Twin; its durable output (snapshots) survives as the
 (idle) ──▶ (assembling) ──▶ (serving) ──▶ (dissolving) ──▶ (idle)
                               │
                               └── snapshotting ──▶ emits ContextSnapshot (immutable State)
-       degraded ◀── Twin/Memory unavailable ──▶ reduced/empty frame, never fabricated
+       degraded ◀── Twin unavailable ──▶ reduced/empty frame, never fabricated
 ```
 
 Operational moves only — LiveContext stores no record that transitions over time.
@@ -87,8 +87,8 @@ Operational moves only — LiveContext stores no record that transitions over ti
 
 1. **Owns no durable state.** Every frame is recomputed; the Service holds nothing that
    must survive a restart (Constitution Art. V §22).
-2. **Read-only over the model.** It reads the Twin and Memory; it never writes identity
-   and introduces no truth.
+2. **Read-only over the model.** It reads the Twin; it never writes identity and
+   introduces no truth.
 3. **Process, not history.** Its only durable output is the `ContextSnapshot` it emits;
    the live frame is never persisted as truth (Art. XII §44, §46).
 4. **Never fabricates salience.** Under degradation it yields a reduced or empty frame,
@@ -133,12 +133,13 @@ Not guaranteed:
 
 - **Crash mid-frame.** The current frame and attention are lost; they are recomputed
   from the durable Twin — by design, nothing of value is lost.
-- **Twin/Memory unavailable.** LiveContext degrades to a reduced or empty frame rather
+- **Twin unavailable.** LiveContext degrades to a reduced or empty frame rather
   than fabricating salience.
-- **Retriever overlap.** LiveContext and `Retriever` both sit between Memory and
+- **Retriever overlap.** LiveContext and `Retriever` both sit between the model and
   reasoning; if their responsibilities blur, the kernel risks two services doing one
-  job. The boundary — LiveContext assembles the *frame*; Retriever ranks *memory within
-  it* — is drawn explicitly in the Intelligence review.
+  job. The boundary — LiveContext assembles the *frame* ("what matters now"); Retriever
+  ranks *history within it* ("given that, what is relevant") — is drawn explicitly in
+  the Intelligence review and frozen there.
 - **Snapshot pressure.** Emitting a snapshot for every frame would bloat history;
   snapshots are emitted only when explainability requires it.
 

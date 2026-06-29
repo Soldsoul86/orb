@@ -237,6 +237,14 @@ eventually processed.*
   not happen"), feeding Learn. It does **not** mutate the original Decision or its
   history — it appends.
 - Reflection is how Orb stays honest: outcomes are observed, not assumed.
+- **Reflection is composed behavior, not a kernel contract.** There is no
+  `Reflector` contract: the `Scheduler` triggers the `Reasoner` over a
+  `Prediction`↔`Observation` gap, and the Reasoner records the delta as belief
+  revisions plus an `InferenceRecord`, exactly like any other reasoning. The
+  Intelligence domain review removed `Reflector` for this reason — reflection is a
+  *when-to-reason* policy, not a new kind of thinking (`KERNEL.md` §4). It may be
+  re-promoted to a contract only if it ever needs durable first-class state that
+  cannot be a Belief/Prediction (Architectural Debt AD-3).
 
 ---
 
