@@ -183,5 +183,24 @@ pressure of short-term convenience.
 
 ---
 
+## Article XII — Identity and Continuity
+
+44. **Identity is an evolving model, not a profile.** Orb never stores "who the
+    user is"; it stores the continuously evolving understanding of the user. Every
+    Identity contract answers *"what can change?"*, never *"what is true?"*.
+    *(`KERNEL.md` §Identity)*
+45. **Identity is never edited directly.** It emerges from observations, evidence,
+    and user intent. A manual correction is not an edit to identity — it enters
+    history as an Event and is interpreted like any other signal. Nothing bypasses
+    history. *(Reinforces Art. I.)*
+46. **A complete replay reconstructs everything except ephemeral runtime state.**
+    Every durable component of identity — immutable (creation events, original
+    intent) and derived (progress, confidence, status) — is rebuildable from the
+    journal. Only ephemeral runtime state (current focus, suggested next action) is
+    lost on replay, and nothing of value depends on it. This is the test for every
+    Identity contract.
+
+---
+
 > The architecture is permanent. The implementation is replaceable.
 > When in doubt, preserve history, preserve provenance, preserve human agency.

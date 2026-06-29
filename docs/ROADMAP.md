@@ -50,8 +50,9 @@ decisions incorporated (HLC ordering, replay-vs-determinism, license deferred).
 `CONSTITUTION.md` ratified: originally 36 laws across nine articles (History; Truth
 and Interpretation; Models and Reasoning; Distribution; The Runtime; The Three
 Planes; Capabilities and Human Agency; Ownership and Trust; Engineering). Since
-extended additively (Article X — The Kernel; Article XI — Reality and Confidence)
-to **43 laws across eleven articles** during the Phase 3 kernel and domain reviews.
+extended additively (Article X — The Kernel; Article XI — Reality and Confidence;
+Article XII — Identity and Continuity) to **46 laws across twelve articles** during
+the Phase 3 kernel and domain reviews.
 Includes the laws decided during Phase 1 framing and the continuous-observation /
 three-planes invariants from the Phase 1 amendment.
 

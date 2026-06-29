@@ -331,7 +331,22 @@ Prediction→Reasoner cycle.)
 
 # 3. Identity
 
-How Orb models the user.
+How Orb models the user. **Identity is not a profile; it is an evolving model.**
+Orb never stores "who the user is" — it stores the *continuously evolving
+understanding* of the user. Where Reality records history and Knowledge interprets
+it, **Identity accumulates continuity**: it answers "given everything Orb has
+learned, what context should influence future decisions?" Every contract here
+answers *"what can change?"* rather than *"what is true?"*.
+
+Each Identity contract decomposes into **immutable** (its creation event and
+original intent — append-only history), **derived** (recomputable from the journal:
+progress, confidence, status), and **ephemeral** (runtime-only: current focus,
+suggested next action) components. The decomposition and lifecycle (begin → evolve →
+decay → merge → split → end) are given in the contract specs and the *Identity
+Evolution Report*. The test for every contract: **a complete replay reconstructs
+everything except ephemeral runtime state.** Identity is never edited directly — it
+emerges from observations, evidence, and user intent; manual edits enter as Events
+(Constitution Art. XII).
 
 ## DigitalTwin
 *Kind — State.*
@@ -348,6 +363,8 @@ How Orb models the user.
 - Interpretation, never truth; holds no source-of-truth state.
 - Fully recomputable from the journal.
 - Everything it holds references evidence.
+- Immutable: its genesis/anchor event. Derived: the entire current model. Ephemeral:
+  the in-memory materialization/cache. The top aggregate — nothing depends on it.
 
 **Dependencies** — Entity, Fact, Belief, Relationship, Project, Goal, Context.
 
@@ -364,6 +381,8 @@ located-at, and so on).
 **Invariants**
 - A belief about a connection: references evidence, carries confidence.
 - Recomputable; revisable without rewriting history.
+- Immutable: creation event, originally asserted entities + relation type. Derived:
+  current confidence, strength, active/dormant status. Ephemeral: current salience.
 
 **Dependencies** — Entity, Belief.
 
@@ -380,6 +399,8 @@ time.
 **Invariants**
 - Interpretation; recomputable; references evidence.
 - Revision is appended, never rewritten.
+- Immutable: creation event, original definition/intent. Derived: status, progress,
+  member goals/entities, health. Ephemeral: current focus item, suggested next step.
 
 **Dependencies** — Goal, Entity, Belief.
 
@@ -398,8 +419,13 @@ bring about.
 - Interpretation; references its grounding; recomputable.
 - The source of intent for planning — never an authority to act without
   permission.
+- Immutable: creation event, original intent. Derived: progress, priority,
+  confidence. Ephemeral: current focus, suggested next action, reminders.
 
-**Dependencies** — Belief, Context.
+**Dependencies** — Belief. (Not Context: a durable Goal must not depend on the
+ephemeral situational frame — that edge created a `DigitalTwin → Goal → Context →
+DigitalTwin` cycle and inverted the durability direction. A Goal's intent is
+grounded in Belief; Context references active Goals, never the reverse.)
 
 ## Context
 *Kind — State.*
@@ -416,8 +442,14 @@ activity, attention.
 - Interpretation; derived; recomputable.
 - Never persisted as truth; references the observations and evidence that define
   it.
+- The most ephemeral Identity contract. Immutable: the recorded event of a context
+  snapshot (if retained). Derived: the salient slice (relevant entities, active
+  goals). Ephemeral: current attention/focus — does not survive replay.
 
-**Dependencies** — DigitalTwin, Entity.
+**Dependencies** — Entity, Goal. (Not DigitalTwin: Context summarizes the salient
+*elements* it points at — Entities and active Goals — not the aggregate twin.
+Depending on the twin created a `DigitalTwin ↔ Context` cycle; referencing the
+underlying State instead keeps Identity a DAG with the twin as the top aggregate.)
 
 ---
 
