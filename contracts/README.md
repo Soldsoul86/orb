@@ -15,8 +15,16 @@ committing to a programming language.
 ## Specification Format
 
 Every contract specification is a single Markdown file named for the contract
-(`Event.md`, `Observation.md`, …). It opens with a short header and then defines
-**exactly these eight sections, in order**:
+(`Event.md`, `Observation.md`, …). It opens with a short header, then answers one
+mandatory question, then defines **exactly these eight sections, in order**.
+
+**Mandatory justification.** Immediately after the header, every specification
+must answer: *"Why does this deserve to exist as a permanent kernel contract?"*
+If that question cannot be answered convincingly, the contract belongs in
+implementation, not in the kernel. The architecture should grow **smaller and
+clearer** as it matures, never larger.
+
+The eight sections:
 
 1. **Semantics** — what the contract *means*; the precise concept it represents.
 2. **Lifecycle** — how an instance comes into being, persists, and ends (or why

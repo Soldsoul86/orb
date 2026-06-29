@@ -14,6 +14,12 @@ Depends on: (none — the kernel's atom)
 > load-bearing in the kernel. See `../docs/EVENT_MODEL.md` for the architecture it
 > realizes.
 
+**Why a permanent kernel contract?** Because it is the single irreducible unit of
+history and the *only* write-path into the past. Every other contract is defined
+in terms of, or reconstructed from, Events; remove it and there is no replay, no
+provenance, no continuity — no Orb. Any future implementation, in any language,
+must preserve exactly this atom. It is the most permanent contract in the system.
+
 ---
 
 ## 1. Semantics

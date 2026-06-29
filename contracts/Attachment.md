@@ -13,6 +13,13 @@ Depends on: Storage, Encryption
 > file is made of — held immutably and by reference. See `../docs/STORAGE.md` and
 > `SECURITY.md`.
 
+**Why a permanent kernel contract?** Because separating immutable, content-
+addressed raw bytes from the replayable structured record is an architectural
+decision, not an implementation detail. It is what keeps history small, uniform,
+deduplicated, and replayable while the heavy content lives beside it and is
+fetched only when needed. Any implementation must preserve this separation and the
+content-addressed identity; therefore it is a contract, not a storage choice.
+
 ---
 
 ## 1. Semantics

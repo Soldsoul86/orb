@@ -146,7 +146,9 @@ point of all knowledge.
 - Records occurrence, never resolved truth.
 - Always traceable to its source and its causal/temporal placement.
 
-**Dependencies** — Event, Attachment, Sensor.
+**Dependencies** — Event, Attachment. (Attributed to a *source identity* — a
+value, not the `Sensor` contract — which may be a Sensor, an Action, or an import.
+This breaks the Observation↔Sensor cycle and admits non-sensor sources.)
 
 ## Sensor
 *Kind — Service.*

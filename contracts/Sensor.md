@@ -13,6 +13,14 @@ Depends on: Observation, Attachment
 > Service of the Runtime Loop's **Sense** stage. See `../docs/RUNTIME_LOOP.md` and
 > `EVIDENCE_GRAPH.md`.
 
+**Why a permanent kernel contract?** Because it is the *only* ingress through
+which the external world becomes history, and that boundary must be source- and
+model-independent and runtime-scheduled **by contract**. Fixing "how the world
+enters Orb" as a narrow, permanent obligation — emit attributed observations,
+never interpret, never self-schedule — is precisely what stops ingestion from
+smuggling interpretation or authority into history. The *implementations*
+(calendar, location, browser, …) are replaceable; the boundary is not.
+
 ---
 
 ## 1. Semantics

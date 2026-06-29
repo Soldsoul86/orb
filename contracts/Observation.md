@@ -6,12 +6,26 @@ Domain:     Reality
 Kind:       State
 Version:    v1
 Status:     Draft
-Depends on: Event, Attachment, Sensor
+Depends on: Event, Attachment
 ```
 
 > An Observation is the entry point of all knowledge: the first time the outside
 > world becomes part of Orb's history. See `../docs/EVIDENCE_GRAPH.md` and
 > `SYSTEM_OVERVIEW.md` (the epistemic stack).
+
+**Why a permanent kernel contract?** Because "an occurrence — recorded and
+attributed, but not yet true" is a distinct, load-bearing concept on which the
+entire epistemic stack (Evidence → Belief → Decision) is built. It is the stable
+boundary at which reality becomes knowledge; downstream contracts depend on
+*Observation*, never on raw Events. Collapsing it into "a typed Event" would push
+the History/Interpretation boundary down into implementation, where the
+Constitution forbids it from living.
+
+> **Attribution note (v1 design):** An Observation is attributed to a **source
+> identity** — a stable value naming whatever produced it (a Sensor, an Action
+> outcome, or an import). The source is a *value*, not a kernel contract. This is
+> deliberate: it keeps the kernel smaller, avoids a circular dependency with
+> `Sensor`, and correctly admits non-sensor sources of observation.
 
 ---
 
@@ -66,8 +80,9 @@ the earlier one. The earlier Observation's state never changes.
 1. **Immutable and append-only**, as an Event (inherits all Event invariants).
 2. **Occurrence, not truth.** An Observation never asserts resolved truth; it
    records that something was observed.
-3. **Always attributed.** Every Observation names the Sensor/source that produced
-   it; an unattributed Observation is invalid.
+3. **Always attributed.** Every Observation names the source identity that
+   produced it (a Sensor, an Action, or an import); an unattributed Observation is
+   invalid. The source is a value, not a dependency on the `Sensor` contract.
 4. **Grounded in time and device.** It carries the causal placement and
    provenance of its Event.
 5. **References, never copies.** Raw content is referenced as Attachments by
