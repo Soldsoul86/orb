@@ -1,0 +1,13 @@
+LICENSE — SELECTION PENDING
+
+Orb's license has not yet been chosen. This is a deliberate Phase 0 decision held
+open for the project owner.
+
+The choice carries architectural weight for a local-first, user-sovereign,
+model-independent system and should be made explicitly. See the Phase 0 review
+notes for the trade-offs under consideration (e.g. Apache-2.0 for an explicit
+patent grant, AGPL-3.0 to keep network-deployed forks open, or a source-available
+license).
+
+Until a license is selected and this file is replaced, all rights are reserved by
+the copyright holder.
