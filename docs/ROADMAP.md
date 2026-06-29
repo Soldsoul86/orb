@@ -58,21 +58,36 @@ it. *Passed.*
 
 ---
 
-## Phase 3 — Contracts  ◀ current
+## Phase 3 — The Kernel & Contracts  ◀ current
 
-Freeze interfaces only — no business logic — so the shape is fixed before
-implementation:
+Expanded: rather than freeze loose interfaces, define the **Orb Kernel** — the
+minimal, permanent contract surface every implementation must preserve.
 
-`Event`, `Observation`, `Evidence`, `Fact`, `Belief`, `Entity`, `Capability`,
-`Agent`, `Sensor`, `Memory`, `Reasoner`, `Planner`, `Action`.
+**3a — `KERNEL.md` (current).** Six domains, 29 contracts, each with exactly four
+sections (Purpose, Responsibilities, Invariants, Dependencies). No methods,
+fields, or language. Governed by Article X (kernel evolves through addition,
+never mutation; v1 contracts permanent).
 
-These map onto the documents above (e.g. `Event` ← `EVENT_MODEL`; `Belief`,
-`Fact`, `Entity` ← `DIGITAL_TWIN`; `Reasoner`, `Planner`, `Agent`, `Memory` ←
-`AGENT_RUNTIME`; `Capability`, `Action` ← `CAPABILITY_MODEL`; `Sensor`,
-`Observation`, `Evidence` ← `EVIDENCE_GRAPH`).
+- Reality: `Sensor`, `Observation`, `Attachment`, `Event`
+- Knowledge: `Evidence`, `Entity`, `Fact`, `Belief`, `Prediction`
+- Identity: `DigitalTwin`, `Relationship`, `Project`, `Goal`, `Context`
+- Intelligence: `Memory`, `Retriever`, `Reasoner`, `Planner`, `Reflector`
+- Execution: `Capability`, `Action`, `Policy`, `Scheduler`, `Agent`
+- Infrastructure: `Journal`, `Storage`, `Synchronization`, `ModelRouter`,
+  `Encryption`
 
-**Gate:** contracts accepted/frozen. Each package carries `README`, `DESIGN`,
-`API`, `TESTS`.
+**Gate (3a):** kernel accepted.
+
+**3b — Contract specifications.** After the kernel is accepted, each contract
+receives its own document under `contracts/` (e.g. `contracts/Event.md`) defining
+Semantics, Lifecycle, State transitions, Invariants, Versioning rules,
+Compatibility guarantees, Failure modes, and Examples.
+
+**Gate (3b):** every contract specification accepted.
+
+**3c — Implementation interfaces.** Only after every contract spec is accepted are
+implementation interfaces written in TypeScript or Kotlin. Each package carries
+`README`, `DESIGN`, `API`, `TESTS`.
 
 ---
 

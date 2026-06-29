@@ -208,6 +208,7 @@ history — including the outputs of prior models — intact. See `AGENT_RUNTIME
 | `STORAGE.md` | On-device persistence of journal and projections. |
 | `SYNC_PROTOCOL.md` | Peer replication, causality, conflict handling. |
 | `SECURITY.md` | Trust model, encryption, permissions, privacy. |
+| `KERNEL.md` | The permanent public contract surface (six domains, 29 contracts). |
 | `ROADMAP.md` | Phased delivery plan. |
 
 ---

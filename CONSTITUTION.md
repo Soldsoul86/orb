@@ -148,5 +148,17 @@ pressure of short-term convenience.
 
 ---
 
+## Article X — The Kernel
+
+37. **The kernel evolves through addition, never through mutation.** New
+    capability arrives as new contracts or new versions alongside the old — never
+    by changing the meaning of an existing contract. *(`KERNEL.md`)*
+38. **Breaking changes require a new version.** Orb v1 contracts remain valid
+    forever; a contract accepted at v1 is permanent.
+39. **The architecture is versioned with the discipline of an operating-system
+    kernel.** Implementations are replaceable; the kernel is not.
+
+---
+
 > The architecture is permanent. The implementation is replaceable.
 > When in doubt, preserve history, preserve provenance, preserve human agency.
