@@ -102,6 +102,24 @@ learning cycle) are kernel contracts; the *transitions* themselves are not; thei
 Every contract below declares its kind, then defines exactly four sections:
 **Purpose**, **Responsibilities**, **Invariants**, **Dependencies**.
 
+### Dependency Direction
+
+A single rule governs what a contract may depend on, and it keeps the kernel a
+directed acyclic graph:
+
+> **State depends only on State (or nothing). Services depend on State and
+> Services.** A State contract never depends on a Service.
+
+The justification is the History/Interpretation separation itself. State is a
+durable record; a Service is a live capability that *produces* records. If a State
+depended on a Service, the record would point at the machine that made it rather
+than at the immutable output the machine produced — and since Services produce
+State, the edge would close a cycle. Whenever a derivation by a Service (a
+Reasoner, a Planner) needs to be referenced, it is referenced through the
+**immutable output that Service recorded** — a model-output Evidence with full
+provenance — never through the Service itself. This is what lets *replay reproduce
+history, not intelligence*: the record survives even when the Service is replaced.
+
 ---
 
 # 1. Reality
@@ -236,7 +254,9 @@ organization, device, or thing.
 - References the evidence that justifies its identity.
 - Resolution changes never rewrite the underlying events.
 
-**Dependencies** — Evidence, Belief.
+**Dependencies** — Evidence. (Depends only on Evidence, not on Belief: an
+Entity's identity is justified by the evidence that resolves it; Beliefs reference
+Entities, never the reverse. This breaks the Entity↔Belief cycle.)
 
 ## Fact
 *Kind — State.*
@@ -263,8 +283,9 @@ settled until contradicted, not eternal truth.
 
 **Responsibilities**
 - Carry a claim together with a confidence.
-- Reference its supporting evidence and the derivation that produced it,
-  including model provenance where model-backed.
+- Reference its supporting evidence — including the **model-output Evidence** that
+  records the derivation (provider, model version, prompt, inputs) where the
+  belief is model-backed.
 - Retain prior values across revision.
 
 **Invariants**
@@ -272,7 +293,10 @@ settled until contradicted, not eternal truth.
 - Recomputable; revision preserves history.
 - Never asserted as truth.
 
-**Dependencies** — Evidence, Entity, Reasoner.
+**Dependencies** — Evidence, Entity. (Not Reasoner: a Belief is State and depends
+only on State. The derivation a Reasoner performed is itself recorded as an
+immutable model-output Evidence with full provenance; the Belief references that
+Evidence, not the live Service. This breaks the Belief→Reasoner cycle.)
 
 ## Prediction
 *Kind — State.*
@@ -290,7 +314,10 @@ time.
 - Falsifiable: it must be comparable against a later Observation.
 - Never truth.
 
-**Dependencies** — Belief, Reasoner.
+**Dependencies** — Belief, Evidence. (Not Reasoner: like Belief, a Prediction is
+State grounded in State. The forward-projection derivation is recorded as
+model-output Evidence; the Prediction references that Evidence and the Beliefs it
+rests on, not the live Reasoner. This breaks the Prediction→Reasoner cycle.)
 
 ---
 
