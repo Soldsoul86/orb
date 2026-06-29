@@ -151,4 +151,4 @@ reference on merge/split.
 - **Split.** A single Entity *"Sam"* turns out to be two colleagues with the same
   first name; contradicting Evidence triggers a recorded split.
 - **Device.** Observations attributed to a hardware identifier resolve into the
-  Entity *"Pixel 8 (user's phone)"*, referenced by Relationships and Context.
+  Entity *"Pixel 8 (user's phone)"*, referenced by Relationships and context frames.

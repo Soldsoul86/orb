@@ -6,12 +6,14 @@ Domain:     Identity
 Kind:       State
 Version:    v1
 Status:     Draft
-Depends on: Entity, Fact, Belief, Relationship, Project, Goal, Context
+Depends on: Entity, Fact, Belief, Relationship, Project, Goal, ContextSnapshot, IdentityEvolution
 ```
 
-> A DigitalTwin is Orb's evolving model of the user's world — the coherent assembly of
-> entities, facts, beliefs, relationships, projects, goals, and context that together
-> answer "given everything Orb has learned, what should influence future decisions?"
+> A DigitalTwin is Orb's current best explanation of the user and their world — the
+> coherent assembly of entities, facts, beliefs, relationships, projects, goals, and
+> retained context that together answer "given everything Orb has learned, what should
+> influence future decisions?" It is *the pivot of the architecture*: everything before
+> it understands the world; everything after it acts within it by consulting the Twin.
 > See `../docs/DIGITAL_TWIN.md`.
 
 **Why a permanent kernel contract?** Because continuity needs a *whole*. The other
@@ -31,11 +33,19 @@ the integrated model does not. That is kernel identity in its purest form.
 
 A **DigitalTwin** is the integrated, continuously recomputed model of the user's
 world: the live composition of resolved **Entities**, supported **Facts**, contextual
-**Beliefs**, **Relationships**, **Projects**, **Goals**, and the salient **Context**.
-It answers *"what is Orb's current understanding of the user's world?"* — never
-*"what is true."* The Twin is **interpretation**: a derived aggregate, recomputable in
-full from history, holding no source-of-truth state of its own (Constitution Art. II
-§9).
+**Beliefs**, **Relationships**, **Projects**, **Goals**, the retained
+**ContextSnapshots**, and the **IdentityEvolution** history that explains how the model
+got here. It answers *"what is Orb's current understanding of the user's world — and
+why?"* — never *"what is true."* The Twin is **interpretation**: a derived aggregate,
+recomputable in full from history, holding no source-of-truth state of its own
+(Constitution Art. II §9).
+
+The Twin is **singular and faceted**. There is **one Twin per user**; it never splits.
+Multiple identities — professional self, parent, investor, writer, researcher — are
+modelled as **facets**: recomputed, role-scoped *views* of the one model, never
+separate twins. A facet is a derived projection (a filter over the shared
+constituents), not its own contract; modelling personas as separate twins would make
+replay intractable, so the kernel forbids it.
 
 A DigitalTwin is **not edited directly**. It is never written as a record; it is
 *projected* from its constituents, which are themselves derived from observations,
@@ -48,8 +58,10 @@ history as an Event; the Twin re-derives.
   (the point from which this model of the user begins). The Twin owns no other
   immutable state; its history lives in its constituents and the journal.
 - **Derived** — the **entire current model**: which Entities/Facts/Beliefs/
-  Relationships/Projects/Goals are held, how they cohere, and the present salient
-  Context. All of it is recomputed from history.
+  Relationships/Projects/Goals are held, how they cohere, and the **facets** (role-
+  scoped views) projected over them. All of it is recomputed from history. The live
+  salient frame is *not* held here — it is the `LiveContext` Service; only retained
+  `ContextSnapshot`s are constituents.
 - **Ephemeral** — the **in-memory materialization** (the assembled, indexed,
   query-ready form held for the running session). Runtime-only; lost on replay and
   rebuilt on demand.
@@ -106,11 +118,16 @@ survive and need not.
    and does not survive replay (Art. XII §46).
 5. **Fully recomputable.** The Twin can be discarded and rebuilt from the journal at
    any time and is identical in content to its derivation (Art. I §3, Art. II §9).
-6. **One user, one Twin.** The Twin is the singular integration point of Identity; it
-   does not split.
+6. **One user, one Twin — faceted, not split.** The Twin is the singular integration
+   point of Identity; multiple identities are facets (derived views) of the one model,
+   never separate twins.
+7. **Explains its own evolution.** The Twin aggregates the `IdentityEvolution` records
+   of its constituents, so replay reconstructs not only the current model but *why* it
+   changed; it never depends back on those records' subjects in a way that cycles
+   (Art. XII §47).
 
 Upholds Constitution Articles XII (Identity and Continuity), II (Truth and
-Interpretation), and I (History).
+Interpretation), III (Models and Reasoning), and I (History).
 
 ---
 

@@ -59,7 +59,9 @@ revisions) are derived. Manual corrections are themselves Events.
    one from evidence — and a Goal is derived, anchored to its creation event and
    original intent.
 2. **Evolves** as evidence accumulates: progress, priority, and confidence are
-   recomputed; sub-structure may be linked (Goals can nest under Projects).
+   recomputed; the Goal may be advanced by one or more Projects (the Goal↔Project
+   relation is many-to-many, not a hierarchy — a Goal is an *outcome*, a Project is
+   the *work*).
 3. **Decays** when intent fades: evidence of abandonment or irrelevance lowers
    confidence; a dormant Goal is retained, not deleted.
 4. **Merges** when two Goals are found to express one intent (recorded re-resolution

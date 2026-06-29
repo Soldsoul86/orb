@@ -186,9 +186,11 @@ pressure of short-term convenience.
 ## Article XII — Identity and Continuity
 
 44. **Identity is an evolving model, not a profile.** Orb never stores "who the
-    user is"; it stores the continuously evolving understanding of the user. Every
-    Identity contract answers *"what can change?"*, never *"what is true?"*.
-    *(`KERNEL.md` §Identity)*
+    user is"; it stores the continuously evolving understanding of the user.
+    Identity is *the runtime's current best explanation of a person, derived from
+    history and continuously revised by new evidence.* A profile stores attributes;
+    Orb stores understanding. Every Identity contract answers *"what can change?"*,
+    never *"what is true?"*. *(`KERNEL.md` §Identity)*
 45. **Identity is never edited directly.** It emerges from observations, evidence,
     and user intent. A manual correction is not an edit to identity — it enters
     history as an Event and is interpreted like any other signal. Nothing bypasses
@@ -199,6 +201,14 @@ pressure of short-term convenience.
     journal. Only ephemeral runtime state (current focus, suggested next action) is
     lost on replay, and nothing of value depends on it. This is the test for every
     Identity contract.
+47. **Identity does not only evolve — it explains why it evolved.** Every revision
+    of the model is a first-class, immutable, evidence-grounded, explainable
+    transition: it records what changed, the evidence that drove it, the inference
+    that interpreted that evidence, and the confidence held. The *explanation* is a
+    model output and is preserved as history, never recomputed — replay reconstructs
+    not only the current model but the reasons it changed (extends Art. II §10 and
+    Art. III §13). The audit of a transition is history; it is never the source of
+    the current derived value, which remains recomputable. *(`IdentityEvolution.md`)*
 
 ---
 

@@ -51,7 +51,7 @@ decisions incorporated (HLC ordering, replay-vs-determinism, license deferred).
 and Interpretation; Models and Reasoning; Distribution; The Runtime; The Three
 Planes; Capabilities and Human Agency; Ownership and Trust; Engineering). Since
 extended additively (Article X — The Kernel; Article XI — Reality and Confidence;
-Article XII — Identity and Continuity) to **46 laws across twelve articles** during
+Article XII — Identity and Continuity) to **47 laws across twelve articles** during
 the Phase 3 kernel and domain reviews.
 Includes the laws decided during Phase 1 framing and the continuous-observation /
 three-planes invariants from the Phase 1 amendment.
@@ -66,14 +66,15 @@ it. *Passed.*
 Expanded: rather than freeze loose interfaces, define the **Orb Kernel** — the
 minimal, permanent contract surface every implementation must preserve.
 
-**3a — `KERNEL.md` (current).** Six domains, 29 contracts, each with exactly four
+**3a — `KERNEL.md` (current).** Six domains, 31 contracts, each with exactly four
 sections (Purpose, Responsibilities, Invariants, Dependencies). No methods,
 fields, or language. Governed by Article X (kernel evolves through addition,
 never mutation; v1 contracts permanent).
 
 - Reality: `Sensor`, `Observation`, `Attachment`, `Event`
 - Knowledge: `Evidence`, `Entity`, `Fact`, `Belief`, `Prediction`
-- Identity: `DigitalTwin`, `Relationship`, `Project`, `Goal`, `Context`
+- Identity: `DigitalTwin`, `Relationship`, `Project`, `Goal`, `ContextSnapshot`,
+  `LiveContext`, `IdentityEvolution`
 - Intelligence: `Memory`, `Retriever`, `Reasoner`, `Planner`, `Reflector`
 - Execution: `Capability`, `Action`, `Policy`, `Scheduler`, `Agent`
 - Infrastructure: `Journal`, `Storage`, `Synchronization`, `ModelRouter`,

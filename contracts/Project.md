@@ -26,10 +26,14 @@ identity, not an implementation's folder.
 
 ## 1. Semantics
 
-A **Project** groups **Goals**, **Entities**, and observations under a sustained
-endeavor, tracking that endeavor's state over time. It answers *"what can change
-within this endeavor?"* — scope, progress, membership, and health all evolve.
-A Project is **interpretation**: recomputable and revisable, never truth.
+A **Project** is the *work* — the **how** — that advances one or more **Goals** (the
+**what**) over time, associating the **Entities** and observations involved and
+tracking that endeavor's state. It answers *"what can change within this endeavor?"* —
+scope, progress, membership, and health all evolve. The **Project↔Goal relation is
+many-to-many**, not hierarchical: one Project may advance several Goals, and one Goal
+may be advanced by several Projects. A Project is **not "a big Goal"** — outcome and
+work are distinct, and never collapse into one record. A Project is **interpretation**:
+recomputable and revisable, never truth.
 
 A Project is **not edited directly**. Its definition is stated (or inferred) as an
 Event; its evolving state is derived from the goals, entities, and evidence it

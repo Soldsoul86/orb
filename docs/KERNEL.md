@@ -38,7 +38,7 @@ of an existing one.
 | --- | --- | --- | --- |
 | 1 | **Reality** | How information enters Orb | Sensor, Observation, Attachment, Event |
 | 2 | **Knowledge** | How Orb understands reality | Evidence, Entity, Fact, Belief, Prediction |
-| 3 | **Identity** | How Orb models the user | DigitalTwin, Relationship, Project, Goal, Context |
+| 3 | **Identity** | How Orb models the user | DigitalTwin, Relationship, Project, Goal, ContextSnapshot, LiveContext, IdentityEvolution |
 | 4 | **Intelligence** | How Orb reasons | Memory, Retriever, Reasoner, Planner, Reflector |
 | 5 | **Execution** | How Orb affects the world | Capability, Action, Policy, Scheduler, Agent |
 | 6 | **Infrastructure** | The services every runtime depends upon | Journal, Storage, Synchronization, ModelRouter, Encryption |
@@ -96,8 +96,8 @@ learning cycle) are kernel contracts; the *transitions* themselves are not; thei
 
 | Kind | Count | Contracts |
 | --- | --- | --- |
-| **State** | 15 | Event, Observation, Attachment, Evidence, Entity, Fact, Belief, Prediction, DigitalTwin, Relationship, Project, Goal, Context, Action, Policy |
-| **Service** | 14 | Sensor, Memory, Retriever, Reasoner, Planner, Reflector, Capability, Scheduler, Agent, Journal, Storage, Synchronization, ModelRouter, Encryption |
+| **State** | 16 | Event, Observation, Attachment, Evidence, Entity, Fact, Belief, Prediction, DigitalTwin, Relationship, Project, Goal, ContextSnapshot, IdentityEvolution, Action, Policy |
+| **Service** | 15 | Sensor, Memory, Retriever, Reasoner, Planner, Reflector, LiveContext, Capability, Scheduler, Agent, Journal, Storage, Synchronization, ModelRouter, Encryption |
 
 Every contract below declares its kind, then defines exactly four sections:
 **Purpose**, **Responsibilities**, **Invariants**, **Dependencies**.
@@ -331,12 +331,15 @@ Prediction→Reasoner cycle.)
 
 # 3. Identity
 
-How Orb models the user. **Identity is not a profile; it is an evolving model.**
-Orb never stores "who the user is" — it stores the *continuously evolving
-understanding* of the user. Where Reality records history and Knowledge interprets
-it, **Identity accumulates continuity**: it answers "given everything Orb has
-learned, what context should influence future decisions?" Every contract here
-answers *"what can change?"* rather than *"what is true?"*.
+How Orb models the user. **Identity is not a profile; it is an evolving model** —
+*the runtime's current best explanation of a person, derived from history and
+continuously revised by new evidence.* A profile stores attributes; Orb stores
+understanding. Where Reality records history and Knowledge interprets it, **Identity
+accumulates continuity**: it answers "given everything Orb has learned, what context
+should influence future decisions?" Every contract here answers *"what can change?"*
+rather than *"what is true?"*. The **DigitalTwin is the pivot of the architecture**:
+everything before it understands the world; everything after it (Reasoning, Planning,
+Execution) acts within it by consulting the Twin.
 
 Each Identity contract decomposes into **immutable** (its creation event and
 original intent — append-only history), **derived** (recomputable from the journal:
@@ -348,25 +351,45 @@ everything except ephemeral runtime state.** Identity is never edited directly �
 emerges from observations, evidence, and user intent; manual edits enter as Events
 (Constitution Art. XII).
 
+**Process and history are separated.** The momentary situational frame is a *process*
+(`LiveContext`, a Service, recomputed and never persisted); the frame *retained for a
+decision* is *history* (`ContextSnapshot`, immutable State). They are distinct
+contracts because a process and a record must never share one. **Identity also
+explains itself**: every revision of the model is recorded as an `IdentityEvolution`
+— a first-class, immutable, evidence-grounded transition carrying the inference that
+drove it — so replay reconstructs not only the current Twin but *why* it changed
+(Constitution Art. XII §47).
+
 ## DigitalTwin
 *Kind — State.*
 
-**Purpose** — Orb's current best model of the user and their world.
+**Purpose** — Orb's current best explanation of the user and their world: the
+integrated, recomputable model every reasoning, planning, and execution component
+consults.
 
 **Responsibilities**
-- Hold the live set of entities, facts, beliefs, relationships, projects, goals,
-  and context.
-- Be continuously recomputed as evidence arrives.
-- Be fully rebuildable from history.
+- Hold the live set of entities, facts, beliefs, relationships, projects, goals, and
+  retained context snapshots, plus the recorded `IdentityEvolution` history.
+- Expose **facets** — recomputed, role-scoped views of the one model (e.g.
+  professional self, parent, investor, writer). Facets are *derived projections of a
+  single Twin*, never separate twins.
+- Be continuously recomputed as evidence arrives; be fully rebuildable from history.
 
 **Invariants**
 - Interpretation, never truth; holds no source-of-truth state.
 - Fully recomputable from the journal.
 - Everything it holds references evidence.
-- Immutable: its genesis/anchor event. Derived: the entire current model. Ephemeral:
-  the in-memory materialization/cache. The top aggregate — nothing depends on it.
+- **One user, one Twin** — the Twin never splits; multiple identities are modelled as
+  facets *inside* it. Apparent splits are constituent re-resolutions.
+- Immutable: its genesis/anchor event. Derived: the entire current model and its
+  facets. Ephemeral: the in-memory materialization/cache. The top aggregate — nothing
+  depends on it.
 
-**Dependencies** — Entity, Fact, Belief, Relationship, Project, Goal, Context.
+**Dependencies** — Entity, Fact, Belief, Relationship, Project, Goal, ContextSnapshot,
+IdentityEvolution. (Depends on `ContextSnapshot`, the immutable record — never on the
+`LiveContext` Service, which would violate Art. X §40. Aggregates `IdentityEvolution`
+so its change-history is rebuildable; `IdentityEvolution` never depends back on the
+Twin.)
 
 ## Relationship
 *Kind — State.*
@@ -389,26 +412,34 @@ located-at, and so on).
 ## Project
 *Kind — State.*
 
-**Purpose** — A coherent body of the user's ongoing work or intent that spans
-time.
+**Purpose** — A coherent body of the user's ongoing work — the *how* — that spans
+time. A Project answers "how?"; a Goal answers "what outcome?".
 
 **Responsibilities**
-- Group goals, entities, and observations under a sustained endeavor.
+- Associate the goals it advances, the entities involved, and observations under a
+  sustained endeavor. The Project↔Goal relation is **many-to-many**, not
+  hierarchical: one Project may pursue several Goals, and one Goal may be advanced by
+  several Projects.
 - Track the endeavor's state over time as interpretation.
 
 **Invariants**
 - Interpretation; recomputable; references evidence.
 - Revision is appended, never rewritten.
+- A Project is not "a big Goal" — it is the work-frame that advances Goals; the two
+  never collapse into one contract.
 - Immutable: creation event, original definition/intent. Derived: status, progress,
-  member goals/entities, health. Ephemeral: current focus item, suggested next step.
+  associated goals/entities, health. Ephemeral: current focus item, suggested next step.
 
-**Dependencies** — Goal, Entity, Belief.
+**Dependencies** — Goal, Entity, Belief. (References the Goals it advances; the edge
+is direction-only — a Goal never depends on a Project — so many-to-many association
+introduces no cycle.)
 
 ## Goal
 *Kind — State.*
 
 **Purpose** — A desired future state the user, or Orb on their behalf, intends to
-bring about.
+bring about — the *outcome* ("what?"). The work that pursues it lives in one or more
+Projects ("how?"); the Goal↔Project relation is many-to-many.
 
 **Responsibilities**
 - Express an objective.
@@ -422,34 +453,81 @@ bring about.
 - Immutable: creation event, original intent. Derived: progress, priority,
   confidence. Ephemeral: current focus, suggested next action, reminders.
 
-**Dependencies** — Belief. (Not Context: a durable Goal must not depend on the
-ephemeral situational frame — that edge created a `DigitalTwin → Goal → Context →
-DigitalTwin` cycle and inverted the durability direction. A Goal's intent is
-grounded in Belief; Context references active Goals, never the reverse.)
+**Dependencies** — Belief. (Not the situational frame: a durable Goal must not depend
+on the ephemeral context — that edge created a `DigitalTwin → Goal → Context →
+DigitalTwin` cycle and inverted the durability direction. A Goal's intent is grounded
+in Belief; the frame — now `LiveContext`/`ContextSnapshot` — references active Goals,
+never the reverse.)
 
-## Context
+## ContextSnapshot
 *Kind — State.*
 
-**Purpose** — The current situational frame: what is salient now — time, place,
-activity, attention.
+**Purpose** — The situational frame *retained as history* — the salient slice of the
+model captured at a moment (typically to explain a decision later).
 
 **Responsibilities**
-- Summarize the presently relevant slice of the twin.
-- Inform retrieval and planning.
-- Be continuously recomputed.
+- Record, immutably, the entities and active goals that were salient at a moment.
+- Provide a replayable frame for explainability (which context framed a decision).
 
 **Invariants**
-- Interpretation; derived; recomputable.
-- Never persisted as truth; references the observations and evidence that define
-  it.
-- The most ephemeral Identity contract. Immutable: the recorded event of a context
-  snapshot (if retained). Derived: the salient slice (relevant entities, active
-  goals). Ephemeral: current attention/focus — does not survive replay.
+- Immutable history once captured; never edited.
+- References the underlying State it captured (entities, goals); introduces no truth.
+- Immutable: the snapshot's creation event and captured slice. Derived: none.
+  Ephemeral: none. (A snapshot is pure history — the live frame that produced it is
+  `LiveContext`.)
 
-**Dependencies** — Entity, Goal. (Not DigitalTwin: Context summarizes the salient
-*elements* it points at — Entities and active Goals — not the aggregate twin.
-Depending on the twin created a `DigitalTwin ↔ Context` cycle; referencing the
-underlying State instead keeps Identity a DAG with the twin as the top aggregate.)
+**Dependencies** — Entity, Goal. (References the elements it captured, never the
+aggregate twin — keeping Identity a DAG with the Twin as the top aggregate.)
+
+## LiveContext
+*Kind — Service.*
+
+**Purpose** — The *process* that assembles the current situational frame — what is
+salient now (time, place, activity, attention) — from the Twin. The live counterpart
+of `ContextSnapshot`.
+
+**Responsibilities**
+- Continuously recompute the presently relevant slice of the model.
+- Inform retrieval and planning; emit a `ContextSnapshot` when a frame must be
+  retained as history (e.g. to explain a decision).
+
+**Invariants**
+- Ephemeral and recomputed; **never persisted as truth** — lost on replay and rebuilt
+  on demand. The durable record it produces is the `ContextSnapshot`.
+- Read-only over the Twin; introduces no truth; owns no durable state.
+
+**Dependencies** — DigitalTwin, Memory. (A Service may read State; it produces, but
+does not depend on, `ContextSnapshot`. Its responsibilities sit close to `Retriever` —
+LiveContext assembles the *frame*, Retriever ranks *memory within* it — and the two
+are kept distinct in the Intelligence review.)
+
+## IdentityEvolution
+*Kind — State.*
+
+**Purpose** — The immutable record of *why the model changed*: a first-class,
+evidence-grounded, explainable transition of identity.
+
+**Responsibilities**
+- Record a single revision of the model — the subject that changed (referenced by
+  identity), its before/after as observed at that moment, the confidence held, and
+  the timestamp.
+- Link to the **Evidence** that drove the change and the **Inference Record** that
+  interpreted it — *referencing* the explanation, never duplicating it.
+
+**Invariants**
+- Immutable history; append-only; never edited.
+- The **audit of a transition, not a source of truth** — it never supplies the
+  *current* derived value (which stays recomputable); it preserves the historical
+  fact that a revision occurred and why.
+- The explanation is a preserved model output, recorded not recomputed — replay
+  reproduces history, not intelligence (Art. III §13, Art. XII §47).
+- Immutable: the entire record (before, after, evidence, inference, confidence,
+  timestamp). Derived: none. Ephemeral: none.
+
+**Dependencies** — Evidence, InferenceRecord *(forthcoming — Intelligence domain)*.
+(References its subject of change by identity, as Evidence references what it bears
+upon; it never depends on the DigitalTwin, so the Twin may aggregate it without a
+cycle.)
 
 ---
 
@@ -489,7 +567,9 @@ intelligence draws upon.
 - Deterministic given the same inputs and index.
 - Returns only grounded references; introduces no truth.
 
-**Dependencies** — Memory, Context.
+**Dependencies** — Memory, LiveContext. (Retrieval is scoped by the live frame
+`LiveContext` assembles; the two services' boundary is drawn in the Intelligence
+review.)
 
 ## Reasoner
 *Kind — Service.*

@@ -2,8 +2,10 @@
 
 > Phase 3b architectural review. The Identity domain answers: **given everything
 > Orb has learned, what context should influence future decisions?** **Status:
-> Submitted for acceptance.** Specs:
-> `../../contracts/{DigitalTwin,Relationship,Project,Goal,Context}.md`.
+> Accepted (review round 2) — reviewer decisions applied; held for confirmation of
+> three follow-ups.** Specs: `../../contracts/{DigitalTwin,Relationship,Project,Goal,
+> ContextSnapshot,LiveContext,IdentityEvolution}.md`. Now **7 contracts** (5 State,
+> 1 Service, plus DigitalTwin) — the domain grew by two on purpose (see *Decisions*).
 
 ---
 
@@ -20,20 +22,80 @@ Where the prior two domains play different roles:
 - **Identity accumulates continuity** — the durable, evolving frame that gives that
   interpretation a *self to be about*, persisting across years.
 
-This principle is ratified into the Constitution as **Article XII — Identity and
-Continuity** (laws 44–46):
+The reviewer sharpened the definition, now canonical: **Identity is the runtime's
+current best explanation of a person, derived from history and continuously revised by
+new evidence.** A profile stores attributes; Orb stores understanding. Identity is not
+edited — it *emerges*: observations accumulate → evidence accrues → beliefs change →
+the Twin evolves → identity changes.
 
-44. **Identity is an evolving model, not a profile.** Every Identity contract answers
-    "what can change?", never "what is true?".
+This principle is ratified into the Constitution as **Article XII — Identity and
+Continuity** (laws 44–47):
+
+44. **Identity is an evolving model, not a profile** — the runtime's current best
+    explanation of a person. Answers "what can change?", never "what is true?".
 45. **Identity is never edited directly.** It emerges from observations, evidence, and
     user intent; a manual correction enters history as an Event. Nothing bypasses
     history.
 46. **A complete replay reconstructs everything except ephemeral runtime state.** This
     is the test for every Identity contract.
+47. **Identity does not only evolve — it explains why it evolved.** Every revision is a
+    first-class, immutable, evidence-grounded, explainable transition; the explanation
+    is preserved as history, never recomputed (replay reproduces history, not
+    intelligence). *Added this round to anchor the `IdentityEvolution` contract.*
 
 ---
 
-## The new invariant, applied to all five contracts
+## Decisions applied (review round 2)
+
+The reviewer accepted the domain and directed five changes; all are applied. They make
+the domain sharper, and they grow it by two contracts (5 → 7) — a deliberate, justified
+exception to "the kernel should shrink," because each addition removes a conflation
+rather than adding scope.
+
+1. **Sharper definition adopted** — "the runtime's current best explanation of a
+   person…" — woven into Constitution §44, the kernel intro, and `DigitalTwin`.
+
+2. **Context split into process + history.** The old `Context` State contract conflated
+   a *running process* with a *historical record*. Now:
+   - **`LiveContext`** *(Service)* — the ephemeral assembler of the salient frame; never
+     persisted; recomputed on demand; emits snapshots.
+   - **`ContextSnapshot`** *(State)* — the immutable frame retained for explainability.
+   *Rule honoured:* a process and a record must never share a contract. This also
+   cleanly resolves the Twin↔Context dependency (the Twin now depends on the immutable
+   `ContextSnapshot`, never on the `LiveContext` Service — Art. X §40).
+
+3. **DigitalTwin stays singular; personas are facets.** One Twin per user, never split.
+   Multiple identities (professional self, parent, investor, writer, researcher) are
+   **facets** — recomputed role-scoped *views* of the one model. *Engineering call:* a
+   facet is modelled as a **derived projection within `DigitalTwin`, not a new
+   contract** — promote it only if facets later need their own creation events/evolution
+   (flagged as follow-up Q1). Modelling personas as separate twins is forbidden: it
+   makes replay intractable.
+
+4. **Project ↔ Goal is many-to-many, not hierarchical.** A **Goal** is an *outcome*
+   ("what?"); a **Project** is the *work* ("how?"). One Goal may be advanced by many
+   Projects; one Project may advance many Goals. The dependency stays `Project → Goal`
+   (direction-only — a Goal never depends on a Project), so many-to-many introduces no
+   cycle and needs no join contract. "A Project is not a big Goal" is frozen as an
+   invariant. Removed the old nesting/containment language from `Goal` and `Project`.
+
+5. **`IdentityEvolution` added (State) — identity explains its own change.** A
+   first-class, immutable record of *why* the model changed: subject, before/after,
+   confidence, timestamp, the **Evidence** that drove it, and the **Inference Record**
+   that interpreted it. Two boundaries were enforced during authoring, because the naive
+   version would have violated the Constitution:
+   - **It references the Inference Record's reasoning; it never duplicates it** — else a
+     second source of truth (Art. IX §33).
+   - **Its before/after is an audit of a transition, never the source of the current
+     value** — the current derived value stays recomputable; this record is the *reason*,
+     not the *value* (Art. II §9).
+   The constitutional justification for first-classing it: the *explanation* is a model
+   output, and **replay reproduces history, not intelligence** (Art. III §13) — so the
+   reason cannot be faithfully recomputed and must be recorded. Hence law §47.
+
+---
+
+## The new invariant, applied to all contracts
 
 > **Identity is never edited directly.** Identity emerges from observations, evidence,
 > and user intent. Manual edits become Events. Nothing bypasses history.
@@ -46,7 +108,7 @@ reinforces Art. I (append-only history).
 
 ---
 
-## The replay test, applied to all five contracts
+## The replay test, applied to all contracts
 
 > **What survives a complete replay? Everything except ephemeral runtime state.**
 
@@ -64,9 +126,17 @@ does not, and nothing of value depends on it. This satisfies Constitution Art. X
 | --- | --- | --- | --- |
 | **Goal** | creation event; original intent | progress; priority; confidence | current focus; suggested next action; temporary reminders |
 | **Relationship** | creation event; originally asserted connection (endpoints + type) | confidence; strength; active/dormant status | current salience |
-| **Project** | creation event; original definition/intent | status; progress; member goals/entities; health | current focus item; suggested next step |
-| **Context** | creation event of a retained *snapshot* (if any) | the salient slice (selected members + weighting) | current attention/focus; assembly buffers |
-| **DigitalTwin** | genesis / anchor event | the entire current model | in-memory materialization |
+| **Project** | creation event; original definition/intent | status; progress; associated goals/entities; health | current focus item; suggested next step |
+| **ContextSnapshot** | the entire record (creation event + captured slice) | none | none |
+| **LiveContext** *(Service)* | none (its snapshots belong to `ContextSnapshot`) | none stored | the live frame, attention, assembly buffers |
+| **IdentityEvolution** | the entire record (subject, before/after, evidence, inference, confidence, timestamp) | none | none |
+| **DigitalTwin** | genesis / anchor event | the entire current model + facets | in-memory materialization |
+
+Note the two ends of the spectrum the split produced: **`ContextSnapshot`** and
+**`IdentityEvolution`** are *all-immutable* (pure history, nothing recomputed),
+while **`LiveContext`** is *all-ephemeral* (a process that stores nothing). That is the
+point of separating process from history — each contract now sits cleanly at one end
+rather than straddling both, as the old `Context` did.
 
 The decomposition reads cleanly **outward**: durability decreases left to right, and
 the ephemeral column is exactly what may be lost on replay without loss of value.
@@ -79,17 +149,20 @@ the ephemeral column is exactly what may be lost on replay without loss of value
 | --- | --- | --- |
 | **DigitalTwin** | State | The integrated, recomputable model of the user's world — the single point where all Identity strands compose. Holds no truth of its own; one per user. The most durable contract in the kernel. |
 | **Relationship** | State | A typed, evidence-grounded, confidence-bearing connection between Entities that forms, strengthens, decays, and ends over years — first-class continuity, not a foreign key. |
-| **Project** | State | A sustained endeavor that outlasts any single goal — the durable frame under which goals, entities, and observations cohere for months or decades. |
-| **Goal** | State | The source of intent planning reasons toward: durable, evidence-grounded, immutable in its original intent, never itself an authority to act. |
-| **Context** | State | The recomputable salient slice that focuses reasoning on what matters now — the contract for *relevance*, derivable from history rather than held in a process. |
+| **Project** | State | The *work* ("how?") that advances Goals over time, associating the entities and observations involved — many-to-many with Goal, never a hierarchy. |
+| **Goal** | State | The *outcome* ("what?") planning reasons toward: durable, evidence-grounded, immutable in its original intent, never itself an authority to act. |
+| **ContextSnapshot** | State | The situational frame *retained as history* — the immutable, replayable slice that keeps a decision explainable for years. |
+| **LiveContext** | Service | The *process* that assembles the salient frame now, from the Twin; stateless, recomputed, emits snapshots. The live counterpart of `ContextSnapshot`. |
+| **IdentityEvolution** | State | The immutable record of *why* the model changed — subject, before/after, evidence, inference, confidence — so replay rebuilds not just the Twin but the reasons it evolved. |
 
-All five answer the justification question convincingly, and each passes the **20-year
-test**: the *frame* each defines (an endeavor, a tie, an intent, a relevant slice, the
-whole model) is stable for decades while its *content* evolves continuously. None is a
-candidate for demotion to implementation. The nearest-overlap pair — **Project vs.
-Goal** — is kept distinct: a Goal is a single intent; a Project is a sustained frame
-that *gathers* goals, entities, and observations. (Project depends on Goal, not the
-reverse.)
+All seven answer the justification question convincingly, and each passes the **20-year
+test**: the *frame* each defines (an endeavor, a tie, an outcome, a retained or live
+slice, a recorded reason, the whole model) is stable for decades while its *content*
+evolves. None is a candidate for demotion to implementation. Two near-overlaps were
+resolved this round: **Project vs. Goal** (work vs. outcome, many-to-many — kept
+distinct) and **LiveContext vs. ContextSnapshot** (process vs. history — split into two
+contracts). A third overlap, **LiveContext vs. Retriever**, is flagged for the
+Intelligence review (follow-up Q below).
 
 ---
 
@@ -99,34 +172,51 @@ Directed edges = "depends on". `*` marks a cross-domain edge (into Knowledge/Rea
 both already accepted). All edges point **backward** into accepted domains or *down*
 the Identity stack — never forward.
 
+State contracts (the spine that the Twin aggregates):
+
 ```
-Relationship → Entity*, Belief*                              (Knowledge)
-Goal         → Belief*                                       (Knowledge)
-Project      → Goal, Entity*, Belief*
-Context      → Entity*, Goal
-DigitalTwin  → Entity*, Fact*, Belief*, Relationship, Project, Goal, Context
+Relationship      → Entity*, Belief*                          (Knowledge)
+Goal              → Belief*                                   (Knowledge)
+Project           → Goal, Entity*, Belief*                    (many-to-many w/ Goal)
+ContextSnapshot   → Entity*, Goal
+IdentityEvolution → Evidence*, InferenceRecord* (forthcoming) (Knowledge/Intelligence)
+DigitalTwin       → Entity*, Fact*, Belief*, Relationship, Project, Goal,
+                    ContextSnapshot, IdentityEvolution
+```
+
+The one Service in the domain (depends on State + Service; nothing State depends on it):
+
+```
+LiveContext (Service) → DigitalTwin, Memory ;  emits ⇒ ContextSnapshot (State)
+Retriever   (Service) → Memory, LiveContext   (Intelligence; boundary flagged below)
 ```
 
 ```
-        Knowledge plane:  Entity, Fact, Belief
-                              ▲   ▲   ▲
-        ┌─────────────┬───────┘   │   └────────┬──────────────┐
-        │             │           │            │              │
-   ┌────┴─────┐  ┌────┴─────┐ ┌───┴────┐  ┌────┴────┐         │
-   │   Goal   │  │Relationship│ │ Context│  │ Project │        │
-   └────┬─────┘  └────┬─────┘ └───┬────┘  └────┬────┘         │
-        │  (Project→Goal)         │ (Context→Goal)            │
-        └──────────┬──────────────┴───────────┬──────────────┘
-                   ▼                           ▼
-              ┌────────────────────────────────────┐
-              │            DigitalTwin              │  ← top aggregate
-              └────────────────────────────────────┘
-                 (nothing depends on the Twin)
+   Knowledge plane:  Entity, Fact, Belief        Evidence, InferenceRecord(fwd)
+                         ▲   ▲   ▲                     ▲
+   ┌──────────┬─────────┘   │   └──────┬─────────┐     │
+   │          │             │          │         │     │
+┌──┴───┐ ┌────┴───────┐ ┌───┴──────┐ ┌─┴─────┐ ┌─┴──────────────┐
+│ Goal │ │Relationship│ │ContextSnap│ │Project│ │IdentityEvolution│
+└──┬───┘ └────┬───────┘ └───┬──────┘ └──┬────┘ └─────┬──────────┘
+   │ (Project→Goal)         │           │            │
+   └─────────┬──────────────┴───────────┴────────────┘
+             ▼
+        ┌──────────────────────────────────────┐
+        │             DigitalTwin              │  ← top aggregate / pivot
+        └──────────────────────────────────────┘
+                 ▲  (reads, never depended-on)
+                 │
+        ┌────────┴────────┐
+        │   LiveContext   │  (Service) ── emits ──▶ ContextSnapshot
+        └─────────────────┘
 ```
 
-**DigitalTwin is the top aggregate**: it depends on every other Identity contract (and
-on Knowledge State directly), and **nothing depends on it** — a pure sink. This makes
-the Identity domain a DAG with a single integration point.
+**DigitalTwin is the top aggregate and the architecture's pivot**: it depends on every
+Identity State contract (and on Knowledge State directly), and **no State depends on
+it**. The one Service, `LiveContext`, *reads* the Twin and *emits* `ContextSnapshot`s
+but is depended on by no State — so the State graph remains a DAG with a single
+integration point, and Art. X §40 (State never depends on a running process) holds.
 
 ---
 
@@ -155,10 +245,25 @@ now resolved in `KERNEL.md`.
   Evidence) that express it, never in a transient context. Context depends on Goal,
   not the reverse.
 
-**After amendment:** **No cycles exist.** The Identity domain is a DAG; every edge
+*(In round 2, `Context` became `ContextSnapshot`; the resolutions above carry over —
+`ContextSnapshot → Entity, Goal`, `Goal → Belief` — unchanged.)*
+
+**Round-2 additions introduce no new cycles.**
+- **`LiveContext` (Service) → DigitalTwin, Memory.** A Service depending on State is
+  legal; the Twin depends on `ContextSnapshot` (State), never on `LiveContext`, so no
+  State→Service edge exists (Art. X §40 holds). `LiveContext` *emits* `ContextSnapshot`
+  — a production edge, not a dependency.
+- **`IdentityEvolution` → Evidence, InferenceRecord.** It references its *subject* by
+  identity (like Evidence "bears upon" a target), so it does **not** depend on Goal/
+  Relationship/Twin. The Twin aggregates it (`DigitalTwin → IdentityEvolution`); since
+  IdentityEvolution has no edge back to the Twin, the aggregation is acyclic.
+- **`Retriever → LiveContext`** (Intelligence) is Service→Service and does not close a
+  loop, since `LiveContext` does not depend on `Retriever`.
+
+**After both rounds:** **No cycles exist.** The Identity domain is a DAG; every edge
 points backward into accepted Knowledge/Reality State or downward to the DigitalTwin
 sink. The durability gradient is respected end-to-end: **nothing durable depends on
-anything more ephemeral than itself.**
+anything more ephemeral than itself**, and **no State depends on a running process.**
 
 ### The rule that prevents recurrence
 
@@ -168,8 +273,10 @@ process* — extended in spirit by an Identity-specific reading surfaced by this
 
 > **Durable identity never depends on ephemeral identity.** A longer-lived frame
 > (Goal, Project, the Twin) is grounded in evidence and durable members, never in a
-> shorter-lived one (Context). Aggregates depend on their parts; parts never depend on
-> the aggregate.
+> shorter-lived one. Aggregates depend on their parts; parts never depend on the
+> aggregate. And the sharpest form, vindicated by the round-2 split: **a process and a
+> record are never the same contract** — the live frame is `LiveContext` (Service), the
+> kept frame is `ContextSnapshot` (State).
 
 This is the structural finding of the domain: it keeps the dependency graph aligned
 with the durability gradient, which is what guarantees the replay test holds for every
@@ -179,12 +286,14 @@ contract.
 
 ## Hidden State
 
-State that lives outside the five State contracts, and why it is permissible:
+State that lives outside the State contracts, and why it is permissible:
 
 - **DigitalTwin in-memory materialization** (assembled, indexed, query-ready model) —
   ephemeral by declaration; rebuilt from the journal on demand. Not source-of-truth.
-- **Context attention/focus and assembly buffers** — ephemeral runtime working state;
-  recomputed from the durable Twin and the situation. Not source-of-truth.
+- **LiveContext frame, attention, assembly buffers** — now an explicit Service whose
+  entire footprint is ephemeral runtime working state; recomputed from the durable Twin.
+  Anything worth keeping is emitted as an immutable `ContextSnapshot`. Not
+  source-of-truth.
 - **Relationship salience / Project focus item / Goal suggested next action** — the
   ephemeral edges of those contracts; lost on replay by design, recomputed from
   derived state.
@@ -203,20 +312,27 @@ consistent with Art. I §3 and Art. XII §46. The ephemeral column is exactly �
 
 Articles exercised by the Identity domain:
 
-- **Article XII — Identity and Continuity** (all five): evolving model not a profile
-  (§44); never edited directly (§45); replay reconstructs everything but ephemeral
-  state (§46). This domain is the primary exercise of Article XII.
-- **Article II — Truth and Interpretation** (all five): identity is recomputable,
-  revisable interpretation grounded in evidence; never asserted as truth.
-- **Article I — History** (all five): immutable creation/anchor events; revision is
-  append-only; manual edits enter as Events.
-- **Article VII — Capabilities and Human Agency** (Goal): a Goal is the source of
-  intent but **never an authority to act** — planning proposes, permission gates.
+- **Article XII — Identity and Continuity** (all): evolving model not a profile (§44);
+  never edited directly (§45); replay reconstructs everything but ephemeral state (§46);
+  **and identity explains why it evolved (§47, added this round)**. This domain is the
+  primary exercise of Article XII.
+- **Article III — Models and Reasoning** (IdentityEvolution): the explanation of a
+  change is a recorded model output; replay reproduces history, not intelligence
+  (§12–13). Newly exercised this round via `IdentityEvolution`.
+- **Article II — Truth and Interpretation** (all): identity is recomputable, revisable
+  interpretation grounded in evidence; never asserted as truth. `IdentityEvolution` is
+  audit, not a second source of truth (§9).
+- **Article I — History** (all): immutable creation/anchor events; revision is
+  append-only; `ContextSnapshot` and `IdentityEvolution` are pure history.
+- **Article V — The Runtime** (LiveContext): a Service that owns no durable state and is
+  lost-then-rebuilt on restart (§22).
+- **Article VII — Capabilities and Human Agency** (Goal): a Goal is the source of intent
+  but **never an authority to act** — planning proposes, permission gates.
+- **Article X §40** (LiveContext / the whole domain): no State depends on a running
+  process — the Twin depends on `ContextSnapshot`, never on `LiveContext`.
 
-Not exercised here (belong to later domains): Art. III (Models/Reasoning — the scoring
-services live in Intelligence), IV (Distribution), V (Runtime), VI (Three Planes), VIII
-(Ownership/Trust), IX (Engineering), X/XI (already applied — versioning and the
-dependency-direction law).
+Not exercised here (belong to later domains): Art. IV (Distribution), VI (Three Planes),
+VIII (Ownership/Trust), IX (Engineering).
 
 ---
 
@@ -232,53 +348,80 @@ All additive under Article X (v1 contracts remain valid forever):
   — added and versioned; the Twin stays a recomputable projection that holds no truth.
 - **New strength/health/progress/relevance scoring strategies** — implementation behind
   the contracts; derived values may change over time, but the immutable cores never move.
-- **Context snapshot retention policy** — implementation may evolve *when* a live
-  context is retained as an immutable snapshot for explainability, without changing the
-  contract.
+- **ContextSnapshot retention policy** — implementation may evolve *when* `LiveContext`
+  retains a frame as an immutable snapshot, without changing either contract.
+- **New IdentityEvolution subject kinds** (goal-confidence, relationship-strength,
+  belief-revision, facet-metric, …) — added and versioned; the audit-not-truth
+  obligation is frozen.
+- **Facets** — currently a derived projection within the Twin; may be **promoted to a
+  first-class contract** later if they need their own creation events and evolution
+  (additive under Art. X; would not change the existing Twin contract).
 
 ---
 
-## Questions for the reviewer
+## Questions — round 1 resolved; three follow-ups open
 
-1. **Context's dual nature (live vs. snapshot).** Context is the only contract whose
-   *default* instance is almost entirely ephemeral, becoming immutable only when a
-   snapshot is deliberately retained for explainability. Is this dual treatment correct,
-   or should decision-framing snapshots be a *separate* contract (e.g. `ContextSnapshot`)
-   so that "live Context" carries no immutable core at all? The current spec keeps them
-   one contract to avoid kernel growth; flagging in case you prefer the split.
+The three questions raised in round 1 were all answered by the reviewer and applied:
 
-2. **DigitalTwin "one per user / does not split."** The Twin is specified as singular
-   and non-splitting; apparent splits are constituent re-resolutions. Do you accept the
-   Twin as a strict singleton, or should multi-twin scenarios (e.g. a sharply separated
-   work persona vs. personal persona) be modeled as first-class rather than as Context
-   dimensions over one Twin?
+1. **Context dual nature → split.** `LiveContext` (process/Service) + `ContextSnapshot`
+   (history/State). Applied.
+2. **DigitalTwin singleton → confirmed, with facets.** One Twin; personas are facets.
+   Applied (facets as a derived view).
+3. **Project vs. Goal → confirmed distinct, sharpened to many-to-many** (work vs.
+   outcome). Applied.
 
-3. **Project vs. Goal boundary.** Kept distinct (Project = sustained frame that gathers
-   Goals; Goal = single intent). Confirm this is the intended cut, and that "a Project
-   is not just a big Goal" is the right invariant to freeze at v1.
+Three new follow-ups, surfaced by the round-2 changes — design confirmations, **not
+blockers**:
 
-These are design confirmations, not blockers; the domain is internally consistent under
-either resolution.
+1. **Facet — derived view or first-class contract?** I modelled facets as a *derived
+   projection within `DigitalTwin`* to avoid kernel growth. If you want facets to carry
+   their own creation events, lifecycle, and `IdentityEvolution` (e.g. "the day the
+   *investor* facet began"), they should be promoted to a contract. Recommend: keep
+   derived for v1; promote only when a concrete need appears.
+
+2. **LiveContext vs. Retriever — draw the boundary now.** Both Services sit between
+   Memory and reasoning. My working split: **LiveContext assembles the *frame* (what is
+   salient now); Retriever ranks *memory within* that frame.** This must be confirmed or
+   merged in the **Intelligence review**, or the kernel risks two services doing one job.
+   Flagged so the Intelligence domain resolves it explicitly rather than inheriting an
+   overlap.
+
+3. **IdentityEvolution ↔ InferenceRecord — confirm the reference boundary.** I made
+   `IdentityEvolution` *reference* the `InferenceRecord` (the reasoning) rather than
+   embed it, and made before/after an *audit* that never supplies the current value.
+   This keeps it from becoming a second source of truth. Confirm this is the intended
+   relationship before `InferenceRecord` is finalized in Intelligence.
 
 ---
 
 ## Recommendation
 
-**Amend (applied) → submit for acceptance.**
+**Accepted (round 2) — reviewer decisions applied.**
 
-Three structural defects in the draft (`DigitalTwin ↔ Context`, the transitive
-`DigitalTwin → Goal → Context → DigitalTwin`, and the inverted `Goal → Context`) are
-resolved by one Identity-specific reading of the ratified dependency-direction law:
-*durable identity never depends on ephemeral identity; aggregates depend on their
-parts, never the reverse.* With the fixes applied (`Context → Entity, Goal`;
-`Goal → Belief`), the Identity domain is **acyclic**, with **DigitalTwin as the single
-top aggregate**, every edge pointing backward into accepted Knowledge/Reality or down to
-the Twin sink. Every contract carries the Immutable/Derived/Ephemeral decomposition, the
-never-edited-directly invariant, and an explicit replay test, and every contract passes
-the 20-year test. The domain is minimal, fully grounded, and closed under the
-Constitution (now extended by Article XII). **Held for the reviewer's acceptance**
-before the Intelligence domain; the three Questions above are design confirmations that
-do not block acceptance.
+*Round 1* fixed three structural defects (`DigitalTwin ↔ Context`, the transitive
+`DigitalTwin → Goal → Context → DigitalTwin`, and the inverted `Goal → Context`) via one
+reading of the dependency-direction law: *durable identity never depends on ephemeral
+identity; aggregates depend on their parts.*
+
+*Round 2* applied the reviewer's five decisions, which sharpen the domain by removing two
+conflations: **process vs. history** (Context → `LiveContext` Service + `ContextSnapshot`
+State) and **value vs. reason** (the new `IdentityEvolution` records *why* the model
+changed). It also confirmed **one faceted Twin** and a **many-to-many Project↔Goal**
+relation (work vs. outcome). Constitution Art. XII gained **§47** to anchor explainable
+evolution.
+
+The domain is now **7 contracts** (DigitalTwin, Relationship, Project, Goal,
+ContextSnapshot, IdentityEvolution — State; LiveContext — Service), **acyclic** in its
+State graph, with **DigitalTwin as the single top aggregate and architectural pivot**,
+**no State depending on any running process** (Art. X §40), every contract carrying the
+Immutable/Derived/Ephemeral decomposition and an explicit replay test, and every contract
+passing the 20-year test. Kernel totals updated to **31 contracts (16 State, 15
+Service)**.
+
+**Held for confirmation of the three follow-ups above** (facet promotion; LiveContext↔
+Retriever boundary; IdentityEvolution↔InferenceRecord reference) — none blocks
+acceptance. The LiveContext↔Retriever boundary and the `InferenceRecord` contract carry
+forward into the **Intelligence** domain review.
 
 ---
 
@@ -295,7 +438,8 @@ do not block acceptance.
 - **Begins** when intent is observed — the user states an objective, or Orb infers one
   from evidence — anchored to a creation event and an original intent that never change.
 - **Evolves** as evidence accumulates: progress, priority, and confidence are
-  recomputed; it may nest under a Project.
+  recomputed; it may be advanced by one or more Projects (many-to-many — outcome vs.
+  work).
 - **Decays** when intent fades: confidence falls and the Goal goes dormant — retained,
   recoverable if intent returns.
 - **Merges** when two Goals are found to express one intent (recorded re-resolution;
@@ -336,21 +480,41 @@ do not block acceptance.
 - **Ends** by **completion**, **abandonment**, or **supersession** — recorded; the
   Project and its trajectory remain history.
 
-## Context
+## LiveContext *(process — lives in the present only)*
 
 - **Begins** when a situation calls for a frame — a task starts, an observation arrives,
-  the user asks something — and Orb assembles a salient slice over relevant Entities and
-  Goals.
+  the user asks something — and the Service assembles a salient slice over relevant
+  Entities and Goals from the Twin.
 - **Evolves** as the situation shifts: members added/dropped, relevance re-weighted, the
   frame tightened as evidence narrows what matters.
-- **Decays** as the moment passes: relevance fades; a live context simply dissolves
-  (it held nothing of value to lose).
-- **Merges** when two concurrent frames are recognized as one situation (recorded only
-  for retained snapshots).
-- **Splits** when one frame conflated two situations and is re-assembled as two
-  (recorded only for retained snapshots).
-- **Ends** by dissolution (live context) or by being closed and kept as an immutable
-  **snapshot** when explainability requires it.
+- **Decays** the instant the moment passes: the frame simply dissolves — it held nothing
+  of value to lose.
+- **Merges / Splits** — not applicable to the live process; concurrent or conflated
+  frames are just reassembled. (Any merge/split that matters is recorded on the
+  *snapshots* it emitted.)
+- **Ends** by dissolution. Anything worth keeping was already emitted as a
+  `ContextSnapshot`; the process itself leaves no residue.
+
+## ContextSnapshot *(history — frozen at capture)*
+
+- **Begins** when `LiveContext` retains a frame — typically as a decision is framed —
+  capturing the salient slice as an immutable record.
+- **Evolves / Decays** — it does neither. A snapshot is frozen at capture; change means a
+  *new* snapshot, and history never decays.
+- **Merges / Splits** — never in place; if two snapshots are later read as one (or one as
+  two), that is a new recorded interpretation, leaving the originals intact.
+- **Ends** — never erased. It persists as long as the journal, keeping its decision
+  explainable.
+
+## IdentityEvolution *(history — the reason a value changed)*
+
+- **Begins** when a revision to the model is committed — a Reasoner concludes a value
+  should change — recording subject, before/after, evidence, inference, confidence, time.
+- **Evolves / Decays** — it does neither; each record is frozen. A further change is a
+  *new* record, forming an append-only **chain of reasons** per subject.
+- **Merges / Splits** — only by recorded re-interpretation; originals stand.
+- **Ends** — never erased. The chain is the model's permanent explanation of itself; a
+  contradicted reason stays in history beside its correction.
 
 ## DigitalTwin
 
@@ -370,8 +534,15 @@ do not block acceptance.
 
 ---
 
-> **The shared shape.** Every Identity contract is *born from an event*, *evolves by
-> recomputation*, *decays into dormancy rather than deletion*, *re-resolves by recorded
-> merge/split*, and *ends into preserved history*. That uniformity is the proof that
-> Identity is a living, replayable system: continuity accumulates, nothing of value is
-> ever lost, and a complete replay reconstructs everything except the ephemeral edge.
+> **The shared shape — and the two clean ends.** The *evolving* contracts (Goal,
+> Relationship, Project, DigitalTwin) are each *born from an event*, *evolve by
+> recomputation*, *decay into dormancy rather than deletion*, *re-resolve by recorded
+> merge/split*, and *end into preserved history*. The round-2 split added the two pure
+> ends of the spectrum: the **pure-history** contracts (`ContextSnapshot`,
+> `IdentityEvolution`) do not evolve at all — they are frozen at capture and accrete as
+> append-only chains; the **pure-process** contract (`LiveContext`) evolves only in the
+> present and leaves no residue but the snapshots it emits. That separation is the proof
+> the domain is now a clean living system: each contract sits at exactly one place on the
+> process↔history axis, continuity accumulates, nothing of value is ever lost, and a
+> complete replay reconstructs the whole model **and the reasons it changed** — losing
+> only the live frame, which is exactly what a process is allowed to lose.
