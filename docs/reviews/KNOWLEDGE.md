@@ -1,8 +1,39 @@
 # Domain Integrity Report — 2. Knowledge
 
 > Phase 3b architectural review. The Knowledge domain answers: **how Orb
-> understands reality.** Reviewed before freezing. Specs:
-> `../../contracts/{Evidence,Entity,Fact,Belief,Prediction}.md`.
+> understands reality.** **Status: Accepted** (with the decisions below applied).
+> Specs: `../../contracts/{Evidence,Entity,Fact,Belief,Prediction}.md`.
+
+---
+
+## Decisions (ratified)
+
+1. **"Persistent state shall never depend on a running process"** is ratified as a
+   kernel-wide law — Constitution **Article X §40** — strengthening the earlier
+   "State never depends on a Service." A State contract depends only on State (or
+   nothing); a Service's derivation is referenced through the immutable record it
+   produced, never the live process. This guarantees replay is always possible.
+2. **Fact and Belief are kept as distinct epistemic objects** (not two confidence
+   levels of one claim). A **Fact** is the runtime's best-supported *objective*
+   statement ("the meeting lasted 43 minutes"), persisting until contradicted by
+   better evidence; a **Belief** is *contextual* ("this customer is becoming
+   disengaged") and may disappear tomorrow. Neither reclassifies into the other.
+   The stack is `Observation → Evidence → Fact → Belief`, so **Belief now depends
+   on Fact**.
+3. **Prediction is kept separate** — it is where Orb learns. The loop
+   `Belief → Prediction → Reality → Observation → Belief Revision` is the basis of
+   continuous learning.
+4. **"Model-output Evidence" is renamed to `Inference Record`** and made a *distinct
+   kind of State*, not Evidence. **Evidence is external grounding only**
+   (observation, attachment, external source); the model contributes an Inference
+   Record that explains *how* evidence was interpreted. The `InferenceRecord`
+   contract is specified together with its producer, the `Reasoner`, in the
+   **Intelligence** domain review (kernel State count then grows by one under
+   Article X). Knowledge contracts already reference it by name.
+5. **`Claim` is logged as Architectural Debt** (`../ARCHITECTURAL_DEBT.md`, item
+   AD-1) for evaluation in v2 — a layer between Evidence and Fact for statements
+   *people make* ("John likes Rust"), distinct from runtime Facts and Beliefs.
+   Phase 3 does not stop for it.
 
 ---
 
@@ -10,17 +41,16 @@
 
 | Contract | Kind | Why it deserves to be a permanent kernel contract (summary) |
 | --- | --- | --- |
-| **Evidence** | State | The grounding of all interpretation: the immutable, polarity-bearing link between what was observed and what it bears upon. Also where a model's derivation is recorded as history. |
+| **Evidence** | State | The grounding of all interpretation: the immutable, polarity-bearing link between what was observed and what it bears upon. **External grounding only** — a model's reading is an Inference Record, not Evidence. |
 | **Entity** | State | The resolved *subject* interpretation is about — one subject inferred across many signals; recomputable and revisable by merge/split. |
-| **Fact** | State | The claim Orb currently relies upon: "settled until contradicted," distinct from both raw observation and uncertain belief. |
-| **Belief** | State | Interpretation held with explicit confidence and provenance — how Orb represents what it thinks and how strongly, never as truth. |
+| **Fact** | State | The runtime's best-supported *objective* statement, grounded in evidence; persists until contradicted. A distinct object from Belief. |
+| **Belief** | State | *Contextual* interpretation held with confidence — how Orb represents what it thinks and how strongly, never as truth. May disappear as context shifts. |
 | **Prediction** | State | A falsifiable belief about the future: the recorded expectation that lets Reflection check understanding against reality. |
 
 All five answer the justification question convincingly. None is a candidate for
-demotion to implementation. (Note: the present-tense vs. future-tense split between
-**Belief** and **Prediction**, and the stance split between **Belief** and **Fact**,
-are flagged in Questions for explicit ratification — they are the domain's only
-near-overlaps.)
+demotion to implementation. The Belief/Fact and Belief/Prediction distinctions —
+the domain's only near-overlaps — were the subject of review Questions 2–3 and are
+ratified as **distinct objects** (see *Decisions*).
 
 ---
 
@@ -34,31 +64,42 @@ one-directional.
 Evidence    → Observation*, Event*, Attachment*   (Reality)
 Entity      → Evidence
 Fact        → Evidence, Entity
-Belief      → Evidence, Entity
+Belief      → Evidence, Entity, Fact
 Prediction  → Belief, Evidence
 ```
 
 ```
-         Reality plane
-   Observation, Event, Attachment
-              ▲
-              │ (depends on)
-        ┌─────┴──────┐
-        │  Evidence  │◀───────────────┐──────────────┐
-        └─────┬──────┘                │              │
-              ▲                        │              │
-        ┌─────┴──────┐          ┌──────┴─────┐  ┌─────┴──────┐
-        │   Entity   │◀─────────│   Belief   │  │    Fact    │
-        └─────┬──────┘          └──────┬─────┘  └────────────┘
-              ▲                        ▲   (Entity ◀── Fact too)
-              │                  ┌─────┴──────┐
-              └──────────────────│ Prediction │
-                  (via Belief)   └────────────┘
+   Reality plane: Observation, Event, Attachment
+                     ▲
+                     │ (depends on)
+              ┌──────┴──────┐
+              │  Evidence   │
+              └──────┬──────┘
+                     ▲
+              ┌──────┴──────┐
+              │   Entity    │
+              └──────┬──────┘
+                     ▲
+              ┌──────┴──────┐
+              │    Fact     │
+              └──────┬──────┘
+                     ▲
+              ┌──────┴──────┐
+              │   Belief    │
+              └──────┬──────┘
+                     ▲
+              ┌──────┴──────┐
+              │ Prediction  │
+              └─────────────┘
 ```
 
-Intra-domain topological order (no back-edges): `Evidence` → `Entity` →
-`{Fact, Belief}` → `Prediction`. All cross-domain edges point *backward* into
-Reality (already accepted), never forward.
+With **Belief → Fact** added (decision 2), the domain collapses to a clean linear
+spine: `Evidence → Entity → Fact → Belief → Prediction`. (Entity, Fact, and Belief
+each also reference Evidence directly; the spine shows the strongest edge.) All
+cross-domain edges point *backward* into Reality (already accepted), never forward.
+The forthcoming `InferenceRecord` (decision 4) is produced by the Reasoner and
+references Knowledge State as inputs/outputs; it is a sink — nothing in Knowledge
+depends on it — so it cannot introduce a cycle.
 
 ---
 
@@ -80,28 +121,28 @@ resolved.
 - *Before:* `Belief → Reasoner` and `Prediction → Reasoner`, while a Reasoner
   *produces* Beliefs and Predictions — a State-depends-on-Service edge that closes
   a cycle.
-- *Resolution:* **`Belief → Evidence, Entity`** and **`Prediction → Belief,
+- *Resolution:* **`Belief → Evidence, Entity, Fact`** and **`Prediction → Belief,
   Evidence`** (Reasoner removed from both). The derivation a Reasoner performed is
-  recorded as an immutable **model-output Evidence** carrying full provenance; the
-  Belief/Prediction references that Evidence, not the live Service.
+  recorded as an immutable **Inference Record** carrying full provenance; the
+  Belief/Prediction is grounded in State (Facts/Evidence/Beliefs) and the Inference
+  Record links to it — no live Service is depended upon.
 
 **After amendment:** **No cycles exist.** The Knowledge domain is a DAG, and all
 its outward edges point backward into the already-accepted Reality domain.
 
 ### The rule that prevents recurrence
 
-Both fixes are the same rule, now documented in `KERNEL.md` (§Dependency
-Direction):
+Both fixes are the same rule, now **ratified** as Constitution Article X §40 and
+documented in `KERNEL.md` (§Dependency Direction):
 
-> **State depends only on State (or nothing). Services depend on State and
-> Services. A State contract never depends on a Service.**
+> **Persistent state shall never depend on a running process.** A State contract
+> depends only on other State (or on nothing); it never depends on a Service.
 
 The justification is the History/Interpretation separation itself: a durable record
-must point at the immutable *output* a Service produced (recorded as Evidence with
-provenance), never at the live Service — otherwise the record cannot outlive a model
-swap, and *replay would reproduce intelligence instead of history*. This rule is the
-domain's central structural finding and is raised in Questions for ratification as a
-kernel-wide invariant.
+must point at the immutable *output* a Service produced (recorded as an Inference
+Record with provenance), never at the live Service — otherwise the record cannot
+outlive a model swap, and *replay would reproduce intelligence instead of history*.
+This rule is the domain's central structural finding.
 
 ---
 
@@ -117,7 +158,7 @@ State that lives outside the five State contracts, and why it is permissible:
   Events, never the Twin (covered in the Identity-domain review).
 - **Confidence-scoring / resolution model state** — operational Service state of
   the Reasoner/Memory (Intelligence domain); owns no durable truth. Its outputs are
-  recorded as Evidence.
+  recorded as Inference Records (and the Beliefs/Predictions they explain).
 
 **Conclusion:** No *source-of-truth* state exists outside the State contracts. All
 interpretation is recomputable from recorded Events and Evidence, consistent with
@@ -134,9 +175,9 @@ Articles exercised by the Knowledge domain:
   replayable Events; revision is append-only.
 - **Article II — Truth and Interpretation** (Entity, Fact, Belief, Prediction):
   recomputable, revisable, never truth; corrections accumulate, never rewrite.
-- **Article III — Models and Reasoning** (Belief, Prediction, model-output
-  Evidence): model conclusions recorded with full provenance; *replay reproduces
-  history, not intelligence*.
+- **Article III — Models and Reasoning** (Belief, Prediction, Inference Record):
+  model conclusions recorded with full provenance; *replay reproduces history, not
+  intelligence*.
 - **Article XI — Reality and Confidence** (Prediction ↔ Observation): predictions
   are checked only when reality confirms; the learning loop closes on observation.
 
@@ -150,8 +191,9 @@ VI (Three Planes — boundary itself), VII (Capabilities/Human Agency), VIII
 
 All additive under Article X (v1 contracts remain valid forever):
 
-- **New Evidence kinds** (corroboration, contradiction, model-output, citation,
-  derivation, …) — added and versioned without touching existing kinds.
+- **New Evidence kinds** (corroboration, contradiction, citation, external-source,
+  …) — added and versioned without touching existing kinds. (Model interpretations
+  are Inference Records, not Evidence kinds.)
 - **New Entity types, Fact categories, Belief categories, Prediction categories** —
   value/schema-level additions; existing meanings frozen.
 - **New resolution / settlement / projection strategies** — implementation behind
@@ -162,39 +204,38 @@ All additive under Article X (v1 contracts remain valid forever):
 
 ---
 
-## Questions
+## Questions — resolved
 
-1. **Dependency Direction as a kernel-wide invariant.** The two cycle fixes both
-   reduce to one rule — *State depends only on State; a State never depends on a
-   Service* — now documented in `KERNEL.md` §Dependency Direction. Recommend
-   **ratifying it as a kernel invariant** (and applying it preemptively to the
-   remaining domains, e.g. `Attachment → Storage, Encryption` in Reality, which the
-   Infrastructure review must reconcile). Confirm?
-2. **Belief vs. Fact — keep both?** They differ in *stance* (held-with-uncertainty
-   vs. relied-upon-as-settled), not in kind. Recommend **keep**: "settled until
-   contradicted" and "held with confidence" are distinct, load-bearing stances that
-   planning and action consume differently, and promotion/demotion between them is
-   explicit and recorded. Flagging as the domain's main near-overlap.
-3. **Prediction vs. Belief — keep separate?** A Prediction is a forward-projected,
-   *falsifiable* Belief. Recommend **keep**: falsifiability-against-a-future-
-   Observation is the hinge of the learning loop and deserves a first-class,
-   checkable record distinct from a present-tense Belief.
-4. **Model-output Evidence — confirm the mechanism.** Recording a Service's
-   derivation as immutable Evidence (rather than a live dependency) is what breaks
-   Cycle 2 and upholds *replay reproduces history, not intelligence*. This presumes
-   the Intelligence-domain `Reasoner` contract emits such Evidence by obligation;
-   flagged so the Intelligence review closes this consistently.
+All four review questions were ratified by the reviewer (see *Decisions* above):
+
+1. **Dependency Direction → ratified and strengthened** to "persistent state shall
+   never depend on a running process" (Constitution Art. X §40). It must be applied
+   preemptively to the remaining domains; `Attachment → Storage, Encryption` in
+   Reality is the first to reconcile, in the Infrastructure review.
+2. **Belief vs. Fact → keep both**, sharpened: they are *distinct epistemic
+   objects* (objective Fact vs. contextual Belief), not stances on one claim, and
+   neither reclassifies into the other. Belief now depends on Fact.
+3. **Prediction vs. Belief → keep separate** — Prediction is where Orb learns.
+4. **Model-output Evidence → renamed `Inference Record`** and separated from
+   Evidence (external grounding only). Its contract is formalized with the
+   `Reasoner` in the Intelligence review.
+
+One new item was raised by the reviewer and **logged as Architectural Debt** rather
+than actioned now: a `Claim` layer between Evidence and Fact (`../ARCHITECTURAL_DEBT.md`,
+AD-1), for v2 evaluation.
 
 ---
 
 ## Recommendation
 
-**Amend (applied) → Accept.**
+**Amend (applied) → Accepted.**
 
 The two structural defects (`Entity ↔ Belief` and the `Belief/Prediction ↔
-Reasoner` cross-domain cycles) are resolved by a single principle — *State depends
-only on State* — which also makes the domain smaller and more correct and records
-model derivations as auditable history. With these amendments the Knowledge domain
-is acyclic, minimal, fully grounded in Reality, and closed under the Constitution.
-Recommend **acceptance** of the Knowledge domain as amended, pending your
-confirmation of Questions 1–4.
+Reasoner` cross-domain cycles) are resolved by a single ratified principle —
+*persistent state never depends on a running process* — which also makes the domain
+smaller and more correct and records model derivations as auditable Inference
+Records. With the reviewer's decisions applied, the Knowledge domain is acyclic
+(linear spine `Evidence → Entity → Fact → Belief → Prediction`), minimal, fully
+grounded in Reality, and closed under the Constitution. The domain is **accepted**;
+the `InferenceRecord` contract and the `Claim` debt item carry forward to the
+Intelligence review and v2 respectively.

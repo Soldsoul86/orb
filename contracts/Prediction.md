@@ -5,7 +5,7 @@ Contract:   Prediction
 Domain:     Knowledge
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Belief, Evidence
 ```
 
@@ -32,10 +32,12 @@ forward in time, asserting an expected state with a confidence in `[0, 1]`, and
 likely reply to John by Friday (0.6)," "the meeting will probably be rescheduled
 (0.4)."
 
-A Prediction rests on **Beliefs** (and the **Evidence** grounding them, including
-the model-output Evidence that records any forward-projection derivation). Like
-all interpretation it is **never truth**: it is an expectation Orb is willing to be
-wrong about, on the record, so that being wrong can teach it.
+A Prediction rests on **Beliefs** and the **Evidence** grounding them. Where the
+forward projection is model-backed, the model's reasoning is recorded separately as
+an **Inference Record** (specified with the `Reasoner` in the Intelligence domain),
+not as Evidence. Like all interpretation a Prediction is **never truth**: it is an
+expectation Orb is willing to be wrong about, on the record, so that being wrong can
+teach it.
 
 A Prediction's defining property is **checkability**: at some horizon, reality is
 observed and the Prediction is compared against it. That comparison (by Reflection)
@@ -46,8 +48,9 @@ produces new Evidence and revises Beliefs — closing the learning loop.
 ## 2. Lifecycle
 
 1. **Projection.** During Understand/Plan, a forward-looking derivation projects
-   current Beliefs into an expected future state; the derivation is recorded as
-   model-output Evidence and a Prediction is formed referencing it.
+   current Beliefs into an expected future state; the model's reasoning is recorded
+   as an Inference Record and a Prediction is formed, grounded in those Beliefs and
+   their Evidence.
 2. **Recording.** The Prediction is recorded as an Event, fixing the expectation
    and its horizon in history.
 3. **Pending.** It awaits the horizon at which it becomes checkable.
@@ -83,9 +86,11 @@ layered on top.
 2. **Falsifiable.** Every Prediction is comparable against a later Observation; a
    Prediction that can never be checked is invalid.
 3. **Grounded.** Every Prediction references the Beliefs it rests on and the
-   Evidence beneath them (including model-output Evidence for its derivation).
+   Evidence beneath them; a model-backed projection is additionally explained by an
+   Inference Record.
 4. **Depends only on State.** A Prediction references Beliefs and Evidence, never a
-   live Service; the projecting model's role survives as recorded Evidence.
+   live Service (Constitution Art. X §40); the projecting model's role survives as
+   a recorded Inference Record.
 5. **Resolution is append-only.** Confirmation or refutation is recorded as new
    Evidence; the original Prediction is never rewritten.
 6. **Knowledge plane only.** A Prediction holds no power to act and no
@@ -156,6 +161,6 @@ recorded Evidence.
   confidence of the Belief that meetings rarely move.
 - **Partial.** "The user will finish the report this week (0.5)" is partially met —
   a draft but not a final — and the partial outcome is recorded as Evidence.
-- **Auditability.** Each Prediction links to the Beliefs and model-output Evidence
-  it rested on, so a wrong prediction can be traced to the reasoning that produced
-  it.
+- **Auditability.** Each Prediction links to the Beliefs and Evidence it rested on
+  and the Inference Record that produced it, so a wrong prediction can be traced to
+  the reasoning — and the model — behind it.

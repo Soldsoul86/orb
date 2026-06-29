@@ -5,7 +5,7 @@ Contract:   Evidence
 Domain:     Knowledge
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Observation, Event, Attachment
 ```
 
@@ -19,9 +19,15 @@ History and Interpretation. Every Fact, Belief, Entity, and Prediction must be
 able to answer "on what basis?" and the answer is always Evidence. If grounding
 were not a contract, interpretation could float free of history, and Orb's core
 promise (*nothing becomes knowledge except through evidence*) would live in
-implementation, where the Constitution forbids it. Evidence is also where a
-model's *derivation* is recorded as history (model-output Evidence), which is what
-lets replay reproduce history without re-running intelligence.
+implementation, where the Constitution forbids it.
+
+> **Evidence is external grounding only.** Evidence is what the world provides — an
+> Observation, an Attachment, an external source. It is *not* what a model
+> concludes. A model's interpretation of evidence is recorded separately as an
+> **Inference Record** (specified with the `Reasoner` in the Intelligence domain),
+> never as Evidence. Keeping these distinct prevents conflating generated
+> interpretation with external grounding — a distinction that matters when
+> comparing models or revisiting a conclusion years later.
 
 ---
 
@@ -38,12 +44,13 @@ point in opposite directions about the same claim, and both are kept. Whether th
 claim is then believed is interpretation, decided later in the Knowledge Plane —
 never by the Evidence itself.
 
-A distinguished kind is **model-output Evidence**: when a Service (a Reasoner,
-Planner, or other model-backed derivation) produces a conclusion, the derivation
-is recorded as Evidence carrying full provenance (provider, model version, prompt
-template version, input references, parameters, timestamp, environment). This is
-how a derivation enters history as an immutable artifact rather than a live
-dependency on the Service that produced it.
+Evidence is **external grounding**: it originates in what the world supplied — an
+Observation, the raw bytes of an Attachment, an external source. A model's
+*interpretation* of evidence is not itself Evidence; it is recorded as an
+**Inference Record** (a distinct kind of State, specified with the `Reasoner` in
+the Intelligence domain). This separation keeps "what the world showed" cleanly
+apart from "how Orb read it," so a conclusion can be re-examined — or attributed to
+a particular model — long after the fact.
 
 ---
 
@@ -51,7 +58,7 @@ dependency on the Service that produced it.
 
 1. **Derivation.** During Extract/Link (and Understand), the runtime derives a
    grounding relation from one or more recorded Events — corroboration between two
-   Observations, a contradiction, or a model-output conclusion.
+   Observations, a contradiction, or a citation of an external source.
 2. **Recording.** The Evidence is appended to the journal as an Event, fixing its
    identity, provenance, and causal placement. From this moment it is permanent
    history.
@@ -86,21 +93,22 @@ state never changes.
    Event(s) and the subject(s) it grounds; ungrounded Evidence is invalid.
 4. **Polarity is explicit.** Each Evidence states whether it supports or
    contradicts, so conflict is structural and inspectable.
-5. **Model derivations are recorded with provenance.** Model-output Evidence
-   carries the full provenance needed to explain — and audit — how a conclusion
-   was reached, without depending on the live Service.
+5. **External grounding only.** Evidence originates from the world (Observation,
+   Attachment, external source), never from a model's interpretation. A model's
+   reading of evidence is an Inference Record, not Evidence.
 6. **History plane only.** Evidence contains no resolved belief or confidence
    verdict of its own; it carries only the grounding relation and its provenance.
 
-Upholds Constitution Articles I (History), II (Truth and Interpretation), and III
-(Models and Reasoning).
+Upholds Constitution Articles I (History) and II (Truth and Interpretation).
 
 ---
 
 ## 5. Versioning rules
 
-- New **Evidence kinds** (corroboration, contradiction, model-output, derivation,
-  citation, …) are added freely and versioned; existing kinds never change meaning.
+- New **Evidence kinds** (corroboration, contradiction, citation, external-source,
+  …) are added freely and versioned; existing kinds never change meaning. (Model
+  interpretations are Inference Records, a separate contract — not new Evidence
+  kinds.)
 - The core obligation — *grounds an interpretation, records polarity, is recorded
   as an immutable Event with provenance* — is frozen at v1. Strengthening it is
   addition; weakening it requires `Evidence v2` alongside v1.
@@ -117,6 +125,9 @@ Consumers may permanently rely on:
 - Evidence never changes; revised grounding arrives as new Evidence.
 - Model-backed conclusions are always accompanied by provenance sufficient to
   explain them.
+
+- A conclusion is never mistaken for its grounding: a model's reading is an
+  Inference Record, and the Evidence beneath it remains separately inspectable.
 
 Not guaranteed:
 
@@ -135,15 +146,15 @@ Not guaranteed:
 - **Evidence for a missing attachment.** If raw content a piece of Evidence cites
   is temporarily unresolvable, the Evidence remains valid history; only the raw
   bytes are pending (recoverable by replication).
-- **Stale model derivation.** If the model that produced a model-output Evidence
-  is later replaced, the old Evidence stands as history with its original
-  provenance; new conclusions are *new* Evidence. Replay never re-runs the model.
+- **Misfiled interpretation.** A model conclusion must never be recorded as
+  Evidence; it is recorded as an Inference Record. Storing interpretation as
+  external grounding is a contract violation, not a degraded mode.
 - **Partial recording.** If recording fails mid-way, no Evidence exists (Event
   append is all-or-nothing); the derivation is re-emitted idempotently.
 
 Never permitted: mutating or deleting recorded Evidence; ungrounded Evidence;
-recording a model-output conclusion without its provenance; resolving a conflict
-by editing the graph.
+recording a model's interpretation as Evidence; resolving a conflict by editing the
+graph.
 
 ---
 
@@ -155,10 +166,11 @@ by editing the graph.
 - **Contradiction.** A calendar Observation ("Lunch with John, 1 PM") is
   contradicted by a GPS Observation placing the user elsewhere at 1 PM. Evidence
   records the contradiction; both Observations are untouched.
-- **Model-output Evidence.** A Reasoner extracts "this email implies a deadline of
-  Friday" from a message. The conclusion is recorded as model-output Evidence
-  citing the message Attachment and carrying provider/model/prompt provenance. The
-  Belief that later forms references *this Evidence*, not the Reasoner.
+- **Evidence vs. interpretation.** A Reasoner reads "this email implies a deadline
+  of Friday" from a message. The *email* (its Attachment and the message
+  Observation) is the Evidence; the Reasoner's reading is an **Inference Record**
+  that cites that Evidence and carries provider/model/prompt provenance. The Belief
+  that forms is grounded in the Evidence; the Inference Record explains how.
 - **Chained grounding.** Evidence may ground other Evidence: a contradiction
-  between two model-output conclusions is itself recorded as Evidence, making the
-  disagreement inspectable.
+  between two Observations is itself recorded as Evidence, making the disagreement
+  inspectable independently of any model's reading.

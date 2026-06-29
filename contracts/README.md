@@ -74,11 +74,11 @@ State (15) and Service (14), grouped by domain. Status tracks Phase 3b review.
 ### 2. Knowledge
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [Evidence](Evidence.md) | State | Draft |
-| [Entity](Entity.md) | State | Draft |
-| [Fact](Fact.md) | State | Draft |
-| [Belief](Belief.md) | State | Draft |
-| [Prediction](Prediction.md) | State | Draft |
+| [Evidence](Evidence.md) | State | Accepted |
+| [Entity](Entity.md) | State | Accepted |
+| [Fact](Fact.md) | State | Accepted |
+| [Belief](Belief.md) | State | Accepted |
+| [Prediction](Prediction.md) | State | Accepted |
 
 ### 3. Identity
 | Contract | Kind | Status |

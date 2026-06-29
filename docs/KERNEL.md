@@ -105,20 +105,23 @@ Every contract below declares its kind, then defines exactly four sections:
 ### Dependency Direction
 
 A single rule governs what a contract may depend on, and it keeps the kernel a
-directed acyclic graph:
+directed acyclic graph. It is **ratified as a kernel-wide law** (Constitution
+Article X §40):
 
-> **State depends only on State (or nothing). Services depend on State and
-> Services.** A State contract never depends on a Service.
+> **Persistent state shall never depend on a running process.** A State contract
+> depends only on other State (or on nothing); it never depends on a Service.
+> Services depend on State and on other Services.
 
 The justification is the History/Interpretation separation itself. State is a
-durable record; a Service is a live capability that *produces* records. If a State
+durable record; a Service is a live process that *produces* records. If a State
 depended on a Service, the record would point at the machine that made it rather
 than at the immutable output the machine produced — and since Services produce
-State, the edge would close a cycle. Whenever a derivation by a Service (a
-Reasoner, a Planner) needs to be referenced, it is referenced through the
-**immutable output that Service recorded** — a model-output Evidence with full
-provenance — never through the Service itself. This is what lets *replay reproduce
-history, not intelligence*: the record survives even when the Service is replaced.
+State, the edge would close a cycle, and the record could no longer be replayed
+once the process was gone. Whenever a derivation by a Service (a Reasoner, a
+Planner) needs to be referenced, it is referenced through the **immutable record
+that Service produced** — an **Inference Record** with full provenance — never
+through the Service itself. This is what lets *replay reproduce history, not
+intelligence*: the record survives even when the Service is replaced.
 
 ---
 
@@ -279,13 +282,16 @@ settled until contradicted, not eternal truth.
 ## Belief
 *Kind — State.*
 
-**Purpose** — An interpretation held with uncertainty.
+**Purpose** — A **contextual** interpretation held with uncertainty. Distinct from
+a Fact: a Fact is the runtime's best-supported objective statement and persists
+until contradicted by better evidence; a Belief is contextual and may disappear
+tomorrow. ("The meeting lasted 43 minutes" is a Fact; "this customer is becoming
+disengaged" is a Belief.)
 
 **Responsibilities**
 - Carry a claim together with a confidence.
-- Reference its supporting evidence — including the **model-output Evidence** that
-  records the derivation (provider, model version, prompt, inputs) where the
-  belief is model-backed.
+- Reference the Facts and Evidence it rests on, and the **Inference Record** that
+  recorded how a model interpreted them (where the belief is model-backed).
 - Retain prior values across revision.
 
 **Invariants**
@@ -293,10 +299,11 @@ settled until contradicted, not eternal truth.
 - Recomputable; revision preserves history.
 - Never asserted as truth.
 
-**Dependencies** — Evidence, Entity. (Not Reasoner: a Belief is State and depends
-only on State. The derivation a Reasoner performed is itself recorded as an
-immutable model-output Evidence with full provenance; the Belief references that
-Evidence, not the live Service. This breaks the Belief→Reasoner cycle.)
+**Dependencies** — Evidence, Entity, Fact. (Not Reasoner: a Belief is State and
+depends only on State — Constitution Art. X §40. A model's interpretation is
+recorded as an immutable **Inference Record** with full provenance; the Belief is
+grounded in Facts/Evidence and the Inference Record links to it, so no live Service
+is depended upon. This breaks the Belief→Reasoner cycle.)
 
 ## Prediction
 *Kind — State.*
@@ -315,9 +322,10 @@ time.
 - Never truth.
 
 **Dependencies** — Belief, Evidence. (Not Reasoner: like Belief, a Prediction is
-State grounded in State. The forward-projection derivation is recorded as
-model-output Evidence; the Prediction references that Evidence and the Beliefs it
-rests on, not the live Reasoner. This breaks the Prediction→Reasoner cycle.)
+State grounded in State — Constitution Art. X §40. The forward-projection is
+recorded as an immutable **Inference Record**; the Prediction is grounded in the
+Beliefs and Evidence it rests on, not the live Reasoner. This breaks the
+Prediction→Reasoner cycle.)
 
 ---
 
@@ -460,16 +468,30 @@ kernel contract — its outputs, Beliefs, are.)
 
 **Responsibilities**
 - Consume interpretation and evidence and produce interpretation.
-- Record full model provenance when model-backed.
+- Record every derivation as an **Inference Record** — the immutable account of
+  *how* evidence was interpreted, carrying full model provenance (provider, model
+  version, prompt template version, input references, parameters, timestamp,
+  environment). The Inference Record is distinct from Evidence: Evidence is
+  external grounding (observation, attachment, external source); an Inference
+  Record is the machine's interpretation of it.
 - Remain interchangeable.
 
 **Invariants**
 - Model-independent: no provider is hardcoded; a local implementation is always
   viable.
-- Outputs are recorded as observations with provenance.
+- Every derivation is recorded as an Inference Record with provenance; conclusions
+  enter history as State, never as a live dependency.
 - Produces interpretation, never truth.
 
 **Dependencies** — Memory, ModelRouter, Belief, Evidence.
+
+> **Inference Record (forthcoming State contract).** The renaming of "model-output
+> evidence" to a distinct *Inference Record* (Knowledge decision 4) means the
+> Reasoner's recorded derivations are their own kind of State, not Evidence. The
+> formal `InferenceRecord` contract is specified together with the Reasoner in the
+> **Intelligence** domain review (it is the Reasoner's durable output), at which
+> point the kernel's State count grows by one under Article X (addition, never
+> mutation). Knowledge-domain contracts already reference it by name.
 
 ## Planner
 *Kind — Service.*

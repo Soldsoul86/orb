@@ -157,21 +157,26 @@ pressure of short-term convenience.
     forever; a contract accepted at v1 is permanent.
 39. **The architecture is versioned with the discipline of an operating-system
     kernel.** Implementations are replaceable; the kernel is not.
+40. **Persistent state shall never depend on a running process.** A State
+    contract depends only on other State (or on nothing); it never depends on a
+    Service. The derivation a Service performs is referenced through the immutable
+    record it produced, never through the live Service. This guarantees that
+    history is always replayable, independent of any process. *(`KERNEL.md`)*
 
 ---
 
 ## Article XI — Reality and Confidence
 
-40. **Observations originate from reality; Events originate from runtime
+41. **Observations originate from reality; Events originate from runtime
     activity.** Many Observations produce Events; not every Event produces an
     Observation. A reasoning step, a plan, or the issuance of an Action are
     runtime activity recorded as Events — they are not, in themselves,
     Observations. *(`Observation.md`)*
-41. **Reality is updated only through observation.** Orb never assumes an Action
+42. **Reality is updated only through observation.** Orb never assumes an Action
     changed reality. The runtime loop closes only when a Sensor confirms that
     reality occurred as expected; an issued Action that is never confirmed never
     updates reality. *(`RUNTIME_LOOP.md`)*
-42. **An Observation owns confidence, not truth.** Every Observation carries a
+43. **An Observation owns confidence, not truth.** Every Observation carries a
     Confidence of Reality in `[0, 1]` describing the reliability of its
     perception. Truth never exists inside Orb; confidence is recorded faithfully,
     never resolved into certainty and never silently upgraded. *(`Observation.md`)*

@@ -5,7 +5,7 @@ Contract:   Entity
 Domain:     Knowledge
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Evidence
 ```
 
