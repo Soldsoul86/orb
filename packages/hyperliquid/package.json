@@ -1,0 +1,25 @@
+{
+  "name": "@orb/hyperliquid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hyperliquid exchange adapter: signing, info/exchange REST, WebSocket.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "npm run build && node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "@noble/curves": "^1.8.0",
+    "@noble/hashes": "^1.7.0"
+  }
+}

@@ -111,3 +111,46 @@ modelled as a Belief/Prediction.
 
 **Decision owner:** reviewer (architecture). **Resolution:** explicit accept/reject if a
 durable reflection-state need materializes.
+
+
+---
+
+## Trade executor built ahead of its contract specifications
+
+**Recorded:** Phase 3, alongside the Hyperliquid trade executor.
+
+The executor (`packages/trade-executor`, `packages/hyperliquid`,
+`apps/executor`) was implemented at the operator's direction before Phase 3b
+produced contract specifications for `Capability`, `Action` and `Policy`, and
+before the Phase 3c gate.
+
+**The debt.** Three kernel contracts the executor depends on are named in
+`KERNEL.md` but not yet specified:
+
+- **`Capability`** — the executor's `ExchangePort` is a Capability in all but
+  name. It declares its effects (`canTrade`, reduce-only flags) and is the only
+  path to the world, but it does not declare a permission tier, and financial
+  actions are irreversible-tier by `CAPABILITY_MODEL.md` §5. Human confirmation
+  for irreversible actions is currently satisfied by configuration (the mainnet
+  interlock, the symbol allowlist, the notional cap) rather than by a
+  per-action authorization gate.
+- **`Action`** — lifecycle events record what was submitted and what the
+  exchange confirmed, but they are a package-local schema
+  (`orb.trade.lifecycle/1`), not the kernel `Action` contract.
+- **`Policy`** — `RiskConfig` is a Policy in substance. It is not expressed as
+  the kernel contract, and it is not itself journalled, so a configuration
+  change is not currently part of replayable history.
+
+**Why it was accepted.** The executor is self-contained, journals everything
+through the Event Journal, and holds no truth of its own — so adopting the
+contracts later is a re-expression of existing structure rather than a rewrite.
+Nothing about the implementation forecloses any of the three specifications.
+
+**Repayment.** When `Capability`, `Action` and `Policy` are specified:
+
+1. Express `ExchangePort` as a `Capability` with a declared permission tier.
+2. Replace the package-local lifecycle schema with the kernel `Action` record,
+   keeping the existing schema readable forever (Art. X §37 — addition, never
+   mutation).
+3. Journal `RiskConfig` changes as events, so the threshold in force at any past
+   moment is replayable rather than inferred.

@@ -94,6 +94,35 @@ Compatibility guarantees, Failure modes, and Examples.
 implementation interfaces written in TypeScript or Kotlin. Each package carries
 `README`, `DESIGN`, `API`, `TESTS`.
 
+### Amendment — the Hyperliquid trade executor
+
+An executable trade executor was built ahead of this phase's gate, at the
+operator's explicit direction. It is recorded here rather than quietly, because
+the roadmap says phases are sequential and none is skipped.
+
+**What it deviates from.** Phase 3b/3c are not complete: no contract
+specification exists for a trading Capability, and implementation interfaces
+were written before contract specs were accepted.
+
+**What it does not deviate from.** The executor was built *onto* the kernel
+rather than beside it, and the Event Journal — Phase 4's stated first
+component — was implemented first and is the executor's only source of truth:
+
+- the signal API and the Hyperliquid feed are **Sensors** producing
+  **Observations**;
+- order submission is a **Capability** producing **Actions**;
+- risk and hard-exit rules are **Policy**;
+- position state is a **projection** over the journal, never a source of truth
+  (Art. IX §33);
+- every lifecycle record enters through the journal (Art. IX §34), append-only
+  and hash-chained (Art. I);
+- Art. XI §42 is honoured literally: an order is never assumed to have changed
+  reality, and a position is closed only when the exchange confirms it.
+
+**Outstanding debt.** `Capability`, `Action` and `Policy` still need contract
+specifications, and the executor's implementation should be re-reviewed against
+them when they are accepted. Recorded in `ARCHITECTURAL_DEBT.md`.
+
 ---
 
 ## Phase 4 — Runtime Skeleton
@@ -108,7 +137,7 @@ Journal** — the single source of truth that everything else depends on.
 - Unit tests before integration tests; every module compiles independently.
 
 **Gate:** the journal runs, replays deterministically, and everything else can be
-built to depend on it.
+built to depend on it. **Met** — `runtime/journal`, 26 tests.
 
 ---
 

@@ -1,0 +1,32 @@
+{
+  "name": "orb",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Orb — a personal runtime that continuously learns, reasons and acts alongside its user.",
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "workspaces": [
+    "runtime/*",
+    "packages/*",
+    "apps/executor"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "tsc -b",
+    "typecheck": "tsc -b && node scripts/typecheck-independently.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test": "npm run build && node --test --test-reporter=spec \"runtime/*/dist/tests/**/*.test.js\" \"packages/*/dist/tests/**/*.test.js\" \"apps/*/dist/tests/**/*.test.js\" \"tests/dist/**/*.test.js\"",
+    "test:unit": "npm run build && node --test --test-reporter=spec \"runtime/*/dist/tests/**/*.test.js\" \"packages/*/dist/tests/**/*.test.js\" \"apps/*/dist/tests/**/*.test.js\"",
+    "test:acceptance": "npm run build && node --test --test-reporter=spec \"tests/dist/**/*.test.js\"",
+    "verify": "npm run lint && npm run build && npm run test",
+    "executor": "node apps/executor/dist/src/main.js",
+    "executor:dev": "node --enable-source-maps apps/executor/dist/src/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

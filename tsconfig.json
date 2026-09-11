@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./runtime/journal" },
+    { "path": "./packages/hyperliquid" },
+    { "path": "./packages/trade-executor" },
+    { "path": "./apps/executor" },
+    { "path": "./tests" }
+  ]
+}

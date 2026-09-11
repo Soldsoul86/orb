@@ -1,0 +1,927 @@
+{
+  "privateKey": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "address": "0xFCAd0B19bB29D4674531d6f115237E16AfCE377c",
+  "vectors": [
+    {
+      "name": "orderSimple",
+      "label": "plain",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x537978eabdd2256c41877b65c24b9c9bfd0f205be97f00e127e74593b58ab5d3",
+      "signature": {
+        "r": "0x0a55cb3f7ded606f5c2d5c4fe183c9f8dc905f836529932ab5c6413e912dd0dd",
+        "s": "0x4c6a265d6f9de1e510ae7f0830cd87316a8bdf5fdfe8aa49bcd8af3c4ef7bf6b",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderSimple",
+      "label": "plain",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x537978eabdd2256c41877b65c24b9c9bfd0f205be97f00e127e74593b58ab5d3",
+      "signature": {
+        "r": "0x3ca65600252d14c5111b14ed35876aca7a142adf4272a107a37a11c5949b664d",
+        "s": "0x3c8c1ae99452efb8f9a716007aae9dc3be06ebd5017f68c1b86c079a7379c395",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderSimple",
+      "label": "vault",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x63c36fc2af030175a3d4431be79c4b893aadb3ce334925a5230fb42edba6b1c2",
+      "signature": {
+        "r": "0x9fa6595efedcc3af90e480e95cbec131b835470d012da33ea59ec80238ffcdf4",
+        "s": "0x22cbad4556af83e27d7b5b1ca5b02d02a37333d8743bdc655c9dbb3ca9ecd6e3",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderSimple",
+      "label": "vault",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x63c36fc2af030175a3d4431be79c4b893aadb3ce334925a5230fb42edba6b1c2",
+      "signature": {
+        "r": "0x56597f5e98dd39fcb8e804efc2299b976dbf610e5959432a371cb2564eb7aa35",
+        "s": "0x5895a3e0ea08e53d923a40d3c77dcfaca26c3f636217ad66737609fb25309929",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderSimple",
+      "label": "expires",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x7a7da5cc3c4d6d2c09ebc32df09c378dcb869bd5f8a3d30d23b2baa5ebfbbd98",
+      "signature": {
+        "r": "0xfbaae230269dc78b66f3d25a0990067441888b9a67dd32ed6a1430725fa680e8",
+        "s": "0x4a7f6589fb7014441c217b192d3e35ae466d3a38b27f4bb6db44d43f64428699",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderSimple",
+      "label": "expires",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 0,
+            "b": true,
+            "p": "30000",
+            "s": "0.1",
+            "r": false,
+            "t": {
+              "limit": {
+                "tif": "Gtc"
+              }
+            }
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x7a7da5cc3c4d6d2c09ebc32df09c378dcb869bd5f8a3d30d23b2baa5ebfbbd98",
+      "signature": {
+        "r": "0xd2cd344113a06a9595092c8adae1240595530b85d3c582e3c7e5fbef96aef250",
+        "s": "0x5f3bf1155dde5d520684136440270862635563dbc0c770127156eac0e043a4ec",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "plain",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x534e2411a502672c2f29839516bd944d61578710115439541e969c051b438bd3",
+      "signature": {
+        "r": "0x3c4b645af09614c8b7fb81971876e1b9ca456f83d2e701ddde4a43ea6180be49",
+        "s": "0x56acd98e4690da9690e7bc93f91edd9335d528c19e065fe583e698246907f42e",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "plain",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x534e2411a502672c2f29839516bd944d61578710115439541e969c051b438bd3",
+      "signature": {
+        "r": "0x0fd7ff010848848fe46da5319e67a9b5e05eb71b1924f519e41040a511ca1df7",
+        "s": "0x022f44152a42d3d814f0131f824b5ec834ee373c0aa5d0aa096b2a8a3d34e0a0",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "vault",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x44af23f62077247ef6a0a0e62231da6f1f72b7d61d26e9be1017e6961e89492f",
+      "signature": {
+        "r": "0xd440773ac6febb9eadf3c439304d465dd9c92dd91f488319cbe093969de80d23",
+        "s": "0x32aacd8c4adeec44ca1de6325c4ebfaa3ff2c0005ab4ad02001f1030e664d3c8",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "vault",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x44af23f62077247ef6a0a0e62231da6f1f72b7d61d26e9be1017e6961e89492f",
+      "signature": {
+        "r": "0x8920a76872efdb6d451e7ebebef1c309e100a6970a04b30cbc4650841d9e1c95",
+        "s": "0x6ee2558bc49f55b1f65e5774952fcf57f9555cd362d52b1dbaa33fe86e33c5c4",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "expires",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x1bf0877ab18f9b856068b8e898b40c8a35825ea8e9f76f5f1bc3c81b5e39fb23",
+      "signature": {
+        "r": "0x9e389077a92b55a710040ecdf2b14110bb5b02949620f8223dbc55ba70871f08",
+        "s": "0x04f3d0d5f2c2ab3f43f521fef53bf6bd4eab6d742e2710b12bbe500dfbf64983",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderReduceOnlyIoc",
+      "label": "expires",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 5,
+            "b": false,
+            "p": "1234.5",
+            "s": "2.25",
+            "r": true,
+            "t": {
+              "limit": {
+                "tif": "Ioc"
+              }
+            },
+            "c": "0x00000000000000000000000000000001"
+          }
+        ],
+        "grouping": "na"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x1bf0877ab18f9b856068b8e898b40c8a35825ea8e9f76f5f1bc3c81b5e39fb23",
+      "signature": {
+        "r": "0x3168ee34d249178967e8de1c77f4b26d90b2d4feb66c0660fa9cd4845eff4529",
+        "s": "0x0324ac6dce2e0d4f247ae1450f55239042c5b8327480c6b2a3b84b2322b5b71e",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "plain",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x2ca599c26e35f6836d62b690bdf1cbb1b2d43d8c986c10142df7274d9ccc1890",
+      "signature": {
+        "r": "0x7416da70f8bedf198060a5520f12f4422b8d6c0a36208c1695d58300db9c596b",
+        "s": "0x56893f6ac9d7e17145923a917864f0c3061593386ac1dd55c45b528da0ffaded",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "plain",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0x2ca599c26e35f6836d62b690bdf1cbb1b2d43d8c986c10142df7274d9ccc1890",
+      "signature": {
+        "r": "0xef20a965fed7be4c8719a48e004818909a8e1891878260af07ec9a6d41d1d111",
+        "s": "0x4784cd7cea71b840c7a34e83014ae11d6b288a77301d35745385ad05b18c3dce",
+        "v": 28
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "vault",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0xbdea438030a3b5d8373f25b48dceed42485e23bf7c1d098be9a589d1c5091b51",
+      "signature": {
+        "r": "0x3f9cec91732513f1e399a03c1dfd52f6f145ff5adce0eb7ed22d32d5387143d7",
+        "s": "0x173c9eadafa89562b1518dfa97dd2b50f6e48472e3e3e4a934415e9e762d5b34",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "vault",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0xbdea438030a3b5d8373f25b48dceed42485e23bf7c1d098be9a589d1c5091b51",
+      "signature": {
+        "r": "0xd78335d0c433cb4637a189b5fb78a030595eb1b82ee22166d9bc34b931045f37",
+        "s": "0x10c366192e8c66187d539be3becd46bd8f95ad6e7e53821ce14e966b0048e6d5",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "expires",
+      "isTestnet": true,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0xccc64919c2341426c87bfdd7131bb7eb45e53f72b134f1231418fcb155018153",
+      "signature": {
+        "r": "0xf3ef42b13d50b8c81031b21488f0e5e20d2f63b70794ed5f3721eaa03528a7da",
+        "s": "0x61aa29703d913715e209b2ce0aaa386998127ddbc48b6bb181725f07fb39804f",
+        "v": 27
+      }
+    },
+    {
+      "name": "orderTriggerSl",
+      "label": "expires",
+      "isTestnet": false,
+      "action": {
+        "type": "order",
+        "orders": [
+          {
+            "a": 1,
+            "b": false,
+            "p": "2500",
+            "s": "1.5",
+            "r": true,
+            "t": {
+              "trigger": {
+                "isMarket": true,
+                "triggerPx": "2450.5",
+                "tpsl": "sl"
+              }
+            }
+          }
+        ],
+        "grouping": "positionTpsl"
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0xccc64919c2341426c87bfdd7131bb7eb45e53f72b134f1231418fcb155018153",
+      "signature": {
+        "r": "0xdca4186c11df9a04bac3a040e29b209388447ccafa6507b807dc88e0608a848d",
+        "s": "0x17b7b5ba707e89530fb774b88465c8e3fab8fbb40f62c2b438972327399d10a9",
+        "v": 28
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "plain",
+      "isTestnet": true,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0xa1cb188de2cd5e1f2684211f96d83f1b05541001e55eb2e98192f4d87623d36b",
+      "signature": {
+        "r": "0x6f333f461c3ed6b80ad7877eae4dab95076f6bee1a47fb6b22885050ca2cb195",
+        "s": "0x6c0f609132af5139ae202f211b6ebfcaf7c7dec15fe849c18c787e9c76f98484",
+        "v": 28
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "plain",
+      "isTestnet": false,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0xa1cb188de2cd5e1f2684211f96d83f1b05541001e55eb2e98192f4d87623d36b",
+      "signature": {
+        "r": "0x04287f8d91550e423f8047e18429e63a6349512e053a3277ed5134eb91567258",
+        "s": "0x14468de1546af30dfed5ee4c8a47caafc427fcd0c02964004dca5be38fc35396",
+        "v": 27
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "vault",
+      "isTestnet": true,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x932173af348a6de73acc0bfb018eefff47b90c50ee2c0757b63c756b980c2d78",
+      "signature": {
+        "r": "0xacc2129dc7853cf4284a9d38714fc4e966a24509970238e81ebbb1916df9154c",
+        "s": "0x30333446616a0094044f711fa48e976b02f17e501d567fe50851c65f88bc61e5",
+        "v": 27
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "vault",
+      "isTestnet": false,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x932173af348a6de73acc0bfb018eefff47b90c50ee2c0757b63c756b980c2d78",
+      "signature": {
+        "r": "0xee8bc0c901ec29e895c879672336019bbd4cae28163052f5e69b175e166d01d9",
+        "s": "0x5a259f0cc9a0b4d58ccde7b7f6dde259a6c2b51599c0b3a9f5214140e7b383bb",
+        "v": 28
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "expires",
+      "isTestnet": true,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0xd0f380a21848cc63ecd1a667c6ca64695722a477aac24667732bbadaa6d4cfaa",
+      "signature": {
+        "r": "0xfee454e47fecc7abe3b301d1c2ab063f4574cfe1744839036d6ba281eb2cbb5d",
+        "s": "0x40b8dd08a76cecfbce240ca35ba9d00b819777e1d087b52f5ca66923c93fdc3d",
+        "v": 28
+      }
+    },
+    {
+      "name": "cancel",
+      "label": "expires",
+      "isTestnet": false,
+      "action": {
+        "type": "cancel",
+        "cancels": [
+          {
+            "a": 0,
+            "o": 12345
+          }
+        ]
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0xd0f380a21848cc63ecd1a667c6ca64695722a477aac24667732bbadaa6d4cfaa",
+      "signature": {
+        "r": "0xef69da208bbeed482857a65d38b07cae1167f69a5af47b59ac5a9b5e331da9eb",
+        "s": "0x1998bdcbe77c78a6dc74e03efd8f4802b59d0a2994adac62ecf77db2106ba817",
+        "v": 27
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "plain",
+      "isTestnet": true,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0xed098b6f8ca1307a1e5598d983d2e0cacfd5a38091f6a336b24ca863cc186649",
+      "signature": {
+        "r": "0x42717388a3b26f9c2b5307182245a3799cb7b6fb1945287098494b348e8af0dd",
+        "s": "0x703cb7125d311f4a4d494ef559bc24ef16ca620ce86403c2821676b65b38dc90",
+        "v": 28
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "plain",
+      "isTestnet": false,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "actionHash": "0xed098b6f8ca1307a1e5598d983d2e0cacfd5a38091f6a336b24ca863cc186649",
+      "signature": {
+        "r": "0x40dc89d0b1d7ac01263a825f8fcec9eb88c85c5b283de5e825f61549ad260619",
+        "s": "0x7e1d18042fc4bd777729fc57396060b7b12506aeab7f858ea640deae82292f2d",
+        "v": 28
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "vault",
+      "isTestnet": true,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x5af829a0c80244c4e57706794c28c6b0c82087d8a63b7bddbe036c25d973d91e",
+      "signature": {
+        "r": "0x6183d473b14cd96f21e11a91bb4e151be8150627c16b700e0d25e87d420ccaed",
+        "s": "0x05f786425f00c5d9958241964b0e4c401401b6ace4298e009d992a90721d1d8f",
+        "v": 28
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "vault",
+      "isTestnet": false,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "vaultAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "actionHash": "0x5af829a0c80244c4e57706794c28c6b0c82087d8a63b7bddbe036c25d973d91e",
+      "signature": {
+        "r": "0x7e5a205ea56db0abf97877edaae33b44076b113b46a078c423104906be1f8ddd",
+        "s": "0x7dd0d186d5a30d28296e30f6ea08b953319ef1688611c981ed365896d52551a9",
+        "v": 27
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "expires",
+      "isTestnet": true,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x2b896d44c14e4895c5b56a875105678e8d2a37ca5a3ae27b88daec7a50e5d304",
+      "signature": {
+        "r": "0xe572a2dc2f7312ac3166f652fab957dadee53d303bec844619d031034c170073",
+        "s": "0x598685e9d9b00bf5c714ac1d1b0170c44c94cfc29d84f911f6dc567e67cdf5a7",
+        "v": 27
+      }
+    },
+    {
+      "name": "updateLeverage",
+      "label": "expires",
+      "isTestnet": false,
+      "action": {
+        "type": "updateLeverage",
+        "asset": 3,
+        "isCross": false,
+        "leverage": 7
+      },
+      "nonce": 1700000000000,
+      "expiresAfter": 1700000060000,
+      "actionHash": "0x2b896d44c14e4895c5b56a875105678e8d2a37ca5a3ae27b88daec7a50e5d304",
+      "signature": {
+        "r": "0xf18694018ee8037ad3ced67e79841ef7da6d1778669c5b1ea4417683b12a3da6",
+        "s": "0x3ad48ae1c7ee5866416eb64216387d63798c0b3daed6ef9af781ab242ab365b7",
+        "v": 28
+      }
+    }
+  ],
+  "msgpack": {
+    "orderSimple": "0x83a474797065a56f72646572a66f72646572739186a16100a162c3a170a53330303030a173a3302e31a172c2a17481a56c696d697481a3746966a3477463a867726f7570696e67a26e61",
+    "orderReduceOnlyIoc": "0x83a474797065a56f72646572a66f72646572739187a16105a162c2a170a6313233342e35a173a4322e3235a172c3a17481a56c696d697481a3746966a3496f63a163d92230783030303030303030303030303030303030303030303030303030303030303031a867726f7570696e67a26e61",
+    "orderTriggerSl": "0x83a474797065a56f72646572a66f72646572739186a16101a162c2a170a432353030a173a3312e35a172c3a17481a77472696767657283a869734d61726b6574c3a9747269676765725078a6323435302e35a47470736ca2736ca867726f7570696e67ac706f736974696f6e5470736c",
+    "cancel": "0x82a474797065a663616e63656ca763616e63656c739182a16100a16fcd3039",
+    "updateLeverage": "0x84a474797065ae7570646174654c65766572616765a5617373657403a7697343726f7373c2a86c6576657261676507"
+  },
+  "msgpackPrimitives": {
+    "emptyMap": "0x80",
+    "emptyArr": "0x90",
+    "nested": "0x8aa16101a16293c3c2c0a163a368c3a9a164ffa1657fa166cc80a167cdffffa168ce00010000a169e0a16ad0df",
+    "bigint": "0x81a16ecf0000018bcfe56800",
+    "floats": "0x81a166cb3ff8000000000000",
+    "str31": "0xbf61616161616161616161616161616161616161616161616161616161616161",
+    "str32": "0xd9206161616161616161616161616161616161616161616161616161616161616161",
+    "arr15": "0x9f010101010101010101010101010101",
+    "arr16": "0xdc001001010101010101010101010101010101",
+    "map15": "0x8fa26b3000a26b3101a26b3202a26b3303a26b3404a26b3505a26b3606a26b3707a26b3808a26b3909a36b31300aa36b31310ba36b31320ca36b31330da36b31340e",
+    "map16": "0xde0010a26b3000a26b3101a26b3202a26b3303a26b3404a26b3505a26b3606a26b3707a26b3808a26b3909a36b31300aa36b31310ba36b31320ca36b31330da36b31340ea36b31350f"
+  },
+  "formatting": [
+    {
+      "price": "97123.456789",
+      "szDecimals": 0,
+      "type": "perp",
+      "result": "97123"
+    },
+    {
+      "price": "1.23456789",
+      "szDecimals": 5,
+      "type": "perp",
+      "result": "1.2"
+    },
+    {
+      "price": "0.0000123456789",
+      "szDecimals": 0,
+      "type": "spot",
+      "result": "0.00001234"
+    },
+    {
+      "price": "1234.56",
+      "szDecimals": 1,
+      "type": "perp",
+      "result": "1234.5"
+    },
+    {
+      "price": "123456",
+      "szDecimals": 0,
+      "type": "perp",
+      "result": "123456"
+    },
+    {
+      "price": "12345.6",
+      "szDecimals": 0,
+      "type": "perp",
+      "result": "12345"
+    },
+    {
+      "price": "0.001234",
+      "szDecimals": 2,
+      "type": "perp",
+      "result": "0.0012"
+    },
+    {
+      "price": "0.0012345",
+      "szDecimals": 2,
+      "type": "perp",
+      "result": "0.0012"
+    },
+    {
+      "price": "1.0",
+      "szDecimals": 3,
+      "type": "perp",
+      "result": "1"
+    },
+    {
+      "price": "99999.9",
+      "szDecimals": 0,
+      "type": "perp",
+      "result": "99999"
+    }
+  ],
+  "sizeFormatting": [
+    {
+      "size": "1.23456789",
+      "szDecimals": 5,
+      "result": "1.23456"
+    },
+    {
+      "size": "0.123456789",
+      "szDecimals": 2,
+      "result": "0.12"
+    },
+    {
+      "size": "100",
+      "szDecimals": 0,
+      "result": "100"
+    },
+    {
+      "size": "1.999",
+      "szDecimals": 0,
+      "result": "1"
+    },
+    {
+      "size": "0.5",
+      "szDecimals": 0,
+      "result": "ERR:Size is too small and was truncated to 0"
+    }
+  ]
+}
