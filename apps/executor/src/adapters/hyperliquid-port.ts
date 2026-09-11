@@ -95,6 +95,9 @@ export class HyperliquidExchangePort implements ExchangePort {
         liquidationPrice: entry.position.liquidationPx,
         leverage: entry.position.leverage.value,
         positionValue: entry.position.positionValue,
+        ...(entry.position.cumFunding
+          ? { fundingSinceOpen: entry.position.cumFunding.sinceOpen }
+          : {}),
       });
     }
 

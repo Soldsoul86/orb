@@ -35,6 +35,12 @@ export interface SimulatedPortOptions {
   readonly now?: () => number;
   /** Fraction of notional charged per fill, matching a taker fee. */
   readonly feeFraction?: number;
+  /**
+   * Hourly funding rate as a fraction of notional, charged to longs when
+   * positive. Hyperliquid settles funding hourly into the account balance, so
+   * modelling it is the only way to validate a hold measured in hours.
+   */
+  readonly hourlyFundingRate?: number;
 }
 
 interface SimPosition {
@@ -44,6 +50,10 @@ interface SimPosition {
   entryPrice: number;
   leverage: number;
   openedAt: number;
+  /** Funding paid (positive) or received (negative) since the position opened. */
+  fundingPaid?: number;
+  /** When funding was last accrued, so accrual is not double counted. */
+  fundingAccruedAt?: number;
 }
 
 /**
@@ -58,6 +68,7 @@ export class PaperExchangePort implements ExchangePort {
   readonly #priceSource: PriceSource;
   readonly #now: () => number;
   readonly #feeFraction: number;
+  readonly #hourlyFundingRate: number;
 
   readonly #positions = new Map<string, SimPosition>();
   readonly #restingOrders = new Map<number, PlacedOrder & { orderId: number }>();
@@ -80,6 +91,7 @@ export class PaperExchangePort implements ExchangePort {
     this.#priceSource = options.priceSource;
     this.#now = options.now ?? (() => Date.now());
     this.#feeFraction = options.feeFraction ?? 0.00045;
+    this.#hourlyFundingRate = options.hourlyFundingRate ?? 0;
     this.#balance = options.startingBalanceUsd;
     this.account = options.account ?? "0xpaper000000000000000000000000000000000000";
   }
@@ -97,6 +109,27 @@ export class PaperExchangePort implements ExchangePort {
     this.#positions.set(position.symbol, { ...position });
   }
 
+  /**
+   * Accrues funding up to now, in whole hours.
+   *
+   * Charged against the balance, not against unrealized PnL — which is what the
+   * real exchange does, and the reason a position's price PnL and its true
+   * economic result diverge over a long hold.
+   */
+  #accrueFunding(position: SimPosition): void {
+    if (this.#hourlyFundingRate === 0) return;
+    const now = this.#now();
+    const since = position.fundingAccruedAt ?? position.openedAt;
+    const hours = Math.floor((now - since) / 3_600_000);
+    if (hours < 1) return;
+
+    const sign = position.side === "LONG" ? 1 : -1;
+    const charge = sign * hours * this.#hourlyFundingRate * position.entryPrice * position.size;
+    position.fundingPaid = (position.fundingPaid ?? 0) + charge;
+    position.fundingAccruedAt = since + hours * 3_600_000;
+    this.#balance -= charge;
+  }
+
   async accountState(): Promise<AccountStateView> {
     if (this.unreachable) throw new Error("paper exchange is unreachable");
 
@@ -105,6 +138,7 @@ export class PaperExchangePort implements ExchangePort {
     let unrealized = 0;
 
     for (const position of this.#positions.values()) {
+      this.#accrueFunding(position);
       const mark = Number.parseFloat(await this.#priceSource(position.symbol));
       const sign = position.side === "LONG" ? 1 : -1;
       const pnl = sign * (mark - position.entryPrice) * position.size;
@@ -123,6 +157,9 @@ export class PaperExchangePort implements ExchangePort {
         liquidationPrice: null,
         leverage: position.leverage,
         positionValue: String(mark * position.size),
+        ...(this.#hourlyFundingRate !== 0
+          ? { fundingSinceOpen: String(position.fundingPaid ?? 0) }
+          : {}),
       });
     }
 
@@ -190,6 +227,7 @@ export class PaperExchangePort implements ExchangePort {
     const orderId = this.#nextOrderId++;
 
     if (order.reduceOnly && existing) {
+      this.#accrueFunding(existing);
       const fillable = Math.min(requested, existing.size) * this.partialFillFraction;
       const size = roundDown(fillable, asset.szDecimals);
       if (!(size > 0)) return { kind: "rejected", reason: "reduce-only fill rounds to zero" };

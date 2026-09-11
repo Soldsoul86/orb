@@ -778,6 +778,7 @@ export class TradeExecutor {
             ...(outcome.averagePrice !== undefined ? { exitPrice: outcome.averagePrice } : {}),
             ...(outcome.realizedPnl !== undefined ? { realizedPnl: outcome.realizedPnl } : {}),
             ...(outcome.fees !== undefined ? { fees: outcome.fees } : {}),
+            ...(outcome.fundingPaid !== undefined ? { fundingPaid: outcome.fundingPaid } : {}),
           });
           this.#audit.record({
             stage: "TRADE_CLOSED",
@@ -788,8 +789,18 @@ export class TradeExecutor {
             ...(outcome.averagePrice !== undefined ? { price: outcome.averagePrice } : {}),
             ...(outcome.realizedPnl !== undefined ? { realizedPnl: outcome.realizedPnl } : {}),
             ...(outcome.fees !== undefined ? { fees: outcome.fees } : {}),
+            ...(outcome.fundingPaid !== undefined ? { funding: outcome.fundingPaid } : {}),
             size: outcome.closedSize,
-            detail: { attempts: outcome.attempts },
+            detail: {
+              attempts: outcome.attempts,
+              // The identity a reconciliation should satisfy against the account.
+              net:
+                outcome.realizedPnl !== undefined
+                  ? Number.parseFloat(outcome.realizedPnl) -
+                    Number.parseFloat(outcome.fees ?? "0") -
+                    Number.parseFloat(outcome.fundingPaid ?? "0")
+                  : null,
+            },
           });
           this.#marketData.unwatch(symbol);
         } else {

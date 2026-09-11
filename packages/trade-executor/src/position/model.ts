@@ -129,6 +129,8 @@ export interface ManagedPosition {
 
   readonly realizedPnl?: string;
   readonly fees?: string;
+  /** Funding paid (+) or received (-) over the hold. Absent when unknown. */
+  readonly fundingPaid?: string;
   readonly exitPrice?: string;
 
   /** Recorded when local belief and exchange truth diverged. Never overwritten silently. */

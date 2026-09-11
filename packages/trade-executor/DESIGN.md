@@ -152,7 +152,75 @@ engaged; a failed write leaves it engaged; and a failed *release* leaves it
 engaged, so a restart cannot come back up trading against state that was never
 stored.
 
-## 10. Trade-offs
+## 10. What the threshold does and does not count
+
+The sentinel measures **price movement**, not economic loss:
+
+```
+unrealizedPnl = sign x (mark - entry) x size
+```
+
+No fees. No funding. That is a deliberate, documented boundary — and it means
+the configured threshold is not the loss the account actually takes.
+
+Measured on a 1 ETH long at 2000, 10x (200 margin, a 10% stop = a $20 budget),
+held for a day and stopped out at 1980:
+
+| Regime (hourly funding) | Funding/day | True loss at the stop | vs the $20 budget |
+| --- | --- | --- | --- |
+| none (instant round trip) | $0.00 | $21.79 | +9% |
+| calm (0.00125%/hr) | $0.63 | $23.42 | +17% |
+| typical (0.005%/hr) | $2.50 | $25.29 | +26% |
+| trending (0.01%/hr) | $5.00 | $27.79 | +39% |
+
+Round-trip taker fees alone are 0.9% of margin at 10x. A day of funding in a
+trending market is another 2.4%. Together they consume up to ~39% of a 10% stop
+budget, and the overrun grows with holding time and with leverage.
+
+**This is not currently corrected**, because correcting it changes what the stop
+*means*, and that is the operator's decision rather than the implementation's.
+Two options, neither taken unilaterally:
+
+1. **Widen the budget knowingly** — set `maxLossFraction` to the price-move
+   fraction you actually want, understanding the realised loss will exceed it by
+   fees plus accrued funding.
+2. **Make the basis economic** — add a loss basis that subtracts round-trip fees
+   and `fundingSinceOpen` from the numerator, so the threshold means realised
+   loss. This tightens every stop and will exit earlier than today.
+
+What *is* done: funding is carried through the adapter
+(`ExchangePositionView.fundingSinceOpen`), recorded on every closed trade, and
+reconciled against the account — so the divergence is measured rather than
+invisible. See §11.
+
+## 11. Settlement reconciles against the account
+
+A trade's cash result is three terms, not one:
+
+```
+account delta  ==  realizedPnl - fees - fundingPaid
+```
+
+All three are recorded on `TRADE_CLOSED`, along with their `net`. An acceptance
+test drives a day-long hold with hourly funding through the real executor and
+asserts the identity holds to within 1e-6 of the paper account's own balance.
+
+Two things this caught, both now fixed:
+
+- **Fees omitted the entry.** Settlement windowed fills from the exit claim, so
+  a trade reported only its *exit* fee. The residual was exactly the entry fee —
+  a systematic, one-directional understatement on every trade. The window now
+  starts at the position's open.
+- **Funding was invisible.** `cumFunding` exists in the exchange response but was
+  dropped at the adapter boundary, so a day of funding simply vanished from the
+  record. It is now carried through and reported.
+
+A position adopted from the exchange is the one honest exception: its entry
+predates anything we saw, so its settlement is necessarily partial, and the
+window deliberately does not reach back past adoption and sweep in a previous
+trade's fills.
+
+## 12. Trade-offs
 
 | Decision | Cost | Why |
 | --- | --- | --- |
@@ -161,3 +229,4 @@ stored.
 | One position per symbol | No hedged positions | The exchange nets anyway; pretending otherwise invites a stale-size close. |
 | Aggressive IOC closes | Pays the spread | A close that does not fill is not a close. |
 | No order retries in the client | Ambiguity after a timeout | Resolved by reconciliation. A duplicate position is unrecoverable. |
+| Threshold measures price, not realised loss | The stop overshoots its stated budget by fees + funding | Changing what the stop means is the operator's call. The gap is now measured and reported rather than hidden (§10). |

@@ -30,7 +30,17 @@ export interface CloseOutcome {
   /** Size-weighted average fill price, when anything filled. */
   readonly averagePrice?: string;
   readonly realizedPnl?: string;
+  /** Round-trip trading fees across the whole trade, entry included. */
   readonly fees?: string;
+  /**
+   * Funding paid (positive) or received (negative) over the hold.
+   *
+   * Reported separately because it is not a fee and not price PnL: it is a
+   * third cash flow. A trade's true economic result is
+   * `realizedPnl - fees - fundingPaid`, and over a hold measured in hours this
+   * term is not small. Absent when the port cannot determine it.
+   */
+  readonly fundingPaid?: string;
   readonly error?: string;
 }
 
@@ -59,13 +69,27 @@ export async function closePosition(
   let closedSize = 0;
   let notional = 0;
   let lastError: string | undefined;
+  // The last funding figure seen while the position still existed. Once the
+  // exchange reports flat the position is gone and the figure with it.
+  let fundingPaid: string | undefined;
 
   const position = registry.get(token.symbol);
   if (!position) {
     return { flat: false, attempts: 0, closedSize: "0", error: "position vanished from the registry" };
   }
 
-  const fillsFrom = token.claimedAt - 1_000;
+  // Settlement covers the whole trade, not just the close.
+  //
+  // Windowing from the exit claim would report only the *exit* fee, so a trade's
+  // recorded economics would understate the round trip by exactly the entry fee
+  // — a systematic, one-directional bias across every trade. One position per
+  // symbol is enforced at entry, so every fill for this symbol since the
+  // position opened belongs to this trade.
+  //
+  // A position adopted from the exchange is the exception: its entry predates
+  // anything we saw, so its settlement is necessarily partial. `openedAt` is
+  // then the adoption time and the entry fee is simply not ours to know.
+  const fillsFrom = Math.min(position.openedAt, token.claimedAt) - 1_000;
 
   const flatResult = async (attempts: number): Promise<CloseOutcome> => {
     audit.record({
@@ -82,6 +106,7 @@ export async function closePosition(
       closedSize: trim(closedSize),
       ...(closedSize > 0 ? { averagePrice: trim(notional / closedSize) } : {}),
       ...(settled ? { realizedPnl: trim(settled.realizedPnl), fees: trim(settled.fees) } : {}),
+      ...(fundingPaid !== undefined ? { fundingPaid } : {}),
     };
   };
 
@@ -94,9 +119,10 @@ export async function closePosition(
 
     /* -- What is actually still open? The exchange decides, not our memory. -- */
 
-    let remaining: { size: number; entryPrice: number } | null;
+    let remaining: { size: number; entryPrice: number; fundingSinceOpen?: string } | null;
     try {
       remaining = await readOpenSize(exchange, token.symbol);
+      if (remaining?.fundingSinceOpen !== undefined) fundingPaid = remaining.fundingSinceOpen;
     } catch (error) {
       lastError = describe(error);
       recordAttempt(deps, token, attempt, "0", { outcome: "error", error: lastError });
@@ -229,7 +255,9 @@ export async function closePosition(
   /* -- One last check: an attempt may have succeeded as the budget ran out. -- */
 
   try {
-    if ((await readOpenSize(exchange, token.symbol)) === null) return flatResult(attempt);
+    const stillOpen = await readOpenSize(exchange, token.symbol);
+    if (stillOpen?.fundingSinceOpen !== undefined) fundingPaid = stillOpen.fundingSinceOpen;
+    if (stillOpen === null) return flatResult(attempt);
   } catch (error) {
     lastError ??= describe(error);
   }
@@ -239,6 +267,7 @@ export async function closePosition(
     attempts: attempt,
     closedSize: trim(closedSize),
     ...(closedSize > 0 ? { averagePrice: trim(notional / closedSize) } : {}),
+    ...(fundingPaid !== undefined ? { fundingPaid } : {}),
     error: lastError ?? "the exchange still reports an open position",
   };
 }
@@ -247,13 +276,19 @@ export async function closePosition(
 async function readOpenSize(
   exchange: ExchangePort,
   symbol: string,
-): Promise<{ size: number; entryPrice: number } | null> {
+): Promise<{ size: number; entryPrice: number; fundingSinceOpen?: string } | null> {
   const state = await exchange.accountState();
   const position = state.positions.find((candidate) => candidate.symbol === symbol);
   if (!position) return null;
   const size = Math.abs(Number.parseFloat(position.size));
   if (!(size > 0)) return null;
-  return { size, entryPrice: Number.parseFloat(position.entryPrice) };
+  return {
+    size,
+    entryPrice: Number.parseFloat(position.entryPrice),
+    ...(position.fundingSinceOpen !== undefined
+      ? { fundingSinceOpen: position.fundingSinceOpen }
+      : {}),
+  };
 }
 
 /** Realized PnL and fees, read from the exchange's own fills. */

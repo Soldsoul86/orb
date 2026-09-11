@@ -289,6 +289,47 @@ describe("closing a position", () => {
     assert.ok(Number.parseFloat(outcome.fees!) > 0);
   });
 
+  test("settlement covers the whole trade, including the entry fee", async () => {
+    // Regression: windowing fills from the exit claim reported only the exit
+    // fee, understating every trade's cost by exactly the entry fee.
+    const { exchange, registry, deps } = setup();
+
+    // The position was opened a day before the exit was claimed.
+    const openedADayEarlier = AT - 86_400_000;
+    registry.observe("ETH", { openedAt: openedADayEarlier });
+    exchange.fills.push({
+      symbol: "ETH", side: "LONG", size: "1", price: "2000",
+      fee: "0.9", closedPnl: "0", orderId: 1, at: openedADayEarlier,
+      isLiquidation: false, tradeId: 1,
+    });
+
+    const outcome = await closePosition(deps, claim(registry));
+
+    assert.equal(outcome.flat, true);
+    const fees = Number.parseFloat(outcome.fees!);
+    assert.ok(fees > 0.9, `round-trip fees must include the 0.9 entry fee, got ${fees}`);
+  });
+
+  test("an adopted position settles only over what we actually saw", async () => {
+    // Its entry predates adoption, so the entry fee is not ours to know. The
+    // window must not reach back past the position's own start and sweep in
+    // fills from a previous trade in the same symbol.
+    const { exchange, registry, deps } = setup();
+
+    exchange.fills.push({
+      symbol: "ETH", side: "LONG", size: "5", price: "1800",
+      fee: "99", closedPnl: "-500", orderId: 1, at: AT - 86_400_000,
+      isLiquidation: false, tradeId: 1,
+    });
+
+    const outcome = await closePosition(deps, claim(registry));
+    assert.equal(outcome.flat, true);
+    assert.ok(
+      Number.parseFloat(outcome.fees!) < 99,
+      "a previous trade's fees must not be attributed to this one",
+    );
+  });
+
   test("records every attempt on the position for audit", async () => {
     const { exchange, registry, deps } = setup();
     exchange.fillFraction = 0.5;

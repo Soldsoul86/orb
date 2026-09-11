@@ -76,6 +76,8 @@ export interface LifecycleEvent {
   readonly risk?: RiskMeasurement;
   readonly realizedPnl?: string;
   readonly fees?: string;
+  /** Funding paid (+) or received (-) over the hold. Not a fee, not price PnL. */
+  readonly funding?: string;
   readonly error?: string;
   /** Free-form, audit-only. Never read by any decision path. */
   readonly detail?: Readonly<Record<string, string | number | boolean | null>>;

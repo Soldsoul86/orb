@@ -56,6 +56,7 @@ class Harness {
     config: RiskConfig,
     killSwitchStore: KillSwitchStore = new MemoryKillSwitchStore(),
     exchange?: PaperExchangePort,
+    hourlyFundingRate = 0,
   ) {
     this.exchange =
       exchange ??
@@ -69,6 +70,7 @@ class Harness {
         startingBalanceUsd: 100_000,
         now: () => this.time,
         feeFraction: 0.00045,
+        hourlyFundingRate,
       });
 
     this.killSwitchStore = killSwitchStore;
@@ -971,5 +973,129 @@ describe("acceptance: audit", () => {
 
     await h.executor.stop();
     await journal.close();
+  });
+});
+
+
+/* ================================================================== *
+ * 7. Settlement over a long hold
+ * ================================================================== */
+
+describe("acceptance: settlement is fee- and funding-complete", () => {
+  /**
+   * The identity that must hold for a trade to be reconstructable in cash terms:
+   *
+   *   account delta  ==  realizedPnl - fees - fundingPaid
+   *
+   * Anything left over is a cost the audit trail cannot account for, and over
+   * many trades an unaccounted term is a systematic bias rather than noise.
+   */
+  test("a day-long hold reconciles exactly against the account", async () => {
+    const journal = await newJournal();
+    // 0.01%/hour — a trending-market funding regime, long side paying.
+    const h = new Harness(journal, config(), new MemoryKillSwitchStore(), undefined, 0.0001);
+    await h.executor.start();
+    await h.killSwitch.release("test");
+
+    const before = Number((await h.exchange.accountState()).accountValue);
+    await h.executor.submitSignal(h.signal({ signalId: "settle-day-1" }));
+    await settle();
+
+    // Hold for a full day, drifting to just inside the threshold.
+    for (let hour = 1; hour <= 24; hour++) {
+      h.time += 3_600_000;
+      const price = 2000 - (hour / 24) * 19;
+      h.prices.set("ETH", price.toFixed(4));
+      h.feed.push("ETH", price.toFixed(4), h.time);
+      await settle(3);
+    }
+    assert.equal(h.executor.registry.get("ETH")!.state, "MONITORING", "still inside the threshold");
+
+    // Cross it.
+    h.time += 3_600_000;
+    h.prices.set("ETH", "1979");
+    h.feed.push("ETH", "1979", h.time);
+    await settle(40);
+
+    const position = h.executor.registry.get("ETH")!;
+    assert.equal(position.state, "CLOSED");
+    assert.equal(position.exitReason, "HARD_RISK_EXIT");
+
+    const after = Number((await h.exchange.accountState()).accountValue);
+
+    await h.audit.flush();
+    const lifecycle = await replayLifecycle(journal, position.tradeId);
+    const closed = lifecycle.find((event) => event.stage === "TRADE_CLOSED")!;
+
+    assert.ok(closed.realizedPnl !== undefined, "realised PnL must be recorded");
+    assert.ok(closed.fees !== undefined, "fees must be recorded");
+    assert.ok(closed.funding !== undefined, "funding must be recorded over a long hold");
+
+    const reportedNet =
+      Number(closed.realizedPnl) - Number(closed.fees) - Number(closed.funding);
+    const actualDelta = after - before;
+
+    assert.ok(
+      Math.abs(actualDelta - reportedNet) < 1e-6,
+      `settlement must reconcile: account moved ${actualDelta}, ` +
+        `report accounts for ${reportedNet} ` +
+        `(pnl ${closed.realizedPnl}, fees ${closed.fees}, funding ${closed.funding})`,
+    );
+  });
+
+  test("reported fees cover the round trip, not just the exit", async () => {
+    const journal = await newJournal();
+    const h = new Harness(journal, config());
+    await h.executor.start();
+    await h.killSwitch.release("test");
+    await h.executor.submitSignal(h.signal({ signalId: "roundtrip-1" }));
+    await settle();
+
+    await h.tick("ETH", 1979);
+    await settle(30);
+
+    const position = h.executor.registry.get("ETH")!;
+    await h.audit.flush();
+    const closed = (await replayLifecycle(journal, position.tradeId)).find(
+      (event) => event.stage === "TRADE_CLOSED",
+    )!;
+
+    // Entry at 2000 and exit near 1979, both taker at 0.045%: roughly $1.79.
+    // Only counting the exit would report roughly half that.
+    const fees = Number(closed.fees);
+    const exitOnly = 1979 * 0.00045;
+    assert.ok(
+      fees > exitOnly * 1.8,
+      `round-trip fees expected near 1.79, got ${fees} (exit alone would be ${exitOnly.toFixed(4)})`,
+    );
+  });
+
+  test("funding is recorded even when the price never moves", async () => {
+    const journal = await newJournal();
+    const h = new Harness(journal, config(), new MemoryKillSwitchStore(), undefined, 0.0001);
+    await h.executor.start();
+    await h.killSwitch.release("test");
+    await h.executor.submitSignal(h.signal({ signalId: "funding-only-1" }));
+    await settle();
+
+    // Twelve hours flat, then an operator close. No price movement at all.
+    h.time += 12 * 3_600_000;
+    await h.executor.closePositionNow("ETH", "MANUAL_EXIT", "settlement check");
+    await settle(30);
+
+    const position = h.executor.registry.get("ETH")!;
+    await h.audit.flush();
+    const closed = (await replayLifecycle(journal, position.tradeId)).find(
+      (event) => event.stage === "TRADE_CLOSED",
+    )!;
+
+    // 12h at 0.01%/hr on $2000 notional = $2.40, paid by the long.
+    assert.ok(closed.funding !== undefined, "funding must be recorded");
+    assert.ok(
+      Math.abs(Number(closed.funding) - 2.4) < 1e-6,
+      `expected 2.40 of funding, got ${closed.funding}`,
+    );
+    // And price PnL is zero, so the cost of the hold was entirely fees + funding.
+    assert.equal(Number(closed.realizedPnl), 0);
   });
 });

@@ -100,11 +100,31 @@ own id** so a retry is not a duplicate; namespaces do not collide.
   a pending entry is not a phantom; orphaned reduce-only orders flagged;
   idempotent across repeated runs.
 
+## Settlement (3 acceptance tests)
+
+- **A day-long hold with hourly funding reconciles exactly** against the paper
+  account: `realizedPnl - fees - fundingPaid` matches the account delta to
+  within 1e-6.
+- **Reported fees cover the round trip**, not just the exit — a regression test
+  for a bug where settlement windowed fills from the exit claim and so
+  understated every trade by exactly its entry fee.
+- **Funding is recorded even when the price never moves**, so a hold that costs
+  only fees and funding is still fully accounted.
+
+Plus two unit regressions in the close suite: settlement includes an entry fill
+from a day earlier, and an adopted position does not sweep in a previous trade's
+fills.
+
 ## Not covered, deliberately
 
 - **Multi-symbol portfolio risk.** Limits are per-position and per-count. A
   correlation-aware portfolio limit is a different component.
-- **Funding rate accrual.** Read from the exchange, never modelled locally.
+- **Funding rate *prediction*.** Accrued funding is read from the exchange and
+  reported; the future rate is never forecast, and funding is not projected
+  forward when deciding whether to hold.
+- **Fee- and funding-inclusive thresholds.** The sentinel measures price
+  movement. The gap between that and realised loss is measured and documented
+  (`DESIGN.md` §10) but not corrected, because it changes what the stop means.
 - **Real exchange latency or liquidity.** The paper exchange fills at the
   reference price and models position management, not microstructure. A paper
   result is not an execution estimate.

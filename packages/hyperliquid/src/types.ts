@@ -103,6 +103,18 @@ export interface ExchangePosition {
   readonly marginUsed: string;
   readonly maxLeverage: number;
   readonly leverage: LeverageInfo;
+  /**
+   * Funding paid (positive) or received (negative) on this position.
+   *
+   * Hyperliquid settles funding into the account balance, not into
+   * `unrealizedPnl` — so a position's price PnL and its true economic result
+   * diverge by exactly this, and the divergence grows with holding time.
+   */
+  readonly cumFunding?: {
+    readonly allTime: string;
+    readonly sinceOpen: string;
+    readonly sinceChange: string;
+  };
 }
 
 export interface AssetPosition {

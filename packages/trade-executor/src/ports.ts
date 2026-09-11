@@ -26,6 +26,15 @@ export interface ExchangePositionView {
   readonly liquidationPrice: string | null;
   readonly leverage: number;
   readonly positionValue: string;
+  /**
+   * Funding paid (positive) or received (negative) since the position opened.
+   *
+   * Absent when the port cannot determine it. The exchange settles funding into
+   * the account balance rather than into `unrealizedPnl`, so a trade's price PnL
+   * and its true economic result diverge by this amount — materially, over a
+   * hold measured in hours.
+   */
+  readonly fundingSinceOpen?: string;
 }
 
 /** The account's margin picture, as the exchange reports it. */
