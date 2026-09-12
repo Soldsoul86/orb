@@ -55,6 +55,29 @@ The tests fire 1,000 simultaneous triggers and assert one claim.
 
 A lower-priority rule never overrides a higher one.
 
+## Measuring whether a setup pays
+
+The executor generates no signals and has no opinion about what to trade. What
+it can do is tell you, from recorded history, whether a setup actually made
+money — and what it would have to achieve before it could.
+
+```ts
+import { breakevenHitRate, buildSetupLedger, EXECUTION_STYLES } from "@orb/trade-executor";
+
+// What a setup must achieve before its signal quality matters at all.
+breakevenHitRate({ stopFraction: 0.002, targetFraction: 0.002 }, cost);  // 72.5%
+
+// What each setupId actually did, net of fees and funding, from the journal.
+const ledger = buildSetupLedger(await replayLifecycle(journal), cost);
+```
+
+`node scripts/setup-economics.mjs` prints the constraint across holding
+horizons. The short version: **shorter timeframes make the economics harder,
+not easier.** Cost is roughly fixed per round trip while the stop shrinks with
+the square root of time, so the cost-to-risk ratio climbs steeply as you speed
+up. At a 30-second horizon the round trip costs more than the target is worth,
+and no hit rate breaks even.
+
 ## Documents
 
 - [`DESIGN.md`](DESIGN.md) · [`API.md`](API.md) · [`TESTS.md`](TESTS.md)

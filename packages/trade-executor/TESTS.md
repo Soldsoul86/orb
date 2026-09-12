@@ -115,6 +115,28 @@ Plus two unit regressions in the close suite: settlement includes an entry fill
 from a day earlier, and an adopted position does not sweep in a previous trade's
 fills.
 
+## Trade economics and per-setup measurement (36 tests)
+
+**Economics** — round-trip cost sums fees, both sides of slippage and funding
+over the hold; break-even is 50% for a costless coin flip and 54.5% at a 1%
+stop with taker fees; **tightening the stop raises the required hit rate
+hyperbolically** (52.3% at a 2% stop, 95% at 0.1%); a target that does not clear
+the cost returns `NaN` rather than a hit rate above 1, and loses even at a
+perfect record; **leverage does not change break-even at all** — asserted
+across 1x to 50x, because PnL and fees scale with notional together; resting the
+entry is worth 7.5 points of required hit rate at a 0.2% stop; `minimumViableStop`
+inverts break-even consistently across hit rates and reward ratios; a small edge
+needs tens of thousands of trades to prove, and a 4-trade sample proves nothing.
+
+**Per-setup measurement** — folds `SIGNAL_VALIDATED` and `TRADE_CLOSED` into
+completed trades by `tradeId`; an unfinished trade is absent; a close with no
+recorded open (an adopted position) cannot be attributed; **separates a winning
+setup from a losing one inside a flat account** — including a scalp with a
+perfectly respectable 50% hit rate and decisively negative expectancy; reports
+what share of gross profit went to the exchange; computes break-even from
+*realised* geometry rather than an assumed one; flags a flattering short sample
+as not yet significant; totals reconcile with the sum of the trades.
+
 ## Not covered, deliberately
 
 - **Multi-symbol portfolio risk.** Limits are per-position and per-count. A
@@ -125,6 +147,12 @@ fills.
 - **Fee- and funding-inclusive thresholds.** The sentinel measures price
   movement. The gap between that and realised loss is measured and documented
   (`DESIGN.md` §10) but not corrected, because it changes what the stop means.
+- **Signal generation.** The executor has no opinion about what to trade and
+  contains no setup detector, indicator, or scanner. `analysis/` measures
+  whether a setup paid; it never proposes one.
+- **Forecasting.** `economics.ts` is a constraint calculator. It says what a
+  setup must achieve, never what it will achieve. No test asserts a prediction,
+  because none is made.
 - **Real exchange latency or liquidity.** The paper exchange fills at the
   reference price and models position management, not microstructure. A paper
   result is not an execution estimate.

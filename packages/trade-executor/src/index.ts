@@ -137,6 +137,32 @@ export {
 } from "./identity.js";
 export type { ClientOrderId } from "./identity.js";
 
+/* -- Analysis ------------------------------------------------------------- */
+export {
+  roundTripCost,
+  rewardToRisk,
+  breakevenHitRate,
+  expectancy,
+  expectancyR,
+  minimumViableStop,
+  assess,
+  tradesToSignificance,
+  HYPERLIQUID_BASE_FEES,
+  EXECUTION_STYLES,
+} from "./analysis/economics.js";
+export type { CostModel, SetupGeometry, Verdict } from "./analysis/economics.js";
+
+export {
+  foldTrades,
+  summariseSetup,
+  buildSetupLedger,
+} from "./analysis/setup-performance.js";
+export type {
+  TradeRecord,
+  SetupPerformance,
+  SetupLedger,
+} from "./analysis/setup-performance.js";
+
 /* -- Ports ---------------------------------------------------------------- */
 export type {
   Clock,
