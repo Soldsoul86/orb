@@ -13,6 +13,7 @@ import {
   expectancy,
   expectancyR,
   minimumViableStop,
+  maxViableCost,
   assess,
   tradesToSignificance,
   rewardToRisk,
@@ -471,5 +472,69 @@ describe("per-setup performance", () => {
     const setup = summariseSetup("s", foldTrades(events));
     near(setup.netPnl, 8.2, 1e-9);
     assert.equal(setup.breakeven, null, "no cost model means no break-even claim");
+  });
+});
+
+describe("maximum viable cost", () => {
+  test("is the exact inverse of break-even", () => {
+    for (const geometry of [
+      { stopFraction: 0.002, targetFraction: 0.002 },
+      { stopFraction: 0.0006, targetFraction: 0.0018 },
+      { stopFraction: 0.01, targetFraction: 0.02 },
+    ]) {
+      for (const hitRate of [0.55, 0.65, 0.75]) {
+        const ceiling = maxViableCost(geometry, hitRate);
+        const atCeiling: CostModel = {
+          ...takerTaker,
+          entryFeeFraction: ceiling / 2,
+          exitFeeFraction: ceiling / 2,
+        };
+        near(breakevenHitRate(geometry, atCeiling), hitRate, 1e-9);
+        near(expectancy(geometry, atCeiling, hitRate), 0, 1e-12);
+      }
+    }
+  });
+
+  test("a 30-second scalp cannot clear Hyperliquid's base fees at any plausible hit rate", () => {
+    // One standard 30-second move in ETH is roughly 0.06%.
+    const scalp = { stopFraction: 0.0006, targetFraction: 0.0006 };
+
+    // Even at a 70% hit rate the ceiling is below maker-on-both-sides.
+    const ceilingAt70 = maxViableCost(scalp, 0.7);
+    const makerMaker = EXECUTION_STYLES.makerMaker.entry + EXECUTION_STYLES.makerMaker.exit;
+    assert.ok(
+      ceilingAt70 < makerMaker,
+      `ceiling ${ceilingAt70} should be under maker/maker ${makerMaker}`,
+    );
+
+    // And a hard stop forces the exit to be taker, so maker/maker is not even
+    // reachable. The exit fee alone already exceeds the whole ceiling.
+    assert.ok(HYPERLIQUID_BASE_FEES.taker > ceilingAt70, "the exit fee alone breaks it");
+  });
+
+  test("the hit rate a 30-second scalp needs with a hard stop is not attainable", () => {
+    const scalp = { stopFraction: 0.0006, targetFraction: 0.0006 };
+    // Maker entry is the best a hard-stopped strategy can do; the exit crosses.
+    const required = breakevenHitRate(scalp, makerTaker);
+    // The round trip (0.06%) equals the target, so no hit rate works.
+    assert.ok(
+      Number.isNaN(required) || required >= 1,
+      `expected impossible, got ${required}`,
+    );
+  });
+
+  test("stretching the target is what makes a fast trade viable, not a better signal", () => {
+    const stop = 0.0006;
+    // At 1:1 it is impossible. The reward ratio is the lever that reopens it.
+    const ratios = [1, 2, 3, 5].map((k) =>
+      breakevenHitRate({ stopFraction: stop, targetFraction: stop * k }, makerTaker),
+    );
+    assert.ok(Number.isNaN(ratios[0]!) || ratios[0]! >= 1, "1:1 is impossible");
+    assert.ok(Number.isFinite(ratios[3]!) && ratios[3]! < 0.9, "5:1 is at least arithmetically open");
+  });
+
+  test("a hit rate too low for the geometry yields a non-positive ceiling", () => {
+    assert.ok(maxViableCost({ stopFraction: 0.002, targetFraction: 0.002 }, 0.5) <= 0);
+    assert.ok(maxViableCost({ stopFraction: 0.002, targetFraction: 0.002 }, 0.4) < 0);
   });
 });

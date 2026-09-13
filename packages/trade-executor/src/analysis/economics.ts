@@ -147,6 +147,26 @@ export function minimumViableStop(
   return roundTripCost(cost) / denominator;
 }
 
+/**
+ * The most a round trip may cost before a setup stops breaking even.
+ *
+ * Rearranging `p = (S + c) / (S + T)`:
+ *
+ *   c = p(S + T) - S
+ *
+ * This is the form that settles whether a *style* of trading is available to
+ * you at all, as opposed to whether one particular signal is any good. Compare
+ * the result against what you actually pay: if your fees exceed this ceiling,
+ * no signal at that geometry can pay, and the only things that can change the
+ * answer are the fee tier, the execution style, or the geometry itself.
+ *
+ * @returns the ceiling as a fraction of notional, or a non-positive number when
+ *   the hit rate cannot support the geometry even at zero cost.
+ */
+export function maxViableCost(geometry: SetupGeometry, hitRate: number): number {
+  return hitRate * (geometry.stopFraction + geometry.targetFraction) - geometry.stopFraction;
+}
+
 /** How a setup stands against its own break-even requirement. */
 export interface Verdict {
   readonly roundTripCost: number;

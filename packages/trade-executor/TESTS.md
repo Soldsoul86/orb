@@ -128,6 +128,13 @@ entry is worth 7.5 points of required hit rate at a 0.2% stop; `minimumViableSto
 inverts break-even consistently across hit rates and reward ratios; a small edge
 needs tens of thousands of trades to prove, and a 4-trade sample proves nothing.
 
+**Cost ceiling** — `maxViableCost` is the exact inverse of `breakevenHitRate`,
+verified across geometries and hit rates; **a 30-second scalp cannot clear
+Hyperliquid base fees at any plausible hit rate** — the ceiling at 70% sits
+below maker-on-both-sides, and the taker exit fee alone already exceeds it; with
+a hard stop the required hit rate at 1:1 is not attainable at all; stretching
+the reward ratio, not improving the signal, is what reopens a fast trade.
+
 **Per-setup measurement** — folds `SIGNAL_VALIDATED` and `TRADE_CLOSED` into
 completed trades by `tradeId`; an unfinished trade is absent; a close with no
 recorded open (an adopted position) cannot be attributed; **separates a winning

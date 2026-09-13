@@ -145,6 +145,7 @@ export {
   expectancy,
   expectancyR,
   minimumViableStop,
+  maxViableCost,
   assess,
   tradesToSignificance,
   HYPERLIQUID_BASE_FEES,
