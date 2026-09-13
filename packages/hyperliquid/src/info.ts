@@ -17,6 +17,8 @@ import type {
   PerpAssetCtx,
   UserFill,
   AssetMeta,
+  Candle,
+  CandleInterval,
 } from "./types.js";
 import { MAINNET_API, TESTNET_API } from "./types.js";
 import type { HyperliquidNetwork } from "./signing.js";
@@ -151,6 +153,33 @@ export class InfoClient {
       throw new TransportError("malformed metaAndAssetCtxs response", "malformed");
     }
     return { meta: result[0], contexts: result[1] };
+  }
+
+  /**
+   * Historical candles.
+   *
+   * The exchange caps how many it returns per call, so a long range must be
+   * walked in windows — see `scripts/collect-candles.mjs`, which does exactly
+   * that and is the intended way to assemble a dataset.
+   *
+   * This is the one read that is genuinely historical. Everything else on this
+   * client describes the present.
+   */
+  async candleSnapshot(
+    coin: string,
+    interval: CandleInterval,
+    startTime: number,
+    endTime?: number,
+    signal?: AbortSignal,
+  ): Promise<readonly Candle[]> {
+    const result = await this.#post<readonly Candle[]>(
+      {
+        type: "candleSnapshot",
+        req: { coin, interval, startTime, ...(endTime !== undefined ? { endTime } : {}) },
+      },
+      signal,
+    );
+    return Array.isArray(result) ? result : [];
   }
 
   /** Mid prices by symbol. A cheap liveness probe as well as a price source. */

@@ -154,6 +154,27 @@ Missing any one and the process **refuses to start**. `dry_run` and `paper`
 build exchange ports with no signing key at all, so they are structurally
 incapable of placing an order.
 
+### Collecting market data
+
+The executor is local-first by design (Constitution Art. VIII §31), and the
+market-data path lives in the executor process, not anywhere else:
+`HyperliquidMarketDataFeed` for live prices and fills, `HyperliquidExchangePort`
+for account state, and `InfoClient.candleSnapshot` for history.
+
+To assemble a dataset for analysis, run the collector somewhere with network
+access to the exchange. It needs no key and no account — `/info` is public and
+read-only:
+
+```bash
+node scripts/collect-candles.mjs ETH 1m 7          # 7 days of 1m candles
+node scripts/collect-candles.mjs BTC 5m 30 --testnet
+```
+
+Output lands in `data/candles/<SYMBOL>-<INTERVAL>.jsonl`, oldest first, with a
+coverage and gap report. The gap report is not decoration: a dataset with silent
+holes produces a backtest that overstates its edge, because the missing candles
+are usually the violent ones.
+
 ### Environment variables
 
 **Never commit secrets.** Every `*_SECRET` and `*_PRIVATE_KEY` also accepts a

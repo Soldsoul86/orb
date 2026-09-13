@@ -80,6 +80,7 @@ class InfoClient {
   userFills(user: Address, signal?): Promise<readonly UserFill[]>
   userFillsByTime(user: Address, startTime: number, signal?): Promise<readonly UserFill[]>
   orderStatus(user: Address, oid: number | `0x${string}`, signal?): Promise<OrderStatusResponse>
+  candleSnapshot(coin, interval: CandleInterval, startTime, endTime?, signal?): Promise<readonly Candle[]>
   metaAndAssetCtxs(signal?): Promise<{ meta: MetaResponse; contexts: readonly PerpAssetCtx[] }>
   allMids(signal?): Promise<Readonly<Record<string, string>>>
 }
@@ -150,7 +151,13 @@ reconnection is deterministic under test.
 
 `OrderWire`, `OrderType`, `Tif`, `OrderGrouping`, `ClearinghouseState`,
 `ExchangePosition`, `AssetMeta`, `PerpAssetCtx`, `UserFill`, `OpenOrder`,
-`OrderProcessingStatus`, plus `isTerminalOrderStatus(status)`.
+`OrderProcessingStatus`, `Candle`, `CandleInterval`, plus
+`isTerminalOrderStatus(status)`.
+
+`candleSnapshot` is the only genuinely historical read; everything else on the
+client describes the present. The exchange caps how many candles it returns per
+call, so a long range must be walked in windows — `scripts/collect-candles.mjs`
+does that and writes JSONL.
 
 Abbreviated field names (`a`, `b`, `p`, `s`, `r`, `t`, `c`) are the exchange's
 and are kept verbatim.

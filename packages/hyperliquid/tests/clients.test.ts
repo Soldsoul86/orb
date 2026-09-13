@@ -93,6 +93,35 @@ describe("info client", () => {
     assert.deepEqual([...(await info.openOrders(USER))], []);
   });
 
+  test("requests candles in the documented nested shape", async () => {
+    const script = scriptedTransport([[{ t: 1, T: 2, s: "ETH", i: "1m", o: "1", c: "2", h: "3", l: "0", v: "9", n: 4 }]]);
+    const info = new InfoClient({ network: "testnet", transport: script.transport });
+
+    const candles = await info.candleSnapshot("ETH", "1m", 1_000, 2_000);
+
+    assert.deepEqual(script.requests[0]!.body, {
+      type: "candleSnapshot",
+      req: { coin: "ETH", interval: "1m", startTime: 1_000, endTime: 2_000 },
+    });
+    assert.equal(candles.length, 1);
+    assert.equal(candles[0]!.c, "2");
+  });
+
+  test("omits endTime when it is not given, rather than sending undefined", async () => {
+    const script = scriptedTransport([[]]);
+    const info = new InfoClient({ network: "testnet", transport: script.transport });
+    await info.candleSnapshot("ETH", "5m", 1_000);
+
+    const req = (script.requests[0]!.body as { req: Record<string, unknown> }).req;
+    assert.ok(!("endTime" in req), "an absent endTime must be absent, not null");
+  });
+
+  test("tolerates a non-array candle response", async () => {
+    const script = scriptedTransport([{}]);
+    const info = new InfoClient({ network: "testnet", transport: script.transport });
+    assert.deepEqual([...(await info.candleSnapshot("ETH", "1m", 0))], []);
+  });
+
   test("rejects a malformed response rather than inventing state", async () => {
     const script = scriptedTransport(["not an object"]);
     const info = new InfoClient({ network: "testnet", transport: script.transport });

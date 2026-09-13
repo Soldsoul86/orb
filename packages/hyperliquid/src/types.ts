@@ -201,6 +201,36 @@ export interface OrderStatusResponse {
   };
 }
 
+/** Candle intervals the exchange supports. */
+export type CandleInterval =
+  | "1m" | "3m" | "5m" | "15m" | "30m"
+  | "1h" | "2h" | "4h" | "8h" | "12h"
+  | "1d" | "3d" | "1w" | "1M";
+
+/**
+ * One candle, in the exchange's abbreviated wire form.
+ *
+ * Kept verbatim rather than prettified, for the same reason as the order
+ * fields: a rename here would hide a wire change behind a local name.
+ */
+export interface Candle {
+  /** Opening timestamp, ms since epoch. */
+  readonly t: number;
+  /** Closing timestamp, ms since epoch. */
+  readonly T: number;
+  /** Asset symbol. */
+  readonly s: string;
+  readonly i: CandleInterval;
+  readonly o: string;
+  readonly c: string;
+  readonly h: string;
+  readonly l: string;
+  /** Volume in the base asset. */
+  readonly v: string;
+  /** Number of trades in the interval. */
+  readonly n: number;
+}
+
 /** True when the exchange considers an order finished — no more fills will come. */
 export function isTerminalOrderStatus(status: OrderProcessingStatus): boolean {
   return status !== "open" && status !== "triggered";
