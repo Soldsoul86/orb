@@ -1,11 +1,11 @@
 /**
- * The relation a circuit would enforce.
+ * The relation, now that completeness is a constraint rather than a hope.
  *
- * Two groups matter. The soundness group forges each constraint in turn and
- * checks it is caught — a relation that cannot be broken by a test is one
- * nobody has tried to break. The honesty group asserts the things this
- * deliberately does *not* provide, so that if someone later makes it look like
- * a zero-knowledge proof, these tests fail.
+ * The previous version of this file ended with a test that *omitted* an
+ * in-window entry and still satisfied every constraint — kept passing on
+ * purpose, with a note that if the gap were ever closed it should start
+ * failing. It has been closed, so that test is now inverted: omission is
+ * caught, and the constraint that catches it is named.
  */
 import { ok, strictEqual } from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -13,14 +13,19 @@ import { describe, it } from "node:test";
 import type { BudgetProofBundle, LedgerEntry, SpendPolicy, SpendRequest } from "../src/index.js";
 import {
   ANY_REQUESTER,
+  BucketCommitment,
   IS_ZERO_KNOWLEDGE,
-  LedgerCommitment,
+  buildBudgetBundle,
   checkBudgetRelation,
-  digestOf,
-  policyDigest,
+  commitmentMatchesLedger,
+  coveringBuckets,
+  evaluate,
 } from "../src/index.js";
 
-const T0 = Date.UTC(2026, 8, 16, 4, 0, 0);
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+/** Bucket-aligned, so window arithmetic is easy to reason about by hand. */
+const T0 = Math.floor(Date.UTC(2026, 8, 16, 12, 0, 0) / HOUR) * HOUR;
 const ACCOUNT = "acct:research-agent";
 const TOKENS = "anthropic:tokens";
 
@@ -33,13 +38,13 @@ const policy: SpendPolicy = {
       kind: "WINDOW_BUDGET",
       scope: ANY_REQUESTER,
       asset: TOKENS,
-      windowMs: 86_400_000,
+      windowMs: DAY,
       maxTotal: 10_000n,
     },
   ],
 };
 
-const entry = (id: string, amount: bigint, at = T0 - 60_000): LedgerEntry => ({
+const entry = (id: string, amount: bigint, at: number): LedgerEntry => ({
   requestId: id,
   account: ACCOUNT,
   asset: TOKENS,
@@ -63,43 +68,114 @@ const request: SpendRequest = {
   memo: null,
 };
 
-/** Builds an honest bundle over a ledger the payer would rather not reveal. */
-function bundle(ledger: readonly LedgerEntry[] = [entry("a", 3_000n), entry("b", 4_000n)]): BudgetProofBundle {
-  const commitment = new LedgerCommitment(ledger);
-  return {
-    statement: {
-      policyDigest: policyDigest(policy),
-      ledgerRoot: commitment.root,
-      requestDigest: digestOf(request),
-      requestedAt: T0,
-      claimedOutcome: "ALLOW",
-    },
-    witness: {
-      policy,
-      request,
-      ruleId: "daily",
-      windowEntries: ledger.map((e, i) => ({ entry: e, inclusion: commitment.prove(i)! })),
-    },
-  };
+const RANGE = coveringBuckets(T0, DAY, HOUR);
+
+function commit(entries: readonly LedgerEntry[]): BucketCommitment {
+  return BucketCommitment.build(entries, {
+    account: ACCOUNT,
+    asset: TOKENS,
+    bucketMs: HOUR,
+    from: RANGE.from,
+    to: RANGE.to,
+  });
+}
+
+function bundle(
+  entries: readonly LedgerEntry[] = [entry("a", 3_000n, T0 - HOUR), entry("b", 4_000n, T0 - 2 * HOUR)],
+): BudgetProofBundle {
+  const built = buildBudgetBundle({
+    policy,
+    request,
+    ruleId: "daily",
+    commitment: commit(entries),
+    windowMs: DAY,
+  });
+  ok(built !== null, "bundle should assemble");
+  return built;
 }
 
 const constraint = (b: BudgetProofBundle, id: string) =>
   checkBudgetRelation(b).constraints.find((c) => c.id === id);
 
 describe("an honest bundle", () => {
-  it("satisfies every constraint", () => {
+  it("satisfies all seven constraints", () => {
     const result = checkBudgetRelation(bundle());
     strictEqual(result.satisfied, true, JSON.stringify(result.constraints, null, 2));
-    strictEqual(result.constraints.length, 6);
+    strictEqual(result.constraints.length, 7);
   });
 
-  it("proves compliance without the statement carrying the limit", () => {
-    // The whole point: 10,000 appears nowhere in the public half.
-    const { statement } = bundle();
-    const publicText = JSON.stringify(statement);
-    ok(!publicText.includes("10000"));
-    ok(!publicText.includes("3000"));
+  it("covers the window with one leaf per hour, plus the partial edge", () => {
+    strictEqual(bundle().witness.buckets.length, 25);
+  });
+
+  it("keeps the limit and the individual payments out of the public half", () => {
+    const publicText = JSON.stringify(bundle().statement);
+    ok(!publicText.includes("10000"), "the limit must not leak");
+    ok(!publicText.includes("3000"), "individual amounts must not leak");
     ok(!publicText.includes("4000"));
+  });
+});
+
+describe("completeness is now a constraint, not a hope", () => {
+  it("catches an omitted bucket", () => {
+    // The old attack: drop the bucket that would break the budget. It used to
+    // satisfy every constraint.
+    const entries = [
+      entry("a", 3_000n, T0 - HOUR),
+      entry("b", 4_000n, T0 - 2 * HOUR),
+      entry("c", 9_000n, T0 - 3 * HOUR),
+    ];
+    const honest = bundle(entries);
+    strictEqual(checkBudgetRelation(honest).satisfied, false, "the honest bundle should not fit");
+
+    const heavy = honest.witness.buckets.find((b) => b.leaf.total === 9_000n);
+    ok(heavy !== undefined);
+    const dishonest: BudgetProofBundle = {
+      ...honest,
+      witness: {
+        ...honest.witness,
+        buckets: honest.witness.buckets.filter((b) => b !== heavy),
+      },
+    };
+
+    const result = checkBudgetRelation(dishonest);
+    strictEqual(result.satisfied, false);
+    strictEqual(constraint(dishonest, "C6")?.satisfied, false);
+    ok(constraint(dishonest, "C6")?.detail.includes("24"));
+  });
+
+  it("catches a bucket supplied twice to pad the count", () => {
+    const honest = bundle();
+    const buckets = [...honest.witness.buckets];
+    buckets[5] = buckets[4]!;
+    const padded = { ...honest, witness: { ...honest.witness, buckets } };
+    strictEqual(constraint(padded, "C6")?.satisfied, false);
+  });
+
+  it("catches a commitment that does not cover the window", () => {
+    const narrow = BucketCommitment.build([], {
+      account: ACCOUNT,
+      asset: TOKENS,
+      bucketMs: HOUR,
+      from: RANGE.from + 5,
+      to: RANGE.to,
+    });
+    const b = bundle();
+    const short: BudgetProofBundle = {
+      ...b,
+      statement: {
+        ...b.statement,
+        commitment: { ...b.statement.commitment, root: narrow.root, from: RANGE.from + 5 },
+      },
+    };
+    strictEqual(constraint(short, "C6")?.satisfied, false);
+  });
+
+  it("the required range is computed from public values, not supplied", () => {
+    // A prover cannot narrow the window by claiming fewer buckets are needed:
+    // the range comes from requestedAt and the rule's own windowMs.
+    const range = coveringBuckets(T0, DAY, HOUR);
+    strictEqual(range.to - range.from + 1, 25);
   });
 });
 
@@ -121,112 +197,163 @@ describe("soundness — each constraint catches its own forgery", () => {
 
   it("C3 catches a shifted evaluation time", () => {
     const b = bundle();
-    const shifted = { ...b, statement: { ...b.statement, requestedAt: T0 + 1 } };
-    strictEqual(constraint(shifted, "C3")?.satisfied, false);
+    strictEqual(
+      constraint({ ...b, statement: { ...b.statement, requestedAt: T0 + 1 } }, "C3")?.satisfied,
+      false,
+    );
   });
 
-  it("C4 catches an entry that is not in the committed ledger", () => {
+  it("C4 catches a leaf whose total was edited", () => {
     const b = bundle();
-    const invented = { ...b.witness.windowEntries[0]!, entry: entry("ghost", 1n) };
-    const forged = {
-      ...b,
-      witness: { ...b.witness, windowEntries: [invented, b.witness.windowEntries[1]!] },
+    const buckets = [...b.witness.buckets];
+    // Must be a bucket that actually holds something: rewriting an empty one
+    // to zero changes nothing, and there would be nothing to catch.
+    const position = buckets.findIndex((x) => x.leaf.total > 0n);
+    ok(position >= 0, "fixture should have a non-empty bucket");
+    buckets[position] = {
+      ...buckets[position]!,
+      leaf: { ...buckets[position]!.leaf, total: 1n },
     };
-    strictEqual(constraint(forged, "C4")?.satisfied, false);
+    strictEqual(constraint({ ...b, witness: { ...b.witness, buckets } }, "C4")?.satisfied, false);
   });
 
-  it("C4 catches the same leaf presented twice", () => {
+  it("C5 catches a leaf lifted from a commitment with other parameters", () => {
+    // Same shape, different bucket size — a leaf that proves inclusion in its
+    // own tree but describes a different quantity.
+    const foreign = BucketCommitment.build([entry("x", 1n, T0)], {
+      account: ACCOUNT,
+      asset: TOKENS,
+      bucketMs: HOUR * 2,
+      from: RANGE.from,
+      to: RANGE.to,
+    });
+    const opened = foreign.open(RANGE.from)!;
     const b = bundle();
-    const doubled = {
-      ...b,
-      witness: { ...b.witness, windowEntries: [b.witness.windowEntries[0]!, b.witness.windowEntries[0]!] },
-    };
-    strictEqual(constraint(doubled, "C4")?.satisfied, false);
+    const buckets = [...b.witness.buckets];
+    buckets[0] = opened;
+    const swapped = { ...b, witness: { ...b.witness, buckets } };
+    strictEqual(constraint(swapped, "C5")?.satisfied, false);
   });
 
-  it("C5 catches an entry dragged in from outside the window", () => {
-    const stale = [entry("a", 3_000n), entry("old", 4_000n, T0 - 86_400_001)];
-    strictEqual(constraint(bundle(stale), "C5")?.satisfied, false);
-  });
-
-  it("C6 catches a payment that does not fit", () => {
-    const heavy = [entry("a", 5_000n), entry("b", 4_000n)];
-    const b = bundle(heavy);
-    strictEqual(constraint(b, "C6")?.satisfied, false);
-    strictEqual(checkBudgetRelation(b).satisfied, false);
+  it("C7 catches a payment that does not fit", () => {
+    const heavy = [entry("a", 5_000n, T0 - HOUR), entry("b", 4_000n, T0 - 2 * HOUR)];
+    strictEqual(constraint(bundle(heavy), "C7")?.satisfied, false);
   });
 
   it("refuses a rule that is not a window budget, rather than guessing", () => {
     const b = bundle();
-    const result = checkBudgetRelation({ ...b, witness: { ...b.witness, ruleId: "nonexistent" } });
-    strictEqual(result.satisfied, false);
+    strictEqual(
+      checkBudgetRelation({ ...b, witness: { ...b.witness, ruleId: "nonexistent" } }).satisfied,
+      false,
+    );
+  });
+
+  it("refuses a commitment in a different asset from the rule", () => {
+    const b = bundle();
+    const mismatched = {
+      ...b,
+      statement: { ...b.statement, commitment: { ...b.statement.commitment, asset: "USDC" } },
+    };
+    strictEqual(checkBudgetRelation(mismatched).satisfied, false);
   });
 });
 
-describe("mirrors the engine, not an approximation of it", () => {
-  it("a reversed entry gives its budget back, exactly as evaluate does", () => {
-    // 7,000 + a reversed 5,000 + the 2,000 request = 9,000 of a 10,000 limit.
-    // Counting the reversal would push it to 14,000 and fail.
-    const ledger = [entry("a", 7_000n), { ...entry("b", 5_000n), state: "REVERSED" as const }];
-    strictEqual(checkBudgetRelation(bundle(ledger)).satisfied, true);
+describe("agrees with the engine, and errs only toward refusing", () => {
+  it("allows exactly what evaluate allows, on bucket-aligned spend", () => {
+    const entries = [entry("a", 3_000n, T0 - HOUR), entry("b", 4_000n, T0 - 2 * HOUR)];
+    strictEqual(evaluate(request, policy, entries).outcome, "ALLOW");
+    strictEqual(checkBudgetRelation(bundle(entries)).satisfied, true);
   });
 
-  it("a different asset does not consume this budget", () => {
-    // The USDC entry is huge on purpose: counting it would blow the limit.
-    const ledger = [entry("a", 7_000n), { ...entry("b", 90_000n), asset: "USDC" }];
-    strictEqual(checkBudgetRelation(bundle(ledger)).satisfied, true);
+  it("refuses exactly what evaluate refuses", () => {
+    const entries = [entry("a", 5_000n, T0 - HOUR), entry("b", 4_000n, T0 - 2 * HOUR)];
+    strictEqual(evaluate(request, policy, entries).outcome, "DENY");
+    strictEqual(checkBudgetRelation(bundle(entries)).satisfied, false);
   });
 
-  it("the request never counts against itself", () => {
-    const ledger = [entry("call-9", 9_000n), entry("b", 100n)];
-    // Same requestId as the request under proof, so it is excluded — the
-    // idempotency rule the engine follows.
-    strictEqual(checkBudgetRelation(bundle(ledger)).satisfied, true);
+  it("over-counts the partial edge bucket, which can only refuse", () => {
+    // A window that does NOT land on a bucket boundary. At exactly T0 the
+    // 24-hour window is bucket-aligned and there is no partial edge at all,
+    // so the case has to be built deliberately.
+    const halfPast = T0 + HOUR / 2;
+    const offRequest = { ...request, requestedAt: halfPast };
+    // Five minutes after the edge bucket opens, but twenty-five minutes
+    // before the window itself does.
+    const straddling = entry("old", 9_000n, halfPast - DAY - 25 * 60_000);
+
+    // The engine excludes it: it is outside the rolling window.
+    strictEqual(evaluate(offRequest, policy, [straddling]).outcome, "ALLOW");
+
+    // The commitment cannot exclude it, because a bucket is atomic. The
+    // relation is therefore stricter than the policy — refusing something
+    // that was allowable, never the reverse.
+    const range = coveringBuckets(halfPast, DAY, HOUR);
+    const commitment = BucketCommitment.build([straddling], {
+      account: ACCOUNT,
+      asset: TOKENS,
+      bucketMs: HOUR,
+      from: range.from,
+      to: range.to,
+    });
+    const built = buildBudgetBundle({
+      policy,
+      request: offRequest,
+      ruleId: "daily",
+      commitment,
+      windowMs: DAY,
+    });
+    ok(built !== null);
+    strictEqual(checkBudgetRelation(built).satisfied, false);
+    strictEqual(
+      checkBudgetRelation(built).constraints.find((c) => c.id === "C7")?.satisfied,
+      false,
+    );
+  });
+
+  it("a reversed entry never enters a bucket at all", () => {
+    const entries = [
+      entry("a", 7_000n, T0 - HOUR),
+      { ...entry("b", 9_000n, T0 - 2 * HOUR), state: "REVERSED" as const },
+    ];
+    strictEqual(checkBudgetRelation(bundle(entries)).satisfied, true);
+  });
+
+  it("another asset never enters a bucket at all", () => {
+    const entries = [entry("a", 7_000n, T0 - HOUR), { ...entry("b", 90_000n, T0 - HOUR), asset: "USDC" }];
+    strictEqual(checkBudgetRelation(bundle(entries)).satisfied, true);
+  });
+});
+
+describe("the residual assumption is checkable", () => {
+  it("a commitment rebuilt from the ledger matches", () => {
+    const entries = [entry("a", 3_000n, T0 - HOUR), entry("b", 4_000n, T0 - 2 * HOUR)];
+    strictEqual(commitmentMatchesLedger(commit(entries), entries), true);
+  });
+
+  it("a doctored commitment does not match the ledger it claims", () => {
+    // The remaining attack: total dishonestly at commit time. Anyone holding
+    // the ledger catches it, which is why this is a smaller assumption than
+    // the one it replaced.
+    const real = [entry("a", 3_000n, T0 - HOUR), entry("b", 9_000n, T0 - 2 * HOUR)];
+    const understated = [entry("a", 3_000n, T0 - HOUR), entry("b", 10n, T0 - 2 * HOUR)];
+    strictEqual(commitmentMatchesLedger(commit(understated), real), false);
   });
 });
 
 describe("honesty", () => {
-  it("does not claim to be zero-knowledge", () => {
+  it("still does not claim to be zero-knowledge", () => {
     strictEqual(IS_ZERO_KNOWLEDGE, false);
     strictEqual(checkBudgetRelation(bundle()).zeroKnowledge, false);
   });
 
-  it("carries the witness in the clear, and says so", () => {
-    const b = bundle();
-    // If this ever stops being true, the type has changed and the docs must too.
-    ok(b.witness.policy !== undefined);
-    ok(b.witness.windowEntries.length > 0);
-  });
-
-  it("reports completeness as an assumption, not a constraint", () => {
+  it("completeness is a constraint now, and no longer an assumption", () => {
     const result = checkBudgetRelation(bundle());
-    strictEqual(result.constraints.some((c) => c.name.includes("complete")), false);
-    ok(result.assumptions.some((a) => a.startsWith("COMPLETENESS")));
+    ok(result.constraints.some((c) => c.name === "completeness"));
+    ok(!result.assumptions.some((a) => a.startsWith("COMPLETENESS")));
   });
 
-  it("an omitted entry still satisfies every constraint — which is the gap", () => {
-    const full = [entry("a", 3_000n), entry("b", 4_000n), entry("c", 9_000n)];
-    const commitment = new LedgerCommitment(full);
-    // The prover simply leaves out the entry that would break the budget.
-    const dishonest: BudgetProofBundle = {
-      statement: {
-        policyDigest: policyDigest(policy),
-        ledgerRoot: commitment.root,
-        requestDigest: digestOf(request),
-        requestedAt: T0,
-        claimedOutcome: "ALLOW",
-      },
-      witness: {
-        policy,
-        request,
-        ruleId: "daily",
-        windowEntries: [0, 1].map((i) => ({ entry: full[i]!, inclusion: commitment.prove(i)! })),
-      },
-    };
-
-    // Every constraint holds. The relation is satisfied. The claim is false.
-    // A Merkle tree proves membership; it cannot prove nothing else exists.
-    strictEqual(checkBudgetRelation(dishonest).satisfied, true);
-    ok(checkBudgetRelation(dishonest).assumptions.length > 0);
+  it("names what it still takes on trust", () => {
+    const result = checkBudgetRelation(bundle());
+    ok(result.assumptions.some((a) => a.startsWith("FAITHFUL TOTALLING")));
   });
 });

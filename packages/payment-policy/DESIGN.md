@@ -421,23 +421,63 @@ same reason. C5 and C6 are integer comparisons and nearly free. That ordering
 is the useful output of doing this in plain code first: it says where the
 engineering will actually go.
 
-### The gap no proving system closes
+### Completeness: closed by removing the prover's choice
 
-A prover who omits an in-window entry produces a smaller sum, and **every
-constraint still passes**. A Merkle tree proves membership; it does not prove
-that nothing else exists. There is a test that omits an entry and satisfies
-the relation, kept passing on purpose so the gap cannot be forgotten.
+The first version committed to individual ledger entries, and a prover who
+omitted an in-window entry produced a smaller sum with every constraint still
+passing. That was reported as an assumption rather than a constraint, and a
+test omitted an entry and passed on purpose, with a note that if the gap ever
+closed the test should start failing. It has, and it does.
 
-This is a property of the commitment, not of the proving system, so no
-cryptography bolted on later fixes it. The fix is to commit to a **running
-total per (account, asset, window)** instead of to individual entries: the
-circuit then proves inclusion of one aggregate leaf, and completeness becomes
-the committer's responsibility — discharged by the journal's hash chain, which
-already exists.
+**The fix was not cryptography.** A Merkle tree proves membership and will
+never prove that nothing else exists, so no proving system bolted on later
+could have helped. The fix was to stop letting the prover decide what to
+supply.
 
-`checkBudgetRelation` reports it under `assumptions`, separately from
-`constraints`, because a result that folded an unchecked assumption in with six
-checked constraints would be a lie told by a data structure.
+`BucketCommitment` is a **dense array** of per-bucket totals — one leaf per
+bucket index, zero-filled where nothing was spent — so position `p` in the
+tree *is* bucket `from + p`, and nothing else can occupy it. The verifier then
+computes the covered range **from public values alone** (`requestedAt` and the
+rule's own `windowMs`) and demands exactly those leaves at exactly those
+positions. Omitting one leaves a hole the verifier was already looking at.
+Inventing one lands at the wrong position and fails C5.
+
+Note what C7 does in the cheating case: the sum really does come out smaller,
+and the budget constraint really does pass. Completeness is doing the work, not
+arithmetic.
+
+### The edges over-count, deliberately
+
+A rolling window rarely lands on a bucket boundary, so the first and last
+buckets carry a little time from outside it. The proven bound is therefore
+`windowMs + bucketMs` rather than exactly `windowMs` — **stronger** than the
+policy requires.
+
+Over-counting can only refuse a payment that should have been allowed. It can
+never allow one that should have been refused, and that is the only direction
+a budget may be wrong in. The cost is liveness, not safety, and it shrinks with
+the bucket. Leaves per proof is `ceil(windowMs / bucketMs) + 1`: a day at
+hourly buckets is 25 leaves and over-counts by up to an hour; at one-minute
+buckets it is 1,441 leaves, which no circuit wants. That trade is the caller's.
+
+### What remains assumed, and why it is a smaller thing
+
+The committer must have totalled honestly. That is not the old gap dressed up:
+
+- It is a **deterministic function of the ledger**, so anyone holding the
+  ledger rebuilds the commitment and compares roots. `commitmentMatchesLedger`
+  is that check, not a promise of one.
+- A counterparty who cannot see the ledger discharges it the ordinary way: the
+  root is signed, published or anchored *before* the fact, so it cannot be
+  rewritten afterwards.
+
+The old assumption could be broken silently by anyone, leaving no artefact. This
+one requires publishing a false root in advance and then being unable to produce
+a ledger that matches it.
+
+`checkBudgetRelation` reports it under `assumptions`, apart from `constraints`,
+because a result that folded an unchecked assumption in with seven checked ones
+would be a lie told by a data structure.
 
 ## Known limits
 
@@ -480,8 +520,11 @@ checked constraints would be a lie told by a data structure.
   without a network.
 - **There is no zero-knowledge proof here.** `circuit.ts` reveals its witness.
   It is the statement and the test oracle, not the proof.
-- **Completeness is assumed, not proven.** See above; the fix is a different
-  commitment shape.
+- **Faithful totalling is assumed, not proven by the relation.** Checkable by
+  anyone with the ledger (`commitmentMatchesLedger`), or discharged by
+  publishing the root in advance.
+- **Bucket granularity over-counts the window edges.** Safe direction only;
+  see above.
 - **One algorithm.** Ed25519 only. `SignatureAlgorithm` is a union so adding
   another is an addition the compiler then enforces everywhere, but nothing
   else is implemented today.

@@ -458,24 +458,56 @@ Leaves carry a `0x00` prefix and nodes `0x01`, so an internal node cannot be
 presented as a leaf. Odd levels are promoted, never duplicated, so two
 different ledgers cannot share a root.
 
+## Bucketed totals
+
+```ts
+const MAX_BUCKETS = 512;
+
+function bucketIndex(at: number, bucketMs: number): number;
+function coveringBuckets(requestedAt, windowMs, bucketMs): { from: number; to: number };
+
+interface BucketLeaf {
+  account: string; asset: AssetId; bucketMs: number;
+  index: number; total: Amount;
+}
+
+class BucketCommitment {
+  static build(entries: readonly LedgerEntry[], params: {
+    account: string; asset: AssetId; bucketMs: number; from: number; to: number;
+  }): BucketCommitment;
+  readonly root: string; readonly size: number;
+  readonly account: string; readonly asset: AssetId;
+  readonly bucketMs: number; readonly from: number; readonly to: number;
+  open(index: number): { leaf: BucketLeaf; inclusion: InclusionProof } | null;
+  openRange(range): readonly { leaf; inclusion }[] | null;
+}
+
+function commitmentMatchesLedger(commitment, entries): boolean;
+```
+
+Dense and zero-filled: position `p` in the tree **is** bucket `from + p`, which
+is what makes omission detectable. `build` applies the same three exclusions
+`evaluate` does — wrong account, wrong asset, reversed.
+
 ## The circuit relation — NOT a proof
 
 ```ts
 const IS_ZERO_KNOWLEDGE = false;   // assert on it
-const MAX_WINDOW_ENTRIES = 64;     // a circuit is fixed-size
 
 interface BudgetStatement {        // public
-  policyDigest: string; ledgerRoot: string; requestDigest: string;
-  requestedAt: number; claimedOutcome: "ALLOW";
+  policyDigest: string;
+  commitment: { root; account; asset; bucketMs; from; to };
+  requestDigest: string; requestedAt: number; claimedOutcome: "ALLOW";
 }
 interface BudgetWitness {          // private in a real circuit; revealed here
   policy: SpendPolicy; request: SpendRequest; ruleId: string;
-  windowEntries: readonly { entry: LedgerEntry; inclusion: InclusionProof }[];
+  buckets: readonly { leaf: BucketLeaf; inclusion: InclusionProof }[];
 }
 interface BudgetProofBundle { statement: BudgetStatement; witness: BudgetWitness }
 
-function checkBudgetRelation(bundle: BudgetProofBundle): RelationResult;
-function explainRelation(result: RelationResult): string;
+function buildBudgetBundle(input): BudgetProofBundle | null;   // assembles an honest one
+function checkBudgetRelation(bundle): RelationResult;
+function explainRelation(result): string;
 ```
 
 | | Constraint | In a circuit |
@@ -483,11 +515,11 @@ function explainRelation(result: RelationResult): string;
 | C1 | `hash(policy) == policyDigest` | hash gadget |
 | C2 | `hash(request) == requestDigest` | hash gadget |
 | C3 | request time matches the statement | one equality |
-| C4 | each entry included under `ledgerRoot` | **dominates the cost** |
-| C5 | each entry inside the window | two comparisons |
-| C6 | `sum + amount <= maxTotal` | addition + one comparison |
+| C4 | each leaf included under the root | **dominates the cost** |
+| C5 | each leaf's key matches its position | a few equalities |
+| C6 | leaves are exactly the covered range | **completeness** |
+| C7 | `sum + amount <= maxTotal` | addition + one comparison |
 
-`RelationResult.assumptions` carries **COMPLETENESS** — the witness is assumed
-to hold every in-window entry, which no Merkle inclusion proof can establish.
-Reported apart from `constraints` so a caller cannot mistake five checks for
-six.
+`RelationResult.assumptions` carries **FAITHFUL TOTALLING** — the committer is
+assumed to have summed correctly. Unlike the completeness gap it replaced, that
+is checkable: `commitmentMatchesLedger` rebuilds and compares roots.

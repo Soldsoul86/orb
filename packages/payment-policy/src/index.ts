@@ -124,18 +124,33 @@ export type { InclusionProof, PathStep } from "./commitment.js";
 export { LedgerCommitment, verifyInclusion, emptyRoot } from "./commitment.js";
 
 export type {
+  BucketLeaf,
+  BucketRange,
+  BucketCommitmentParams,
+} from "./buckets.js";
+export {
+  BucketCommitment,
+  BucketCommitmentError,
+  MAX_BUCKETS,
+  bucketIndex,
+  coveringBuckets,
+  commitmentMatchesLedger,
+} from "./buckets.js";
+
+export type {
   BudgetStatement,
+  CommitmentStatement,
   BudgetWitness,
   BudgetProofBundle,
-  WitnessEntry,
+  WitnessBucket,
   ConstraintId,
   ConstraintResult,
   RelationResult,
 } from "./circuit.js";
 export {
   IS_ZERO_KNOWLEDGE,
-  MAX_WINDOW_ENTRIES,
   checkBudgetRelation,
+  buildBudgetBundle,
   explainRelation,
 } from "./circuit.js";
 

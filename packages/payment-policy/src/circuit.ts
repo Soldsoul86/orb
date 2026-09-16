@@ -1,105 +1,107 @@
 /**
  * The relation a zero-knowledge circuit would enforce — written in plain code.
  *
- * ## THIS IS NOT ZERO-KNOWLEDGE
+ * ## THIS IS STILL NOT ZERO-KNOWLEDGE
  *
- * `IS_ZERO_KNOWLEDGE` is exported as `false` so a caller can assert on it.
- * A {@link BudgetProofBundle} **contains its witness in the clear**. Anyone
- * holding one sees the policy, the request and the ledger entries. Handing one
- * to a counterparty discloses exactly what a real proof would hide.
+ * `IS_ZERO_KNOWLEDGE` is exported as `false` and a test asserts it. A
+ * {@link BudgetProofBundle} **contains its witness in the clear.** It is the
+ * statement and the test oracle a real circuit needs, not the proof.
  *
- * So why build it? Because the cryptography is not the hard part, and it is
- * not the part that has to come first.
+ * What changed is soundness, not privacy: the completeness gap this file used
+ * to report as an unchecked assumption is now constraint **C6**.
  *
- * A circuit is useless without a **statement** — a precise split of what is
- * public from what is private, and a relation between them expressible as
- * arithmetic. Getting that wrong produces a proof of the wrong thing, which is
- * worse than no proof. And a circuit needs a **test oracle**: you write the
- * relation twice, once in the constraint system and once in ordinary code, and
- * check they agree on every input. Ordinary code is the half that can exist
- * today, and it is the half a cryptographer needs in order to write the other.
+ * ## How the gap closed
+ *
+ * The old witness was a set of ledger entries, and the prover chose which to
+ * supply. A Merkle tree proves membership, so omitting an in-window entry
+ * produced a smaller sum with every proof still checking.
+ *
+ * The fix was not more cryptography. It was taking the choice away.
+ * `BucketCommitment` is a dense array of per-bucket totals, so position `p` in
+ * the tree *is* bucket `baseIndex + p` and nothing else can sit there. The
+ * verifier computes the covered bucket range **from the public statement
+ * alone** and demands exactly those leaves at exactly those positions. A
+ * missing bucket is a hole the verifier was already looking at; an invented
+ * one lands at the wrong position.
  *
  * ## The statement
  *
- * Public — what a counterparty, auditor or regulator sees:
- *
+ * Public:
  *   policyDigest     which rules were in force (not what they say)
- *   ledgerRoot       a commitment to the payer's ledger (not its contents)
- *   requestDigest    which payment (the counterparty already knows this one)
+ *   commitment       root, account, asset, bucket size and range
+ *   requestDigest    which payment
  *   requestedAt      when
  *   claimedOutcome   ALLOW
  *
- * Private — the witness a real circuit keeps:
- *
+ * Private:
  *   policy           including the limits, which stay secret
  *   request          the amount and destination
- *   windowEntries    the payer's *other* transactions, which is the point
+ *   buckets          per-bucket totals — never the individual payments
  *
- * The valuable property is that **the limit itself stays private.** You prove
- * "this was within my budget" without revealing what the budget is, or what
- * else you spent it on.
+ * The limit stays private, and so does every individual transaction. What
+ * leaks is coarser than before: bucket totals rather than entries, and only
+ * for the window in question.
  *
  * ## The constraints
  *
- * C1  hash(policy) == policyDigest                    binds the rules
- * C2  hash(request) == requestDigest                  binds the payment
- * C3  request.requestedAt == statement.requestedAt    binds the time
- * C4  each witness entry is included under ledgerRoot Merkle path check
- * C5  each witness entry lies inside the window       two comparisons
- * C6  sum(entries) + amount <= maxTotal               addition, one comparison
+ * C1  hash(policy) == policyDigest                  binds the rules
+ * C2  hash(request) == requestDigest                binds the payment
+ * C3  request.requestedAt == statement.requestedAt  binds the time
+ * C4  each leaf is included under the root          Merkle path check
+ * C5  each leaf's key matches its position          binds leaf to bucket
+ * C6  the leaves are exactly the covered range      **completeness**
+ * C7  sum + amount <= maxTotal                      addition, one comparison
  *
- * C4 dominates the cost. A SHA-256 Merkle path is tens of thousands of
- * constraints per step; a real circuit swaps in a hash built for the field
- * (Poseidon, Rescue) and the tree here would be rebuilt with it. C1–C3 are
- * also SHA-256 today and would move for the same reason. C5 and C6 are
- * integer comparisons and are nearly free.
+ * C4 still dominates. A SHA-256 path is tens of thousands of constraints per
+ * step, so a real circuit swaps in a field-native hash (Poseidon, Rescue) and
+ * the tree is rebuilt with it. C5, C6 and C7 are integer comparisons and
+ * nearly free.
  *
- * ## What this relation cannot do, and no circuit written against it could
+ * ## What remains assumed, and why it is a much smaller thing
  *
- * **It cannot prove the witness is complete.** A prover who omits an in-window
- * entry produces a smaller sum, and every constraint above still passes. A
- * Merkle tree proves membership; it does not prove that nothing else exists.
+ * The committer must have totalled honestly. That is *not* the old gap: it is
+ * a deterministic function of the ledger, so anyone holding the ledger can
+ * rebuild the commitment and compare roots — `commitmentMatchesLedger` does
+ * exactly that. A counterparty who cannot see the ledger discharges it the
+ * ordinary way instead: the root is signed, published, or anchored before the
+ * fact, so it cannot be rewritten afterwards.
  *
- * That is a property of the commitment, not of the proving system, so no
- * amount of cryptography bolted on later fixes it. The fix is a different
- * commitment: commit to a **running total per (account, asset, window)**
- * rather than to individual entries, so the circuit proves inclusion of one
- * aggregate leaf and completeness becomes the committer's responsibility —
- * discharged by the journal's hash chain, which already exists.
- *
- * {@link checkBudgetRelation} reports this as an *assumption*, separately from
- * the constraints it actually checks, because a result that quietly folded an
- * unchecked assumption in with six checked constraints would be a lie told by
- * a data structure.
+ * The difference matters. The old assumption could be broken silently by
+ * anyone, with no artefact left behind. This one requires publishing a false
+ * root and then being unable to produce a ledger that matches it.
  */
-import type { LedgerEntry } from "./ledger.js";
 import type { SpendRequest } from "./model.js";
 import type { SpendPolicy } from "./policy.js";
 import { policyDigest } from "./policy.js";
-import { consumesBudget } from "./ledger.js";
 import { digestOf } from "./wire.js";
 import type { InclusionProof } from "./commitment.js";
 import { verifyInclusion } from "./commitment.js";
+import type { BucketCommitment, BucketLeaf } from "./buckets.js";
+import { MAX_BUCKETS, coveringBuckets } from "./buckets.js";
 
-/**
- * Exported as a constant so a caller can assert on it, and so this claim
- * appears in a type-checked place rather than only in prose.
- */
+/** Exported so the claim sits somewhere type-checked, not only in prose. */
 export const IS_ZERO_KNOWLEDGE = false;
 
-/** A circuit is fixed-size; the witness must be bounded before it is written. */
-export const MAX_WINDOW_ENTRIES = 64;
+/** The commitment parameters, as the public half sees them. */
+export interface CommitmentStatement {
+  readonly root: string;
+  readonly account: string;
+  readonly asset: string;
+  readonly bucketMs: number;
+  readonly from: number;
+  readonly to: number;
+}
 
 export interface BudgetStatement {
   readonly policyDigest: string;
-  readonly ledgerRoot: string;
+  readonly commitment: CommitmentStatement;
   readonly requestDigest: string;
   readonly requestedAt: number;
   readonly claimedOutcome: "ALLOW";
 }
 
-export interface WitnessEntry {
-  readonly entry: LedgerEntry;
+export interface WitnessBucket {
+  readonly leaf: BucketLeaf;
   readonly inclusion: InclusionProof;
 }
 
@@ -109,21 +111,22 @@ export interface BudgetWitness {
   readonly request: SpendRequest;
   /** The rule being proven against; must be a `WINDOW_BUDGET` in `policy`. */
   readonly ruleId: string;
-  readonly windowEntries: readonly WitnessEntry[];
+  /** Exactly the buckets covering the window, in order. */
+  readonly buckets: readonly WitnessBucket[];
 }
 
 /**
  * A statement and the witness for it.
  *
- * Named a bundle rather than a proof on purpose: a proof is the thing you can
- * hand over *instead of* the witness, and this is not that.
+ * A bundle, not a proof: a proof is the thing you hand over *instead of* the
+ * witness, and this is not that.
  */
 export interface BudgetProofBundle {
   readonly statement: BudgetStatement;
   readonly witness: BudgetWitness;
 }
 
-export type ConstraintId = "C1" | "C2" | "C3" | "C4" | "C5" | "C6";
+export type ConstraintId = "C1" | "C2" | "C3" | "C4" | "C5" | "C6" | "C7";
 
 export interface ConstraintResult {
   readonly id: ConstraintId;
@@ -133,41 +136,35 @@ export interface ConstraintResult {
 }
 
 export interface RelationResult {
-  /** True when every constraint above holds. Says nothing about completeness. */
   readonly satisfied: boolean;
   readonly constraints: readonly ConstraintResult[];
-  /**
-   * Things the relation takes on trust.
-   *
-   * Reported apart from `constraints` because folding an unchecked assumption
-   * in with checked constraints would let a caller believe six things were
-   * verified when only five were.
-   */
+  /** What the relation still takes on trust. Reported apart from constraints. */
   readonly assumptions: readonly string[];
   /** Always false here. See the file header. */
   readonly zeroKnowledge: boolean;
 }
 
 const ok = (id: ConstraintId, name: string, detail: string): ConstraintResult => ({
-  id,
-  name,
-  satisfied: true,
-  detail,
+  id, name, satisfied: true, detail,
 });
 const bad = (id: ConstraintId, name: string, detail: string): ConstraintResult => ({
-  id,
-  name,
-  satisfied: false,
-  detail,
+  id, name, satisfied: false, detail,
 });
+
+const REMAINING_ASSUMPTION =
+  "FAITHFUL TOTALLING: the committer is assumed to have summed the ledger " +
+  "correctly into buckets. Unlike the completeness gap this replaced, it is a " +
+  "deterministic function of the ledger — anyone holding it can rebuild the " +
+  "commitment and compare roots (commitmentMatchesLedger), and a counterparty " +
+  "who cannot see it relies on the root being signed or published beforehand.";
 
 /**
  * Evaluates the relation exactly as a circuit would, over revealed values.
  *
- * Total: every failure is a `satisfied: false` constraint, never an exception.
- * A constraint system cannot throw, so neither can its reference
- * implementation — otherwise the two disagree on malformed input, which is
- * precisely where a circuit gets attacked.
+ * Total: every failure is an unsatisfied constraint, never an exception. A
+ * constraint system cannot throw, so neither may its reference implementation
+ * — otherwise the two disagree on malformed input, which is precisely where a
+ * circuit gets attacked.
  */
 export function checkBudgetRelation(bundle: BudgetProofBundle): RelationResult {
   const { statement, witness } = bundle;
@@ -200,82 +197,177 @@ export function checkBudgetRelation(bundle: BudgetProofBundle): RelationResult {
     (r) => r.id === witness.ruleId && r.kind === "WINDOW_BUDGET",
   );
   if (rule === undefined || rule.kind !== "WINDOW_BUDGET") {
-    constraints.push(bad("C4", "inclusion", `no WINDOW_BUDGET rule named ${witness.ruleId}`));
-    constraints.push(bad("C5", "window", "no rule to bound the window"));
-    constraints.push(bad("C6", "budget", "no rule to bound the total"));
+    for (const id of ["C4", "C5", "C6", "C7"] as const) {
+      constraints.push(bad(id, "rule", `no WINDOW_BUDGET rule named ${witness.ruleId}`));
+    }
+    return finish(constraints);
+  }
+  if (rule.asset !== statement.commitment.asset) {
+    for (const id of ["C4", "C5", "C6", "C7"] as const) {
+      constraints.push(
+        bad(id, "rule", `rule budgets ${rule.asset}, commitment covers ${statement.commitment.asset}`),
+      );
+    }
     return finish(constraints);
   }
 
-  if (witness.windowEntries.length > MAX_WINDOW_ENTRIES) {
-    constraints.push(
-      bad("C4", "inclusion", `witness holds ${witness.windowEntries.length}, circuit fits ${MAX_WINDOW_ENTRIES}`),
-    );
-    constraints.push(bad("C5", "window", "witness exceeds the circuit's fixed size"));
-    constraints.push(bad("C6", "budget", "witness exceeds the circuit's fixed size"));
+  /* The covered range is computed from public values only. That is what makes
+     completeness something the verifier imposes, not something the prover
+     asserts. */
+  const required = coveringBuckets(
+    statement.requestedAt,
+    rule.windowMs,
+    statement.commitment.bucketMs,
+  );
+  const requiredCount = required.to - required.from + 1;
+
+  if (requiredCount > MAX_BUCKETS) {
+    for (const id of ["C4", "C5", "C6", "C7"] as const) {
+      constraints.push(bad(id, "size", `window needs ${requiredCount} buckets, circuit fits ${MAX_BUCKETS}`));
+    }
     return finish(constraints);
   }
 
-  /* C4 — every entry in the witness really is in the committed ledger. */
-  const seen = new Set<number>();
-  let duplicated = false;
-  const notIncluded = witness.windowEntries.filter((w) => {
-    // A prover could otherwise present one entry twice — harmless for a sum
-    // that must stay *under* a limit, but not for any other use of this
-    // witness, so it is refused here rather than assumed benign.
-    if (seen.has(w.inclusion.index)) duplicated = true;
-    seen.add(w.inclusion.index);
-    return !verifyInclusion(w.entry, w.inclusion, statement.ledgerRoot);
-  });
-  constraints.push(
-    duplicated
-      ? bad("C4", "inclusion", "witness presents the same leaf twice")
-      : notIncluded.length === 0
-        ? ok("C4", "inclusion", `${witness.windowEntries.length} entr(ies) proven under the root`)
-        : bad("C4", "inclusion", `${notIncluded.length} entr(ies) are not under the stated root`),
-  );
-
-  /* C5 — every entry lies inside the window the rule defines. */
-  const from = statement.requestedAt - rule.windowMs;
-  const outside = witness.windowEntries.filter(
-    (w) => w.entry.at < from || w.entry.at > statement.requestedAt,
+  /* C4 — every supplied leaf really is under the stated root. */
+  const notIncluded = witness.buckets.filter(
+    (b) => !verifyInclusion(b.leaf, b.inclusion, statement.commitment.root),
   );
   constraints.push(
-    outside.length === 0
-      ? ok("C5", "window", `all entries within ${rule.windowMs}ms`)
-      : bad("C5", "window", `${outside.length} entr(ies) fall outside the window`),
+    notIncluded.length === 0
+      ? ok("C4", "inclusion", `${witness.buckets.length} leaf/leaves proven under the root`)
+      : bad("C4", "inclusion", `${notIncluded.length} leaf/leaves are not under the stated root`),
   );
 
-  /* C6 — the sum, plus this payment, is inside the private limit. */
+  /* C5 — each leaf is the bucket its position says it is, from this very
+     commitment. Without this a leaf could be lifted from another tree with
+     different parameters and still prove inclusion in its own. */
+  const misKeyed = witness.buckets.filter(
+    (b) =>
+      b.leaf.account !== statement.commitment.account ||
+      b.leaf.asset !== statement.commitment.asset ||
+      b.leaf.bucketMs !== statement.commitment.bucketMs ||
+      b.leaf.index !== statement.commitment.from + b.inclusion.index,
+  );
+  constraints.push(
+    misKeyed.length === 0
+      ? ok("C5", "leaf keying", "every leaf matches its position and the commitment")
+      : bad("C5", "leaf keying", `${misKeyed.length} leaf/leaves do not match their position`),
+  );
+
+  /* C6 — completeness. The leaves are exactly the covered range, in order,
+     no gaps and no repeats. This is the constraint that used to be a hope. */
+  constraints.push(coverageCheck(witness.buckets, required, statement));
+
+  /* C7 — the sum, plus this payment, is inside the private limit. */
   let spent = 0n;
-  for (const w of witness.windowEntries) {
-    // Mirrors the engine exactly: same asset, still holding budget, and never
-    // the request judging itself.
-    if (w.entry.asset !== rule.asset) continue;
-    if (!consumesBudget(w.entry)) continue;
-    if (w.entry.requestId === witness.request.requestId) continue;
-    spent += w.entry.amount;
-  }
+  for (const b of witness.buckets) spent += b.leaf.total;
   const projected = spent + witness.request.amount;
   constraints.push(
     projected <= rule.maxTotal
-      ? ok("C6", "budget", `${projected} within the limit`)
-      : bad("C6", "budget", `${projected} exceeds the limit`),
+      ? ok("C7", "budget", `${projected} within the limit`)
+      : bad("C7", "budget", `${projected} exceeds the limit`),
   );
 
   return finish(constraints);
+}
+
+function coverageCheck(
+  buckets: readonly WitnessBucket[],
+  required: { from: number; to: number },
+  statement: BudgetStatement,
+): ConstraintResult {
+  const requiredCount = required.to - required.from + 1;
+
+  if (statement.commitment.from > required.from || statement.commitment.to < required.to) {
+    return bad(
+      "C6",
+      "completeness",
+      `commitment covers [${statement.commitment.from}, ${statement.commitment.to}], ` +
+        `window needs [${required.from}, ${required.to}]`,
+    );
+  }
+  if (buckets.length !== requiredCount) {
+    return bad(
+      "C6",
+      "completeness",
+      `window covers ${requiredCount} bucket(s), witness supplies ${buckets.length}`,
+    );
+  }
+
+  // Exactly one leaf per required index, no gaps and no repeats.
+  const seen = new Set<number>();
+  for (const b of buckets) {
+    if (b.leaf.index < required.from || b.leaf.index > required.to) {
+      return bad("C6", "completeness", `bucket ${b.leaf.index} is outside the covered window`);
+    }
+    if (seen.has(b.leaf.index)) {
+      return bad("C6", "completeness", `bucket ${b.leaf.index} supplied more than once`);
+    }
+    seen.add(b.leaf.index);
+  }
+  if (seen.size !== requiredCount) {
+    return bad("C6", "completeness", `missing ${requiredCount - seen.size} bucket(s)`);
+  }
+
+  return ok(
+    "C6",
+    "completeness",
+    `buckets [${required.from}, ${required.to}] all present — omission is not possible`,
+  );
 }
 
 function finish(constraints: readonly ConstraintResult[]): RelationResult {
   return {
     satisfied: constraints.every((c) => c.satisfied),
     constraints,
-    assumptions: [
-      "COMPLETENESS: the witness is assumed to hold every in-window entry. " +
-        "A Merkle tree proves membership, never that nothing else exists. " +
-        "Fixed by committing to a running total per (account, asset, window) " +
-        "instead of to individual entries.",
-    ],
+    assumptions: [REMAINING_ASSUMPTION],
     zeroKnowledge: IS_ZERO_KNOWLEDGE,
+  };
+}
+
+/**
+ * Assembles an honest bundle from a commitment.
+ *
+ * Provided so the ordinary path does not require hand-building a witness: the
+ * easiest thing to do should be the correct thing, and a hand-assembled
+ * witness is where an accidental omission would come from.
+ */
+export function buildBudgetBundle(input: {
+  readonly policy: SpendPolicy;
+  readonly request: SpendRequest;
+  readonly ruleId: string;
+  readonly commitment: BucketCommitment;
+  readonly windowMs: number;
+}): BudgetProofBundle | null {
+  const required = coveringBuckets(
+    input.request.requestedAt,
+    input.windowMs,
+    input.commitment.bucketMs,
+  );
+  const opened = input.commitment.openRange(required);
+  if (opened === null) return null;
+
+  return {
+    statement: {
+      policyDigest: policyDigest(input.policy),
+      commitment: {
+        root: input.commitment.root,
+        account: input.commitment.account,
+        asset: input.commitment.asset,
+        bucketMs: input.commitment.bucketMs,
+        from: input.commitment.from,
+        to: input.commitment.to,
+      },
+      requestDigest: digestOf(input.request),
+      requestedAt: input.request.requestedAt,
+      claimedOutcome: "ALLOW",
+    },
+    witness: {
+      policy: input.policy,
+      request: input.request,
+      ruleId: input.ruleId,
+      buckets: opened.map((o) => ({ leaf: o.leaf, inclusion: o.inclusion })),
+    },
   };
 }
 
@@ -290,3 +382,4 @@ export function explainRelation(result: RelationResult): string {
   const assumed = result.assumptions.map((a) => `  ASSUMED  ${a}`).join("\n");
   return `${header}\n${body}\n${assumed}`;
 }
+

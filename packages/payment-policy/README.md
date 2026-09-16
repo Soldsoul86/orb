@@ -217,35 +217,59 @@ a payload to a copy of itself proves only that the peer can echo.
 
 ## Groundwork for a zero-knowledge proof
 
-> **`IS_ZERO_KNOWLEDGE` is exported as `false`.** A `BudgetProofBundle`
-> carries its witness in the clear. It is not a proof and must not be handed
-> to a counterparty as one.
+> **`IS_ZERO_KNOWLEDGE` is exported as `false`.** A `BudgetProofBundle` carries
+> its witness in the clear. It is the statement and the test oracle a circuit
+> needs, not the proof.
 
-`LedgerCommitment` is real, working cryptography — an RFC 6962 Merkle tree, so
-you can publish one hash fixing an entire ledger and later prove one entry
-belongs without revealing the others. `checkBudgetRelation` is the **relation a
-circuit would enforce**, written in ordinary code.
-
-That code is what has to exist first. A circuit is useless without a precise
-split of public from private, and it needs a reference implementation to test
-against — you write the relation twice and check the two agree. This is the
-half that can exist today.
+You prove *"this payment was inside my budget"* while the **limit stays
+private** and so does **every individual transaction**.
 
 | | |
 |---|---|
-| **Public** | policy digest, ledger root, request digest, time, `ALLOW` |
-| **Private** | the policy *including its limits*, the request, your other transactions |
+| **Public** | policy digest, commitment root and parameters, request digest, time, `ALLOW` |
+| **Private** | the policy *including its limits*, the request, the per-bucket totals |
 
-The valuable property: you prove *"this was within my budget"* **without
-revealing what the budget is or what else you spent it on.** A test asserts the
-limit appears nowhere in the public half.
+### Completeness — the gap, and how it closed
 
-And one honest gap, reported by the code as an **assumption** rather than a
-constraint: a Merkle tree proves membership, never that nothing else exists, so
-a prover who omits an in-window entry satisfies every constraint. There is a
-test that does exactly that and passes, on purpose. The fix is a different
-commitment — a running total per window rather than individual entries — not
-more cryptography.
+An earlier version committed to individual ledger entries. A Merkle tree proves
+membership and nothing else, so a prover could simply **omit** an in-window
+entry: the sum came out smaller and every constraint still passed.
+
+The fix was not more cryptography. It was taking away the prover's choice of
+what to supply.
+
+`BucketCommitment` is a **dense array of per-bucket totals** — one leaf per
+bucket, zero-filled — so position `p` in the tree *is* bucket `base + p` and
+nothing else can sit there. The verifier computes the covered bucket range
+**from the public statement alone** and demands exactly those leaves at exactly
+those positions.
+
+```
+node scripts/budget-proof.mjs
+
+  ok    C4  inclusion
+  ok    C5  leaf keying
+  FAIL  C6  completeness      window covers 25 bucket(s), witness supplies 24
+  ok    C7  budget
+```
+
+Look at C7: dropping the heavy bucket does make the sum fit. It no longer
+helps, because a missing bucket is a hole the verifier was already looking at.
+
+The edges are **over-counted on purpose** — a rolling window rarely lands on a
+bucket boundary, so the proven bound is `windowMs + bucketMs` rather than
+exactly `windowMs`. That can only refuse a payment that was allowable, never
+allow one that was not, which is the only direction a budget may be wrong in.
+Bucket size is the dial: a day at hourly buckets is 25 leaves.
+
+### What is still assumed
+
+The committer must have totalled honestly. That is a far smaller thing than the
+gap it replaced: it is a deterministic function of the ledger, so anyone
+holding the ledger runs `commitmentMatchesLedger` and checks. A counterparty
+who cannot see the ledger relies on the root being signed or published
+beforehand — so a false root has to be committed to in advance and then
+defended.
 
 ## What it is not
 

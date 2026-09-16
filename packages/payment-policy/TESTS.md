@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **221 tests, all passing.** (615 across the repo.)
+`npm test -w @orb/payment-policy` — **229 tests, all passing.** (623 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -250,22 +250,38 @@ where a hand-rolled tree breaks. Proofs do not transfer to another value or
 another root. Malformed proofs (bad indices, non-hex paths, a 100-deep path)
 return `false` rather than throwing.
 
-### The circuit relation (`circuit.test.ts`)
+### Bucketed totals and the circuit relation (`circuit.test.ts`)
 
-**Soundness**: each of the six constraints is forged in turn and caught —
-swapped policy, swapped request, shifted time, an invented entry, the same leaf
-presented twice, an entry dragged in from outside the window, and a payment
-that does not fit.
+**The inverted test.** The previous version ended with a bundle that omitted an
+in-window entry and satisfied every constraint, kept passing on purpose with a
+note that closing the gap should make it fail. It now asserts the opposite:
+dropping the bucket holding the 9,000 fails **C6 completeness** — *"window
+covers 25 bucket(s), witness supplies 24"*. Note that C7, the budget
+constraint, *passes* in that case, because the sum really is smaller.
+Completeness is doing the work.
 
-**Fidelity to the engine, not an approximation of it**: a reversed entry gives
-its budget back, another asset does not consume this one, and the request never
-counts against itself — the same three rules `evaluate` follows.
+Also caught: a bucket supplied twice to pad the count, and a commitment whose
+range does not cover the window.
 
-**Honesty**, which is why these tests exist: `IS_ZERO_KNOWLEDGE` is `false`; the
-limit appears nowhere in the public half of an honest bundle; completeness is
-reported as an assumption and not as a constraint; and **a bundle that omits an
-in-window entry satisfies every constraint** — that test passes on purpose, and
-if the gap is ever closed it should start failing.
+**Soundness**: each of the seven constraints is forged in turn — swapped
+policy, swapped request, shifted time, an edited leaf total, a leaf lifted from
+a commitment with a different bucket size, a payment that does not fit, a rule
+that is not a window budget, and a commitment in a different asset from the
+rule.
+
+**Agreement with the engine, erring only toward refusing**: allows what
+`evaluate` allows and refuses what it refuses on bucket-aligned spend; reversed
+entries and other assets never enter a bucket at all. The over-count test has
+to construct a genuinely off-boundary window, because at a bucket-aligned
+instant there is no partial edge — the engine allows a payment the relation
+refuses, which is the safe direction and never the reverse.
+
+**The residual assumption is checkable**: a commitment rebuilt from its ledger
+matches; a doctored one does not.
+
+**Honesty**: `IS_ZERO_KNOWLEDGE` is `false`; the limit and the individual
+amounts appear nowhere in the public half; completeness is now a constraint and
+no longer an assumption; and what remains assumed is named.
 
 ## What is *not* covered, and why
 
@@ -289,6 +305,8 @@ if the gap is ever closed it should start failing.
   test claims they do.
 - **Actual HTTP.** The module encodes and decodes header values; wiring them to
   a server belongs where a server lives.
+- **Faithful totalling at commit time.** The relation cannot check it; the
+  tests cover the external check (`commitmentMatchesLedger`) instead.
 - **An actual zero-knowledge proof.** None exists here, and the tests assert
   that rather than obscuring it. Writing the circuit needs a proving toolchain
   and a field-native hash.
