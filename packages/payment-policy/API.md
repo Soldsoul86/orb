@@ -393,3 +393,45 @@ function digestOf(value: unknown): string;       // sha256 hex
 One encoder, used by quotes, receipts and signatures alike. Two encoders that
 agree today diverge after one is edited, and then a signature made by one fails
 under the other for no visible reason.
+
+## Transport
+
+```ts
+const PAYMENT_REQUIRED_HEADER  = "payment-required";   // 402 response
+const PAYMENT_SIGNATURE_HEADER = "payment-signature";  // the retry
+const PAYMENT_RESPONSE_HEADER  = "payment-response";   // settlement
+const DEFAULT_MAX_HEADER_BYTES = 65536;
+
+interface PaymentAuthorization {
+  quoteDigest: string;      // binds to the exact offer
+  requestId: string;
+  account: string;
+  asset: AssetId;
+  amount: Amount;           // the quoted ceiling, in full
+  authorizedAt: number;
+  policyDigest: string;     // binds to the decision that approved it
+}
+
+type DecodeResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: "MISSING" | "TOO_LARGE" | "NOT_BASE64" | "NOT_JSON" | "MALFORMED";
+      detail: string };
+```
+
+| Function | Notes |
+|---|---|
+| `encodeChallenge` / `decodeChallenge` | `Signed<PaymentRequired>`, base64 canonical JSON |
+| `encodeAuthorization` / `decodeAuthorization` | `Signed<PaymentAuthorization>` |
+| `encodeSettlement` / `decodeSettlement` | `Signed<SpendReceipt>` — **structural only**, see below |
+| `readAmount(value)` | Canonical decimal only: no hex, exponent, sign, leading zeros, whitespace |
+| `admitPayment({ authorization, quote, directory, now })` | The seller's gate |
+| `challengeToWire(challenge)` | Plain object for a non-Node transport to serialise |
+
+`decodeSettlement` validates the envelope and refuses to re-derive the
+receipt's interior: `verifyReceipt` already recomputes the whole decision and
+is the real gate. A second, weaker validator would become a second opinion
+people trusted by mistake. **Run `verifySignedReceipt` and `verifyReceipt`
+before believing a decoded settlement.**
+
+`AdmissionRejection`: `NOT_ATTRIBUTED`, `WRONG_QUOTE`, `QUOTE_EXPIRED`,
+`ASSET_MISMATCH`, `AMOUNT_MISMATCH`.

@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **162 tests, all passing.** (556 across the repo.)
+`npm test -w @orb/payment-policy` — **191 tests, all passing.** (585 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -210,6 +210,32 @@ against its own identity; one bad signature does not sink a good one.
 Custody: the signer does not carry its private key on the object (checked by
 serialising it), and signing is deterministic over canonical bytes.
 
+### Transport (`transport.test.ts`)
+
+Held to a different standard, because it reads bytes a stranger wrote.
+
+**Canonical amounts.** Hex (`"0x10"`, which `BigInt` would read as sixteen),
+exponent form (`"1e999"`, which `BigInt` would throw on), leading zeros
+(`"007"` — normalising it re-encodes as `"7"` and **breaks the signature over
+the original bytes**), signs, whitespace, separators, decimals, absurd lengths,
+and non-strings are each refused individually.
+
+**Hostile input never throws.** Ten shapes — absent, empty, a number, invalid
+base64, base64 of a non-object, of an array, of `null`, truncated JSON, missing
+signatures, empty signatures — each return a reason from both decoders. A
+200KB header is refused as `TOO_LARGE`, and an unknown signature algorithm is
+refused at the boundary rather than passed inward.
+
+**Round trips preserve the signature.** A challenge is signed, encoded,
+decoded, and re-signed — the two signatures must match byte for byte. If the
+encoder altered any part of the canonical form, this test fails.
+
+**The admission check.** The one that matters presents a correctly signed,
+internally coherent authorisation for a *cheaper quote the buyer invented*; it
+is refused as `WRONG_QUOTE`, because the seller compares against its own quote
+and not the buyer's copy. Also covered: a stranger's signature, an expired
+quote, a mismatched asset, and an authorisation for less than the ceiling.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -228,6 +254,10 @@ serialising it), and signing is deterministic over canonical bytes.
   speaks for whom — a registry, DNS, a certificate chain — is the hard part of
   any PKI and is not solved or tested here.
 - **Algorithms other than Ed25519.** None are implemented.
+- **x402 schema mapping.** Header names align; payload schemas do not, and no
+  test claims they do.
+- **Actual HTTP.** The module encodes and decodes header values; wiring them to
+  a server belongs where a server lives.
 - **Transport.** `PaymentRequired` is the 402 payload as data; carrying it over
   HTTP, and the rails in `accepts`, belong to an adapter.
 - **Performance under a large ledger.** `spentWithin` is linear by design

@@ -119,6 +119,31 @@ export {
 
 export { toWire, canonicalText, canonicalBytes, digestOf } from "./wire.js";
 
+/* -- Transport ------------------------------------------------------------ */
+export type {
+  PaymentAuthorization,
+  DecodeRejection,
+  DecodeResult,
+  Admission,
+  AdmissionInput,
+  AdmissionRejection,
+} from "./transport.js";
+export {
+  PAYMENT_REQUIRED_HEADER,
+  PAYMENT_SIGNATURE_HEADER,
+  PAYMENT_RESPONSE_HEADER,
+  DEFAULT_MAX_HEADER_BYTES,
+  readAmount,
+  encodeChallenge,
+  decodeChallenge,
+  encodeAuthorization,
+  decodeAuthorization,
+  encodeSettlement,
+  decodeSettlement,
+  admitPayment,
+  challengeToWire,
+} from "./transport.js";
+
 export { reconcile } from "./reconcile.js";
 export type {
   SpendObserver,

@@ -350,6 +350,48 @@ by a debugger walking the signer. Generating, storing and destroying key
 material belongs to whoever owns the identity, not to a library that also
 decides whether payments are allowed.
 
+## Transport: a different standard
+
+Everything else in this package is fed by its own caller. `transport.ts` is the
+first thing that reads bytes a stranger wrote, so it holds two rules the rest
+does not need: **nothing throws, and nothing is believed.**
+
+### Strict parsing is a correctness requirement
+
+Amounts cross the wire as decimal strings, and a relaxed reader is a bug rather
+than a style complaint. `BigInt("0x10")` is `16n`. `BigInt("1e999")` throws,
+from inside whatever was holding the decision. And `"007"` parses to `7n`,
+re-encodes as `"7"`, and **the signature made over the original bytes no longer
+verifies** — a valid payment refused for reasons nobody can see.
+
+That last one is why normalising is worse than rejecting: signatures are made
+over canonical bytes, so a decoder that helpfully tidies its input has broken
+the signature scheme underneath it. Amounts must arrive canonical or not at
+all.
+
+The base64 check round-trips rather than trusting `Buffer.from`, which is
+lenient and silently drops junk — so "it decoded" does not mean "it was
+base64".
+
+### The seller compares against its own quote
+
+`admitPayment` checks the presented authorisation against the quote the
+**seller** holds, never the copy the buyer sends back. A protocol that compares
+a payload to a copy of itself proves only that the peer can echo. The test for
+this presents a perfectly coherent, correctly signed authorisation for a
+cheaper quote the buyer invented; it is refused as `WRONG_QUOTE`.
+
+The buyer must also authorise the **full ceiling**, not less — otherwise the
+seller does the work and then discovers it may not charge for it.
+
+### One validator, not two
+
+`decodeSettlement` deliberately does not re-derive the receipt's interior.
+`verifyReceipt` already recomputes the entire decision and is the real gate; a
+second, weaker validator at the boundary would become a second opinion people
+trusted by mistake. The decode establishes that the envelope is well-formed and
+says so plainly, and the docs push the caller to the verifier.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -382,6 +424,13 @@ decides whether payments are allowed.
   chain, a file someone handed you — is the hard part of any PKI and is not
   solved here. The directory is synchronous so verification stays replayable,
   which means a remote directory must be snapshotted before use.
+- **x402 wire compatibility is not implemented.** The header names match, the
+  payload schemas do not. Mapping onto x402's `PaymentRequirement` is a
+  separate adapter, and the honest status is "has somewhere obvious to map
+  onto", not "compatible".
+- **No HTTP.** This module encodes and decodes header values. Binding them to a
+  server or client belongs in an app, not in a package that must compile
+  without a network.
 - **One algorithm.** Ed25519 only. `SignatureAlgorithm` is a union so adding
   another is an addition the compiler then enforces everywhere, but nothing
   else is implemented today.

@@ -187,6 +187,34 @@ The package holds no keys. `Signer` is a port; the reference Ed25519
 implementation takes a private key you supply and keeps it in a closure, so it
 cannot be read back off the object. Custody stays yours.
 
+## Transport — the network boundary
+
+`PAYMENT-REQUIRED` on the 402, `PAYMENT-SIGNATURE` on the retry,
+`PAYMENT-RESPONSE` on settlement — x402 v2's header names, so an adapter that
+speaks that dialect has somewhere obvious to map onto. The payloads are this
+package's own; matching x402's `PaymentRequirement` schema field for field is a
+mapping layer that is **not** implemented here, and claiming otherwise would be
+a lie in a place people would rely on.
+
+This module works to a different standard from the rest: **nothing throws, and
+nothing is believed.** Every decode returns a reason instead of an exception.
+
+Amounts must arrive as canonical decimal, and rejecting rather than repairing
+is a correctness requirement, not fussiness:
+
+| Input | A relaxed reader | Why it matters |
+|---|---|---|
+| `"0x10"` | `16n` | `BigInt` accepts hex. A quote priced `0x10` reads as sixteen |
+| `"1e999"` | throws | ...from inside whatever was holding the decision |
+| `"007"` | `7n`, re-encodes `"7"` | **the signature over the original bytes no longer verifies** |
+
+That third row is the important one. Signatures are made over canonical bytes,
+so a decoder that silently normalises has broken the signature scheme.
+
+`admitPayment` is the seller's gate, and it compares against **the quote the
+seller holds, never the one the buyer echoes back** — a protocol that compares
+a payload to a copy of itself proves only that the peer can echo.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and
