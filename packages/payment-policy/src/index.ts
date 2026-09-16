@@ -19,6 +19,9 @@ export { requesterKey, distinctApprovers } from "./model.js";
 export type { Attestation } from "./attestation.js";
 export { attestationIsCurrent, satisfying } from "./attestation.js";
 
+export type { AssetUnit } from "./units.js";
+export { MAX_DECIMALS, unitFor, formatAmount } from "./units.js";
+
 /* -- Policy --------------------------------------------------------------- */
 export type { Rule, RuleKind, RuleScope, SpendPolicy } from "./policy.js";
 export {

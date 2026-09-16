@@ -14,6 +14,8 @@
 import { canonicalJson } from "@orb/journal";
 import { createHash } from "node:crypto";
 import type { Amount, AssetId } from "./model.js";
+import type { AssetUnit } from "./units.js";
+import { MAX_DECIMALS } from "./units.js";
 
 /** Which requesters a rule constrains. */
 export type RuleScope =
@@ -116,6 +118,19 @@ export interface SpendPolicy {
   /** Bumped on every change. Recorded in every decision. */
   readonly version: number;
   readonly rules: readonly Rule[];
+  /**
+   * The denominations this policy governs.
+   *
+   * Omitted means no unit checking, which is the behaviour every policy had
+   * before units existed. Declaring them turns two silent failures into
+   * refusals — a scale disagreement and a typo'd asset that would otherwise
+   * accrue in a parallel envelope. See `units.ts`.
+   *
+   * They live on the policy rather than beside it so the policy digest covers
+   * them: a receipt then proves which denominations were in force, not merely
+   * which limits.
+   */
+  readonly units?: readonly AssetUnit[];
 }
 
 export class PolicyConfigError extends Error {
@@ -144,6 +159,8 @@ export function validatePolicy(policy: SpendPolicy): void {
     throw new PolicyConfigError(`version must be a positive integer, got ${policy.version}`);
   }
 
+  const declared = validateUnits(policy);
+
   const seen = new Set<string>();
   for (const rule of policy.rules) {
     if (rule.id.length === 0) throw new PolicyConfigError("rule has no id");
@@ -154,6 +171,18 @@ export function validatePolicy(policy: SpendPolicy): void {
       // A scope naming nobody makes the rule unreachable. That is always a
       // mistake: the author meant ANY, or meant to name someone.
       throw new PolicyConfigError("scope names no requesters; use ANY_REQUESTER", rule.id);
+    }
+
+    // A rule naming an asset the policy does not declare can never do its
+    // job, and fails open: the spend simply is not covered by it. That is
+    // exactly the silent hole declaring units is meant to close, so it is
+    // caught at load time rather than never.
+    if (declared !== null) {
+      for (const asset of assetsOf(rule)) {
+        if (!declared.has(asset)) {
+          throw new PolicyConfigError(`names undeclared asset ${JSON.stringify(asset)}`, rule.id);
+        }
+      }
     }
 
     switch (rule.kind) {
@@ -210,6 +239,51 @@ export function validatePolicy(policy: SpendPolicy): void {
   }
 }
 
+/** Assets a rule constrains. Rules that constrain no particular asset yield none. */
+function assetsOf(rule: Rule): readonly AssetId[] {
+  switch (rule.kind) {
+    case "ASSET_ALLOWLIST":
+      return rule.assets;
+    case "PER_TRANSACTION_LIMIT":
+    case "WINDOW_BUDGET":
+    case "APPROVAL_THRESHOLD":
+      return [rule.asset];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Checks the declarations themselves, returning the declared assets.
+ *
+ * `null` when a policy declares no units at all — not an empty set, which
+ * would mean "declares that nothing is allowed" and would reject every rule.
+ */
+function validateUnits(policy: SpendPolicy): Set<AssetId> | null {
+  if (policy.units === undefined) return null;
+
+  const declared = new Set<AssetId>();
+  for (const unit of policy.units) {
+    if (unit.asset.length === 0) throw new PolicyConfigError("a unit declares no asset");
+    if (declared.has(unit.asset)) {
+      throw new PolicyConfigError(`asset ${JSON.stringify(unit.asset)} is declared twice`);
+    }
+    if (unit.symbol.length === 0) {
+      throw new PolicyConfigError(`asset ${JSON.stringify(unit.asset)} has no symbol`);
+    }
+    if (!Number.isInteger(unit.decimals) || unit.decimals < 0 || unit.decimals > MAX_DECIMALS) {
+      throw new PolicyConfigError(
+        `asset ${JSON.stringify(unit.asset)}: decimals must be an integer in [0, ${MAX_DECIMALS}]`,
+      );
+    }
+    if (unit.maxAmount <= 0n) {
+      throw new PolicyConfigError(`asset ${JSON.stringify(unit.asset)}: maxAmount must be positive`);
+    }
+    declared.add(unit.asset);
+  }
+  return declared;
+}
+
 /**
  * A policy's content hash.
  *
@@ -225,6 +299,19 @@ export function policyDigest(policy: SpendPolicy): string {
   const serializable = {
     account: policy.account,
     version: policy.version,
+    // Included so a receipt proves which denominations were in force. Omitted
+    // rather than sent as null when absent, so a policy that declares no units
+    // hashes exactly as it did before units existed.
+    ...(policy.units === undefined
+      ? {}
+      : {
+          units: policy.units.map((u) => ({
+            asset: u.asset,
+            decimals: u.decimals,
+            symbol: u.symbol,
+            maxAmount: u.maxAmount.toString(10),
+          })),
+        }),
     rules: policy.rules.map((rule) =>
       Object.fromEntries(
         Object.entries(rule).map(([k, v]) => [k, typeof v === "bigint" ? v.toString(10) : v]),

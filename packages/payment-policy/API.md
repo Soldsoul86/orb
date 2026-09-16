@@ -45,10 +45,43 @@ interface Attestation {
 | `attestationIsCurrent(a, asOf, maxAgeMs)` | `boolean` — not future-dated, not stale |
 | `satisfying(attestations, claimId, attesters, asOf, maxAgeMs)` | `readonly Attestation[]` |
 
+## Denominations
+
+```ts
+interface AssetUnit {
+  asset: AssetId;
+  decimals: number;    // 6 for USDC, 18 for ETH, 0 for something counted
+  symbol: string;      // for people; never compared
+  maxAmount: Amount;   // largest sane single amount — a ceiling on nonsense
+}
+
+const MAX_DECIMALS = 36;
+function unitFor(units: readonly AssetUnit[] | undefined, asset): AssetUnit | undefined;
+function formatAmount(amount: Amount, unit: AssetUnit): string;   // presentation only
+```
+
+Declared on the policy (`units`), so the **policy digest covers them** — a
+receipt then proves which denominations were in force, not merely which limits.
+
+Omitting `units` keeps the previous behaviour exactly, including the digest.
+Declaring them adds two refusals, checked **before any rule**:
+
+| Reason | When |
+|---|---|
+| `UNIT_NOT_DECLARED` | the request's asset is not one the policy declares |
+| `AMOUNT_OUT_OF_RANGE` | the amount exceeds that asset's `maxAmount` |
+
+and one load-time check: `validatePolicy` rejects a rule naming an asset the
+policy does not declare, because such a rule **fails open** — it never applies,
+and the spend is simply not covered by it.
+
 ## Policy
 
 ```ts
-interface SpendPolicy { account: string; version: number; rules: readonly Rule[] }
+interface SpendPolicy {
+  account: string; version: number; rules: readonly Rule[];
+  units?: readonly AssetUnit[];      // omitted = no unit checking
+}
 
 type RuleScope =
   | { kind: "ANY" }
@@ -161,7 +194,8 @@ interface RuleEvaluation {
 `DenialReason` is one of `NO_POLICY`, `WRONG_ACCOUNT`, `INVALID_AMOUNT`,
 `REQUESTER_NOT_PERMITTED`, `DESTINATION_NOT_ALLOWED`, `DESTINATION_DENIED`,
 `ASSET_NOT_ALLOWED`, `TRANSACTION_TOO_LARGE`, `BUDGET_EXHAUSTED`,
-`TOO_MANY_TRANSACTIONS`, `OUTSIDE_TIME_WINDOW`, `ATTESTATION_MISSING`.
+`TOO_MANY_TRANSACTIONS`, `OUTSIDE_TIME_WINDOW`, `ATTESTATION_MISSING`,
+`UNIT_NOT_DECLARED`, `AMOUNT_OUT_OF_RANGE`.
 
 Precedence: **DENY** > **REQUIRES_APPROVAL** > **ALLOW**; within a tier, the
 first rule in policy order.

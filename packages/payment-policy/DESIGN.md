@@ -579,6 +579,59 @@ reservations past grace, and every reversal is journalled. The guess is
 recorded as a decision somebody made, never as something the system quietly
 did.
 
+## Denominations: an opaque identifier has no wrong values
+
+Every amount here is a `bigint` in "the asset's smallest indivisible unit", and
+nothing recorded what that unit was. The type system cannot help — `5n` meaning
+five USDC and `5n` meaning five millionths of one are the same value, and the
+engine would add them together.
+
+Two failures follow, and both are silent.
+
+**A scale disagreement.** One caller sends `5n` for five USDC while the ledger
+holds `5_000_000n` for the same. A fifty-USDC budget is never reached, because
+every spend rounds to nothing against it.
+
+**A typo makes a second budget.** `"USDC "` with a trailing space is a
+different asset to every rule that reads it. The `WINDOW_BUDGET` for the
+correct spelling never constrains it, and the spend accrues in an envelope
+nobody declared. There is a test that demonstrates exactly this happening
+before showing the declaration turning it into a refusal — it is the clearest
+statement of what the feature is for.
+
+### Why the declarations live on the policy
+
+They could have been a registry passed alongside. Putting them *in* the policy
+means the policy digest covers them, so a receipt proves which denominations
+were in force rather than only which limits — a limit of 100 means nothing if
+the reader cannot tell 100 of what.
+
+It also keeps `evaluate` pure: no new parameter, no new dependency, and the
+check is data the policy already carries.
+
+### Why opt-in, and what that costs
+
+Omitting `units` keeps the previous behaviour exactly, **including the digest**
+— a policy that declares none hashes as it did before units existed, so no
+existing receipt is invalidated. The cost is honest and worth stating: a policy
+that declares nothing has no unit safety at all, and neither failure above is
+detectable in it.
+
+### Two checks, at two different times
+
+At evaluation, denomination is checked **before any rule**, because a rule
+judging an amount in the wrong unit gives a confident answer to the wrong
+question.
+
+At load, `validatePolicy` rejects a rule naming an undeclared asset. Such a
+rule **fails open** — it never applies, and the spend is simply not covered.
+That is precisely the hole being closed, so it is caught at configuration
+rather than never.
+
+`maxAmount` is a ceiling on nonsense rather than a policy limit: it catches six
+decimals confused for eighteen, where the number is enormous rather than merely
+wrong.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -603,6 +656,12 @@ did.
   iteration 9. The protection is that the *next* call sees the true figure and
   is refused. If you need a per-call ceiling enforced against the actual
   spend, the operation itself has to enforce it; nothing outside the call can.
+- **Unit checking is off unless a policy declares `units`.** A policy that
+  declares none has no protection against a scale disagreement or a typo'd
+  asset, which is the behaviour it had before.
+- **`decimals` is presentation and range-checking only.** The engine still
+  computes exclusively in base units; a decimal point in arithmetic is how
+  money drifts.
 - **Nothing expires unless a TTL is configured.** The default is no deadline,
   which is the behaviour every reservation had before deadlines existed.
 - **`releaseExpired` is a guess.** It assumes nothing was spent. Prefer

@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **260 tests, all passing.** (685 across the repo.)
+`npm test -w @orb/payment-policy` — **278 tests, all passing.** (703 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -73,6 +73,32 @@ Decisions carry the policy version and a 64-character digest.
 The same inputs produce a deep-equal decision across repeated calls, and
 `evaluate` does not mutate the request or the ledger (verified by
 `structuredClone` comparison).
+
+### Denominations (`units.test.ts`)
+
+**The showpiece demonstrates the bug before the fix.** With no units declared,
+a full budget correctly refuses the right spelling — and then the *same spend*
+under `"USDC "` with a trailing space sails through, because the rule simply
+does not apply to it. Declaring units turns that into `UNIT_NOT_DECLARED`.
+
+Scale mistakes: six decimals confused for eighteen is caught as
+`AMOUNT_OUT_OF_RANGE`; exactly the declared ceiling passes the unit check and
+is then judged by the rules; and an asset that is both undeclared *and*
+absurdly scaled reports the unit problem, proving denomination is checked
+before any rule.
+
+Backward compatibility is asserted, not assumed: a policy declaring no units
+allows any asset and **hashes exactly as it did before units existed**, so no
+existing receipt is invalidated. Declaring them changes the digest — including
+changing only `decimals` — which is what lets a receipt prove them.
+
+Validation rejects a rule naming an undeclared asset (it would fail open), an
+allowlist doing the same, duplicate declarations, an empty asset or symbol,
+negative, fractional and oversized `decimals`, and a non-positive `maxAmount`.
+
+`formatAmount` pads the fraction, because "5.5" and "5.000005" differ only in
+zeros a naive conversion drops; omits the point for a counted asset; and
+survives 18 decimals without losing a digit.
 
 ### Policy validation (`policy.test.ts`)
 Duplicate rule ids, a scope naming nobody, negative limits, non-positive

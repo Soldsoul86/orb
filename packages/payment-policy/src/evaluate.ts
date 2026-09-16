@@ -31,6 +31,7 @@ import {
 } from "./policy.js";
 import type { LedgerEntry, WindowQuery } from "./ledger.js";
 import { countWithin, spentWithin } from "./ledger.js";
+import { unitFor } from "./units.js";
 import { satisfying } from "./attestation.js";
 
 export type Verdict = "ALLOW" | "DENY" | "REQUIRES_APPROVAL" | "NOT_APPLICABLE";
@@ -48,7 +49,11 @@ export type DenialReason =
   | "BUDGET_EXHAUSTED"
   | "TOO_MANY_TRANSACTIONS"
   | "OUTSIDE_TIME_WINDOW"
-  | "ATTESTATION_MISSING";
+  | "ATTESTATION_MISSING"
+  /** The policy declares its denominations and this asset is not one of them. */
+  | "UNIT_NOT_DECLARED"
+  /** The amount is beyond anything sane for this asset — usually a scale mistake. */
+  | "AMOUNT_OUT_OF_RANGE";
 
 /**
  * One rule's reading of one request.
@@ -335,6 +340,26 @@ export function evaluate(
   }
   if (policy.rules.length === 0) {
     return refuse("NO_POLICY", "policy has no rules; nothing may move");
+  }
+
+  // Denomination is checked before any rule, because a rule that judges an
+  // amount in the wrong unit gives a confident answer to the wrong question.
+  // A policy declaring no units skips this entirely (see `units.ts`).
+  if (policy.units !== undefined) {
+    const unit = unitFor(policy.units, request.asset);
+    if (unit === undefined) {
+      return refuse(
+        "UNIT_NOT_DECLARED",
+        `${request.asset} is not a denomination this policy declares`,
+      );
+    }
+    if (request.amount > unit.maxAmount) {
+      return refuse(
+        "AMOUNT_OUT_OF_RANGE",
+        `${request.amount.toString(10)} exceeds the largest sane ${unit.symbol} amount ` +
+          `(${unit.maxAmount.toString(10)}); check the scale`,
+      );
+    }
   }
 
   // A ledger entry for another account is another account's history.
