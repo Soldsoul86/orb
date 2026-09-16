@@ -12,7 +12,13 @@
       "default": "./dist/src/index.js"
     }
   },
-  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "files": [
+    "dist/src",
+    "README.md",
+    "DESIGN.md",
+    "API.md",
+    "TESTS.md"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
@@ -21,5 +27,6 @@
   "dependencies": {
     "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.7.0"
-  }
+  },
+  "license": "Apache-2.0"
 }

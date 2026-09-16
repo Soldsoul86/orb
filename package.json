@@ -2,9 +2,9 @@
   "name": "orb",
   "private": true,
   "version": "0.0.0",
-  "description": "Orb — a personal runtime that continuously learns, reasons and acts alongside its user.",
+  "description": "Orb \u2014 a personal runtime that continuously learns, reasons and acts alongside its user.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=22.6.0"
   },

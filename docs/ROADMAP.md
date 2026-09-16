@@ -22,7 +22,8 @@ Repository structure and governance, versioned from day one.
 - Repository tree (`apps/`, `runtime/`, `platform/`, `packages/`, `docs/`,
   `tests/`, `scripts/`, `tools/`, `.github/`).
 - Root documents: `MASTER.md`, `CLAUDE.md`, `README.md`, `.gitignore`.
-- `CONSTITUTION.md` and `LICENSE` held as deliberate placeholders.
+- `CONSTITUTION.md` held as a deliberate placeholder; `LICENSE` since settled
+  as Apache-2.0 (see `NOTICE` for the one package with a GPL toolchain).
 - Git initialized; first commit recorded.
 
 **Gate:** structure exists; no implementation. *Passed.*
@@ -32,7 +33,8 @@ Repository structure and governance, versioned from day one.
 ## Phase 1 — Architectural Documents  ✅ complete
 
 The `/docs` specifications that define the architecture, with the three frozen
-decisions incorporated (HLC ordering, replay-vs-determinism, license deferred).
+decisions incorporated (HLC ordering, replay-vs-determinism; license since
+settled as Apache-2.0).
 
 - `SYSTEM_OVERVIEW`, `RUNTIME_LOOP`, `EVENT_MODEL`, `EVIDENCE_GRAPH`,
   `DIGITAL_TWIN`, `AGENT_RUNTIME`, `CAPABILITY_MODEL`, `STORAGE`,

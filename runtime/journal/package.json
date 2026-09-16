@@ -2,7 +2,7 @@
   "name": "@orb/journal",
   "version": "0.1.0",
   "private": true,
-  "description": "Orb Event Journal — append-only, hash-chained, HLC-ordered history.",
+  "description": "Orb Event Journal \u2014 append-only, hash-chained, HLC-ordered history.",
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -12,10 +12,17 @@
       "default": "./dist/src/index.js"
     }
   },
-  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "files": [
+    "dist/src",
+    "README.md",
+    "DESIGN.md",
+    "API.md",
+    "TESTS.md"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "npm run build && node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
-  }
+  },
+  "license": "Apache-2.0"
 }

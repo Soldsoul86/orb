@@ -12,7 +12,13 @@
       "default": "./dist/src/index.js"
     }
   },
-  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "files": [
+    "dist/src",
+    "README.md",
+    "DESIGN.md",
+    "API.md",
+    "TESTS.md"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
@@ -20,5 +26,6 @@
   },
   "dependencies": {
     "@orb/journal": "0.1.0"
-  }
+  },
+  "license": "Apache-2.0"
 }

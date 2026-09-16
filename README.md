@@ -243,4 +243,15 @@ built-in runner; there is no test framework dependency.
 
 ## License
 
-See [`LICENSE`](LICENSE). _(License selection pending — see Phase 0 review notes.)_
+[Apache License 2.0](LICENSE). Chosen for the explicit patent grant: this
+repository implements payment authorization and a zero-knowledge circuit, both
+areas where an implicit grant leaves an adopter guessing.
+
+Every package is Apache-2.0 **except** `@orb/payment-circuit`, whose proving
+toolchain (snarkjs, circomlibjs, circom) is GPL-3.0 — see [`NOTICE`](NOTICE)
+before redistributing that one.
+
+`@orb/hyperliquid` carries two MIT dependencies for signing.
+`@orb/journal`, `@orb/payment-policy` and `@orb/trade-executor` have **no
+third-party runtime dependencies at all**, which is what lets the engine that
+decides whether money moves run anywhere, offline, with nothing installed.
