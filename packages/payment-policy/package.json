@@ -1,8 +1,35 @@
 {
   "name": "@orb/payment-policy",
   "version": "0.1.0",
-  "private": true,
   "description": "Programmable spend authority: a pure, deterministic, explainable policy engine for money movement.",
+  "keywords": [
+    "agentic-payments",
+    "x402",
+    "spend-policy",
+    "authorization",
+    "ai-agents",
+    "payments",
+    "budget",
+    "audit",
+    "receipts",
+    "mcp"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Soldsoul86/orb/tree/main/packages/payment-policy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Soldsoul86/orb.git",
+    "directory": "packages/payment-policy"
+  },
+  "bugs": {
+    "url": "https://github.com/Soldsoul86/orb/issues"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -17,7 +44,9 @@
     "README.md",
     "DESIGN.md",
     "API.md",
-    "TESTS.md"
+    "TESTS.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -b",
@@ -26,6 +55,5 @@
   },
   "dependencies": {
     "@orb/journal": "0.1.0"
-  },
-  "license": "Apache-2.0"
+  }
 }

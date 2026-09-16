@@ -1,8 +1,32 @@
 {
   "name": "@orb/payment-circuit",
   "version": "0.1.0",
-  "private": true,
   "description": "A Groth16 circuit proving a payment stayed inside a private budget.",
+  "keywords": [
+    "zero-knowledge",
+    "groth16",
+    "circom",
+    "snarkjs",
+    "privacy",
+    "budget-proof",
+    "agentic-payments"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Soldsoul86/orb/tree/main/packages/payment-circuit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Soldsoul86/orb.git",
+    "directory": "packages/payment-circuit"
+  },
+  "bugs": {
+    "url": "https://github.com/Soldsoul86/orb/issues"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -15,11 +39,12 @@
   "files": [
     "dist/src",
     "circuits",
-    "artifacts",
     "README.md",
     "DESIGN.md",
     "API.md",
-    "TESTS.md"
+    "TESTS.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -b",
@@ -34,6 +59,5 @@
   },
   "devDependencies": {
     "circomlib": "^2.0.5"
-  },
-  "license": "Apache-2.0"
+  }
 }

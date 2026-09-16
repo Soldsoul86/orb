@@ -12,6 +12,25 @@ npm run circuit          # compile + trusted setup (minutes, once)
 npm test -w @orb/payment-circuit
 ```
 
+## Install
+
+```bash
+npm install @orb/payment-circuit
+```
+
+**The published package contains the circuit source, not proving keys.** You run
+your own ceremony:
+
+```bash
+npm run circuit     # ~40 minutes; writes artifacts/ locally
+```
+
+That is deliberate, and the section below says why. A proving key is 48MB and
+the ceremony that produces it here is a single-participant development one. Had
+we shipped those keys, every user would be trusting randomness that was never
+destroyed — by someone else, silently, because it came down with an `npm
+install`. Build your own, or run a real multi-party ceremony.
+
 ## Why it is a separate package
 
 `@orb/payment-policy` must run anywhere, offline, with nothing installed — it

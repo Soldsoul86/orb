@@ -10,6 +10,34 @@ signal provider; exit authority belongs to the executor*), one layer down and
 pointed at money instead of positions. Nothing a requester sends can raise a
 limit, skip an approval, or widen a window.
 
+## Install
+
+```bash
+npm install @orb/payment-policy
+```
+
+Node 22.6+. TypeScript types included. One dependency — [`@orb/journal`](../../runtime/journal),
+which has none of its own. No network calls, no key material, no vendor SDK.
+
+```ts
+import { evaluate, explain, SpendGuard, MemoryLedgerStore } from "@orb/payment-policy";
+```
+
+### Run it before you install it
+
+Four demos, no configuration, no keys, no network:
+
+```bash
+git clone https://github.com/Soldsoul86/orb && cd orb && npm install && npm run build
+
+node scripts/agent-budget.mjs   # an agent spends until the policy stops it
+node scripts/receipt.mjs        # a receipt verified without trusting its issuer
+node scripts/quoted-call.mjs    # a seller's quote bounding a buyer's spend
+node scripts/signed-quote.mjs   # attribution: proving who, not just what
+```
+
+Start with `agent-budget.mjs`. It is the whole idea in one screen.
+
 ## What it is
 
 A pure, deterministic, explainable policy engine. Given a request, a policy and

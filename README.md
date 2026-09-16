@@ -25,6 +25,8 @@ Now executable:
 | --- | --- |
 | [`runtime/journal`](runtime/journal) | The **Event Journal** — append-only, hash-chained, HLC-ordered. Phase 4's first component. |
 | [`packages/hyperliquid`](packages/hyperliquid) | A thin, auditable Hyperliquid adapter. No vendor SDK. |
+| [`packages/payment-policy`](packages/payment-policy) | **Programmable spend authority** for agentic payments. Published to npm. |
+| [`packages/payment-circuit`](packages/payment-circuit) | A Groth16 circuit proving a payment stayed inside a private budget. |
 | [`packages/trade-executor`](packages/trade-executor) | A signal-agnostic trade executor that owns risk, position and **exit** authority. |
 | [`apps/executor`](apps/executor) | The runtime host: config, safety interlock, authenticated signal API. |
 
@@ -51,6 +53,8 @@ orb/
 │   └── journal/     The Event Journal — the single source of truth
 ├── platform/        Cross-cutting platform services
 ├── packages/        Independent, composable packages
+│   ├── payment-policy/  Programmable spend authority for agentic payments
+│   ├── payment-circuit/ Zero-knowledge budget proof (Groth16)
 │   ├── hyperliquid/     Exchange adapter (signing, REST, WebSocket)
 │   └── trade-executor/  Risk, position and exit authority
 ├── contracts/       Per-contract kernel specifications
@@ -71,6 +75,55 @@ Every package carries `README.md`, `DESIGN.md`, `API.md` and `TESTS.md`.
 - **Model-independent always.** Reasoning engines are interchangeable; models never define the architecture.
 
 ---
+
+## Agentic payments
+
+**If you came here for the payments work, you want
+[`packages/payment-policy`](packages/payment-policy). It stands alone — nothing
+in it depends on the trading code below.**
+
+> A payment may be requested by anyone — a person, a schedule, an autonomous
+> agent. **Spend authority belongs to the policy.**
+
+Give an AI agent a payment method and you have given it your money. The usual
+answers are a hard cap that is either too low to be useful or too high to be
+safe, and a log you read afterwards. This is the other answer: the agent asks,
+a policy decides, and every decision is explainable, replayable and provable
+after the fact.
+
+```bash
+npm install @orb/payment-policy
+```
+
+```ts
+const result = await guard.run(request, async (grant) => {
+  const response = await callTheModel();
+  grant.report(BigInt(response.usage.total_tokens));  // what it actually cost
+  return response;
+});
+```
+
+Nothing the requester sends can raise a limit, skip an approval or widen a
+window. The ledger is a projection of the journal, so the reasoning survives a
+restart and reconstructs identically a year later.
+
+| Package | Install | What it is |
+| --- | --- | --- |
+| [`payment-policy`](packages/payment-policy) | `npm i @orb/payment-policy` | Policy engine, guard, ledger, receipts, quotes, signing, x402 transport |
+| [`payment-circuit`](packages/payment-circuit) | `npm i @orb/payment-circuit` | Prove a spend stayed in budget without revealing the budget |
+| [`journal`](runtime/journal) | `npm i @orb/journal` | The append-only hash-chained history everything replays from |
+
+See it run without installing anything:
+
+```bash
+npm install && npm run build && node scripts/agent-budget.mjs
+```
+
+Interop notes for protocol implementers: the canonical encoding conforms to
+**RFC 8785 (JCS)**, headers follow **x402 v2**, and signature verification
+reports the five-way disposition taxonomy from the
+[Cycles evidence spec](https://github.com/runcycles/cycles-protocol) rather than
+a boolean. Details in [`API.md`](packages/payment-policy/API.md).
 
 ## The Hyperliquid trade executor
 
@@ -240,6 +293,31 @@ npm run verify       # all of the above
 TypeScript strict mode throughout, with `exactOptionalPropertyTypes`,
 `noUncheckedIndexedAccess` and `verbatimModuleSyntax`. Tests use the Node
 built-in runner; there is no test framework dependency.
+
+### Publishing
+
+Three packages are public: `@orb/journal`, `@orb/payment-policy`,
+`@orb/payment-circuit`. Everything else stays `private` — the trading code is
+not for distribution.
+
+Publish in dependency order, because each depends on an exact version of the
+one before it:
+
+```bash
+npm run verify                                    # must be green first
+npm publish -w @orb/journal
+npm publish -w @orb/payment-policy
+npm publish -w @orb/payment-circuit
+```
+
+Check what a tarball will actually contain before sending it:
+
+```bash
+npm pack --dry-run -w @orb/payment-policy
+```
+
+`@orb/payment-circuit` ships the circuit source and **no proving keys**. See
+that package's README for why.
 
 ## License
 
