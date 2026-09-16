@@ -39,5 +39,22 @@ export { consumesBudget, spentWithin, countWithin } from "./ledger.js";
 export type { Decision, DenialReason, RuleEvaluation, Verdict } from "./evaluate.js";
 export { evaluate, authorizedEntry } from "./evaluate.js";
 
+/* -- The shell ------------------------------------------------------------ */
+export type { Clock } from "./clock.js";
+export { systemClock, ManualClock } from "./clock.js";
+
+export type { LedgerStore } from "./store.js";
+export { MemoryLedgerStore, LedgerStoreError } from "./store.js";
+
+export type {
+  SpendDraft,
+  PolicySource,
+  Authorization,
+  Grant,
+  GuardOutcome,
+  GuardOptions,
+} from "./guard.js";
+export { SpendGuard, singlePolicy } from "./guard.js";
+
 /* -- Presentation --------------------------------------------------------- */
 export { explain, summarize } from "./explain.js";

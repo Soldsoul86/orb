@@ -1,8 +1,9 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **74 tests, all passing.** (468 across the repo.)
+`npm test -w @orb/payment-policy` — **92 tests, all passing.** (486 across the repo.)
 
-Unit tests only. The package has no I/O to integrate with, which is the point.
+Unit tests only. The package has no I/O to integrate with, which is the point
+— the guard's clock and store are both injected.
 
 ## What is covered
 
@@ -86,6 +87,30 @@ version does; a `bigint` too large for JSON still hashes.
 Asset filtering, request exclusion, inclusive window bounds at both edges,
 requester filtering, the empty ledger, and state handling in `countWithin`.
 
+### The guard (`guard.test.ts`)
+
+Two tests carry this file.
+
+**Ten racing callers against a budget that fits three.** Every call suspends
+inside its operation; exactly three complete and seven are refused. It only
+passes because `authorize` never suspends between reading the ledger and
+writing the reservation. If that ever regresses, this test goes to ten
+completions.
+
+**What happens when the operation throws.** A failure with no declared cost
+leaves the reservation `PENDING` and returns `INDETERMINATE` — the guard
+refuses to guess whether money moved — and `openReservations` surfaces it once
+it is stale. A failure that reports `0n` settles at zero, and one that reports
+a real figure settles at that figure. A zero-cost attempt still counts against
+a velocity limit, because it cost nothing but it happened.
+
+Also covered: settling at the reported figure rather than the estimate;
+overages recorded rather than prevented; the budget self-correcting because
+the next decision sees the true figure; retries with a repeated request id
+returning `DUPLICATE` **without running the operation**; an unknown account
+denying with `NO_POLICY`; `onDecision` firing for allowed and refused alike
+(and not for duplicates); and budget windows moving with an injected clock.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -94,6 +119,9 @@ requester filtering, the empty ledger, and state handling in `countWithin`.
 - **Settlement, confirmation, reversal detection.** Not in this package. The
   ledger is an input; producing it is the settlement layer's job.
 - **Rail behaviour, custody, key handling.** None of it is here.
+- **Durable or multi-process stores.** `MemoryLedgerStore` is the reference;
+  a store that must survive a restart or be shared across processes needs its
+  own atomicity tests, against its own engine.
 - **Performance under a large ledger.** `spentWithin` is linear by design
   (`DESIGN.md` → Known limits). No benchmark is asserted because no threshold
   has been agreed; asserting an arbitrary one would be theatre.

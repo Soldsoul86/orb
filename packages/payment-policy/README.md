@@ -48,6 +48,34 @@ if (decision.outcome === "ALLOW") submit(request);
 console.log(explain(decision));
 ```
 
+## The guard — four lines around an operation
+
+```ts
+import { SpendGuard, MemoryLedgerStore, singlePolicy, explain } from "@orb/payment-policy";
+
+const guard = new SpendGuard({ store: new MemoryLedgerStore(), policyFor: singlePolicy(policy) });
+
+const result = await guard.run(
+  { requestId: "call-10", account, requester: { kind: "AGENT", agentId: "researcher" },
+    asset: "anthropic:tokens", amount: 5_000n, destination: "vendor:messages-api" },
+  async (grant) => {
+    const response = await callTheModel();
+    grant.report(BigInt(response.usage.total_tokens));   // tell the truth about the cost
+    return response;
+  },
+);
+
+if (result.outcome === "REFUSED") console.log(explain(result.decision));
+```
+
+`node scripts/agent-budget.mjs` runs a looping agent against a 50,000-token
+envelope and prints the refusal when it runs out.
+
+Outcomes are `COMPLETED`, `REFUSED`, `DUPLICATE`, `FAILED` and
+`INDETERMINATE` — the last meaning the operation threw without saying whether
+it spent anything, so the reservation is deliberately left open for
+reconciliation rather than guessed at.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

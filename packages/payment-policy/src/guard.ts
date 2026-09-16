@@ -1,0 +1,278 @@
+/**
+ * The imperative shell.
+ *
+ * The engine decides. The guard is what a caller actually holds: it stamps the
+ * time, runs the decision, reserves the budget, executes the operation, and
+ * records what really happened.
+ *
+ * Two things make it more than a convenience wrapper.
+ *
+ * **The critical section.** `authorize` reads the ledger, evaluates, and
+ * appends the reservation with no `await` anywhere between. That is the entire
+ * concurrency argument, and it is the same one that makes the executor's
+ * `claimExit` safe: on a single-threaded runtime, a synchronous
+ * read-decide-write cannot be interleaved. Introduce one suspension point in
+ * that path and simultaneous callers will each see an untouched budget.
+ *
+ * **What happens when the operation fails.** Constitution Art. XI §42: Orb
+ * never assumes an Action changed reality. A thrown error does not tell you
+ * whether the money moved — a connection reset before the request left is
+ * indistinguishable, from here, from a response lost after the vendor already
+ * charged. So the default is to *hold*: the reservation stays open, the
+ * outcome is reported as indeterminate, and `staleReservations` surfaces it
+ * for reconciliation. Silently reversing would release budget for money that
+ * may well have been spent, which is the expensive direction to be wrong in.
+ */
+import type { Approval, Amount, AssetId, Requester, SpendRequest } from "./model.js";
+import type { Attestation } from "./attestation.js";
+import type { SpendPolicy } from "./policy.js";
+import type { Decision } from "./evaluate.js";
+import { authorizedEntry, evaluate } from "./evaluate.js";
+import type { LedgerEntry } from "./ledger.js";
+import type { LedgerStore } from "./store.js";
+import type { Clock } from "./clock.js";
+import { systemClock } from "./clock.js";
+
+/** A request without the bookkeeping the shell can fill in. */
+export interface SpendDraft {
+  readonly requestId: string;
+  readonly account: string;
+  readonly requester: Requester;
+  readonly asset: AssetId;
+  readonly amount: Amount;
+  readonly destination: string;
+  readonly requestedAt?: number;
+  readonly approvals?: readonly Approval[];
+  readonly attestations?: readonly Attestation[];
+  readonly memo?: string;
+}
+
+function materialize(draft: SpendDraft, now: number): SpendRequest {
+  return {
+    requestId: draft.requestId,
+    account: draft.account,
+    requester: draft.requester,
+    asset: draft.asset,
+    amount: draft.amount,
+    destination: draft.destination,
+    requestedAt: draft.requestedAt ?? now,
+    approvals: draft.approvals ?? [],
+    attestations: draft.attestations ?? [],
+    memo: draft.memo ?? null,
+  };
+}
+
+/** Where a policy comes from. Returning `undefined` denies: no policy, nothing moves. */
+export type PolicySource = (account: string) => SpendPolicy | undefined;
+
+/** A `PolicySource` for the common case of one account, one policy. */
+export function singlePolicy(policy: SpendPolicy): PolicySource {
+  return (account) => (account === policy.account ? policy : undefined);
+}
+
+/**
+ * Three outcomes, discriminated so the compiler carries the difference.
+ *
+ * A refusal because the policy said no and a refusal because the id has been
+ * seen before are not the same event, and collapsing them into one shape with
+ * nullable fields would force a cast in the one code path that should never
+ * contain one.
+ */
+export type Authorization =
+  | {
+      readonly granted: true;
+      readonly request: SpendRequest;
+      readonly decision: Decision;
+      readonly reservation: LedgerEntry;
+      /** Records what was actually spent, which may differ from the estimate. */
+      settle(actualAmount: Amount): void;
+      /** Records that the spend provably did not happen. */
+      reverse(): void;
+    }
+  | {
+      readonly granted: false;
+      readonly refusal: "DENIED";
+      readonly request: SpendRequest;
+      readonly decision: Decision;
+    }
+  | {
+      readonly granted: false;
+      readonly refusal: "DUPLICATE";
+      readonly request: SpendRequest;
+      readonly existing: LedgerEntry;
+    };
+
+/** What the operation is handed. */
+export interface Grant {
+  readonly request: SpendRequest;
+  readonly decision: Decision;
+  /**
+   * Declare what was actually consumed.
+   *
+   * Call it on the way out with the real figure — an estimate of 4,000 tokens
+   * that turns out to be 4,231 must land in the ledger as 4,231, or every
+   * later budget inherits the error. Calling it before throwing is also how
+   * you tell the guard a failed operation still cost something (or, with `0n`,
+   * that it provably did not).
+   */
+  report(actualAmount: Amount): void;
+}
+
+export type GuardOutcome<T> =
+  | {
+      readonly outcome: "COMPLETED";
+      readonly value: T;
+      readonly decision: Decision;
+      readonly reserved: Amount;
+      readonly actual: Amount;
+      /** Positive when the operation cost more than it reserved. */
+      readonly overage: Amount;
+    }
+  | { readonly outcome: "REFUSED"; readonly decision: Decision }
+  | { readonly outcome: "DUPLICATE"; readonly existing: LedgerEntry }
+  /** The operation failed and told us what it cost. The ledger holds the truth. */
+  | { readonly outcome: "FAILED"; readonly error: unknown; readonly decision: Decision; readonly actual: Amount }
+  /**
+   * The operation failed without saying whether it spent anything. The
+   * reservation is still open on purpose; reconcile it against the vendor.
+   */
+  | {
+      readonly outcome: "INDETERMINATE";
+      readonly error: unknown;
+      readonly decision: Decision;
+      readonly reservation: LedgerEntry;
+    };
+
+export interface GuardOptions {
+  readonly store: LedgerStore;
+  readonly policyFor: PolicySource;
+  readonly clock?: Clock;
+  /**
+   * Called for every decision, allowed or refused, before the operation runs.
+   *
+   * This is the journal seam. Art. VII §29: there are no silent actions — and
+   * a refusal is as much a part of the record as a payment.
+   */
+  readonly onDecision?: (decision: Decision, request: SpendRequest) => void;
+}
+
+const EMPTY_POLICY = (account: string): SpendPolicy => ({ account, version: 1, rules: [] });
+
+export class SpendGuard {
+  readonly #store: LedgerStore;
+  readonly #policyFor: PolicySource;
+  readonly #clock: Clock;
+  readonly #onDecision: ((decision: Decision, request: SpendRequest) => void) | null;
+
+  constructor(options: GuardOptions) {
+    this.#store = options.store;
+    this.#policyFor = options.policyFor;
+    this.#clock = options.clock ?? systemClock;
+    this.#onDecision = options.onDecision ?? null;
+  }
+
+  /**
+   * Decides and reserves, atomically.
+   *
+   * **Synchronous on purpose.** There is no `await` between reading the ledger
+   * and writing the reservation, so two callers cannot both observe the same
+   * unspent budget. Keep it that way.
+   */
+  authorize(draft: SpendDraft): Authorization {
+    const request = materialize(draft, this.#clock.now());
+
+    const existing = this.#store.find(request.requestId);
+    if (existing !== undefined) {
+      // A repeated id is a retry, and a retry must never spend twice. A
+      // genuinely new attempt needs a new id — the same rule every idempotency
+      // key follows.
+      return { granted: false, refusal: "DUPLICATE", request, existing };
+    }
+
+    const policy = this.#policyFor(request.account) ?? EMPTY_POLICY(request.account);
+    const decision = evaluate(request, policy, this.#store.entries(request.account));
+    this.#onDecision?.(decision, request);
+
+    if (decision.outcome !== "ALLOW") {
+      return { granted: false, refusal: "DENIED", request, decision };
+    }
+
+    const reservation = authorizedEntry(request, decision);
+    this.#store.append(reservation);
+
+    const store = this.#store;
+    return {
+      granted: true,
+      request,
+      decision,
+      reservation,
+      settle: (actualAmount) => store.settle(request.requestId, actualAmount),
+      reverse: () => store.reverse(request.requestId),
+    };
+  }
+
+  /**
+   * The whole cycle: decide, reserve, run, record.
+   *
+   * The operation receives a {@link Grant} and should `report` what it really
+   * consumed. If it never reports, the reservation is settled at the amount
+   * requested.
+   */
+  async run<T>(draft: SpendDraft, operation: (grant: Grant) => Promise<T>): Promise<GuardOutcome<T>> {
+    const auth = this.authorize(draft);
+
+    if (!auth.granted) {
+      return auth.refusal === "DUPLICATE"
+        ? { outcome: "DUPLICATE", existing: auth.existing }
+        : { outcome: "REFUSED", decision: auth.decision };
+    }
+
+    let reported: Amount | null = null;
+    const grant: Grant = {
+      request: auth.request,
+      decision: auth.decision,
+      report: (actualAmount) => {
+        reported = actualAmount;
+      },
+    };
+
+    let value: T;
+    try {
+      value = await operation(grant);
+    } catch (error) {
+      const declared: Amount | null = reported;
+      if (declared === null) {
+        // We do not know whether the money moved, so we do not pretend to.
+        // The reservation stays open and shows up in `staleReservations`.
+        return {
+          outcome: "INDETERMINATE",
+          error,
+          decision: auth.decision,
+          reservation: auth.reservation,
+        };
+      }
+      auth.settle(declared);
+      return { outcome: "FAILED", error, decision: auth.decision, actual: declared };
+    }
+
+    const reserved = auth.request.amount;
+    const actual: Amount = reported ?? reserved;
+    auth.settle(actual);
+
+    return {
+      outcome: "COMPLETED",
+      value,
+      decision: auth.decision,
+      reserved,
+      actual,
+      // Recorded rather than prevented: the spend already happened, and the
+      // next decision will see the true, higher figure.
+      overage: actual > reserved ? actual - reserved : 0n,
+    };
+  }
+
+  /** Reservations left open longer than `ageMs`. These need reconciling, not guessing. */
+  openReservations(ageMs: number): readonly LedgerEntry[] {
+    return this.#store.staleReservations(this.#clock.now(), ageMs);
+  }
+}

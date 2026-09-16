@@ -162,6 +162,45 @@ journal entry — not a flag on a request.
 **Local timezones in `TIME_WINDOW`.** Rejected: a decision must not depend on
 where it was evaluated. UTC minutes only.
 
+## The guard: why `authorize` is synchronous
+
+`SpendGuard.authorize` reads the ledger, evaluates, and appends the
+reservation with **no `await` anywhere in between**. That is the whole
+concurrency argument, and it is the executor's `claimExit` argument
+unchanged: on a single-threaded runtime a synchronous read-decide-write
+cannot be interleaved. Put one suspension point in that path and ten
+simultaneous callers each observe an untouched budget.
+
+This is why every `LedgerStore` method is synchronous. A durable store must do
+its own atomicity internally — a transaction, a compare-and-set, a
+single-threaded writer — and present a synchronous face. An `async` store
+would reopen exactly the window this design exists to close.
+
+## The guard: why a failed operation is not reversed
+
+Art. XI §42 again: Orb never assumes an Action changed reality. A thrown error
+does not tell you whether the money moved. A connection reset before the
+request left and a response lost after the vendor already charged are
+indistinguishable from inside the `catch`.
+
+So the default is to **hold**. The reservation stays open, the outcome is
+`INDETERMINATE`, and `openReservations` surfaces it for reconciliation against
+the vendor. Reversing would release budget for money that may well have been
+spent — the expensive direction to be wrong in. An operation that *knows* it
+spent nothing says so with `grant.report(0n)`, and one that knows it was
+charged reports the figure before throwing.
+
+Note that a zero-cost settled attempt still counts against a velocity limit.
+It cost nothing, but it happened.
+
+## The guard: the ledger records truth, not intent
+
+`grant.report(actual)` exists because an estimate is not an outcome. A call
+budgeted at 4,000 tokens that really consumed 4,231 must land in the ledger as
+4,231, or every later budget decision inherits the error. Overages are
+**recorded, not prevented** — the spend has already happened — and the next
+decision sees the true, higher figure, so the budget self-corrects.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -172,3 +211,13 @@ where it was evaluated. UTC minutes only.
   The shell must authenticate them first.
 - **No settlement.** This package decides; it does not act, watch, or confirm.
   That is the next package.
+- **The guard is an authorization boundary, not a kill switch.** It cannot
+  interrupt an operation already in flight. A call authorized at an estimate
+  of 5,000 that really consumes 40,000 completes, and the overage is recorded
+  rather than prevented — `scripts/agent-budget.mjs` shows exactly this on
+  iteration 9. The protection is that the *next* call sees the true figure and
+  is refused. If you need a per-call ceiling enforced against the actual
+  spend, the operation itself has to enforce it; nothing outside the call can.
+- **`MemoryLedgerStore` is in-process.** A reservation does not survive a
+  restart, and two processes do not share a budget. Both need a durable store
+  with its own atomicity.

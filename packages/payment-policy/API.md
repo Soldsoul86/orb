@@ -163,3 +163,62 @@ first rule in policy order.
 | `summarize(decision)` | One line, for a log |
 
 Rendering cannot change what was decided; it reads a finished `Decision`.
+
+## The shell
+
+```ts
+interface Clock { now(): number }
+const systemClock: Clock;
+class ManualClock implements Clock { constructor(startAt: number); advance(ms); set(at) }
+```
+
+```ts
+interface LedgerStore {                       // every method SYNCHRONOUS — see DESIGN.md
+  entries(account: string): readonly LedgerEntry[];
+  find(requestId: string): LedgerEntry | undefined;
+  append(entry: LedgerEntry): void;           // throws on a duplicate request id
+  settle(requestId: string, actualAmount: Amount): void;
+  reverse(requestId: string): void;
+  staleReservations(asOf: number, ageMs: number): readonly LedgerEntry[];
+}
+class MemoryLedgerStore implements LedgerStore {}
+```
+
+```ts
+type PolicySource = (account: string) => SpendPolicy | undefined;   // undefined denies
+function singlePolicy(policy: SpendPolicy): PolicySource;
+
+class SpendGuard {
+  constructor(options: {
+    store: LedgerStore;
+    policyFor: PolicySource;
+    clock?: Clock;                            // defaults to systemClock
+    onDecision?: (d: Decision, r: SpendRequest) => void;   // the journal seam
+  });
+
+  authorize(draft: SpendDraft): Authorization;              // SYNCHRONOUS, atomic
+  run<T>(draft: SpendDraft, operation: (grant: Grant) => Promise<T>): Promise<GuardOutcome<T>>;
+  openReservations(ageMs: number): readonly LedgerEntry[];
+}
+```
+
+`SpendDraft` is a `SpendRequest` with `requestedAt`, `approvals`,
+`attestations` and `memo` optional — the shell stamps the clock and defaults
+the rest.
+
+`Grant` carries `request`, `decision`, and `report(actualAmount)`: call it with
+what was really consumed. Reporting before throwing is how a failing operation
+declares what it cost (or, with `0n`, that it cost nothing).
+
+| `GuardOutcome` | Meaning | Ledger state |
+|---|---|---|
+| `COMPLETED` | ran; carries `reserved`, `actual`, `overage` | `SETTLED` at `actual` |
+| `REFUSED` | policy said no; carries the `decision` | nothing written |
+| `DUPLICATE` | request id already seen; **the operation never runs** | unchanged |
+| `FAILED` | threw, but declared its cost | `SETTLED` at that cost |
+| `INDETERMINATE` | threw without declaring; we do not guess | stays `PENDING` |
+
+`Authorization` is a three-way union — `{granted: true, …}`,
+`{granted: false, refusal: "DENIED", decision}`, or
+`{granted: false, refusal: "DUPLICATE", existing}`. Granted authorizations
+carry `settle(actual)` and `reverse()`.
