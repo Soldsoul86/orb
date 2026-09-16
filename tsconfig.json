@@ -4,6 +4,7 @@
     { "path": "./runtime/journal" },
     { "path": "./packages/hyperliquid" },
     { "path": "./packages/payment-policy" },
+    { "path": "./packages/payment-circuit" },
     { "path": "./packages/trade-executor" },
     { "path": "./apps/executor" },
     { "path": "./tests" }

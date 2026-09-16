@@ -1,0 +1,23 @@
+{
+  "name": "@orb/payment-circuit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Groth16 circuit proving a payment stayed inside a private budget.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
+  "files": ["dist/src", "circuits", "artifacts", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "circuit": "node scripts/build-circuit.mjs",
+    "test": "npm run build && node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "@orb/payment-policy": "0.1.0",
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.5"
+  },
+  "devDependencies": { "circomlib": "^2.0.5" }
+}
