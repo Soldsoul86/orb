@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **57 tests, all passing.**
+`npm test -w @orb/payment-policy` — **74 tests, all passing.** (468 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point.
 
@@ -36,6 +36,23 @@ Below-threshold passes through. **At** the threshold holds — the boundary is
 `>=`, matching the hard-exit sentinel, because a threshold you can sit
 precisely on without consequence is not a threshold. Three signatures from one
 approver count as one.
+
+### Attestation-gated settlement (`attestation.test.ts`)
+Written around a real shape — an India/Europe chemical shipment — because an
+abstract claim id hides the questions that matter. Payment is held until the
+claim is attested; released when a named attester asserts it; refused for the
+wrong attester, the wrong claim, or a stale certificate. Any of several
+permitted attesters satisfies a claim, and an empty attester list accepts
+whoever the shell vouched for.
+
+Two edges are tested deliberately: an attestation **exactly** at the age limit
+is accepted, and one **dated after the request** is refused — a document from
+the future is a clock problem or a forgery, and either way must not release
+money. Multi-condition policies require every condition, and the decision
+records the **evidence digest, never the document**.
+
+Composition is tested too: attested but over the per-transaction cap still
+denies, with the limit named as the reason.
 
 ### Time windows
 Inside, outside, and the wrap-around case (22:00→06:00) which is where an

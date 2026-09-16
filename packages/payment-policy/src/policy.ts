@@ -79,6 +79,24 @@ export type Rule =
       readonly approvalsRequired: number;
     })
   /**
+   * A named claim must have been attested before money moves.
+   *
+   * This is the rule that turns a payment engine into a settlement engine:
+   * release on *dispatched*, on *customs cleared*, on *received*, on
+   * *counterparty verified* — each asserted by a named party, each carrying a
+   * digest of the document that backs it.
+   *
+   * `attesters` empty means any attester the shell accepted. `maxAgeMs` null
+   * means the claim does not go stale; a quality certificate from two years
+   * ago should not release this shipment's payment.
+   */
+  | (RuleBase & {
+      readonly kind: "ATTESTATION_REQUIRED";
+      readonly claimId: string;
+      readonly attesters: readonly string[];
+      readonly maxAgeMs: number | null;
+    })
+  /**
    * Spending is allowed only inside a daily UTC window.
    *
    * Minutes of the day, `[from, to)`. `from > to` wraps midnight, so
@@ -175,6 +193,12 @@ export function validatePolicy(policy: SpendPolicy): void {
         }
         if (rule.fromMinuteUtc === rule.toMinuteUtc) {
           throw new PolicyConfigError("window is empty; from equals to", rule.id);
+        }
+        break;
+      case "ATTESTATION_REQUIRED":
+        if (rule.claimId.length === 0) throw new PolicyConfigError("claimId is empty", rule.id);
+        if (rule.maxAgeMs !== null && (!Number.isFinite(rule.maxAgeMs) || rule.maxAgeMs <= 0)) {
+          throw new PolicyConfigError("maxAgeMs must be positive or null", rule.id);
         }
         break;
       case "REQUESTER_ALLOWLIST":

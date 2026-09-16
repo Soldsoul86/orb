@@ -31,6 +31,7 @@ import {
 } from "./policy.js";
 import type { LedgerEntry, WindowQuery } from "./ledger.js";
 import { countWithin, spentWithin } from "./ledger.js";
+import { satisfying } from "./attestation.js";
 
 export type Verdict = "ALLOW" | "DENY" | "REQUIRES_APPROVAL" | "NOT_APPLICABLE";
 
@@ -46,7 +47,8 @@ export type DenialReason =
   | "TRANSACTION_TOO_LARGE"
   | "BUDGET_EXHAUSTED"
   | "TOO_MANY_TRANSACTIONS"
-  | "OUTSIDE_TIME_WINDOW";
+  | "OUTSIDE_TIME_WINDOW"
+  | "ATTESTATION_MISSING";
 
 /**
  * One rule's reading of one request.
@@ -248,6 +250,34 @@ function evaluateRule(
             null,
             rule.approvalsRequired,
             held,
+          );
+    }
+
+    case "ATTESTATION_REQUIRED": {
+      const matches = satisfying(
+        request.attestations,
+        rule.claimId,
+        rule.attesters,
+        request.requestedAt,
+        rule.maxAgeMs,
+      );
+      const who = rule.attesters.length === 0 ? "any attester" : rule.attesters.join(", ");
+      const first = matches[0];
+      return first !== undefined
+        ? settle(
+            rule,
+            "ALLOW",
+            rule.claimId,
+            who,
+            `attested by ${first.attester} (evidence ${first.evidenceDigest.slice(0, 12)})`,
+          )
+        : settle(
+            rule,
+            "DENY",
+            rule.claimId,
+            who,
+            `no current attestation for ${rule.claimId} from ${who}`,
+            "ATTESTATION_MISSING",
           );
     }
 

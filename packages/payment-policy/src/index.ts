@@ -16,6 +16,8 @@
 /* -- Vocabulary ----------------------------------------------------------- */
 export type { AssetId, Amount, Requester, Approval, SpendRequest } from "./model.js";
 export { requesterKey, distinctApprovers } from "./model.js";
+export type { Attestation } from "./attestation.js";
+export { attestationIsCurrent, satisfying } from "./attestation.js";
 
 /* -- Policy --------------------------------------------------------------- */
 export type { Rule, RuleKind, RuleScope, SpendPolicy } from "./policy.js";

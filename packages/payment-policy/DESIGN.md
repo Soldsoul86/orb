@@ -114,6 +114,32 @@ Note that a scoped `WINDOW_BUDGET` measures only the scoped requesters' spend �
 so an agent's daily envelope is not consumed by the owner's transfers. That is
 what makes per-agent envelopes meaningful.
 
+## Attestations: why the evidence never travels
+
+An approval says *"I permit this."* An attestation says *"I observed this."*
+One exercises authority, the other reports a fact — and Art. XI §43 is explicit
+that an observation owns confidence, not truth.
+
+`ATTESTATION_REQUIRED` is what turns a payment engine into a settlement engine:
+release on *dispatched*, on *customs cleared*, on *quality accepted*. Two
+constraints make it safe to build a business on:
+
+**The engine records a digest, never a document.** A bill of lading, a customs
+declaration, a verification result: the hash is stored, the original stays with
+whoever holds it. A system that never holds the evidence cannot leak it, and
+cannot quietly become the place everyone's documents live.
+
+**The engine does not decide who is a legitimate attester.** A policy names
+attesters; establishing that an attester is who they claim, and is entitled to
+the claim, happens in the shell under whoever's compliance obligation it
+actually is. This is not squeamishness — deciding who may participate is
+precisely what makes someone an operator rather than a tool, and the whole
+point of this shape is that each licensed participant carries its own
+obligation rather than inheriting one from us.
+
+A future-dated attestation is never current. A clock problem and a forgery look
+identical from here, and neither should release money.
+
 ## What was considered and rejected
 
 **Cross-asset limits.** Requires a price oracle. Rejected: it introduces a

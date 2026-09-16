@@ -68,6 +68,12 @@ no way to fetch.
 | **Pending money holds its budget** | Ten requests in the same millisecond must not each see an empty budget. This is the payments equivalent of a double spend. |
 | **Every rule is recorded** | A decision that names one tripped limit while hiding the four it passed cannot be audited. |
 
+Payments can also be gated on **attested facts** — *dispatched*, *customs
+cleared*, *quality accepted* — each asserted by a named party. The engine
+records the hash of the supporting document and never the document, and it
+never decides who counts as a legitimate attester: that belongs to whoever
+carries the compliance obligation.
+
 Amounts are `bigint` in base units, always. Time is supplied on the request,
 never read from a clock — so the same inputs produce the same decision forever,
 which is what makes a decision replayable (Constitution Art. I §4).

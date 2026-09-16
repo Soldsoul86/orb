@@ -25,7 +25,15 @@ interface SpendRequest {
   destination: string;
   requestedAt: number;                 // the instant the policy is evaluated at
   approvals: readonly Approval[];      // counted, not authenticated
+  attestations: readonly Attestation[];// matched, not authenticated
   memo: string | null;
+}
+
+interface Attestation {
+  claimId: string;                     // e.g. "goods.dispatched"
+  attester: string;                    // identifier, never personal details
+  assertedAt: number;
+  evidenceDigest: string;              // hash of the document; the document never travels
 }
 ```
 
@@ -33,6 +41,8 @@ interface SpendRequest {
 |---|---|
 | `requesterKey(r: Requester)` | `string` — canonical form, e.g. `"AGENT:researcher"` |
 | `distinctApprovers(req)` | `readonly string[]` — sorted, deduplicated approver ids |
+| `attestationIsCurrent(a, asOf, maxAgeMs)` | `boolean` — not future-dated, not stale |
+| `satisfying(attestations, claimId, attesters, asOf, maxAgeMs)` | `readonly Attestation[]` |
 
 ## Policy
 
@@ -58,6 +68,7 @@ Every rule has `{ id: string; scope: RuleScope }` plus:
 | `WINDOW_BUDGET` | `asset`, `windowMs`, `maxTotal` | `committed + amount > maxTotal` |
 | `WINDOW_VELOCITY` | `windowMs`, `maxCount` | this would be transaction `maxCount + 1` |
 | `APPROVAL_THRESHOLD` | `asset`, `atOrAboveAmount`, `approvalsRequired` | *holds* (does not deny) when `amount >= atOrAboveAmount` and approvers are short |
+| `ATTESTATION_REQUIRED` | `claimId`, `attesters`, `maxAgeMs` | no current attestation for `claimId` from a permitted attester (empty `attesters` = any; `maxAgeMs: null` = never stale; an attestation dated after `requestedAt` is never current) |
 | `TIME_WINDOW` | `fromMinuteUtc`, `toMinuteUtc` | outside `[from, to)`; `from > to` wraps midnight |
 
 A rule whose `asset` differs from the request's is `NOT_APPLICABLE`, not a pass.
@@ -135,7 +146,7 @@ interface RuleEvaluation {
 `DenialReason` is one of `NO_POLICY`, `WRONG_ACCOUNT`, `INVALID_AMOUNT`,
 `REQUESTER_NOT_PERMITTED`, `DESTINATION_NOT_ALLOWED`, `DESTINATION_DENIED`,
 `ASSET_NOT_ALLOWED`, `TRANSACTION_TOO_LARGE`, `BUDGET_EXHAUSTED`,
-`TOO_MANY_TRANSACTIONS`, `OUTSIDE_TIME_WINDOW`.
+`TOO_MANY_TRANSACTIONS`, `OUTSIDE_TIME_WINDOW`, `ATTESTATION_MISSING`.
 
 Precedence: **DENY** > **REQUIRES_APPROVAL** > **ALLOW**; within a tier, the
 first rule in policy order.

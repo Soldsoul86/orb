@@ -13,6 +13,8 @@
  *    replayable (Constitution Art. I §4).
  */
 
+import type { Attestation } from "./attestation.js";
+
 /**
  * An asset identifier, opaque to this package.
  *
@@ -87,6 +89,13 @@ export interface SpendRequest {
   /** Wall-clock milliseconds. This is the instant the policy is evaluated at. */
   readonly requestedAt: number;
   readonly approvals: readonly Approval[];
+  /**
+   * Claims about the world that conditions may depend on.
+   *
+   * Like approvals, these are counted and matched, never authenticated: the
+   * shell verifies signatures before calling in.
+   */
+  readonly attestations: readonly Attestation[];
   readonly memo: string | null;
 }
 

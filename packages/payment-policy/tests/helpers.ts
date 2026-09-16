@@ -33,6 +33,7 @@ export function request(overrides: Partial<SpendRequest> = {}): SpendRequest {
     destination: "addr:vendor-a",
     requestedAt: T0,
     approvals: [],
+    attestations: [],
     memo: null,
     ...overrides,
   };
