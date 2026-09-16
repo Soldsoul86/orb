@@ -14,23 +14,13 @@ covered by the copyright above. Those pulled in at build or run time include:
   - @types/node                   MIT         (build)
   - @noble/curves                 MIT         (runtime, @orb/hyperliquid)
   - @noble/hashes                 MIT         (runtime, @orb/hyperliquid)
-  - snarkjs                       GPL-3.0     (runtime, @orb/payment-circuit)
-  - circomlibjs                   GPL-3.0     (runtime, @orb/payment-circuit)
-  - circom                        GPL-3.0     (build, @orb/payment-circuit)
 
-Note on the proving toolchain
------------------------------
-
-`@orb/payment-circuit` depends on snarkjs and circomlibjs, and its build step
-uses the circom compiler. Those are GPL-3.0. That package is therefore the one
-piece of this repository whose distribution terms are not simply Apache-2.0,
-and anyone redistributing it should take their own advice on the combination.
+Everything in this repository is Apache-2.0. The GPL-3.0 proving toolchain
+(snarkjs, circomlibjs, circom) that previously qualified this notice left with
+the payment circuit, which now lives at github.com/Soldsoul86/allowance.
 
 @orb/hyperliquid carries two MIT dependencies (@noble/curves, @noble/hashes)
 for signing, which combine with Apache-2.0 without qualification.
 
-@orb/journal, @orb/payment-policy and @orb/trade-executor have no third-party
-runtime dependencies at all. That was not an accident: the engine that decides
-whether money moves was kept dependency-free so it could run anywhere, offline,
-with nothing installed -- and a clean licensing position is a welcome side
-effect of the same decision.
+@orb/journal and @orb/trade-executor have no third-party runtime dependencies
+at all.

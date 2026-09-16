@@ -40,35 +40,6 @@ import { validateRiskConfig } from "./risk/config.js";
 import type { TradeSignal } from "./signal/model.js";
 import { validateSignal, type Rejection, type ValidationResult } from "./signal/validate.js";
 import { preflightEntry, validateEntry, type EntryContext } from "./risk/entry-guards.js";
-import {
-  baseUnitsToUsd,
-  confirmedNotional,
-  entryDraft,
-  type SpendAuthority,
-} from "./risk/spend-authority.js";
-import type { Authorization, Decision } from "@orb/payment-policy";
-
-/** The granted arm of {@link Authorization} — the only arm we hold on to. */
-type GrantedAuthorization = Extract<Authorization, { granted: true }>;
-
-/**
- * One line naming the control that refused, for the rejection a caller sees.
- *
- * Deliberately not `explain()`, which is several lines and is the right thing
- * for an operator reading an audit trail, not for a rejection field crossing
- * an API boundary. The full reasoning is in the journal either way.
- */
-function describeRefusal(decision: Decision): string {
-  switch (decision.outcome) {
-    case "DENY":
-      return `${decision.reason}${decision.ruleId === null ? "" : ` (${decision.ruleId})`}: ${decision.detail}`;
-    case "REQUIRES_APPROVAL":
-      return `needs ${decision.approvalsRequired} approvals, held ${decision.approvalsHeld}`;
-    case "ALLOW":
-      // Unreachable: a refusal never carries an ALLOW.
-      return "allowed";
-  }
-}
 import { evaluateHardExit, type RiskSnapshot } from "./risk/sentinel.js";
 import { protectiveStopPrice } from "./risk/stop-price.js";
 import type { ExitReason, ManagedPosition } from "./position/model.js";
@@ -90,19 +61,6 @@ export interface ExecutorDependencies {
   readonly audit: AuditSink;
   readonly killSwitch: KillSwitch;
   readonly config: RiskConfig;
-  /**
-   * Optional per-scope spend authority over entry exposure.
-   *
-   * Absent, the executor behaves exactly as it always has: `RiskConfig` is the
-   * only gate. Present, every entry must also be authorised against a budget
-   * that spans time, which `RiskConfig` has no way to express — see
-   * `risk/spend-authority.ts`.
-   *
-   * Optional rather than required because Art. X §37 says the kernel evolves
-   * through addition: an existing deployment must not change behaviour because
-   * a new control was added to the codebase.
-   */
-  readonly spendAuthority?: SpendAuthority;
   readonly now?: Clock;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly setInterval?: (fn: () => void, ms: number) => unknown;
@@ -176,24 +134,12 @@ export class TradeExecutor {
   /** In-flight close lifecycles, so shutdown can wait for them. */
   readonly #closing = new Map<string, Promise<void>>();
 
-  readonly #spendAuthority: SpendAuthority | null;
-
-  /**
-   * Reservations awaiting confirmation, keyed by symbol.
-   *
-   * Keyed by symbol because that is what `#confirmEntry` and reconciliation
-   * are keyed by, and a reservation that cannot be found from the confirming
-   * path is a reservation that never settles.
-   */
-  readonly #pendingSpend = new Map<string, GrantedAuthorization>();
-
   constructor(deps: ExecutorDependencies) {
     this.#exchange = deps.exchange;
     this.#marketData = deps.marketData;
     this.#audit = deps.audit;
     this.#killSwitch = deps.killSwitch;
     this.#config = validateRiskConfig(deps.config);
-    this.#spendAuthority = deps.spendAuthority ?? null;
     this.#now = deps.now ?? (() => Date.now());
     this.#sleep = deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.#setInterval = deps.setInterval ?? ((fn, ms) => setInterval(fn, ms));
@@ -401,63 +347,6 @@ export class TradeExecutor {
       return this.#rejectSignal(decision);
     }
 
-    /* -- Spend authority ------------------------------------------------- *
-     * Last, and only once the size is resolved: a budget is charged the
-     * notional actually about to be committed, not the one the signal asked
-     * for. Reserved *before* the order goes out, because a reservation made
-     * after the fact cannot refuse anything. */
-    if (this.#spendAuthority !== null) {
-      const authority = this.#spendAuthority;
-      let authorization: Authorization;
-      try {
-        authorization = await authority.guard.authorize(entryDraft(signal, decision, authority));
-      } catch (error) {
-        // The gate is unreachable, which is not the same as a refusal. We
-        // cannot tell whether this entry is within budget, and an unanswerable
-        // authorization question is never resolved in favour of spending.
-        this.registry.releaseSignal(signal.signalId);
-        return this.#rejectSignal({
-          ok: false,
-          reason: "SPEND_AUTHORITY_UNAVAILABLE",
-          detail: `spend authority could not be consulted: ${describe(error)}`,
-          signalId: signal.signalId,
-        });
-      }
-
-      if (!authorization.granted) {
-        this.registry.releaseSignal(signal.signalId);
-        return this.#rejectSignal({
-          ok: false,
-          reason: "SPEND_NOT_AUTHORIZED",
-          detail:
-            authorization.refusal === "DENIED"
-              ? `spend refused: ${describeRefusal(authorization.decision)}`
-              : // DUPLICATE and MISMATCH mean the guard has seen this request
-                // id before. The executor's own duplicate check normally
-                // catches that first; reaching here means the two disagree,
-                // and the safe reading of a disagreement about money is to
-                // not spend.
-                `spend not authorized: ${authorization.refusal}`,
-          signalId: signal.signalId,
-        });
-      }
-
-      this.#pendingSpend.set(signal.symbol, authorization);
-      this.#audit.record({
-        stage: "SIGNAL_VALIDATED",
-        at: this.#now(),
-        tradeId,
-        signalId: signal.signalId,
-        symbol: signal.symbol,
-        side: signal.side,
-        detail: {
-          spendAuthorized: baseUnitsToUsd(authorization.request.amount),
-          spendAccount: authority.account,
-          policyDigest: authorization.decision.policyDigest,
-        },
-      });
-    }
-
     this.#audit.record({
       stage: "SIGNAL_VALIDATED",
       at: this.#now(),
@@ -512,8 +401,6 @@ export class TradeExecutor {
         symbol: signal.symbol,
         error: `could not set leverage: ${describe(error)}`,
       });
-      // No order was submitted, so no exposure was taken.
-      await this.#releaseSpend(signal.symbol, tradeId, "a refused leverage change");
       return { accepted: false, tradeId, signalId: signal.signalId };
     }
 
@@ -569,8 +456,6 @@ export class TradeExecutor {
 
     if (!outcome || outcome.kind === "rejected") {
       const reason = outcome?.kind === "rejected" ? outcome.reason : "no outcome returned";
-      // A rejection is a definite no from the venue, unlike the throw above.
-      await this.#releaseSpend(signal.symbol, tradeId, "a rejected entry order");
       this.registry.transition(signal.symbol, "ENTRY_REJECTED", { closedAt: this.#now() });
       this.#audit.record({
         stage: "ENTRY_FAILED",
@@ -602,63 +487,6 @@ export class TradeExecutor {
     return { accepted: true, tradeId, signalId: signal.signalId };
   }
 
-  /**
-   * Releases a reservation for an entry that provably did not open.
-   *
-   * Only ever called where the executor *knows* nothing was committed — a
-   * rejected order, a refused leverage change, an exchange that reports no
-   * position. Where the outcome is merely unknown the reservation is left
-   * standing, because Art. XI §42 forbids assuming an action changed reality
-   * and the mirror of that is equally binding: we may not assume it did not.
-   * An unresolved reservation expires or is settled by reconciliation; a
-   * wrongly reversed one silently re-opens the budget it had consumed.
-   */
-  async #releaseSpend(symbol: string, tradeId: string, why: string): Promise<void> {
-    const pending = this.#pendingSpend.get(symbol);
-    if (pending === undefined) return;
-    this.#pendingSpend.delete(symbol);
-    try {
-      await pending.reverse();
-    } catch (error) {
-      // A ledger that will not accept the reversal must not take the trading
-      // loop down with it. The reservation expires on its own; the audit trail
-      // carries why it should not have.
-      this.#audit.record({
-        stage: "ENTRY_FAILED",
-        at: this.#now(),
-        tradeId,
-        symbol,
-        error: `spend reservation for ${why} could not be reversed: ${describe(error)}`,
-      });
-    }
-  }
-
-  /**
-   * Records what an entry actually committed, once the exchange confirms it.
-   *
-   * The figure comes from the venue's own report of size and entry price,
-   * never from the estimate that was reserved. An overage — a fill larger
-   * than authorised — is recorded rather than prevented, because by this
-   * point it has already happened; what it buys is that the *next* entry is
-   * judged against the truth.
-   */
-  async #settleSpend(symbol: string, tradeId: string, size: string, entryPrice: string): Promise<void> {
-    const pending = this.#pendingSpend.get(symbol);
-    if (pending === undefined) return;
-    this.#pendingSpend.delete(symbol);
-    try {
-      await pending.settle(confirmedNotional(size, entryPrice));
-    } catch (error) {
-      this.#audit.record({
-        stage: "ENTRY_FAILED",
-        at: this.#now(),
-        tradeId,
-        symbol,
-        error: `spend reservation could not be settled: ${describe(error)}`,
-      });
-    }
-  }
-
   /** Confirms the entry against exchange truth and begins monitoring. */
   async #confirmEntry(symbol: string, tradeId: string): Promise<void> {
     let account: AccountStateView;
@@ -667,11 +495,6 @@ export class TradeExecutor {
     } catch {
       // Unknown, not failed. Reconciliation resolves it; meanwhile the position
       // stays PENDING_ENTRY and is still watched.
-      //
-      // The spend reservation is left standing for the same reason. This is
-      // the UNKNOWN arm of Art. XI §42, and it resolves nothing in either
-      // direction — settling would record exposure that may not exist,
-      // reversing would free budget that may be committed.
       return;
     }
 
@@ -691,9 +514,6 @@ export class TradeExecutor {
           error: "the exchange reports no position after entry",
         });
       }
-      // The venue is telling us plainly that nothing opened. Definite, so the
-      // reservation is released rather than left to expire.
-      await this.#releaseSpend(symbol, tradeId, "an entry that never opened");
       return;
     }
 
@@ -707,13 +527,6 @@ export class TradeExecutor {
       lastObservedAt: account.observedAt,
     });
 
-    /* -- Settle the reservation against what the exchange actually opened --
-     * Art. XI §42: the loop closes only when a Sensor confirms. This is that
-     * confirmation, and it carries the true figure — a partial fill or a
-     * different average price makes the estimate wrong, and a budget charged
-     * the estimate is wrong from here on. */
-    await this.#settleSpend(symbol, tradeId, actual.size, actual.entryPrice);
-
     this.#audit.record({
       stage: "POSITION_OPEN",
       at: this.#now(),
@@ -722,7 +535,6 @@ export class TradeExecutor {
       side: opened.side,
       size: actual.size,
       price: actual.entryPrice,
-      detail: { notionalOpened: baseUnitsToUsd(confirmedNotional(actual.size, actual.entryPrice)) },
     });
 
     this.#attachMonitoring(opened);

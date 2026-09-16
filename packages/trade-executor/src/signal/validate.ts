@@ -47,12 +47,6 @@ export type RejectionReason =
   | "CONFLICTING_POSITION"
   | "MAX_CONCURRENT_POSITIONS"
   | "RISK_LIMIT_EXCEEDED"
-  // Spend authority (see `risk/spend-authority.ts`). Distinct from
-  // RISK_LIMIT_EXCEEDED because they answer different questions: a risk limit
-  // says this trade is too big, spend authority says this requester has had
-  // enough. Collapsing them would hide which control stopped the trade.
-  | "SPEND_NOT_AUTHORIZED"
-  | "SPEND_AUTHORITY_UNAVAILABLE"
   // Executor state
   | "KILL_SWITCH_ENGAGED"
   | "EXECUTOR_DEGRADED"

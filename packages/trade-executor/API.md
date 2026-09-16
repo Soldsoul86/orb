@@ -193,45 +193,6 @@ class TradeExecutor {
 }
 ```
 
-## Spend authority
-
-```ts
-const NOTIONAL_ASSET = "usd:notional";   // exposure opened, never cash
-const NOTIONAL_DECIMALS = 6;             // matches USDC
-const NOTIONAL_UNIT: AssetUnit;
-
-interface SpendAuthorityConfig {
-  account: string;            // the scope a budget is written against
-  requester?: Requester;      // default DELEGATE:signal-provider
-}
-interface SpendAuthority extends SpendAuthorityConfig { guard: SpendGuard }
-
-function usdToBaseUnits(usd: number): bigint;   // rounds UP, toward the limit
-function baseUnitsToUsd(amount: bigint): string;
-function entryDraft(signal, decision, config): SpendDraft;
-function confirmedNotional(size: string, entryPrice: string): bigint;
-```
-
-Passed as `ExecutorDependencies.spendAuthority`. Omitted, the executor is
-unchanged.
-
-`usdToBaseUnits` rounds **up** because the figure is compared against a
-ceiling; rounding a spend down is how a budget is exceeded a rounding error at
-a time. The conversion runs through a fixed-precision string, not a
-multiplication, because `1234.56 * 1e6` is not `1234560000` in binary floating
-point.
-
-`requestId` is `entry:<signalId>`, so a signal redelivered after a crash asks
-the same question and gets the same answer instead of reserving twice — the
-same reason the client order id is derived from the signal id.
-
-New `RejectionReason` members:
-
-| Reason | Means |
-| --- | --- |
-| `SPEND_NOT_AUTHORIZED` | The policy said no — over budget, or needs approvals |
-| `SPEND_AUTHORITY_UNAVAILABLE` | The gate could not be consulted. Never resolved in favour of trading |
-
 ## Ports
 
 `ExchangePort`, `MarketDataPort`, `AuditSink`, `Clock`. Implemented by the

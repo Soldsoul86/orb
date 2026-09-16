@@ -156,56 +156,61 @@ Nothing about the implementation forecloses any of the three specifications.
 3. Journal `RiskConfig` changes as events, so the threshold in force at any past
    moment is replayable rather than inferred.
 
-### Extension — the payment policy engine
+### Extension — the payment policy engine, and its extraction
 
-`packages/payment-policy` and `packages/payment-circuit` were built under the
-same deviation, recorded in `ROADMAP.md`. Two things changed about this entry
-as a result, one of them good.
+A spend-authorization engine was built under the same deviation, briefly wired
+into the trade executor, and then **extracted** to
+[Soldsoul86/allowance](https://github.com/Soldsoul86/allowance). This entry
+records what that leaves behind, because an extraction that only appears in a
+commit message is how a repository ends up lying about itself.
 
-**What it partly discharges.** The `Capability` item above observes that for
-the executor, *"human confirmation for irreversible actions is currently
-satisfied by configuration … rather than by a per-action authorization gate."*
-`payment-policy` **is** that per-action gate, built and tested — per-scope
-budgets, approval thresholds, attestation requirements, and a decision that
-recomputes identically from the journal. `CAPABILITY_MODEL.md` §5 now points
-at it.
+**What was learned, and still stands.** The `Capability` item above observes
+that for the executor, *"human confirmation for irreversible actions is
+currently satisfied by configuration … rather than by a per-action
+authorization gate."* A working per-action gate was built, and briefly proved
+the point: every entry authorised against a budget spanning time, reserved
+before the order went out, settled against the exchange's own report of what
+opened, left standing when the outcome was unknown. It also demonstrated a
+control `RiskConfig` cannot express at all — fifty entries each inside every
+per-trade limit, together a day nobody authorised.
 
-The debt is only partly discharged, and the remainder is stated plainly:
+**What it leaves open.** All of it. The integration was reverted with the
+extraction, because keeping it would have meant either the engine living in two
+repositories — Art. IX §33, and the copy that is not the source of truth is
+always the one that rots — or Orb's trading code depending on an external
+payments package in order to place an order. Neither is worth paying before the
+`Capability` contract exists to say what the integration should look like.
 
-- it gates **money**, not every irreversible action;
-- it is a library, not a `Capability` — it declares no permission tier,
-  because the contract that would carry one does not exist;
-- ~~**nothing in the runtime invokes it yet**, and the trade executor does not
-  use it. An authorization gate nobody calls authorizes nothing.~~ **Repaid.**
-  The executor now authorises every entry against it when a `spendAuthority`
-  is configured — reserved before the order goes out, settled against the
-  exchange's own report of what opened, released on a definite rejection, and
-  left standing when the outcome is unknown. See `risk/spend-authority.ts` and
-  `tests/acceptance/spend-authority.test.ts`.
+So: **nothing in this repository authorises an irreversible action per action.**
+That is the same position as before the experiment, now held knowingly rather
+than by omission, and with a reference implementation to build against when the
+contract lands.
 
-  This closes the gap the `Capability` item above named: human confirmation
-  for irreversible financial actions is no longer satisfied by configuration
-  alone. It also adds a control `RiskConfig` cannot express at all — a limit
-  that spans time rather than a trade.
+**The journal is now forked, and this is the real cost of the split.**
+`allowance` carries its own copy of the Event Journal, because the journal is
+Orb's single source of truth and could not leave, and because a payments
+library whose ledger is not a journal projection loses the property that makes
+its receipts checkable by a stranger.
 
-  Still open within it: the gate is **optional**, so a deployment that omits it
-  is unchanged (deliberate, Art. X §37, but it means the default is ungated);
-  and it covers entries only. A close is not authorised, on the grounds that
-  refusing to *reduce* exposure is not a safety property anyone wants — but
-  that is a judgement, not a specification, and the `Capability` contract
-  should settle it.
+Two copies of the same code will drift. There is no version of this that does
+not cost something:
 
-**What it adds.** `SpendPolicy` is a `Policy` in substance, exactly as
-`RiskConfig` is, and carries the same gap: a policy change is not itself
-journalled, so the policy in force at a past moment is inferred rather than
-replayed. `policyDigest` is recorded in every decision and every receipt,
-which makes a change *detectable* after the fact — the receipt will fail
-`POLICY_BINDING` against the wrong policy — but detectable is not replayable.
+- *One copy, `allowance` depends on `@orb/journal`* — couples an independent
+  library to this repository's release cadence, and asks an adopter to install
+  a personal-runtime package to authorise a payment.
+- *One copy, Orb depends on `@allowance/journal`* — Orb's own constitutional
+  core arrives from a payments package. Worse.
+- *Two copies* — chosen. They diverge slowly, and the divergence is visible in
+  two public repositories rather than hidden.
 
-**Repayment**, in addition to the three steps above:
+**Repayment.** When a `Capability` contract exists:
 
-4. Express the guard as a `Capability` with the irreversible tier declared.
-   *(The routing half is done — see the extension above. What remains is the
-   tier declaration, which needs the contract.)*
-5. Journal `SpendPolicy` versions as events, so a decision replays against the
-   policy that actually produced it rather than the policy on disk today.
+4. Express an authorization gate as a `Capability` with the irreversible tier
+   declared, and route the executor's order submission through it. The
+   extracted engine is the worked example of what that gate should do; whether
+   Orb depends on it or grows its own is a decision for that contract, not for
+   now.
+5. Decide the journal fork deliberately — reconverge on one copy, or state in
+   both repositories that they are separate lineages and stop calling them the
+   same thing.
+

@@ -8,7 +8,6 @@
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "references": [
     { "path": "../../runtime/journal" },
-    { "path": "../hyperliquid" },
-    { "path": "../payment-policy" }
+    { "path": "../hyperliquid" }
   ]
 }

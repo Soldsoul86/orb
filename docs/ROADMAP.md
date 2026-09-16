@@ -129,9 +129,11 @@ them when they are accepted. Recorded in `ARCHITECTURAL_DEBT.md`.
 
 ### Amendment — the payment policy engine
 
-An executable spend-authorization engine (`packages/payment-policy`,
-`packages/payment-circuit`) was built ahead of this phase's gate, at the
-operator's explicit direction. Recorded here for the same reason as the
+An executable spend-authorization engine was built ahead of this phase's gate,
+at the operator's explicit direction. It has since been **extracted** to
+[Soldsoul86/allowance](https://github.com/Soldsoul86/allowance) and no longer
+lives in this repository; the record stays because the deviation happened and
+the reasoning still governs what may be built here. Recorded here for the same reason as the
 executor above: phases are sequential, and a deviation that is not written
 down is not a deviation, it is a lie of omission.
 
@@ -166,11 +168,14 @@ requirement rather than a new idea beside it:
 executor* becomes *a payment may be requested by anyone; **spend authority
 belongs to the policy***.
 
-**Outstanding debt.** The same three contracts. The engine is now invoked by
-the trade executor — every entry is authorised against it when a
-`spendAuthority` is configured — but it is still a library rather than a
-`Capability` with a declared permission tier, and the gate is optional so the
-default remains ungated. Recorded in `ARCHITECTURAL_DEBT.md`.
+**Outstanding debt.** The same three contracts, and the gap the engine was meant
+to close is open again *here*: nothing in this repository authorises an
+irreversible action per action. A trial integration routed the trade executor's
+entries through the engine; it was reverted with the extraction, because
+keeping it would have meant either a copy of the engine in two repositories or
+Orb's trading code depending on an external payments package to place an order.
+Neither is worth it before the `Capability` contract exists to say what the
+integration should look like. Recorded in `ARCHITECTURAL_DEBT.md`.
 
 ---
 
