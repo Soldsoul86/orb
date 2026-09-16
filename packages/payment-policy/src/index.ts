@@ -46,8 +46,33 @@ export { systemClock, ManualClock } from "./clock.js";
 export type { LedgerStore } from "./store.js";
 export { MemoryLedgerStore, LedgerProjection, LedgerStoreError } from "./store.js";
 
-export { JournalLedgerStore, applyLedgerEvent, LEDGER_SCHEMA, RESERVED, SETTLED, REVERSED } from "./journal-store.js";
+export {
+  JournalLedgerStore,
+  applyLedgerEvent,
+  requestIdOf,
+  LEDGER_SCHEMA,
+  RESERVED,
+  SETTLED,
+  REVERSED,
+} from "./journal-store.js";
 export type { JournalLedgerStoreOptions } from "./journal-store.js";
+
+export {
+  RECEIPT_VERSION,
+  buildReceipt,
+  encodeReceipt,
+  receiptDigest,
+  verifyReceipt,
+  explainVerification,
+} from "./receipt.js";
+export type {
+  SpendReceipt,
+  ReceiptOutcome,
+  BuildReceiptInput,
+  ReceiptCheck,
+  CheckStatus,
+  VerificationResult,
+} from "./receipt.js";
 
 export { reconcile } from "./reconcile.js";
 export type {

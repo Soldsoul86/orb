@@ -93,6 +93,36 @@ budget, and comes back next sweep. A reconciler that resolved uncertainty by
 assumption would be worse than none, because it would look authoritative
 while guessing.
 
+## Receipts you can check without trusting the issuer
+
+Most audit trails are an assertion: *"our system authorised this, here is our
+log."* The log and the claim have the same author, so a reader who does not
+already trust the issuer learns nothing.
+
+A receipt here carries the request, the policy and the ledger the decision was
+made against — so a reader **re-runs the decision themselves**. That is only
+possible because `evaluate` reads no clock and performs no I/O. Determinism is
+usually defended as a testing convenience; this is what it is actually for.
+
+```
+node scripts/receipt.mjs
+
+VERIFIED — every check passed
+  ok    FACTS_INTACT          2 event(s) hash to their contents
+  ok    POLICY_BINDING        policy matches digest b6cccd650e6c
+  ok    DECISION_REPRODUCES   recomputed independently: ALLOW
+  ok    OUTCOME_CONSISTENT    events and outcome agree on SETTLED
+```
+
+Edit one number and `DECISION_REPRODUCES` reports *"recomputing gives DENY,
+receipt claims ALLOW"*.
+
+Full recomputation needs the ledger as it stood, which contains your other
+transactions — fine for an auditor, not always for a counterparty. So `policy`
+and `ledgerContext` can be omitted, and verification then reports `PARTIAL`
+with the skipped checks named. **Redaction costs you a check; it never
+silently passes one.**
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

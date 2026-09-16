@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **109 tests, all passing.** (503 across the repo.)
+`npm test -w @orb/payment-policy` — **123 tests, all passing.** (517 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -142,6 +142,24 @@ not yet stale are never examined; settled entries are never touched.
 The last test walks the full cycle: decide, act, fail indeterminately, hold
 the budget, observe, close.
 
+### Receipts (`receipt.test.ts`)
+
+Six tampering tests carry this file, because a receipt that can be quietly
+altered is a log with extra steps. An edited amount fails
+`DECISION_REPRODUCES` — *"recomputing gives DENY, receipt claims ALLOW"*. A
+swapped policy fails `POLICY_BINDING`. An altered journal event fails
+`FACTS_INTACT`. An outcome the events do not support, events belonging to a
+different request, and an unknown receipt version all fail their own check.
+
+Redaction is tested as carefully as verification: a receipt without the ledger
+reports `PARTIAL` with `DECISION_REPRODUCES` **skipped, not passed**, while
+`FACTS_INTACT` and `POLICY_BINDING` still pass. A redacted receipt whose
+outcome has been forged still fails outright — redaction weakens the proof, it
+does not disable it.
+
+The wire form is checked for lossless `bigint` encoding (decimal strings,
+never `Number`) and stable hashing.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -156,6 +174,9 @@ the budget, observe, close.
   would need its own tests there.
 - **Real observers.** `ScriptedObserver` drives the reconciler; a vendor
   adapter is tested where the adapter lives.
+- **Receipt signatures.** A receipt is *verifiable* — its contents recompute —
+  but it is not yet *attributable*: nothing proves which issuer produced it.
+  That needs a key, and keys belong to the layer above this one.
 - **Performance under a large ledger.** `spentWithin` is linear by design
   (`DESIGN.md` → Known limits). No benchmark is asserted because no threshold
   has been agreed; asserting an arbitrary one would be theatre.

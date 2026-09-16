@@ -262,3 +262,45 @@ declares what it cost (or, with `0n`, that it cost nothing).
 `{granted: false, refusal: "DENIED", decision}`, or
 `{granted: false, refusal: "DUPLICATE", existing}`. Granted authorizations
 carry `settle(actual)` and `reverse()`.
+
+## Receipts
+
+```ts
+interface SpendReceipt {
+  version: number; issuedAt: number;
+  request: SpendRequest;
+  decision: Decision;
+  policy: SpendPolicy | null;                    // null = redacted
+  ledgerContext: readonly LedgerEntry[] | null;  // null = redacted
+  facts: readonly OrbEvent[];                    // journal events, self-verifying
+  outcome: { state: LedgerState; amount: Amount };
+}
+
+function buildReceipt(input: BuildReceiptInput): SpendReceipt;
+function encodeReceipt(receipt: SpendReceipt): string;   // canonical; amounts as strings
+function receiptDigest(receipt: SpendReceipt): string;   // sha256 hex
+function verifyReceipt(receipt: SpendReceipt): VerificationResult;
+function explainVerification(result: VerificationResult): string;
+```
+
+`verifyReceipt` consults no network and no issuer storage — everything is
+recomputed from the receipt's own contents.
+
+| Check | Proves | Skipped when |
+|---|---|---|
+| `VERSION` | the shape is understood | — |
+| `FACTS_INTACT` | each journal event hashes to its own contents | no events attached |
+| `FACTS_MATCH_REQUEST` | the events concern this request | no events attached |
+| `POLICY_BINDING` | the decision was made under the attached policy | policy redacted |
+| `DECISION_REPRODUCES` | **the decision was correct**, by recomputation | policy or ledger redacted |
+| `OUTCOME_CONSISTENT` | the stated outcome matches the events | no events attached |
+
+`verified` is true only when every check ran and passed. `partial` is true when
+everything checkable passed but something was redacted.
+
+```ts
+class JournalLedgerStore {
+  factsFor(requestId: string): readonly OrbEvent[];   // the evidence a receipt carries
+}
+function requestIdOf(event: OrbEvent): string | null;
+```

@@ -68,6 +68,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** The request a ledger event concerns, or `null` if it is not a ledger event. */
+export function requestIdOf(event: OrbEvent): string | null {
+  if (event.schema.id !== LEDGER_SCHEMA.id) return null;
+  if (!isRecord(event.payload)) return null;
+  const id = event.payload["requestId"];
+  return typeof id === "string" ? id : null;
+}
+
 /**
  * Applies one journal event to the projection.
  *
@@ -131,6 +139,12 @@ export interface JournalLedgerStoreOptions {
 export class JournalLedgerStore implements LedgerStore {
   readonly #journal: Journal;
   readonly #projection = new LedgerProjection();
+  /**
+   * The events behind each request, kept so a receipt can carry its own
+   * evidence. Holding references costs nothing — the events are immutable and
+   * already in memory — and it saves a receipt from rescanning history.
+   */
+  readonly #facts = new Map<string, OrbEvent[]>();
   #unsubscribe: (() => void) | null = null;
 
   private constructor(journal: Journal) {
@@ -141,11 +155,31 @@ export class JournalLedgerStore implements LedgerStore {
   static async open(options: JournalLedgerStoreOptions): Promise<JournalLedgerStore> {
     const store = new JournalLedgerStore(options.journal);
     const history = orderEvents(await options.journal.readAll());
-    for (const event of history) applyLedgerEvent(store.#projection, event);
+    for (const event of history) store.#apply(event);
     store.#unsubscribe = options.journal.subscribe((events) => {
-      for (const event of events) applyLedgerEvent(store.#projection, event);
+      for (const event of events) store.#apply(event);
     });
     return store;
+  }
+
+  #apply(event: OrbEvent): void {
+    if (!applyLedgerEvent(this.#projection, event)) return;
+    const requestId = requestIdOf(event);
+    if (requestId === null) return;
+    const existing = this.#facts.get(requestId);
+    if (existing) existing.push(event);
+    else this.#facts.set(requestId, [event]);
+  }
+
+  /**
+   * The journal events behind one request, in the order they were applied.
+   *
+   * This is the evidence a receipt carries: each event still hashes to its own
+   * contents, so a reader can check nothing was edited after the fact without
+   * needing the rest of the lane.
+   */
+  factsFor(requestId: string): readonly OrbEvent[] {
+    return this.#facts.get(requestId) ?? [];
   }
 
   /** Stops following the journal. The journal itself is the caller's to close. */

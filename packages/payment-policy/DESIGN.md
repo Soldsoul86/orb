@@ -265,6 +265,25 @@ block every decision in the process — and only the resulting write is
 serialised. One unreachable vendor is recorded and skipped rather than
 abandoning the sweep.
 
+## Receipts: why determinism was worth the constraints
+
+Every restriction in the engine — no clock, no I/O, no oracle, time supplied on
+the request — was paid for somewhere. This is where it is collected.
+
+Because `evaluate` is a pure function of `(request, policy, ledger)`, a receipt
+that carries all three lets a reader **recompute the decision and compare**.
+That converts an audit trail from an assertion by the issuer into something a
+stranger can check. A conventional log cannot do this at any level of detail,
+because the log and the claim have the same author.
+
+The trade-off is disclosure: full recomputation needs the ledger as it stood,
+and that ledger holds your other transactions. So `policy` and `ledgerContext`
+are optional, and `verifyReceipt` reports each check separately with
+`SKIPPED` distinct from `PASS`. A verifier that silently downgraded a skipped
+check to a pass would be worse than no verifier, so `verified` requires that
+*nothing* was skipped, and a weaker result is labelled `PARTIAL` rather than
+quietly counted as success.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -292,3 +311,7 @@ abandoning the sweep.
 - **Reconciliation is only as good as its sensor.** An observer that returns a
   confident wrong number writes it into an immutable ledger. `UNKNOWN` is
   always the safer answer.
+- **A receipt is verifiable but not yet attributable.** Its contents recompute,
+  and altering them is detected — but nothing in it proves *who* issued it.
+  Attribution needs a signing key, and keys belong to the layer above this one,
+  not to a package that deliberately holds none.
