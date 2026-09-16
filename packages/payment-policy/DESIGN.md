@@ -315,6 +315,41 @@ Like a receipt, a quote is verifiable but not attributable — it proves *what*
 was promised, not *who* promised it. Signing belongs in the layer that holds
 keys, and this package deliberately holds none.
 
+## Signing: the check almost everyone forgets
+
+A valid signature proves a key signed these bytes. It does **not** prove the
+signer was entitled to the identity the payload claims. If a quote says
+`issuer: "vendor:messages-api"`, a correct signature from *some* key proves
+nothing about that vendor.
+
+So `PublicKeyRecord.speaksFor` names the identities a key may sign for, and
+`verifySignatures` refuses a technically perfect signature from a key outside
+its remit. `KEY_NOT_AUTHORIZED` is a separate outcome from `BAD_SIGNATURE`
+because they are different events: one is a forgery, the other a real party
+signing outside what it was entitled to. A verifier that returned "invalid" for
+both would hide which of those had happened.
+
+An empty `speaksFor` attributes nothing. That is the right default for a key
+whose remit was never stated.
+
+**Time belongs to the signature, not the verifier.** Key validity is checked
+against `signedAt`, so rotating a key does not invalidate everything it ever
+signed — otherwise every historical receipt breaks on the day you rotate.
+Compromise is a separate switch: `revoked` fails regardless of when the key
+signed, and reports itself distinctly, because a reader needs to tell "forged"
+from "genuine, by a key we no longer trust".
+
+Malformed input never throws out of verification. A bad key or a truncated
+signature reads as *not verified*, never as a crash in the middle of deciding
+whether to trust a payment.
+
+**This package holds no keys.** `Signer` is a port; the reference Ed25519
+implementation captures a caller-supplied private key in a closure so it is not
+reachable from the object, cannot be serialised by accident, and is not printed
+by a debugger walking the signer. Generating, storing and destroying key
+material belongs to whoever owns the identity, not to a library that also
+decides whether payments are allowed.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -342,7 +377,11 @@ keys, and this package deliberately holds none.
 - **Reconciliation is only as good as its sensor.** An observer that returns a
   confident wrong number writes it into an immutable ledger. `UNKNOWN` is
   always the safer answer.
-- **A receipt is verifiable but not yet attributable.** Its contents recompute,
-  and altering them is detected — but nothing in it proves *who* issued it.
-  Attribution needs a signing key, and keys belong to the layer above this one,
-  not to a package that deliberately holds none.
+- **Key distribution is out of scope.** `KeyDirectory` resolves an id to a
+  record; how you learn that record — a registry, a DNS record, a certificate
+  chain, a file someone handed you — is the hard part of any PKI and is not
+  solved here. The directory is synchronous so verification stays replayable,
+  which means a remote directory must be snapshotted before use.
+- **One algorithm.** Ed25519 only. `SignatureAlgorithm` is a union so adding
+  another is an addition the compiler then enforces everywhere, but nothing
+  else is implemented today.

@@ -341,3 +341,55 @@ means the evidence exists and was withheld — the result is `PARTIAL`.
 `NOT_APPLICABLE` means there is nothing to check (a refused request reserved
 nothing; an unquoted payment has no ceiling), and does **not** downgrade an
 otherwise complete receipt.
+
+## Signing
+
+```ts
+interface Signature { keyId: string; algorithm: "ed25519"; value: string; signedAt: number }
+interface Signed<T> { payload: T; signatures: readonly Signature[] }
+
+interface Signer { readonly keyId: string; readonly algorithm: "ed25519";
+                   sign(bytes: Buffer, signedAt: number): string }
+
+interface PublicKeyRecord {
+  keyId: string; algorithm: "ed25519"; publicKeyPem: string;
+  speaksFor: readonly string[];      // identities this key may sign for
+  notBefore: number; notAfter: number | null;
+  revoked: boolean;                  // compromise; fails whenever it signed
+}
+
+interface KeyDirectory { publicKey(keyId: string): PublicKeyRecord | undefined }
+class MemoryKeyDirectory implements KeyDirectory { constructor(records?); add(record) }
+```
+
+`KeyDirectory` is synchronous so verification stays replayable: a caller with a
+remote directory resolves first and verifies against that snapshot.
+
+| Function | Notes |
+|---|---|
+| `ed25519Signer(keyId, privateKeyPem)` | Key captured in a closure, never on the object |
+| `sign(payload, signer, signedAt)` | `Signed<T>` over the payload's canonical bytes |
+| `countersign(signed, signer, signedAt)` | Adds a signature without disturbing the first |
+| `verifySignatures(signed, directory, identity)` | `SignatureVerification` |
+| `signQuote` / `verifySignedQuote` | Identity is `quote.issuer` |
+| `signReceipt` / `verifySignedReceipt` | Identity defaults to `request.account` |
+| `explainAttribution(result)` | Human-readable report |
+
+`attributed` requires a signature that is both cryptographically sound **and**
+made by a key entitled to the claimed identity.
+
+`SignatureRejection`: `UNKNOWN_KEY`, `ALGORITHM_MISMATCH`, `KEY_NOT_AUTHORIZED`,
+`KEY_NOT_YET_VALID`, `KEY_EXPIRED`, `KEY_REVOKED`, `BAD_SIGNATURE`, `MALFORMED`.
+
+## Canonical encoding
+
+```ts
+function toWire(value: unknown): unknown;        // bigint -> decimal string
+function canonicalText(value: unknown): string;  // sorted keys, no whitespace
+function canonicalBytes(value: unknown): Buffer; // what signatures are made over
+function digestOf(value: unknown): string;       // sha256 hex
+```
+
+One encoder, used by quotes, receipts and signatures alike. Two encoders that
+agree today diverge after one is edited, and then a signature made by one fails
+under the other for no visible reason.

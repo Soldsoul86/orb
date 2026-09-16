@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **145 tests, all passing.** (539 across the repo.)
+`npm test -w @orb/payment-policy` — **162 tests, all passing.** (556 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -185,6 +185,31 @@ good receipt could never read as verified, which is how a verifier teaches
 people to ignore it. A v1 receipt is also tested to still verify, because a
 contract accepted at v1 is permanent.
 
+### Signing (`signing.test.ts`)
+
+The test that carries this file is the authorised-key one, because it is the
+failure real systems ship: a signature that is **cryptographically perfect**,
+made by a key with no right to the name on the payload. It reports
+`KEY_NOT_AUTHORIZED`, and a separate test proves that is a different outcome
+from `BAD_SIGNATURE` — the compiler will not even let the two be compared,
+which is the point. A key that speaks for nobody attributes nothing.
+
+Keys over time: rotating a key does **not** invalidate what it already signed
+(validity is judged against `signedAt`); a signature made after the key left
+service is `KEY_EXPIRED`; before it came into service, `KEY_NOT_YET_VALID`; and
+a revoked key fails whenever it signed, reported as `KEY_REVOKED` rather than a
+forgery.
+
+Malformed input never crashes the decision: unknown key id, empty signature,
+base64 that is not a signature, and no signatures at all each return a reason
+instead of throwing.
+
+Multiple signers: both parties can vouch for one payload and each is verified
+against its own identity; one bad signature does not sink a good one.
+
+Custody: the signer does not carry its private key on the object (checked by
+serialising it), and signing is deterministic over canonical bytes.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -199,10 +224,10 @@ contract accepted at v1 is permanent.
   would need its own tests there.
 - **Real observers.** `ScriptedObserver` drives the reconciler; a vendor
   adapter is tested where the adapter lives.
-- **Receipt and quote signatures.** Both are *verifiable* — their contents
-  recompute and tampering is caught — but neither is *attributable*: nothing
-  proves which issuer produced them. That needs a key, and keys belong to the
-  layer above this one.
+- **Key distribution.** Tests use `MemoryKeyDirectory`. Learning which key
+  speaks for whom — a registry, DNS, a certificate chain — is the hard part of
+  any PKI and is not solved or tested here.
+- **Algorithms other than Ed25519.** None are implemented.
 - **Transport.** `PaymentRequired` is the 402 payload as data; carrying it over
   HTTP, and the rails in `accepts`, belong to an adapter.
 - **Performance under a large ledger.** `spentWithin` is linear by design

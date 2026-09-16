@@ -92,6 +92,33 @@ export type {
   VerificationResult,
 } from "./receipt.js";
 
+/* -- Attribution ---------------------------------------------------------- */
+export type {
+  Signature,
+  SignatureAlgorithm,
+  Signed,
+  Signer,
+  PublicKeyRecord,
+  KeyDirectory,
+  SignatureRejection,
+  SignatureCheck,
+  SignatureVerification,
+} from "./signing.js";
+export {
+  MemoryKeyDirectory,
+  ed25519Signer,
+  sign,
+  countersign,
+  verifySignatures,
+  explainAttribution,
+  signQuote,
+  verifySignedQuote,
+  signReceipt,
+  verifySignedReceipt,
+} from "./signing.js";
+
+export { toWire, canonicalText, canonicalBytes, digestOf } from "./wire.js";
+
 export { reconcile } from "./reconcile.js";
 export type {
   SpendObserver,

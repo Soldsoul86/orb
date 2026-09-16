@@ -29,8 +29,9 @@
  * reports exactly which checks it could and could not perform — a verifier
  * that quietly downgraded would be worse than one that refuses.
  */
-import { canonicalJson, verifyEvent, type OrbEvent } from "@orb/journal";
-import { createHash } from "node:crypto";
+import { verifyEvent, type OrbEvent } from "@orb/journal";
+
+import { canonicalText, digestOf } from "./wire.js";
 
 import type { Amount, SpendRequest } from "./model.js";
 import type { SpendPolicy } from "./policy.js";
@@ -107,34 +108,14 @@ export function buildReceipt(input: BuildReceiptInput): SpendReceipt {
 
 /* -- Wire form ------------------------------------------------------------ */
 
-/**
- * Amounts become decimal strings on the wire.
- *
- * `canonicalJson` refuses `bigint`, and it is right to: JSON has no
- * unambiguous encoding for one, and a `Number` would silently round a receipt
- * for a large payment into a lie.
- */
-function toWire(value: unknown): unknown {
-  if (typeof value === "bigint") return value.toString(10);
-  if (Array.isArray(value)) return value.map(toWire);
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([, v]) => v !== undefined)
-        .map(([k, v]) => [k, toWire(v)]),
-    );
-  }
-  return value;
-}
-
-/** Canonical bytes for a receipt: key order fixed, amounts as decimal strings. */
+/** Canonical bytes for a receipt. See `wire.ts` for why amounts are strings. */
 export function encodeReceipt(receipt: SpendReceipt): string {
-  return canonicalJson(toWire(receipt));
+  return canonicalText(receipt);
 }
 
 /** The receipt's content hash. Two receipts with the same facts hash alike. */
 export function receiptDigest(receipt: SpendReceipt): string {
-  return createHash("sha256").update(encodeReceipt(receipt), "utf8").digest("hex");
+  return digestOf(receipt);
 }
 
 /* -- Verification --------------------------------------------------------- */
@@ -255,7 +236,7 @@ export function verifyReceipt(receipt: SpendReceipt): VerificationResult {
     );
   } else {
     const recomputed = evaluate(receipt.request, receipt.policy, receipt.ledgerContext);
-    const same = canonicalJson(toWire(recomputed)) === canonicalJson(toWire(receipt.decision));
+    const same = canonicalText(recomputed) === canonicalText(receipt.decision);
     checks.push(
       same
         ? pass("DECISION_REPRODUCES", `recomputed independently: ${recomputed.outcome}`)

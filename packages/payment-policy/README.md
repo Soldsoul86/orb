@@ -154,6 +154,39 @@ optional buyer and request bindings (so it cannot be replayed).
 unapproved counterparty. No new rule kind was needed for "do I trust this
 seller" — it falls out.
 
+## Signing — proving *who*, not just *what*
+
+A quote and a receipt already prove what was promised: their contents hash, and
+editing them is caught. Neither proves **who** promised it. Anyone can mint a
+quote claiming to be your vendor, and nothing in the quote objects.
+
+```
+node scripts/signed-quote.mjs
+
+  ok    vendor-key-1                        speaks for vendor:messages-api
+  FAIL  vendor-key-1  [BAD_SIGNATURE]       signature does not match the payload
+  FAIL  impostor-key  [KEY_NOT_AUTHORIZED]  may speak for [vendor:someone-else],
+                                            not vendor:messages-api
+  FAIL  burned-key    [KEY_REVOKED]         burned-key has been revoked
+```
+
+**The third line is the one that matters.** That signature is
+cryptographically perfect — the maths checks out completely. The signer is
+simply not that vendor. A verifier that only checked the signature would
+accept it. So a key in the directory declares what it `speaksFor`, and an
+unauthorised signer is a distinct outcome from a forgery, because they mean
+completely different things.
+
+Key validity is judged against **when the payload was signed**, not against
+now — rotating a key must not invalidate everything it ever signed. Compromise
+is separate: a `revoked` key fails whenever it signed, and reports
+`KEY_REVOKED` rather than a generic failure, because a reader needs to tell
+"this was forged" from "this was genuine, by a key we no longer trust".
+
+The package holds no keys. `Signer` is a port; the reference Ed25519
+implementation takes a private key you supply and keeps it in a closure, so it
+cannot be read back off the object. Custody stays yours.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

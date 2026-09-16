@@ -38,10 +38,8 @@
  * boundary applies to receipts, and it is drawn in the same place for the same
  * reason.
  */
-import { canonicalJson } from "@orb/journal";
-import { createHash } from "node:crypto";
-
 import type { Amount, AssetId, Requester } from "./model.js";
+import { digestOf } from "./wire.js";
 import type { SpendDraft } from "./guard.js";
 
 /** What is being bought, named by hash so the description stays private. */
@@ -108,10 +106,7 @@ export interface QuoteContext {
 
 /** A quote's content hash. Two quotes promising the same thing hash alike. */
 export function quoteDigest(quote: Quote): string {
-  const wire = Object.fromEntries(
-    Object.entries(quote).map(([k, v]) => [k, typeof v === "bigint" ? v.toString(10) : v]),
-  );
-  return createHash("sha256").update(canonicalJson(wire), "utf8").digest("hex");
+  return digestOf(quote);
 }
 
 /**
