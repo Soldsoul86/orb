@@ -284,6 +284,37 @@ check to a pass would be worse than no verifier, so `verified` requires that
 *nothing* was skipped, and a weaker result is labelled `PARTIAL` rather than
 quietly counted as success.
 
+## Quotes: moving the unknown to the party that knows it
+
+`scripts/agent-budget.mjs` iteration 9 is the honest failure in this package:
+a call authorised at an estimate of 5,000 that really consumed 40,000
+completes, and the guard can only record the damage. It is listed under Known
+limits below as something nothing outside the call can prevent.
+
+That is true of the *buyer*. It is not true of the exchange. The buyer cannot
+know the cost in advance because the seller decides it — so a quote asks the
+seller to state a ceiling, and the buyer authorises that ceiling rather than a
+guess. The authorisation becomes exact not because the estimate improved but
+because the counterparty is bound.
+
+The consequences are worth naming:
+
+- **A refusal now happens before the spend, not after.** A ceiling above
+  policy is rejected while nothing has been consumed.
+- **An overcharge changes category.** An estimate that ran long is nobody's
+  fault. Charging past a ceiling you published is a broken promise, and
+  `QUOTE_HONOURED` names it with the amount.
+- **Counterparty trust needed no new rule.** `quotedDraft` puts the seller's
+  payee in `destination`, so `DESTINATION_ALLOWLIST` already answers "do I
+  deal with this seller".
+
+Expiry is exclusive, for the same reason the sentinel's breach is `>=`: a
+deadline you can sit exactly on is not a deadline.
+
+Like a receipt, a quote is verifiable but not attributable — it proves *what*
+was promised, not *who* promised it. Signing belongs in the layer that holds
+keys, and this package deliberately holds none.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every

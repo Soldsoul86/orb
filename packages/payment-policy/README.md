@@ -123,6 +123,37 @@ and `ledgerContext` can be omitted, and verification then reports `PARTIAL`
 with the skipped checks named. **Redaction costs you a check; it never
 silently passes one.**
 
+## Quotes — the seller's half
+
+A quote is usually described as telling the buyer the price. That undersells
+it. A quote is the seller **committing to a ceiling**, and that commitment
+fixes a hole the buyer cannot close alone.
+
+The guard authorises whatever the caller estimated and cannot interrupt a call
+already in flight, so a call budgeted at 1,000 that really burns 40,000
+completes. No cleverness on the buyer's side fixes that — the buyer does not
+know the cost until the seller decides it.
+
+A quote moves the unknown to the party that knows it. The seller states a
+maximum, the buyer authorises **that maximum**, and a seller charging past it
+is no longer an accident to absorb but a broken promise, named in the receipt.
+
+```
+node scripts/quoted-call.mjs
+
+  ok    QUOTE_HONOURED   charged 3100 of a 4000 ceiling (900 unused)
+  FAIL  QUOTE_HONOURED   charged 7400 against a 4000 ceiling — over by 3400
+```
+
+Quotes carry an expiry (a price with no expiry is not a price), a subject
+digest (so a cheap quote cannot be presented for an expensive delivery), and
+optional buyer and request bindings (so it cannot be replayed).
+
+`quotedDraft(quote, …)` puts the seller's payee in the request's
+`destination`, so an ordinary `DESTINATION_ALLOWLIST` refuses a quote from an
+unapproved counterparty. No new rule kind was needed for "do I trust this
+seller" — it falls out.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

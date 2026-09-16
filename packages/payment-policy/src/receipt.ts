@@ -38,8 +38,19 @@ import { policyDigest } from "./policy.js";
 import type { Decision } from "./evaluate.js";
 import { evaluate } from "./evaluate.js";
 import type { LedgerEntry, LedgerState } from "./ledger.js";
+import type { Quote } from "./quote.js";
+import { assessQuote, settlementAgainstQuote } from "./quote.js";
 
-export const RECEIPT_VERSION = 1;
+/**
+ * Current receipt shape.
+ *
+ * Version 2 adds the quote a payment was made against. Art. X §37 — the kernel
+ * evolves through addition, never mutation — so a v1 receipt remains valid
+ * forever and simply has no quote to check. The verifier accepts both and says
+ * which checks it could run.
+ */
+export const RECEIPT_VERSION = 2;
+export const SUPPORTED_RECEIPT_VERSIONS: readonly number[] = [1, 2];
 
 export interface ReceiptOutcome {
   readonly state: LedgerState;
@@ -59,6 +70,11 @@ export interface SpendReceipt {
   /** The journal events behind this request, each self-verifying. */
   readonly facts: readonly OrbEvent[];
   readonly outcome: ReceiptOutcome;
+  /**
+   * The seller's commitment this payment was made against. `null` when the
+   * payment was not quoted, or on a v1 receipt.
+   */
+  readonly quote: Quote | null;
 }
 
 export interface BuildReceiptInput {
@@ -71,6 +87,8 @@ export interface BuildReceiptInput {
   readonly policy?: SpendPolicy;
   /** Omit to redact. */
   readonly ledgerContext?: readonly LedgerEntry[];
+  /** The quote this payment answered, when there was one. */
+  readonly quote?: Quote;
 }
 
 export function buildReceipt(input: BuildReceiptInput): SpendReceipt {
@@ -83,6 +101,7 @@ export function buildReceipt(input: BuildReceiptInput): SpendReceipt {
     ledgerContext: input.ledgerContext ?? null,
     facts: input.facts,
     outcome: input.outcome,
+    quote: input.quote ?? null,
   };
 }
 
@@ -120,7 +139,22 @@ export function receiptDigest(receipt: SpendReceipt): string {
 
 /* -- Verification --------------------------------------------------------- */
 
-export type CheckStatus = "PASS" | "FAIL" | "SKIPPED";
+/**
+ * Why a check did not pass, distinguished with care.
+ *
+ * `SKIPPED` and `NOT_APPLICABLE` look alike and mean opposite things.
+ * `SKIPPED` says the evidence exists and was withheld — the receipt is
+ * weaker than it could be, so the result is only `PARTIAL`.
+ * `NOT_APPLICABLE` says there is nothing to check: a refused request has no
+ * ledger facts because nothing was reserved, and an unquoted payment has no
+ * ceiling to breach. Neither is a gap, and neither should downgrade a
+ * receipt that is otherwise complete.
+ *
+ * Collapsing the two would mean a perfectly good receipt for an unquoted
+ * payment could never read as verified — which is how a verifier teaches
+ * people to ignore it.
+ */
+export type CheckStatus = "PASS" | "FAIL" | "SKIPPED" | "NOT_APPLICABLE";
 
 export interface ReceiptCheck {
   readonly name: string;
@@ -138,7 +172,14 @@ export interface VerificationResult {
 
 const pass = (name: string, detail: string): ReceiptCheck => ({ name, status: "PASS", detail });
 const fail = (name: string, detail: string): ReceiptCheck => ({ name, status: "FAIL", detail });
+/** The evidence exists but was withheld. Weakens the receipt. */
 const skip = (name: string, detail: string): ReceiptCheck => ({ name, status: "SKIPPED", detail });
+/** There is nothing here to check. Does not weaken anything. */
+const moot = (name: string, detail: string): ReceiptCheck => ({
+  name,
+  status: "NOT_APPLICABLE",
+  detail,
+});
 
 /**
  * Checks a receipt without trusting whoever issued it.
@@ -153,14 +194,19 @@ export function verifyReceipt(receipt: SpendReceipt): VerificationResult {
 
   /* 1. Is this a shape we understand? A future version may mean anything. */
   checks.push(
-    receipt.version === RECEIPT_VERSION
+    SUPPORTED_RECEIPT_VERSIONS.includes(receipt.version)
       ? pass("VERSION", `receipt version ${receipt.version}`)
       : fail("VERSION", `unsupported receipt version ${receipt.version}`),
   );
 
   /* 2. Does each journal event still hash to its own contents? */
+  const reserved = receipt.decision.outcome === "ALLOW";
   if (receipt.facts.length === 0) {
-    checks.push(skip("FACTS_INTACT", "receipt carries no journal events"));
+    checks.push(
+      reserved
+        ? skip("FACTS_INTACT", "request was allowed but no journal events are attached")
+        : moot("FACTS_INTACT", `nothing was reserved: decision was ${receipt.decision.outcome}`),
+    );
   } else {
     const broken = receipt.facts.filter((event) => !verifyEvent(event));
     checks.push(
@@ -181,7 +227,7 @@ export function verifyReceipt(receipt: SpendReceipt): VerificationResult {
   );
   checks.push(
     receipt.facts.length === 0
-      ? skip("FACTS_MATCH_REQUEST", "no events to match")
+      ? moot("FACTS_MATCH_REQUEST", "no events to match")
       : foreign.length === 0
         ? pass("FACTS_MATCH_REQUEST", `all events name ${receipt.request.requestId}`)
         : fail("FACTS_MATCH_REQUEST", `${foreign.length} event(s) name a different request`),
@@ -223,16 +269,28 @@ export function verifyReceipt(receipt: SpendReceipt): VerificationResult {
   /* 6. Does the stated outcome match what the events say happened? */
   checks.push(outcomeCheck(receipt));
 
-  const ran = checks.filter((c) => c.status !== "SKIPPED");
-  const failed = ran.some((c) => c.status === "FAIL");
-  const skipped = checks.some((c) => c.status === "SKIPPED");
+  /* 7. Did the seller keep the promise it made? */
+  checks.push(quoteCheck(receipt));
 
-  return { verified: !failed && !skipped, partial: !failed && skipped, checks };
+  const failed = checks.some((c) => c.status === "FAIL");
+  // Only a withheld check weakens the result. A check with nothing to examine
+  // is not a gap in the evidence.
+  const withheld = checks.some((c) => c.status === "SKIPPED");
+
+  return { verified: !failed && !withheld, partial: !failed && withheld, checks };
+}
+
+function reservedOutcome(receipt: SpendReceipt): boolean {
+  return receipt.decision.outcome === "ALLOW";
 }
 
 function outcomeCheck(receipt: SpendReceipt): ReceiptCheck {
   const last = receipt.facts.at(-1);
-  if (last === undefined) return skip("OUTCOME_CONSISTENT", "no events to compare against");
+  if (last === undefined) {
+    return reservedOutcome(receipt)
+      ? skip("OUTCOME_CONSISTENT", "request was allowed but no journal events are attached")
+      : moot("OUTCOME_CONSISTENT", "no events to compare against");
+  }
 
   const expected: Record<string, LedgerState> = {
     "payment.reserved": "PENDING",
@@ -264,6 +322,54 @@ function outcomeCheck(receipt: SpendReceipt): ReceiptCheck {
   return pass("OUTCOME_CONSISTENT", `events and outcome agree on ${impliedState}`);
 }
 
+/**
+ * Holds the seller to its own ceiling.
+ *
+ * Unlike an estimate that ran long, an overcharge here is a broken
+ * commitment: somebody stated a maximum and then exceeded it. The check also
+ * refuses a quote that was already expired when the request was made, or one
+ * bound to a different buyer or request — a quote nobody checks the bindings
+ * on is just a price tag.
+ */
+function quoteCheck(receipt: SpendReceipt): ReceiptCheck {
+  const quote = receipt.quote;
+  if (quote === null) return moot("QUOTE_HONOURED", "payment was not made against a quote");
+
+  const assessment = assessQuote(quote, {
+    now: receipt.request.requestedAt,
+    audience: receipt.request.account,
+    requestId: receipt.request.requestId,
+  });
+  if (!assessment.usable) {
+    return fail("QUOTE_HONOURED", `quote was not usable: ${assessment.reason} — ${assessment.detail}`);
+  }
+
+  if (quote.asset !== receipt.request.asset) {
+    return fail("QUOTE_HONOURED", `quote prices ${quote.asset}, request moves ${receipt.request.asset}`);
+  }
+  if (quote.payTo !== receipt.request.destination) {
+    return fail("QUOTE_HONOURED", `quote pays ${quote.payTo}, request pays ${receipt.request.destination}`);
+  }
+
+  // A reversal charged nothing, so there is no ceiling to breach.
+  if (receipt.outcome.state === "REVERSED") {
+    return pass("QUOTE_HONOURED", "reversed; nothing was charged");
+  }
+
+  const settlement = settlementAgainstQuote(quote, receipt.outcome.amount);
+  return settlement.honoured
+    ? pass(
+        "QUOTE_HONOURED",
+        `charged ${settlement.charged} of a ${quote.maxAmount} ceiling ` +
+          `(${settlement.headroom} unused)`,
+      )
+    : fail(
+        "QUOTE_HONOURED",
+        `charged ${settlement.charged} against a ${quote.maxAmount} ceiling — ` +
+          `over by ${settlement.exceededBy}`,
+      );
+}
+
 /** A short human-readable verification report. */
 export function explainVerification(result: VerificationResult): string {
   const header = result.verified
@@ -271,7 +377,12 @@ export function explainVerification(result: VerificationResult): string {
     : result.partial
       ? "PARTIAL — everything checkable passed, but some evidence was redacted"
       : "FAILED";
-  const mark: Record<CheckStatus, string> = { PASS: "ok  ", FAIL: "FAIL", SKIPPED: "  - " };
+  const mark: Record<CheckStatus, string> = {
+    PASS: "ok  ",
+    FAIL: "FAIL",
+    SKIPPED: "held",
+    NOT_APPLICABLE: "  - ",
+  };
   const body = result.checks
     .map((c) => `  ${mark[c.status]}  ${c.name}\n        ${c.detail}`)
     .join("\n");

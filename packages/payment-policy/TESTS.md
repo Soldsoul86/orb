@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **123 tests, all passing.** (517 across the repo.)
+`npm test -w @orb/payment-policy` — **145 tests, all passing.** (539 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -160,6 +160,31 @@ does not disable it.
 The wire form is checked for lossless `bigint` encoding (decimal strings,
 never `Number`) and stable hashing.
 
+### Quotes (`quote.test.ts`)
+
+The test that matters proves a quote closes the hole the buyer cannot: the
+same guard, the same 5,000 per-call limit. **Unquoted**, a caller guessing
+1,000 that really burns 40,000 completes and the ledger records 40,000 after
+the fact. **Quoted**, a ceiling of 40,000 is refused outright and nothing is
+reserved.
+
+Also: expiry is exclusive — sitting exactly on the deadline is too late, one
+millisecond earlier is fine; quotes from the future, for another buyer, or for
+another request are refused; charging exactly the ceiling is honoured and one
+unit over is a broken promise with `exceededBy`; and an unapproved seller is
+refused by an ordinary `DESTINATION_ALLOWLIST`, with no rule kind added for it.
+
+In a receipt, `QUOTE_HONOURED` catches an overcharge (*"over by 2100"*), an
+expired quote, a quote addressed to a different buyer, and a payee that is not
+where the money went.
+
+**`NOT_APPLICABLE` is tested against `SKIPPED` deliberately.** An unquoted
+payment verifies *fully* — nothing to check is not a gap — while a withheld
+ledger still downgrades to `PARTIAL`. Collapsing the two would mean a perfectly
+good receipt could never read as verified, which is how a verifier teaches
+people to ignore it. A v1 receipt is also tested to still verify, because a
+contract accepted at v1 is permanent.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -174,9 +199,12 @@ never `Number`) and stable hashing.
   would need its own tests there.
 - **Real observers.** `ScriptedObserver` drives the reconciler; a vendor
   adapter is tested where the adapter lives.
-- **Receipt signatures.** A receipt is *verifiable* — its contents recompute —
-  but it is not yet *attributable*: nothing proves which issuer produced it.
-  That needs a key, and keys belong to the layer above this one.
+- **Receipt and quote signatures.** Both are *verifiable* — their contents
+  recompute and tampering is caught — but neither is *attributable*: nothing
+  proves which issuer produced them. That needs a key, and keys belong to the
+  layer above this one.
+- **Transport.** `PaymentRequired` is the 402 payload as data; carrying it over
+  HTTP, and the rails in `accepts`, belong to an adapter.
 - **Performance under a large ledger.** `spentWithin` is linear by design
   (`DESIGN.md` → Known limits). No benchmark is asserted because no threshold
   has been agreed; asserting an arbitrary one would be theatre.

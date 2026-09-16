@@ -304,3 +304,40 @@ class JournalLedgerStore {
 }
 function requestIdOf(event: OrbEvent): string | null;
 ```
+
+## Quotes
+
+```ts
+interface Quote {
+  quoteId: string;
+  issuer: string;                  // identifier; nothing here proves it
+  subject: { kind: string; digest: string };   // what is being bought, by hash
+  asset: AssetId;
+  maxAmount: Amount;               // the ceiling: the seller may charge less, never more
+  payTo: string;                   // becomes the request's destination
+  issuedAt: number;
+  expiresAt: number;               // exclusive
+  audience: string | null;         // bound to one buyer, or bearer
+  requestId: string | null;        // bound to one request, or any
+}
+
+interface PaymentRequired { quote: Quote; accepts: readonly string[] }
+```
+
+| Function | Notes |
+|---|---|
+| `quoteDigest(quote)` | 64-char SHA-256 hex over a canonical encoding |
+| `assessQuote(quote, { now, audience, requestId })` | `MALFORMED`, `NOT_YET_VALID`, `EXPIRED`, `WRONG_AUDIENCE`, `WRONG_REQUEST`, or usable. Pure — the instant arrives in the context |
+| `quotedDraft(quote, { requestId, account, requester, requestedAt, memo? })` | A `SpendDraft` whose `amount` is the **quoted ceiling** and whose `destination` is `payTo` |
+| `settlementAgainstQuote(quote, charged)` | `{honoured: true, headroom}` or `{honoured: false, exceededBy}` |
+
+A receipt may carry the quote; `verifyReceipt` then runs `QUOTE_HONOURED`,
+which checks the bindings, the payee, the asset and the ceiling.
+
+### Check statuses
+
+`SKIPPED` and `NOT_APPLICABLE` look alike and mean opposite things. `SKIPPED`
+means the evidence exists and was withheld — the result is `PARTIAL`.
+`NOT_APPLICABLE` means there is nothing to check (a refused request reserved
+nothing; an unquoted payment has no ceiling), and does **not** downgrade an
+otherwise complete receipt.

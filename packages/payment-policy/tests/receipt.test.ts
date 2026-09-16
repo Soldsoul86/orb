@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 
 import { Journal, MemoryJournalStore } from "@orb/journal";
 
-import type { SpendPolicy, SpendReceipt } from "../src/index.js";
+import type { Quote, SpendPolicy, SpendReceipt } from "../src/index.js";
 import {
   ANY_REQUESTER,
   JournalLedgerStore,
@@ -213,5 +213,103 @@ describe("the wire form", () => {
     const a = await spendAndReceipt("call-1");
     const b = await spendAndReceipt("call-2");
     ok(receiptDigest(a) !== receiptDigest(b));
+  });
+});
+
+
+/* -- Quotes: holding the seller to its own ceiling ------------------------ */
+
+const quote = (overrides: Partial<Quote> = {}): Quote => ({
+  quoteId: "q-1",
+  issuer: "vendor:messages-api",
+  subject: { kind: "api.call", digest: "a".repeat(64) },
+  asset: TOKENS,
+  maxAmount: 4_000n,
+  payTo: "vendor:messages-api",
+  issuedAt: T0 - 1_000,
+  expiresAt: T0 + 60_000,
+  audience: null,
+  requestId: null,
+  ...overrides,
+});
+
+/** Same spend, now made against a seller's commitment. */
+async function quotedReceipt(q: Quote, charged: bigint): Promise<SpendReceipt> {
+  const base = await spendAndReceipt("call-1", 4_000n);
+  return {
+    ...base,
+    quote: q,
+    outcome: { state: "SETTLED", amount: charged },
+  };
+}
+
+describe("quotes in a receipt", () => {
+  it("passes when the seller charged inside its ceiling", async () => {
+    const result = verifyReceipt(await quotedReceipt(quote(), 3_100n));
+    const check = result.checks.find((c) => c.name === "QUOTE_HONOURED");
+    strictEqual(check?.status, "PASS");
+    ok(check.detail.includes("900 unused"));
+  });
+
+  it("catches a seller charging past its own ceiling", async () => {
+    // Not an estimate that ran long — somebody promised this would not happen.
+    const receipt = await quotedReceipt(quote({ maxAmount: 1_000n }), 3_100n);
+    const result = verifyReceipt(receipt);
+    strictEqual(result.verified, false);
+    const check = result.checks.find((c) => c.name === "QUOTE_HONOURED");
+    strictEqual(check?.status, "FAIL");
+    ok(check.detail.includes("over by 2100"));
+  });
+
+  it("refuses a quote that had already expired when the request was made", async () => {
+    const result = verifyReceipt(await quotedReceipt(quote({ expiresAt: T0 - 1 }), 3_100n));
+    strictEqual(result.verified, false);
+    ok(
+      result.checks
+        .find((c) => c.name === "QUOTE_HONOURED")
+        ?.detail.includes("EXPIRED"),
+    );
+  });
+
+  it("refuses a quote addressed to a different buyer", async () => {
+    const result = verifyReceipt(await quotedReceipt(quote({ audience: "acct:someone-else" }), 3_100n));
+    strictEqual(result.verified, false);
+    ok(
+      result.checks
+        .find((c) => c.name === "QUOTE_HONOURED")
+        ?.detail.includes("WRONG_AUDIENCE"),
+    );
+  });
+
+  it("refuses a quote whose payee is not where the money went", async () => {
+    const result = verifyReceipt(await quotedReceipt(quote({ payTo: "vendor:elsewhere" }), 3_100n));
+    strictEqual(result.verified, false);
+    ok(result.checks.find((c) => c.name === "QUOTE_HONOURED")?.detail.includes("quote pays"));
+  });
+});
+
+describe("not applicable is not the same as withheld", () => {
+  it("an unquoted payment still verifies fully", async () => {
+    const result = verifyReceipt(await spendAndReceipt());
+    strictEqual(result.checks.find((c) => c.name === "QUOTE_HONOURED")?.status, "NOT_APPLICABLE");
+    // Nothing to check is not a gap in the evidence.
+    strictEqual(result.verified, true);
+    strictEqual(result.partial, false);
+  });
+
+  it("a withheld ledger downgrades, a missing quote does not", async () => {
+    const redacted = verifyReceipt(await spendAndReceipt("call-1", 4_000n, { ledger: true }));
+    strictEqual(redacted.partial, true);
+    strictEqual(redacted.checks.find((c) => c.name === "DECISION_REPRODUCES")?.status, "SKIPPED");
+    strictEqual(redacted.checks.find((c) => c.name === "QUOTE_HONOURED")?.status, "NOT_APPLICABLE");
+  });
+
+  it("a v1 receipt remains valid forever", async () => {
+    // Art. X §38: a contract accepted at v1 is permanent.
+    const modern = await spendAndReceipt();
+    const legacy: SpendReceipt = { ...modern, version: 1 };
+    const result = verifyReceipt(legacy);
+    strictEqual(result.checks.find((c) => c.name === "VERSION")?.status, "PASS");
+    strictEqual(result.verified, true);
   });
 });

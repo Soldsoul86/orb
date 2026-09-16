@@ -57,8 +57,26 @@ export {
 } from "./journal-store.js";
 export type { JournalLedgerStoreOptions } from "./journal-store.js";
 
+export type {
+  Quote,
+  QuoteSubject,
+  PaymentRequired,
+  QuoteAssessment,
+  QuoteRejection,
+  QuoteContext,
+  QuotedDraftInput,
+  QuoteSettlement,
+} from "./quote.js";
+export {
+  quoteDigest,
+  assessQuote,
+  quotedDraft,
+  settlementAgainstQuote,
+} from "./quote.js";
+
 export {
   RECEIPT_VERSION,
+  SUPPORTED_RECEIPT_VERSIONS,
   buildReceipt,
   encodeReceipt,
   receiptDigest,
