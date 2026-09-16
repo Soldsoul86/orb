@@ -127,9 +127,9 @@ export function distinctApprovers(request: SpendRequest): readonly string[] {
  * - **`memo`** — cosmetic.
  *
  * The encoding is `wire.ts`'s canonical form: sorted keys, amounts as decimal
- * strings. Note for anyone comparing against RFC 8785 (JCS), which some
- * protocols mandate: this is canonical and deterministic but is not that
- * standard. It never emits a float, which is where the two would differ.
+ * strings. It conforms to RFC 8785 (JCS), which some protocols mandate — see
+ * `tests/jcs.test.ts`, which measures it against the RFC rather than restating
+ * the claim.
  */
 export function requestIntent(request: SpendRequest): string {
   return digestOf({

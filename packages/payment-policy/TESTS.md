@@ -211,6 +211,21 @@ good receipt could never read as verified, which is how a verifier teaches
 people to ignore it. A v1 receipt is also tested to still verify, because a
 contract accepted at v1 is permanent.
 
+### Canonical encoding conforms to RFC 8785 (`jcs.test.ts`)
+
+Nine tests measure the encoder against the JSON Canonicalization Scheme rather
+than against our own description of it. The worked example from RFC 8785 §3.2.3
+must match byte for byte; keys sort by UTF-16 code unit, not codepoint (the
+surrogate-pair case, where `U+10000` sorts *before* `U+FFFF`); numbers use the
+ECMAScript `Number::toString` forms the RFC mandates (`1e+30`, `1e-7`,
+`333333333.3333333`), and `-0` encodes as `0`; `NaN`, `Infinity` and `undefined`
+are refused rather than silently encoded.
+
+This file exists because conformance had been *documented as a known gap* for
+several revisions, on the assumption it did not conform. Nobody had checked.
+It did. The tests are what makes that a fact rather than a second assumption,
+and what stops a future change from quietly breaking interop.
+
 ### Signing (`signing.test.ts`)
 
 The test that carries this file is the authorised-key one, because it is the
@@ -236,6 +251,17 @@ against its own identity; one bad signature does not sink a good one.
 Custody: the signer does not carry its private key on the object (checked by
 serialising it), and signing is deterministic over canonical bytes.
 
+**Dispositions.** Eleven tests pin the five-way taxonomy, and the pair that
+earns them is the unknown key against the unreachable directory: the first is
+`signer_authority_failed`, the second `signer_resolution_failed`, and nothing in
+the bytes distinguishes them — only what the directory said. The rest cover each
+disposition at its source (authorised key, remit, revocation, tampering), the
+ranking across several signatures (a definite "no" outranks "could not tell"),
+an unsigned payload taking the most serious disposition rather than the
+gentlest, a sound signature with no identity claimed reaching `binding_only`
+and stopping there, and `explainAttribution` printing the disposition rather
+than just a verdict.
+
 ### Transport (`transport.test.ts`)
 
 Held to a different standard, because it reads bytes a stranger wrote.
@@ -251,6 +277,11 @@ base64, base64 of a non-object, of an array, of `null`, truncated JSON, missing
 signatures, empty signatures — each return a reason from both decoders. A
 200KB header is refused as `TOO_LARGE`, and an unknown signature algorithm is
 refused at the boundary rather than passed inward.
+
+**An outage is not an accusation.** A correctly signed authorisation presented
+to a seller whose key directory is unreachable is refused as
+`ATTRIBUTION_INDETERMINATE`, never `NOT_ATTRIBUTED`. The buyer did nothing
+wrong, and the seller should retry rather than blame them.
 
 **Round trips preserve the signature.** A challenge is signed, encoded,
 decoded, and re-signed — the two signatures must match byte for byte. If the

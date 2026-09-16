@@ -353,9 +353,12 @@ policy changed, still gets the original `ALLOW` — re-deciding would tell a
 caller its payment was refused when it was in fact allowed and may already
 have happened.
 
-The canonical encoding is `wire.ts`'s. For anyone comparing against protocols
-that mandate **RFC 8785 (JCS)**: this is canonical and deterministic but is not
-that standard. It never emits a float, which is where the two would differ.
+The canonical encoding is `wire.ts`'s, and it **conforms to RFC 8785 (JCS)** —
+measured against the RFC, not asserted (`tests/jcs.test.ts`). Protocols that
+mandate JCS by name are satisfied by it. One deliberate narrowing: a `bigint`
+is encoded as a decimal *string* before canonicalisation, because JSON has no
+bigint and a float would lose base units. That is a choice about the value's
+JSON shape, made before JCS runs, not a divergence from JCS.
 
 ## Receipts
 
@@ -452,28 +455,71 @@ interface PublicKeyRecord {
   revoked: boolean;                  // compromise; fails whenever it signed
 }
 
-interface KeyDirectory { publicKey(keyId: string): PublicKeyRecord | undefined }
+type KeyLookup =
+  | { found: true; record: PublicKeyRecord }
+  | { found: false; reason: "UNKNOWN" | "UNAVAILABLE"; detail: string };
+
+interface KeyDirectory { publicKey(keyId: string): KeyLookup }
 class MemoryKeyDirectory implements KeyDirectory { constructor(records?); add(record) }
 ```
 
 `KeyDirectory` is synchronous so verification stays replayable: a caller with a
-remote directory resolves first and verifies against that snapshot.
+remote directory resolves first and verifies against that snapshot — and reports
+`UNAVAILABLE` if that resolution failed. `UNKNOWN` ("no such key") and
+`UNAVAILABLE` ("could not look") are different facts, and a directory that
+collapses them hands its own outage to the verifier as an accusation.
 
 | Function | Notes |
 |---|---|
 | `ed25519Signer(keyId, privateKeyPem)` | Key captured in a closure, never on the object |
 | `sign(payload, signer, signedAt)` | `Signed<T>` over the payload's canonical bytes |
 | `countersign(signed, signer, signedAt)` | Adds a signature without disturbing the first |
-| `verifySignatures(signed, directory, identity)` | `SignatureVerification` |
+| `verifySignatures(signed, directory, identity?)` | `SignatureVerification`; omit `identity` to ask only whether the bytes bind |
 | `signQuote` / `verifySignedQuote` | Identity is `quote.issuer` |
 | `signReceipt` / `verifySignedReceipt` | Identity defaults to `request.account` |
 | `explainAttribution(result)` | Human-readable report |
 
-`attributed` requires a signature that is both cryptographically sound **and**
-made by a key entitled to the claimed identity.
+```ts
+interface SignatureVerification {
+  identity: string | null;        // the claim checked against, or null
+  disposition: Disposition;       // the strongest across all signatures
+  attributed: boolean;            // disposition === "authentic"
+  checks: readonly SignatureCheck[];
+}
+```
 
-`SignatureRejection`: `UNKNOWN_KEY`, `ALGORITHM_MISMATCH`, `KEY_NOT_AUTHORIZED`,
-`KEY_NOT_YET_VALID`, `KEY_EXPIRED`, `KEY_REVOKED`, `BAD_SIGNATURE`, `MALFORMED`.
+`attributed` requires a signature that is both cryptographically sound **and**
+made by a key entitled to the claimed identity. `disposition` says how far
+verification got when it did not, because the four ways of falling short call
+for different responses:
+
+| `Disposition` | Means | What a reader should do |
+|---|---|---|
+| `authentic` | Sound signature, key authorised for the claimed identity | Rely on it |
+| `binding_only` | Sound signature, no identity claimed | Bytes bind; authorship unestablished |
+| `signer_authority_failed` | The directory answered: this key may not speak for that identity | Investigate the key |
+| `signer_resolution_failed` | The directory could not be consulted | Retry — this says nothing about the signer |
+| `signature_invalid` | The bytes do not verify | Treat as tampering |
+
+Ranked best-first in that order, so the strongest outcome across several
+signatures wins. A definite "no" outranks "could not tell", and tampering is
+surfaced last so it is never hidden by a softer result.
+
+Passing no `identity` reaches `binding_only` at best: there is no claim to check
+the signer against. That is the right question when inspecting a payload whose
+claimed identity you have not yet decided to trust, and the wrong one when
+deciding whether to act on it.
+
+An unsigned payload reports `signature_invalid`, not a gentler disposition —
+absence must never read better than a bad signature.
+
+`SignatureRejection` (the specific cause, retained alongside the disposition):
+`UNKNOWN_KEY`, `DIRECTORY_UNAVAILABLE`, `ALGORITHM_MISMATCH`,
+`KEY_NOT_AUTHORIZED`, `KEY_NOT_YET_VALID`, `KEY_EXPIRED`, `KEY_REVOKED`,
+`BAD_SIGNATURE`, `MALFORMED`.
+
+Adopted from the [Cycles evidence spec](https://github.com/runcycles/cycles-protocol),
+which draws this line better than the boolean it replaces.
 
 ## Canonical encoding
 
@@ -527,8 +573,13 @@ is the real gate. A second, weaker validator would become a second opinion
 people trusted by mistake. **Run `verifySignedReceipt` and `verifyReceipt`
 before believing a decoded settlement.**
 
-`AdmissionRejection`: `NOT_ATTRIBUTED`, `WRONG_QUOTE`, `QUOTE_EXPIRED`,
-`ASSET_MISMATCH`, `AMOUNT_MISMATCH`.
+`AdmissionRejection`: `NOT_ATTRIBUTED`, `ATTRIBUTION_INDETERMINATE`,
+`WRONG_QUOTE`, `QUOTE_EXPIRED`, `ASSET_MISMATCH`, `AMOUNT_MISMATCH`.
+
+`ATTRIBUTION_INDETERMINATE` is the seller's own key directory being unreachable
+(`signer_resolution_failed`), never a judgement about the buyer. Retry it; do
+not blacklist the buyer, and do not deliver. Collapsing it into
+`NOT_ATTRIBUTED` turns an outage into an accusation.
 
 ## Commitments
 

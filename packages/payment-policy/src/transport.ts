@@ -328,6 +328,13 @@ export function decodeSettlement(
 
 export type AdmissionRejection =
   | "NOT_ATTRIBUTED"
+  /**
+   * The signer could not be resolved, so attribution is unknown rather than
+   * refused. A seller that treats this as `NOT_ATTRIBUTED` turns its own
+   * directory outage into an accusation against the buyer. Retry; do not
+   * blacklist, and do not deliver.
+   */
+  | "ATTRIBUTION_INDETERMINATE"
   | "WRONG_QUOTE"
   | "QUOTE_EXPIRED"
   | "ASSET_MISMATCH"
@@ -365,10 +372,12 @@ export function admitPayment(input: AdmissionInput): Admission {
   const attribution = verifySignatures(authorization, directory, payload.account);
   if (!attribution.attributed) {
     const first = attribution.checks[0];
-    return reject(
-      "NOT_ATTRIBUTED",
-      `not signed by ${payload.account}: ${first?.reason ?? "no signatures"}`,
-    );
+    const why = `${attribution.disposition}: ${first?.reason ?? "no signatures"}`;
+    // "I could not check" is not "this is forged". Kept apart here because
+    // this is the point where the distinction costs someone money.
+    return attribution.disposition === "signer_resolution_failed"
+      ? reject("ATTRIBUTION_INDETERMINATE", `could not resolve the signer of ${payload.account}: ${why}`)
+      : reject("NOT_ATTRIBUTED", `not signed by ${payload.account}: ${why}`);
   }
 
   const expected = quoteDigest(quote);

@@ -343,6 +343,38 @@ Malformed input never throws out of verification. A bad key or a truncated
 signature reads as *not verified*, never as a crash in the middle of deciding
 whether to trust a payment.
 
+### A boolean was the wrong answer
+
+For several revisions `verifySignatures` answered with `attributed: boolean`.
+That is the same conflation the paragraph above criticises, one level up: it
+collapses *four different failures* into one word, and the four call for
+opposite responses. "The directory timed out" and "this key has no right to
+this name" are not the same event, and a seller that treats the first like the
+second bills its own outage to the buyer.
+
+So verification now reports a `disposition` — `authentic`, `binding_only`,
+`signer_authority_failed`, `signer_resolution_failed`, `signature_invalid` —
+ranked best-first, with `attributed` kept as a convenience for
+`disposition === "authentic"`. The taxonomy is adopted from the
+[Cycles evidence spec](https://github.com/runcycles/cycles-protocol) rather than
+invented here; they drew the line first and drew it correctly.
+
+Three consequences are deliberate:
+
+- **`KeyDirectory` had to change with it.** A lookup returning
+  `PublicKeyRecord | undefined` cannot express "I could not look" at all, so the
+  disposition could never have been derived honestly downstream. It now returns
+  a `KeyLookup` that names `UNKNOWN` or `UNAVAILABLE`.
+- **An unsigned payload takes `signature_invalid`,** the most serious
+  disposition, not a gentler one. Absence must never read better than a bad
+  signature.
+- **`admitPayment` gained `ATTRIBUTION_INDETERMINATE`,** because this is where
+  the distinction costs someone money: a seller whose directory is down should
+  retry, not refuse the buyer and not deliver.
+
+The specific `SignatureRejection` survives alongside the disposition. The
+disposition says what kind of failure it was; the rejection says which one.
+
 **This package holds no keys.** `Signer` is a port; the reference Ed25519
 implementation captures a caller-supplied private key in a closure so it is not
 reachable from the object, cannot be serialised by accident, and is not printed
@@ -642,9 +674,14 @@ wrong.
   result.** The value an operation returned is the caller's data — arbitrary
   and potentially large — and is not stored. Protocols that require replay to
   reproduce the full original response body want more than this.
-- **The canonical encoding is not RFC 8785.** It is canonical and
-  deterministic, and never emits a float — which is where the two would differ
-  — but a protocol that mandates JCS by name is not satisfied by it.
+- ~~**The canonical encoding is not RFC 8785.**~~ It is. This sat in this list
+  for several revisions on the strength of an assumption nobody had tested.
+  When it was finally measured against the RFC — the §3.2.3 worked example,
+  UTF-16 code-unit key ordering across a surrogate pair, the ECMAScript number
+  forms — it already conformed on every point. `tests/jcs.test.ts` now holds it
+  there. The lesson worth keeping is not about JSON: a limitation recorded
+  without being measured is a guess wearing the clothes of a known issue, and
+  it cost interop credibility for nothing.
 - **Approvals are counted, not verified.** Stated in the README and the code.
   The shell must authenticate them first.
 - **No settlement.** This package decides; it does not act, watch, or confirm.

@@ -104,6 +104,8 @@ export type {
   Signer,
   PublicKeyRecord,
   KeyDirectory,
+  KeyLookup,
+  Disposition,
   SignatureRejection,
   SignatureCheck,
   SignatureVerification,

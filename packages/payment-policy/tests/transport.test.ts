@@ -215,6 +215,23 @@ describe("the seller's admission check", () => {
     strictEqual(result.admitted, true);
   });
 
+  it("does not turn its own directory outage into an accusation", () => {
+    // The buyer did everything right; the seller could not look the key up.
+    // Refusing this as NOT_ATTRIBUTED would blame the buyer for the seller's
+    // outage — and a retry, not an investigation, is the correct response.
+    const result = admitPayment({
+      authorization: present(authorization()),
+      quote,
+      directory: {
+        publicKey: () => ({ found: false, reason: "UNAVAILABLE", detail: "directory timed out" }),
+      },
+      now: T0,
+    });
+    strictEqual(result.admitted, false);
+    if (result.admitted) return;
+    strictEqual(result.reason, "ATTRIBUTION_INDETERMINATE");
+  });
+
   it("refuses an authorization signed by somebody else", () => {
     const stranger = identity("stranger-key", ["acct:not-this-buyer"]);
     const result = admitPayment({
