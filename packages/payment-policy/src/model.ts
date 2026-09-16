@@ -14,6 +14,7 @@
  */
 
 import type { Attestation } from "./attestation.js";
+import { digestOf } from "./wire.js";
 
 /**
  * An asset identifier, opaque to this package.
@@ -102,4 +103,40 @@ export interface SpendRequest {
 /** Distinct approver identities on a request. Three signatures from one person are one approval. */
 export function distinctApprovers(request: SpendRequest): readonly string[] {
   return [...new Set(request.approvals.map((a) => a.approver))].sort();
+}
+
+/**
+ * A fingerprint of what this request would actually move.
+ *
+ * An idempotency key promises "the same request, twice, spends once". That
+ * promise is only worth something if *the same request* is checked rather than
+ * merely the same key: otherwise a client that reuses an id with a different
+ * amount is quietly told "already done" about something else entirely.
+ *
+ * What is included is exactly what determines where money goes and how much:
+ * the account, the requester, the asset, the amount and the destination.
+ *
+ * What is deliberately excluded matters just as much, because a fingerprint
+ * that is too wide rejects honest retries:
+ *
+ * - **`requestedAt`** — the shell stamps it from a clock, so a genuine retry
+ *   carries a later instant. Including it would make every retry a mismatch.
+ * - **`approvals` and `attestations`** — a retry may carry *more* of them,
+ *   collected in the meantime. They change whether a spend is permitted, never
+ *   what the spend is.
+ * - **`memo`** — cosmetic.
+ *
+ * The encoding is `wire.ts`'s canonical form: sorted keys, amounts as decimal
+ * strings. Note for anyone comparing against RFC 8785 (JCS), which some
+ * protocols mandate: this is canonical and deterministic but is not that
+ * standard. It never emits a float, which is where the two would differ.
+ */
+export function requestIntent(request: SpendRequest): string {
+  return digestOf({
+    account: request.account,
+    requester: request.requester,
+    asset: request.asset,
+    amount: request.amount,
+    destination: request.destination,
+  });
 }

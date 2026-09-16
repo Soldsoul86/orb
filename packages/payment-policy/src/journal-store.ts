@@ -38,7 +38,15 @@ import type { LedgerEntry } from "./ledger.js";
 import type { LedgerStore } from "./store.js";
 import { LedgerProjection, LedgerStoreError } from "./store.js";
 
-export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 1 };
+/**
+ * Version 2 adds `intent` to `payment.reserved`.
+ *
+ * Art. X §37 — the kernel evolves through addition. A v1 event carries no
+ * fingerprint and replays with `intent: ""`, meaning "cannot be compared";
+ * such a reservation falls back to plain duplicate detection rather than
+ * failing to load.
+ */
+export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 2 };
 
 export const RESERVED = "payment.reserved";
 export const SETTLED = "payment.settled";
@@ -53,6 +61,8 @@ interface ReservedPayload {
   readonly destination: string;
   readonly requester: Requester;
   readonly at: number;
+  /** Absent on v1 events. */
+  readonly intent?: string;
 }
 
 interface SettledPayload {
@@ -103,6 +113,8 @@ export function applyLedgerEvent(projection: LedgerProjection, event: OrbEvent):
         requester: p.requester,
         at: p.at,
         state: "PENDING",
+        // A v1 event has none. Unknown, never guessed at.
+        intent: typeof p.intent === "string" ? p.intent : "",
       });
       return true;
     }
@@ -215,6 +227,7 @@ export class JournalLedgerStore implements LedgerStore {
       destination: entry.destination,
       requester: entry.requester,
       at: entry.at,
+      intent: entry.intent,
     };
     await this.#journal.appendOne({ type: RESERVED, schema: LEDGER_SCHEMA, payload });
   }

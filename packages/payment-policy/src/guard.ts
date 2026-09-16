@@ -28,6 +28,7 @@
  * may well have been spent, which is the expensive direction to be wrong in.
  */
 import type { Approval, Amount, AssetId, Requester, SpendRequest } from "./model.js";
+import { requestIntent } from "./model.js";
 import type { Attestation } from "./attestation.js";
 import type { SpendPolicy } from "./policy.js";
 import type { Decision } from "./evaluate.js";
@@ -106,6 +107,21 @@ export type Authorization =
       readonly refusal: "DUPLICATE";
       readonly request: SpendRequest;
       readonly existing: LedgerEntry;
+    }
+  /**
+   * The id has been seen, but for a different spend.
+   *
+   * Distinct from `DUPLICATE` because the two mean opposite things. A
+   * duplicate is a safe retry to be absorbed; this is a client contradicting
+   * itself, and answering "already done" would tell it a payment succeeded
+   * that nobody ever authorised.
+   */
+  | {
+      readonly granted: false;
+      readonly refusal: "MISMATCH";
+      readonly request: SpendRequest;
+      readonly existing: LedgerEntry;
+      readonly detail: string;
     };
 
 /** What the operation is handed. */
@@ -136,6 +152,12 @@ export type GuardOutcome<T> =
     }
   | { readonly outcome: "REFUSED"; readonly decision: Decision }
   | { readonly outcome: "DUPLICATE"; readonly existing: LedgerEntry }
+  /** The id was reused for a different spend. The operation does not run. */
+  | {
+      readonly outcome: "MISMATCH";
+      readonly existing: LedgerEntry;
+      readonly detail: string;
+    }
   /** The operation failed and told us what it cost. The ledger holds the truth. */
   | { readonly outcome: "FAILED"; readonly error: unknown; readonly decision: Decision; readonly actual: Amount }
   /**
@@ -210,9 +232,23 @@ export class SpendGuard {
 
     const existing = await this.#store.find(request.requestId);
     if (existing !== undefined) {
-      // A repeated id is a retry, and a retry must never spend twice. A
-      // genuinely new attempt needs a new id — the same rule every idempotency
-      // key follows.
+      // A repeated id is a retry, and a retry must never spend twice. But an
+      // id alone is not enough to say two requests are the same request: a
+      // client that reuses an id for a different amount would otherwise be
+      // told "already done" about a spend it never asked for. So the intent is
+      // compared, and a contradiction is refused rather than absorbed.
+      const intent = requestIntent(request);
+      if (existing.intent !== "" && existing.intent !== intent) {
+        return {
+          granted: false,
+          refusal: "MISMATCH",
+          request,
+          existing,
+          detail:
+            `${request.requestId} was reserved for a different spend ` +
+            `(${existing.intent.slice(0, 12)}), not ${intent.slice(0, 12)}`,
+        };
+      }
       return { granted: false, refusal: "DUPLICATE", request, existing };
     }
 
@@ -249,9 +285,14 @@ export class SpendGuard {
     const auth = await this.authorize(draft);
 
     if (!auth.granted) {
-      return auth.refusal === "DUPLICATE"
-        ? { outcome: "DUPLICATE", existing: auth.existing }
-        : { outcome: "REFUSED", decision: auth.decision };
+      switch (auth.refusal) {
+        case "DUPLICATE":
+          return { outcome: "DUPLICATE", existing: auth.existing };
+        case "MISMATCH":
+          return { outcome: "MISMATCH", existing: auth.existing, detail: auth.detail };
+        case "DENIED":
+          return { outcome: "REFUSED", decision: auth.decision };
+      }
     }
 
     let reported: Amount | null = null;

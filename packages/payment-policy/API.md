@@ -41,6 +41,7 @@ interface Attestation {
 |---|---|
 | `requesterKey(r: Requester)` | `string` — canonical form, e.g. `"AGENT:researcher"` |
 | `distinctApprovers(req)` | `readonly string[]` — sorted, deduplicated approver ids |
+| `requestIntent(req)` | `string` — fingerprint of account/requester/asset/amount/destination |
 | `attestationIsCurrent(a, asOf, maxAgeMs)` | `boolean` — not future-dated, not stale |
 | `satisfying(attestations, claimId, attesters, asOf, maxAgeMs)` | `readonly Attestation[]` |
 
@@ -91,6 +92,7 @@ interface LedgerEntry {
   destination: string; requester: Requester;
   at: number;                          // when authorized, not when settled
   state: LedgerState;
+  intent: string;                      // requestIntent at reservation; "" = unknown (legacy)
 }
 
 interface WindowQuery {
@@ -254,14 +256,38 @@ declares what it cost (or, with `0n`, that it cost nothing).
 |---|---|---|
 | `COMPLETED` | ran; carries `reserved`, `actual`, `overage` | `SETTLED` at `actual` |
 | `REFUSED` | policy said no; carries the `decision` | nothing written |
-| `DUPLICATE` | request id already seen; **the operation never runs** | unchanged |
+| `DUPLICATE` | same id, same request; **the operation never runs** | unchanged |
+| `MISMATCH` | same id, **different** request; the operation never runs | unchanged |
 | `FAILED` | threw, but declared its cost | `SETTLED` at that cost |
 | `INDETERMINATE` | threw without declaring; we do not guess | stays `PENDING` |
 
-`Authorization` is a three-way union — `{granted: true, …}`,
-`{granted: false, refusal: "DENIED", decision}`, or
-`{granted: false, refusal: "DUPLICATE", existing}`. Granted authorizations
-carry `settle(actual)` and `reverse()`.
+`Authorization` is a four-way union — `{granted: true, …}`,
+`{granted: false, refusal: "DENIED", decision}`,
+`{granted: false, refusal: "DUPLICATE", existing}`, or
+`{granted: false, refusal: "MISMATCH", existing, detail}`. Granted
+authorizations carry `settle(actual)` and `reverse()`.
+
+### Idempotency
+
+A reused request id is only a duplicate if it is **the same request**.
+`requestIntent` fingerprints what would actually move — account, requester,
+asset, amount, destination — and a reused id carrying anything different is
+refused as `MISMATCH` rather than absorbed.
+
+Deliberately *excluded* from the fingerprint, because an honest retry differs
+on them: `requestedAt` (stamped from a clock), `approvals` and `attestations`
+(a retry may carry more), and `memo`.
+
+The fingerprint is stamped at reservation and never touched by settlement —
+`amount` becomes what was *actually* spent, so the entry cannot serve as the
+record of what was asked for.
+
+`intent: ""` means unknown: an entry replayed from history written before
+fingerprints existed. Such a retry falls back to plain duplicate detection.
+
+The canonical encoding is `wire.ts`'s. For anyone comparing against protocols
+that mandate **RFC 8785 (JCS)**: this is canonical and deterministic but is not
+that standard. It never emits a float, which is where the two would differ.
 
 ## Receipts
 

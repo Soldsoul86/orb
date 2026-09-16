@@ -40,6 +40,21 @@ export interface LedgerEntry {
   /** When the spend was authorized, not when it settled. Windows are measured from intent. */
   readonly at: number;
   readonly state: LedgerState;
+  /**
+   * Fingerprint of the request that opened this reservation, from
+   * {@link requestIntent}.
+   *
+   * Set once at reservation and never touched by settlement — `amount` becomes
+   * what was actually spent, so it cannot serve as the record of what was
+   * *asked for*.
+   *
+   * `""` means unknown: an entry replayed from history written before
+   * fingerprints existed. A retry against one of those cannot be checked for
+   * mismatch, so it is treated as an ordinary duplicate — no worse than the
+   * behaviour it replaces, and it never silently passes a changed request as a
+   * matching one.
+   */
+  readonly intent: string;
 }
 
 /** Does this entry still hold budget? */

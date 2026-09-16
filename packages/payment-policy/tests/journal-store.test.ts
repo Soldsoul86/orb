@@ -47,6 +47,7 @@ const reservation = (requestId: string, amount: bigint, at = T0): LedgerEntry =>
   requester: { kind: "AGENT", agentId: "researcher" },
   at,
   state: "PENDING",
+  intent: "",
 });
 
 async function openStore(journalStore: JournalStore, lane = "device-a") {
@@ -179,6 +180,48 @@ describe("history cannot be corrected", () => {
     await rejects(() => store.settle("ghost", 1n), /no reservation/);
     store.close();
     await journal.close();
+  });
+});
+
+describe("the idempotency fingerprint", () => {
+  it("survives a restart, so a mismatch is still caught", async () => {
+    const disk = new MemoryJournalStore();
+    const clock = new ManualClock(T0);
+
+    const first = await openStore(disk);
+    const guardA = new SpendGuard({ store: first.store, clock, policyFor: singlePolicy(policy) });
+    await guardA.run(
+      {
+        requestId: "call-1",
+        account: ACCOUNT,
+        requester: { kind: "AGENT", agentId: "researcher" },
+        asset: TOKENS,
+        amount: 1_000n,
+        destination: "vendor:api",
+      },
+      async () => "done",
+    );
+    first.store.close();
+    await first.journal.close();
+
+    // A fingerprint held only in memory would be lost here, and the reused id
+    // would read as an ordinary duplicate on the other side of the restart.
+    const second = await openStore(disk);
+    strictEqual((await second.store.find("call-1"))?.intent.length, 64);
+
+    const guardB = new SpendGuard({ store: second.store, clock, policyFor: singlePolicy(policy) });
+    const changed = await guardB.run(
+      {
+        requestId: "call-1",
+        account: ACCOUNT,
+        requester: { kind: "AGENT", agentId: "researcher" },
+        asset: TOKENS,
+        amount: 5_000n,
+        destination: "vendor:api",
+      },
+      async () => "done",
+    );
+    strictEqual(changed.outcome, "MISMATCH");
   });
 });
 

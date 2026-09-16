@@ -49,6 +49,7 @@ export function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     requester: OWNER,
     at: T0 - 60_000,
     state: "SETTLED",
+    intent: "",
     ...overrides,
   };
 }

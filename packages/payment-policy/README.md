@@ -71,7 +71,7 @@ if (result.outcome === "REFUSED") console.log(explain(result.decision));
 `node scripts/agent-budget.mjs` runs a looping agent against a 50,000-token
 envelope and prints the refusal when it runs out.
 
-Outcomes are `COMPLETED`, `REFUSED`, `DUPLICATE`, `FAILED` and
+Outcomes are `COMPLETED`, `REFUSED`, `DUPLICATE`, `MISMATCH`, `FAILED` and
 `INDETERMINATE` — the last meaning the operation threw without saying whether
 it spent anything, so the reservation is deliberately left open for
 reconciliation rather than guessed at.
@@ -290,6 +290,7 @@ no way to fetch.
 | **Deny by default** | No policy, no matching rule, wrong account — all deny. An authorization system whose failure mode is *allow* is not one. |
 | **Pending money holds its budget** | Ten requests in the same millisecond must not each see an empty budget. This is the payments equivalent of a double spend. |
 | **Every rule is recorded** | A decision that names one tripped limit while hiding the four it passed cannot be audited. |
+| **A reused id must be the same request** | Comparing ids alone tells a client "already done" about a spend it never asked for. |
 
 Payments can also be gated on **attested facts** — *dispatched*, *customs
 cleared*, *quality accepted* — each asserted by a named party. The engine

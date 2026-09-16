@@ -252,6 +252,128 @@ describe("retries", () => {
   });
 });
 
+describe("a reused id must be the same request", () => {
+  /* The bug this replaced compared ids and nothing else, so a client that
+     reused an id for a different amount was told "already done" about a spend
+     it had never asked for. */
+
+  const reserve = async (guard: SpendGuard, overrides: Record<string, unknown> = {}) =>
+    guard.run({ ...draft("same"), ...overrides }, async () => "done");
+
+  it("refuses a reused id carrying a different amount", async () => {
+    const { guard, store } = build();
+    await reserve(guard);
+    const second = await reserve(guard, { amount: 2_000n });
+
+    strictEqual(second.outcome, "MISMATCH");
+    if (second.outcome !== "MISMATCH") return;
+    ok(second.detail.includes("different spend"));
+    // The first reservation is untouched; nothing new was written.
+    strictEqual((await store.find("same"))?.amount, 1_000n);
+  });
+
+  it("refuses a reused id carrying a different destination", async () => {
+    const { guard } = build();
+    await reserve(guard);
+    strictEqual((await reserve(guard, { destination: "vendor:elsewhere" })).outcome, "MISMATCH");
+  });
+
+  it("refuses a reused id carrying a different asset", async () => {
+    const { guard } = build();
+    await reserve(guard);
+    strictEqual((await reserve(guard, { asset: "USDC" })).outcome, "MISMATCH");
+  });
+
+  it("refuses a reused id from a different requester", async () => {
+    const { guard } = build();
+    await reserve(guard);
+    const other = { kind: "AGENT", agentId: "somebody-else" } as const;
+    strictEqual((await reserve(guard, { requester: other })).outcome, "MISMATCH");
+  });
+
+  it("does not run the operation on a mismatch", async () => {
+    const { guard } = build();
+    let runs = 0;
+    const op = async () => {
+      runs += 1;
+      return "done";
+    };
+    await guard.run(draft("same"), op);
+    await guard.run({ ...draft("same"), amount: 2_000n }, op);
+    strictEqual(runs, 1);
+  });
+});
+
+describe("an honest retry is still a duplicate", () => {
+  /* A fingerprint that is too wide rejects retries that were never wrong.
+     These are the fields a genuine retry is expected to differ on. */
+
+  it("a later timestamp — the shell stamps it from a clock", async () => {
+    const { guard, clock } = build();
+    await guard.run(draft("same"), async () => "done");
+    clock.advance(5_000);
+    strictEqual((await guard.run(draft("same"), async () => "done")).outcome, "DUPLICATE");
+  });
+
+  it("approvals collected since the first attempt", async () => {
+    const { guard } = build();
+    await guard.run(draft("same"), async () => "done");
+    const withApproval = {
+      ...draft("same"),
+      approvals: [{ approver: "hari", at: T0 + 10 }],
+    };
+    strictEqual((await guard.run(withApproval, async () => "done")).outcome, "DUPLICATE");
+  });
+
+  it("a different memo", async () => {
+    const { guard } = build();
+    await guard.run(draft("same"), async () => "done");
+    const noted = { ...draft("same"), memo: "retry after timeout" };
+    strictEqual((await guard.run(noted, async () => "done")).outcome, "DUPLICATE");
+  });
+
+  it("the fingerprint survives settlement, which overwrites the amount", async () => {
+    // `settle` replaces `amount` with what was really spent, so the entry can
+    // never be the record of what was asked for. If `intent` were ever derived
+    // from the stored amount, this is where the bug would come back.
+    const { guard, store } = build();
+    await guard.run(draft("same", 1_000n), async (grant) => {
+      grant.report(400n);
+      return "done";
+    });
+    strictEqual((await store.find("same"))?.amount, 400n);
+
+    // The original request asked for 1,000, and that is still what matches.
+    strictEqual((await guard.run(draft("same", 1_000n), async () => "x")).outcome, "DUPLICATE");
+    strictEqual((await guard.run(draft("same", 400n), async () => "x")).outcome, "MISMATCH");
+  });
+
+  it("an entry with no fingerprint cannot be compared, so it is a duplicate", async () => {
+    // Replayed from history written before fingerprints existed. No worse than
+    // the behaviour this replaced, and it never passes a changed request off
+    // as a matching one.
+    const store = new MemoryLedgerStore();
+    await store.append({
+      requestId: "legacy",
+      account: ACCOUNT,
+      asset: TOKENS,
+      amount: 1_000n,
+      destination: "vendor:api",
+      requester: { kind: "AGENT", agentId: "researcher" },
+      at: T0,
+      state: "SETTLED",
+      intent: "",
+    });
+    const guard = new SpendGuard({
+      store,
+      clock: new ManualClock(T0),
+      policyFor: singlePolicy(policy),
+    });
+    const result = await guard.run({ ...draft("legacy"), amount: 9_999n }, async () => "x");
+    strictEqual(result.outcome, "DUPLICATE");
+  });
+});
+
 describe("policy source", () => {
   it("an unknown account has no policy, so nothing moves", async () => {
     const { guard } = build();

@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **229 tests, all passing.** (623 across the repo.)
+`npm test -w @orb/payment-policy` — **240 tests, all passing.** (665 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -229,6 +229,20 @@ refused at the boundary rather than passed inward.
 **Round trips preserve the signature.** A challenge is signed, encoded,
 decoded, and re-signed — the two signatures must match byte for byte. If the
 encoder altered any part of the canonical form, this test fails.
+
+**Idempotency is about the request, not the id.** A reused id carrying a
+different amount, destination, asset or requester is refused as `MISMATCH`, and
+the operation does not run. Conversely, the fields an honest retry is *expected*
+to differ on — a later timestamp, approvals collected since, a changed memo —
+remain ordinary duplicates.
+
+The sharpest one: **the fingerprint survives settlement.** `settle` overwrites
+`amount` with what was really spent, so a request for 1,000 settled at 400 must
+still match 1,000 and now mismatch 400. That is precisely where the bug would
+return if anyone later derived the fingerprint from the stored amount. A
+fingerprint-less legacy entry falls back to duplicate detection, and a
+restart-and-reload test proves the fingerprint is persisted rather than held in
+memory.
 
 **The admission check.** The one that matters presents a correctly signed,
 internally coherent authorisation for a *cheaper quote the buyer invented*; it

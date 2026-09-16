@@ -21,7 +21,7 @@
  *   returns the same answer instead of counting the request against itself.
  */
 import type { SpendRequest } from "./model.js";
-import { distinctApprovers, requesterKey } from "./model.js";
+import { distinctApprovers, requestIntent, requesterKey } from "./model.js";
 import type { Rule, RuleKind, SpendPolicy } from "./policy.js";
 import {
   minuteOfDayUtc,
@@ -388,6 +388,7 @@ export function authorizedEntry(request: SpendRequest, decision: Decision): Ledg
     requester: request.requester,
     at: request.requestedAt,
     state: "PENDING",
+    intent: requestIntent(request),
   };
 }
 

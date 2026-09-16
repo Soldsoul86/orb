@@ -479,12 +479,56 @@ a ledger that matches it.
 because a result that folded an unchecked assumption in with seven checked ones
 would be a lie told by a data structure.
 
+## Idempotency: an id is not a request
+
+The first version of the guard treated any repeated request id as a duplicate.
+That is the wrong check, and it was a bug rather than a missing feature: a
+client reusing an id for a different amount was told "already done" about a
+spend it had never asked for — the failure the agentic-payments literature
+calls an idempotency mismatch, and the one that lets a caller believe a payment
+succeeded when nothing was authorised.
+
+An idempotency key promises *the same request, twice, spends once*. That
+promise is only worth something if the request is compared, not merely the key.
+So a reservation carries `requestIntent`: a fingerprint of what would actually
+move — account, requester, asset, amount, destination — and a reused id
+carrying anything different is refused as `MISMATCH`.
+
+**What is excluded matters as much as what is included**, because a
+fingerprint that is too wide rejects retries that were never wrong:
+
+- `requestedAt` — the shell stamps it from a clock, so a genuine retry carries
+  a later instant. Including it would make *every* retry a mismatch.
+- `approvals` and `attestations` — a retry may carry more, collected since.
+  They change whether a spend is permitted, never what the spend is.
+- `memo` — cosmetic.
+
+The fingerprint is stamped at reservation and never touched by settlement.
+That is not incidental: `settle` replaces `amount` with what was really spent,
+so the entry can never be the record of what was *asked for*. A test settles at
+400 against a request for 1,000 and checks that 1,000 still matches and 400 now
+mismatches — which is exactly where the bug would return if anyone later
+derived the fingerprint from the stored amount.
+
+A ledger entry written before fingerprints existed replays with `intent: ""`,
+meaning "cannot be compared". Such a retry falls back to plain duplicate
+detection: no worse than the behaviour it replaces, and it never passes a
+changed request off as a matching one. `payment.reserved` is schema v2 for the
+added field; v1 events still replay (Art. X §37).
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
   entry. At realistic volumes this is irrelevant, and Art. IX §36 says build
   the simplest correct thing. A caller with a large history may pre-filter to
   the longest window; correctness does not depend on it.
+- **A duplicate does not return the original decision.** It returns the
+  existing ledger entry. Protocols that require replay to return the *original
+  response* (including server-generated ids) want more than this; decisions are
+  not currently stored alongside reservations.
+- **The canonical encoding is not RFC 8785.** It is canonical and
+  deterministic, and never emits a float — which is where the two would differ
+  — but a protocol that mandates JCS by name is not satisfied by it.
 - **Approvals are counted, not verified.** Stated in the README and the code.
   The shell must authenticate them first.
 - **No settlement.** This package decides; it does not act, watch, or confirm.

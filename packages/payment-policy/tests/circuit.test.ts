@@ -53,6 +53,7 @@ const entry = (id: string, amount: bigint, at: number): LedgerEntry => ({
   requester: { kind: "AGENT", agentId: "researcher" },
   at,
   state: "SETTLED",
+  intent: "",
 });
 
 const request: SpendRequest = {
