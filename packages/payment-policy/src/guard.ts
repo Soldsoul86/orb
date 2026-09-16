@@ -34,6 +34,7 @@ import type { SpendPolicy } from "./policy.js";
 import type { Decision } from "./evaluate.js";
 import { authorizedEntry, evaluate } from "./evaluate.js";
 import type { LedgerEntry } from "./ledger.js";
+import { isExpired } from "./ledger.js";
 import type { LedgerStore } from "./store.js";
 import type { Clock } from "./clock.js";
 import { systemClock } from "./clock.js";
@@ -49,6 +50,8 @@ export interface SpendDraft {
   readonly amount: Amount;
   readonly destination: string;
   readonly requestedAt?: number;
+  /** Overrides the guard's default TTL for one long-running operation. */
+  readonly ttlMs?: number;
   readonly approvals?: readonly Approval[];
   readonly attestations?: readonly Attestation[];
   readonly memo?: string;
@@ -192,10 +195,35 @@ export type GuardOutcome<T> =
       readonly reservation: LedgerEntry;
     };
 
+export type ExtendOutcome =
+  | { readonly extended: true; readonly expiresAt: number }
+  | {
+      readonly extended: false;
+      readonly reason: "NOT_FOUND" | "NOT_PENDING" | "EXPIRED" | "INVALID";
+      readonly detail: string;
+    };
+
 export interface GuardOptions {
   readonly store: LedgerStore;
   readonly policyFor: PolicySource;
   readonly clock?: Clock;
+  /**
+   * How long a reservation is expected to stay open.
+   *
+   * Omitted means no deadline, which is what every reservation had before
+   * deadlines existed. A deadline does not release budget — see
+   * {@link isExpired} — it only marks a reservation as no longer expected to
+   * complete, so something can go and find out what happened.
+   */
+  readonly reservationTtlMs?: number;
+  /**
+   * Slack after a deadline before a reservation counts as expired.
+   *
+   * Covers the race where a legitimate settlement is already in flight as the
+   * deadline passes. Without it, a commit landing a millisecond late looks
+   * like an abandoned reservation.
+   */
+  readonly graceMs?: number;
   /**
    * Called for every decision, allowed or refused, before the operation runs.
    *
@@ -212,6 +240,8 @@ export class SpendGuard {
   readonly #policyFor: PolicySource;
   readonly #clock: Clock;
   readonly #onDecision: ((decision: Decision, request: SpendRequest) => void) | null;
+  readonly #ttlMs: number | null;
+  readonly #graceMs: number;
   /** Serialises every ledger mutation. See the note on the critical section. */
   #tail: Promise<unknown> = Promise.resolve();
 
@@ -220,6 +250,8 @@ export class SpendGuard {
     this.#policyFor = options.policyFor;
     this.#clock = options.clock ?? systemClock;
     this.#onDecision = options.onDecision ?? null;
+    this.#ttlMs = options.reservationTtlMs ?? null;
+    this.#graceMs = options.graceMs ?? 5_000;
   }
 
   /**
@@ -287,7 +319,9 @@ export class SpendGuard {
       return { granted: false, refusal: "DENIED", request, decision };
     }
 
-    const reservation = authorizedEntry(request, decision);
+    const ttl = draft.ttlMs ?? this.#ttlMs;
+    const expiresAt = ttl === null || ttl === undefined ? null : request.requestedAt + ttl;
+    const reservation = authorizedEntry(request, decision, expiresAt);
     await this.#store.append(reservation);
 
     const store = this.#store;
@@ -364,6 +398,86 @@ export class SpendGuard {
       // next decision will see the true, higher figure.
       overage: actual > reserved ? actual - reserved : 0n,
     };
+  }
+
+  /**
+   * Reservations past their own deadline.
+   *
+   * They are still holding their budget, and deliberately so. This is a
+   * worklist, not a cleanup: each one needs somebody to find out what actually
+   * happened.
+   */
+  expiredReservations(now = this.#clock.now()): Promise<readonly LedgerEntry[]> {
+    return this.#store.expired(now, this.#graceMs);
+  }
+
+  /**
+   * Pushes a reservation's deadline out.
+   *
+   * For an operation that is legitimately still running — a long generation, a
+   * slow provider — rather than one that has been abandoned. Refused once the
+   * grace period is gone, because at that point the reservation's status is a
+   * question for reconciliation and quietly extending it would bury the
+   * question.
+   */
+  extend(requestId: string, additionalMs: number): Promise<ExtendOutcome> {
+    return this.#serialize(async () => {
+      if (!Number.isFinite(additionalMs) || additionalMs <= 0) {
+        return { extended: false, reason: "INVALID", detail: "additionalMs must be positive" };
+      }
+
+      const entry = await this.#store.find(requestId);
+      if (entry === undefined) {
+        return { extended: false, reason: "NOT_FOUND", detail: `no reservation for ${requestId}` };
+      }
+      if (entry.state !== "PENDING") {
+        return {
+          extended: false,
+          reason: "NOT_PENDING",
+          detail: `${requestId} is already ${entry.state}`,
+        };
+      }
+
+      const now = this.#clock.now();
+      if (isExpired(entry, now, this.#graceMs)) {
+        return {
+          extended: false,
+          reason: "EXPIRED",
+          detail: `${requestId} expired past its grace period; reconcile it instead`,
+        };
+      }
+
+      // Measured from now rather than from the old deadline, so an extension
+      // always buys the time it says it buys.
+      const expiresAt = now + additionalMs;
+      await this.#store.extend(requestId, expiresAt);
+      return { extended: true, expiresAt };
+    });
+  }
+
+  /**
+   * Reverses every expired reservation, on the assumption nothing was spent.
+   *
+   * **This is a guess, and it is the unsafe direction.** If a provider charged
+   * before the client died, this hands back budget for money that was spent.
+   * Nothing here can tell the difference — that is what a
+   * {@link SpendObserver} is for, and {@link reconcile} is the method that
+   * uses one.
+   *
+   * It exists because holding a budget forever against a provider that will
+   * never answer is its own failure, and an operator who knows their provider
+   * is transactional should be able to say so. It is opt-in, explicit, and
+   * every reversal is journalled: the guess is recorded as a decision somebody
+   * made, not as something the system quietly did.
+   */
+  async releaseExpired(now = this.#clock.now()): Promise<readonly string[]> {
+    const expired = await this.#store.expired(now, this.#graceMs);
+    const released: string[] = [];
+    for (const entry of expired) {
+      await this.#serialize(() => this.#store.reverse(entry.requestId));
+      released.push(entry.requestId);
+    }
+    return released;
   }
 
   /** Reservations left open longer than `ageMs`. These need reconciling, not guessing. */

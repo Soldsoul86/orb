@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **247 tests, all passing.** (672 across the repo.)
+`npm test -w @orb/payment-policy` — **260 tests, all passing.** (685 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -235,6 +235,24 @@ different amount, destination, asset or requester is refused as `MISMATCH`, and
 the operation does not run. Conversely, the fields an honest retry is *expected*
 to differ on — a later timestamp, approvals collected since, a changed memo —
 remain ordinary duplicates.
+
+**Deadlines mark, they do not settle.** The test that carries this:
+**an expired reservation still holds its budget** — it stays `PENDING`, and the
+next spend is still refused. A reservation only stops holding when it is
+`REVERSED`, which requires evidence rather than a timer. Grace is tested from
+both sides: still inside grace is not yet expired, and a settlement arriving
+during grace is not a late arrival. A per-request `ttlMs` overrides the
+guard's default, and with no TTL configured nothing expires after a year.
+
+**Extending** buys time measured from now, and is refused once grace is gone
+(`EXPIRED`, with a message pointing at reconciliation), for a finished
+reservation (`NOT_PENDING`), for an unknown id, and for a non-positive or
+non-finite interval.
+
+**`releaseExpired`** reverses and returns the budget — and never touches a
+reservation still inside its deadline. Across a restart: a deadline and an
+extension both survive, and an expired reservation is still expired *and still
+holding* after a reload, because a restart is not a release.
 
 **A duplicate returns the answer given the first time.** The sharpest case:
 between two attempts the budget fills, so a fresh evaluation would *deny* — the

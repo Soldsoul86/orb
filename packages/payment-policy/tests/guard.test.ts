@@ -381,6 +381,7 @@ describe("a duplicate returns the answer it gave the first time", () => {
       state: "SETTLED",
       intent: "",
       decision: null,
+      expiresAt: null,
     });
     const guard = new SpendGuard({
       store,
@@ -456,6 +457,7 @@ describe("an honest retry is still a duplicate", () => {
       state: "SETTLED",
       intent: "",
       decision: null,
+      expiresAt: null,
     });
     const guard = new SpendGuard({
       store,
@@ -464,6 +466,190 @@ describe("an honest retry is still a duplicate", () => {
     });
     const result = await guard.run({ ...draft("legacy"), amount: 9_999n }, async () => "x");
     strictEqual(result.outcome, "DUPLICATE");
+  });
+});
+
+describe("deadlines", () => {
+  /* A deadline marks a reservation as no longer expected to complete. It does
+     NOT decide that nothing was spent -- that is the difference between this
+     and a TTL that auto-releases. */
+
+  const withTtl = (ttlMs: number, graceMs = 5_000) => {
+    const store = new MemoryLedgerStore();
+    const clock = new ManualClock(T0);
+    const guard = new SpendGuard({
+      store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: ttlMs,
+      graceMs,
+    });
+    return { store, clock, guard };
+  };
+
+  /** Leaves a reservation open the way a crashed client does. */
+  const strand = async (guard: SpendGuard, id: string, amount = 1_000n) => {
+    const result = await guard.run(draft(id, amount), async () => {
+      throw new Error("client died");
+    });
+    strictEqual(result.outcome, "INDETERMINATE");
+  };
+
+  it("nothing expires when no TTL is configured", async () => {
+    const { guard, clock } = build();
+    await strand(guard, "a");
+    clock.advance(365 * 86_400_000);
+    strictEqual((await guard.expiredReservations()).length, 0);
+  });
+
+  it("expires once the deadline and the grace period have passed", async () => {
+    const { guard, clock } = withTtl(60_000);
+    await strand(guard, "a");
+
+    clock.advance(60_001);
+    strictEqual((await guard.expiredReservations()).length, 0, "still inside grace");
+
+    clock.advance(5_000);
+    const expired = await guard.expiredReservations();
+    strictEqual(expired.length, 1);
+    strictEqual(expired[0]?.requestId, "a");
+  });
+
+  it("an expired reservation still holds its budget", async () => {
+    // The whole point. A passed deadline is not evidence that nothing was
+    // spent, so the budget stays held and the next spend is still refused.
+    const { guard, clock, store } = withTtl(60_000);
+    await strand(guard, "a", 3_000n);
+    clock.advance(600_000);
+
+    strictEqual((await guard.expiredReservations()).length, 1);
+    strictEqual((await store.find("a"))?.state, "PENDING");
+    strictEqual((await guard.run(draft("b", 1_000n), async () => "x")).outcome, "REFUSED");
+  });
+
+  it("a settlement inside the grace period is not a late arrival", async () => {
+    const { guard, clock } = withTtl(60_000);
+    const auth = await guard.authorize(draft("a"));
+    ok(auth.granted);
+
+    clock.advance(62_000);
+    strictEqual((await guard.expiredReservations()).length, 0);
+    await auth.settle(900n);
+    strictEqual((await guard.expiredReservations()).length, 0);
+  });
+
+  it("a per-request TTL overrides the guard's default", async () => {
+    const { guard, clock } = withTtl(60_000);
+    await guard.run({ ...draft("slow"), ttlMs: 3_600_000 }, async () => {
+      throw new Error("still running");
+    });
+
+    clock.advance(600_000);
+    // Long past the default deadline, comfortably inside its own.
+    strictEqual((await guard.expiredReservations()).length, 0);
+  });
+});
+
+describe("extending a deadline", () => {
+  const withTtl = (ttlMs: number) => {
+    const store = new MemoryLedgerStore();
+    const clock = new ManualClock(T0);
+    const guard = new SpendGuard({
+      store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: ttlMs,
+    });
+    return { store, clock, guard };
+  };
+
+  it("buys more time for an operation that is genuinely still running", async () => {
+    const { guard, clock, store } = withTtl(60_000);
+    const auth = await guard.authorize(draft("a"));
+    ok(auth.granted);
+
+    clock.advance(50_000);
+    const result = await guard.extend("a", 600_000);
+    strictEqual(result.extended, true);
+    if (!result.extended) return;
+
+    // Measured from now, so an extension buys the time it says it buys.
+    strictEqual(result.expiresAt, T0 + 50_000 + 600_000);
+    strictEqual((await store.find("a"))?.expiresAt, T0 + 50_000 + 600_000);
+
+    clock.advance(300_000);
+    strictEqual((await guard.expiredReservations()).length, 0);
+  });
+
+  it("refuses once the grace period is gone", async () => {
+    // At that point the reservation's status is a question for reconciliation,
+    // and extending it would bury the question.
+    const { guard, clock } = withTtl(60_000);
+    await guard.authorize(draft("a"));
+    clock.advance(600_000);
+
+    const result = await guard.extend("a", 60_000);
+    strictEqual(result.extended, false);
+    if (result.extended) return;
+    strictEqual(result.reason, "EXPIRED");
+    ok(result.detail.includes("reconcile"));
+  });
+
+  it("refuses a reservation that has already finished", async () => {
+    const { guard } = withTtl(60_000);
+    await guard.run(draft("a"), async () => "done");
+    const result = await guard.extend("a", 60_000);
+    strictEqual(result.extended, false);
+    if (result.extended) return;
+    strictEqual(result.reason, "NOT_PENDING");
+  });
+
+  it("refuses an unknown reservation and a non-positive extension", async () => {
+    const { guard } = withTtl(60_000);
+    await guard.authorize(draft("a"));
+
+    strictEqual((await guard.extend("ghost", 1_000)).extended, false);
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      strictEqual((await guard.extend("a", bad)).extended, false);
+    }
+  });
+});
+
+describe("releasing expired reservations is an explicit guess", () => {
+  it("reverses them and gives the budget back", async () => {
+    const store = new MemoryLedgerStore();
+    const clock = new ManualClock(T0);
+    const guard = new SpendGuard({
+      store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: 60_000,
+    });
+
+    await guard.run(draft("a", 3_000n), async () => {
+      throw new Error("client died");
+    });
+    clock.advance(600_000);
+    strictEqual((await guard.run(draft("b", 1_000n), async () => "x")).outcome, "REFUSED");
+
+    // Opt-in, explicit, and journalled as a reversal somebody chose.
+    const released = await guard.releaseExpired();
+    deepStrictEqual(released, ["a"]);
+    strictEqual((await store.find("a"))?.state, "REVERSED");
+    strictEqual((await guard.run(draft("c", 1_000n), async () => "x")).outcome, "COMPLETED");
+  });
+
+  it("never touches a reservation that is still inside its deadline", async () => {
+    const store = new MemoryLedgerStore();
+    const guard = new SpendGuard({
+      store,
+      clock: new ManualClock(T0),
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: 60_000,
+    });
+    await guard.authorize(draft("a"));
+    deepStrictEqual(await guard.releaseExpired(), []);
+    strictEqual((await store.find("a"))?.state, "PENDING");
   });
 });
 

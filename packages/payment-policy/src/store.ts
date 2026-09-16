@@ -26,6 +26,7 @@
  */
 import type { Amount } from "./model.js";
 import type { LedgerEntry } from "./ledger.js";
+import { isExpired } from "./ledger.js";
 
 export interface LedgerStore {
   /** Every entry for an account, in any order. */
@@ -37,6 +38,10 @@ export interface LedgerStore {
   settle(requestId: string, actualAmount: Amount): Promise<void>;
   /** Records that the spend provably did not happen. */
   reverse(requestId: string): Promise<void>;
+  /** Pushes a reservation's deadline out. Only meaningful while PENDING. */
+  extend(requestId: string, expiresAt: number): Promise<void>;
+  /** Reservations past their own deadline, allowing for a grace period. */
+  expired(now: number, graceMs: number): Promise<readonly LedgerEntry[]>;
   /** Reservations still open at `asOf` that were made more than `ageMs` ago. */
   staleReservations(asOf: number, ageMs: number): Promise<readonly LedgerEntry[]>;
 }
@@ -97,6 +102,22 @@ export class LedgerProjection {
     this.#byId.set(requestId, { ...entry, state: "REVERSED" });
   }
 
+  extend(requestId: string, expiresAt: number): void {
+    const entry = this.#require(requestId);
+    if (entry.state !== "PENDING") {
+      throw new LedgerStoreError(`${requestId} is already ${entry.state}`);
+    }
+    this.#byId.set(requestId, { ...entry, expiresAt });
+  }
+
+  expired(now: number, graceMs: number): readonly LedgerEntry[] {
+    const out: LedgerEntry[] = [];
+    for (const entry of this.#byId.values()) {
+      if (isExpired(entry, now, graceMs)) out.push(entry);
+    }
+    return out;
+  }
+
   staleReservations(asOf: number, ageMs: number): readonly LedgerEntry[] {
     const out: LedgerEntry[] = [];
     for (const entry of this.#byId.values()) {
@@ -137,6 +158,12 @@ export class MemoryLedgerStore implements LedgerStore {
   }
   async reverse(requestId: string): Promise<void> {
     this.#projection.reverse(requestId);
+  }
+  async extend(requestId: string, expiresAt: number): Promise<void> {
+    this.#projection.extend(requestId, expiresAt);
+  }
+  async expired(now: number, graceMs: number): Promise<readonly LedgerEntry[]> {
+    return this.#projection.expired(now, graceMs);
   }
   async staleReservations(asOf: number, ageMs: number): Promise<readonly LedgerEntry[]> {
     return this.#projection.staleReservations(asOf, ageMs);

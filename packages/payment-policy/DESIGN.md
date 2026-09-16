@@ -541,6 +541,44 @@ re-derived one. Inventing an answer would be the same error as guessing at an
 ambiguous settlement: it would look authoritative while being a fresh opinion
 about a past event.
 
+## Deadlines: a timer is not evidence
+
+Cycles gives a reservation a TTL, and on expiry *"the action is treated as
+never committed"* — budget released, no reconciliation. That is a guess, and it
+is the expensive direction: if the provider charged before the client died,
+the budget comes back for money that was spent.
+
+Art. XI §42 does not stop applying because a timer fired. A reservation that
+outlived its deadline is the **indeterminate** case, not the didn't-happen
+case, so here:
+
+- **Expiry is derived, never recorded.** Nothing *happens* when a deadline
+  passes — a settlement simply fails to arrive. Writing a `payment.expired`
+  event would be journalling the passage of time, which history already knows.
+- **Expiry does not release budget.** `consumesBudget` ignores deadlines
+  entirely. An expired reservation holds exactly what a live one holds.
+- **Expiry directs attention.** `expiredReservations` is a worklist, not a
+  cleanup: each entry needs somebody to find out what actually happened, which
+  is what `reconcile` and a `SpendObserver` are for.
+
+`graceMs` covers the race where a legitimate settlement is already in flight as
+the deadline passes. Without it a commit landing a millisecond late looks
+identical to an abandoned reservation.
+
+`extend` exists for the operation that is legitimately still running — a long
+generation, a slow provider — and is refused once grace is gone. At that point
+the reservation's status is a genuine question, and quietly extending it would
+bury the question rather than answer it. It measures from now rather than from
+the old deadline, so an extension buys the time it says it buys.
+
+`releaseExpired` is the escape hatch, and it is deliberately unpleasant to
+reach for. Holding a budget forever against a provider that will never answer
+is its own failure, so an operator who knows their provider is transactional
+must be able to say so — but they say it explicitly, it applies only to
+reservations past grace, and every reversal is journalled. The guess is
+recorded as a decision somebody made, never as something the system quietly
+did.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -565,6 +603,11 @@ about a past event.
   iteration 9. The protection is that the *next* call sees the true figure and
   is refused. If you need a per-call ceiling enforced against the actual
   spend, the operation itself has to enforce it; nothing outside the call can.
+- **Nothing expires unless a TTL is configured.** The default is no deadline,
+  which is the behaviour every reservation had before deadlines existed.
+- **`releaseExpired` is a guess.** It assumes nothing was spent. Prefer
+  `reconcile`; reach for this only against a provider you know is
+  transactional.
 - **`MemoryLedgerStore` is in-process.** A reservation does not survive a
   restart and two processes do not share a budget. Use `JournalLedgerStore`
   for anything that must remember.

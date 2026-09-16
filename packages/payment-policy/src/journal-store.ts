@@ -40,7 +40,8 @@ import type { LedgerStore } from "./store.js";
 import { LedgerProjection, LedgerStoreError } from "./store.js";
 
 /**
- * Version 3 adds `decision` to `payment.reserved`; version 2 added `intent`.
+ * Version 4 adds `expiresAt` to `payment.reserved` and the `payment.extended`
+ * event; version 3 added `decision`; version 2 added `intent`.
  *
  * Art. X §37 — the kernel evolves through addition. Older events replay with
  * the newer fields absent and read as "unknown" (`intent: ""`,
@@ -49,11 +50,12 @@ import { LedgerProjection, LedgerStoreError } from "./store.js";
  * detection, and a missing decision is reported as missing rather than
  * re-derived, because re-evaluating now would answer a different question.
  */
-export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 3 };
+export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 4 };
 
 export const RESERVED = "payment.reserved";
 export const SETTLED = "payment.settled";
 export const REVERSED = "payment.reversed";
+export const EXTENDED = "payment.extended";
 
 interface ReservedPayload {
   readonly requestId: string;
@@ -68,6 +70,13 @@ interface ReservedPayload {
   readonly intent?: string;
   /** Absent before v3. */
   readonly decision?: Decision;
+  /** Absent before v4. */
+  readonly expiresAt?: number | null;
+}
+
+interface ExtendedPayload {
+  readonly requestId: string;
+  readonly expiresAt: number;
 }
 
 interface SettledPayload {
@@ -134,6 +143,9 @@ export function applyLedgerEvent(projection: LedgerProjection, event: OrbEvent):
         // A v1 event has none. Unknown, never guessed at.
         intent: typeof p.intent === "string" ? p.intent : "",
         decision: readDecision(p.decision),
+        // Absent before v4, and absent means no deadline -- the behaviour
+        // every reservation had before deadlines existed.
+        expiresAt: typeof p.expiresAt === "number" ? p.expiresAt : null,
       });
       return true;
     }
@@ -147,6 +159,15 @@ export function applyLedgerEvent(projection: LedgerProjection, event: OrbEvent):
       const p = payload as unknown as ReversedPayload;
       if (projection.find(p.requestId) === undefined) return false;
       projection.reverse(p.requestId);
+      return true;
+    }
+    case EXTENDED: {
+      const p = payload as unknown as ExtendedPayload;
+      const entry = projection.find(p.requestId);
+      // An extension of something already finished is a replicated ordering
+      // artefact, not corruption -- skipped rather than thrown, like an orphan.
+      if (entry === undefined || entry.state !== "PENDING") return false;
+      projection.extend(p.requestId, p.expiresAt);
       return true;
     }
     default:
@@ -248,6 +269,7 @@ export class JournalLedgerStore implements LedgerStore {
       at: entry.at,
       intent: entry.intent,
       ...(entry.decision === null ? {} : { decision: entry.decision }),
+      ...(entry.expiresAt === null ? {} : { expiresAt: entry.expiresAt }),
     };
     await this.#journal.appendOne({ type: RESERVED, schema: LEDGER_SCHEMA, payload });
   }
@@ -267,8 +289,18 @@ export class JournalLedgerStore implements LedgerStore {
     await this.#journal.appendOne({ type: REVERSED, schema: LEDGER_SCHEMA, payload });
   }
 
+  async extend(requestId: string, expiresAt: number): Promise<void> {
+    this.#requireOpen(requestId);
+    const payload: ExtendedPayload = { requestId, expiresAt };
+    await this.#journal.appendOne({ type: EXTENDED, schema: LEDGER_SCHEMA, payload });
+  }
+
   async staleReservations(asOf: number, ageMs: number): Promise<readonly LedgerEntry[]> {
     return this.#projection.staleReservations(asOf, ageMs);
+  }
+
+  async expired(now: number, graceMs: number): Promise<readonly LedgerEntry[]> {
+    return this.#projection.expired(now, graceMs);
   }
 
   #requireOpen(requestId: string): void {

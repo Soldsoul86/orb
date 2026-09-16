@@ -51,6 +51,7 @@ export function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     state: "SETTLED",
     intent: "",
     decision: null,
+    expiresAt: null,
     ...overrides,
   };
 }

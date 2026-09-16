@@ -71,9 +71,49 @@ export interface LedgerEntry {
    * decisions were recorded.
    */
   readonly decision: Decision | null;
+  /**
+   * When this reservation stops being expected to complete. `null` never.
+   *
+   * A deadline, not a settlement. See {@link isExpired}.
+   */
+  readonly expiresAt: number | null;
 }
 
-/** Does this entry still hold budget? */
+/**
+ * Is this reservation past its deadline?
+ *
+ * **Expiry is derived, never recorded.** Nothing happens when a deadline
+ * passes — a settlement simply fails to arrive — so there is no fact to
+ * append. Writing a `payment.expired` event would be journalling the passage
+ * of time, which history already knows.
+ *
+ * More importantly, expiry does **not** release the budget. Art. XI §42 does
+ * not stop applying because a timer fired: a reservation that outlived its TTL
+ * is the indeterminate case, not the didn't-happen case. If the provider
+ * charged before the client died, releasing here hands back budget for money
+ * that was spent — which is why {@link consumesBudget} ignores deadlines
+ * entirely.
+ *
+ * What expiry does is direct attention. It says "nobody is coming back for
+ * this, go and find out", and finding out is the reconciler's job.
+ *
+ * `graceMs` covers the race where a legitimate settlement is already in flight
+ * as the deadline passes.
+ */
+export function isExpired(entry: LedgerEntry, now: number, graceMs = 0): boolean {
+  if (entry.state !== "PENDING") return false;
+  if (entry.expiresAt === null) return false;
+  return now > entry.expiresAt + graceMs;
+}
+
+/**
+ * Does this entry still hold budget?
+ *
+ * Deliberately blind to deadlines. An expired reservation holds its budget
+ * exactly as a live one does, because a passed deadline is not evidence that
+ * nothing was spent. Only `REVERSED` — a spend *proven* not to have happened —
+ * gives budget back.
+ */
 export function consumesBudget(entry: LedgerEntry): boolean {
   return entry.state !== "REVERSED";
 }

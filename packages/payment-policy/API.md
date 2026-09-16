@@ -94,7 +94,19 @@ interface LedgerEntry {
   state: LedgerState;
   intent: string;                      // requestIntent at reservation; "" = unknown (legacy)
   decision: Decision | null;           // why it was allowed; null = unknown (legacy)
+  expiresAt: number | null;            // deadline; null = never
 }
+
+function isExpired(entry: LedgerEntry, now: number, graceMs?: number): boolean;
+```
+
+**Expiry is derived, never recorded, and never releases budget.** A passed
+deadline is not evidence that nothing was spent, so `consumesBudget` ignores
+deadlines entirely — only `REVERSED` gives budget back. Expiry marks a
+reservation as no longer expected to complete, so something can go and find out
+what happened.
+
+```ts
 
 interface WindowQuery {
   from: number; to: number;            // both inclusive
@@ -210,12 +222,17 @@ class SpendGuard {
     store: LedgerStore;
     policyFor: PolicySource;
     clock?: Clock;                            // defaults to systemClock
+    reservationTtlMs?: number;                // omitted = no deadline
+    graceMs?: number;                         // default 5000
     onDecision?: (d: Decision, r: SpendRequest) => void;   // the journal seam
   });
 
   authorize(draft: SpendDraft): Promise<Authorization>;     // serialised + durable
   run<T>(draft: SpendDraft, operation: (grant: Grant) => Promise<T>): Promise<GuardOutcome<T>>;
   openReservations(ageMs: number): Promise<readonly LedgerEntry[]>;
+  expiredReservations(now?: number): Promise<readonly LedgerEntry[]>;
+  extend(requestId: string, additionalMs: number): Promise<ExtendOutcome>;
+  releaseExpired(now?: number): Promise<readonly string[]>;
   reconcile(observer: SpendObserver, ageMs: number): Promise<ReconciliationReport>;
 }
 ```
@@ -245,7 +262,17 @@ function reconcile(options: {
 }): Promise<ReconciliationReport>;
 ```
 
-`SpendDraft` is a `SpendRequest` with `requestedAt`, `approvals`,
+`extend` measures from *now*, so an extension buys the time it says it buys. It
+is refused once the grace period is gone (`reason: "EXPIRED"`), because at that
+point the reservation's status is a question for reconciliation and extending
+it would bury the question.
+
+`releaseExpired` reverses expired reservations **on the assumption nothing was
+spent**. That is a guess in the unsafe direction — use `reconcile` with a
+`SpendObserver` where you can. It is opt-in and every reversal is journalled.
+
+`SpendDraft` adds `ttlMs` for one long-running operation, and is a
+`SpendRequest` with `requestedAt`, `approvals`,
 `attestations` and `memo` optional — the shell stamps the clock and defaults
 the rest.
 

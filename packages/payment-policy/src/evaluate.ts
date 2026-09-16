@@ -374,8 +374,17 @@ export function evaluate(
   return { ...base, evaluations, outcome: "ALLOW" };
 }
 
-/** The ledger entry a decision authorizes. Only ever built from an ALLOW. */
-export function authorizedEntry(request: SpendRequest, decision: Decision): LedgerEntry {
+/**
+ * The ledger entry a decision authorizes. Only ever built from an ALLOW.
+ *
+ * `expiresAt` is supplied rather than computed: a deadline is the shell's
+ * business, and the engine reads no clock.
+ */
+export function authorizedEntry(
+  request: SpendRequest,
+  decision: Decision,
+  expiresAt: number | null = null,
+): LedgerEntry {
   if (decision.outcome !== "ALLOW") {
     throw new Error(`cannot authorize a ${decision.outcome} decision for ${request.requestId}`);
   }
@@ -390,6 +399,7 @@ export function authorizedEntry(request: SpendRequest, decision: Decision): Ledg
     state: "PENDING",
     intent: requestIntent(request),
     decision,
+    expiresAt,
   };
 }
 

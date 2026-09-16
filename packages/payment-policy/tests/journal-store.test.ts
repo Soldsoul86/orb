@@ -5,7 +5,7 @@
  * a budget that survives a restart, a fold that two devices agree on, and
  * amounts that round-trip through an encoding which refuses `bigint`.
  */
-import { deepStrictEqual, rejects, strictEqual } from "node:assert/strict";
+import { deepStrictEqual, ok, rejects, strictEqual } from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { Journal, MemoryJournalStore, type JournalStore } from "@orb/journal";
@@ -49,6 +49,7 @@ const reservation = (requestId: string, amount: bigint, at = T0): LedgerEntry =>
   state: "PENDING",
   intent: "",
   decision: null,
+  expiresAt: null,
 });
 
 async function openStore(journalStore: JournalStore, lane = "device-a") {
@@ -282,6 +283,74 @@ describe("the recorded decision", () => {
     strictEqual(evaluations.length, policy.rules.length);
     store.close();
     await journal.close();
+  });
+});
+
+describe("deadlines across a restart", () => {
+  const spend = (requestId: string, amount: bigint) => ({
+    requestId,
+    account: ACCOUNT,
+    requester: { kind: "AGENT", agentId: "researcher" } as const,
+    asset: TOKENS,
+    amount,
+    destination: "vendor:api",
+  });
+
+  it("a deadline and an extension both survive", async () => {
+    const disk = new MemoryJournalStore();
+    const clock = new ManualClock(T0);
+
+    const first = await openStore(disk);
+    const guardA = new SpendGuard({
+      store: first.store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: 60_000,
+    });
+    const auth = await guardA.authorize(spend("call-1", 1_000n));
+    ok(auth.granted);
+    strictEqual(auth.reservation.expiresAt, T0 + 60_000);
+
+    clock.advance(30_000);
+    strictEqual((await guardA.extend("call-1", 600_000)).extended, true);
+    first.store.close();
+    await first.journal.close();
+
+    // A deadline held only in memory would come back as "never expires", and a
+    // reservation nobody is coming back for would look healthy forever.
+    const second = await openStore(disk);
+    strictEqual((await second.store.find("call-1"))?.expiresAt, T0 + 30_000 + 600_000);
+  });
+
+  it("an expired reservation is still expired, and still holding, after a reload", async () => {
+    const disk = new MemoryJournalStore();
+    const clock = new ManualClock(T0);
+
+    const first = await openStore(disk);
+    const guardA = new SpendGuard({
+      store: first.store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: 60_000,
+    });
+    await guardA.run(spend("call-1", 9_000n), async () => {
+      throw new Error("client died");
+    });
+    first.store.close();
+    await first.journal.close();
+
+    clock.advance(600_000);
+    const second = await openStore(disk);
+    const guardB = new SpendGuard({
+      store: second.store,
+      clock,
+      policyFor: singlePolicy(policy),
+      reservationTtlMs: 60_000,
+    });
+
+    strictEqual((await guardB.expiredReservations()).length, 1);
+    // Still holding, so the budget is still gone. A restart is not a release.
+    strictEqual((await guardB.run(spend("call-2", 2_000n), async () => "x")).outcome, "REFUSED");
   });
 });
 

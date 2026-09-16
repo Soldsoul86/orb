@@ -33,7 +33,7 @@ export {
 
 /* -- Ledger --------------------------------------------------------------- */
 export type { LedgerEntry, LedgerState, WindowQuery } from "./ledger.js";
-export { consumesBudget, spentWithin, countWithin } from "./ledger.js";
+export { consumesBudget, isExpired, spentWithin, countWithin } from "./ledger.js";
 
 /* -- The engine ----------------------------------------------------------- */
 export type { Decision, DenialReason, RuleEvaluation, Verdict } from "./evaluate.js";
@@ -54,6 +54,7 @@ export {
   RESERVED,
   SETTLED,
   REVERSED,
+  EXTENDED,
 } from "./journal-store.js";
 export type { JournalLedgerStoreOptions } from "./journal-store.js";
 
@@ -194,6 +195,7 @@ export type {
   Grant,
   GuardOutcome,
   GuardOptions,
+  ExtendOutcome,
 } from "./guard.js";
 export { SpendGuard, singlePolicy } from "./guard.js";
 
