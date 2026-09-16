@@ -8,7 +8,7 @@
  * The test that matters is the last group: what the verifier can and cannot
  * see. Everything else is soundness plumbing.
  */
-import { ok, strictEqual } from "node:assert/strict";
+import { deepStrictEqual, ok, strictEqual } from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { after, describe, it } from "node:test";
 
@@ -123,13 +123,39 @@ describe("what the verifier sees — and does not", { skip }, () => {
   });
 
   it("the limit and every bucket total are absent from the wire", async () => {
+    // This assertion used to grep the serialised proof for the decimal
+    // strings "10000", "3000", "4000", "2000". That was unsound twice over.
+    //
+    // It failed at random: a Groth16 proof is ~1,200 digits of uniformly
+    // random field elements, so a given four-digit string turns up by chance
+    // roughly one run in ten, and across four secrets about one run in three.
+    // It had nothing to do with secrecy when it fired.
+    //
+    // And it proved nothing when it passed. A secret does not leak as a
+    // decimal substring of a random group element; it would leak as a public
+    // signal. Absence of a substring is not absence of a value.
+    //
+    // So check the actual property: exactly four values reach the verifier,
+    // each is the commitment or index it is supposed to be, and none of them
+    // *is* a secret. Deterministic, and about the right thing.
     const proof = await proveBudget(base);
-    const wire = JSON.stringify(proof);
+    const expected = await publicInputsFor(base);
+    const signals = proof.publicSignals.map(BigInt);
 
-    // The whole point. Not redacted, not omitted by convention — absent,
-    // because they were never inputs to anything the verifier receives.
-    for (const secret of ["10000", "3000", "4000", "2000"]) {
-      ok(!wire.includes(secret), `${secret} must not appear in the proof`);
+    deepStrictEqual(signals, [
+      expected.policyCommit,
+      expected.requestCommit,
+      expected.bucketRoot,
+      expected.baseIndex,
+    ]);
+
+    // Three Poseidon commitments and one public bucket index. The limit, the
+    // amount and the bucket totals are inputs to a hash, never values on the
+    // wire — `requestCommit` hides the amount exactly as `policyCommit` hides
+    // the limit.
+    const secrets = [base.maxTotal, base.amount, 3_000n, 4_000n];
+    for (const signal of signals) {
+      ok(!secrets.includes(signal), `${signal} is a secret value, not a commitment`);
     }
   });
 

@@ -81,6 +81,9 @@ export class PaperExchangePort implements ExchangePort {
 
   /** Set to make the next `submit` fail, to exercise the failure paths. */
   failNextSubmit: string | null = null;
+
+  /** Makes the next submission come back `rejected` rather than throwing. */
+  rejectNextOrder: string | null = null;
   /** Set to make `accountState` throw, to exercise "exchange unreachable". */
   unreachable = false;
   /** Fills only this fraction of each close, to exercise partial fills. */
@@ -193,6 +196,15 @@ export class PaperExchangePort implements ExchangePort {
       const reason = this.failNextSubmit;
       this.failNextSubmit = null;
       throw new Error(reason);
+    }
+
+    // A *definite* refusal from the venue, as distinct from `failNextSubmit`,
+    // which throws and leaves the caller not knowing whether the order landed.
+    // The two exercise opposite paths and must not be collapsed.
+    if (this.rejectNextOrder !== null) {
+      const reason = this.rejectNextOrder;
+      this.rejectNextOrder = null;
+      return orders.map(() => ({ kind: "rejected", reason }) as const);
     }
 
     const outcomes: SubmissionOutcome[] = [];

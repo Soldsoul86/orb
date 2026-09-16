@@ -175,8 +175,25 @@ The debt is only partly discharged, and the remainder is stated plainly:
 - it gates **money**, not every irreversible action;
 - it is a library, not a `Capability` — it declares no permission tier,
   because the contract that would carry one does not exist;
-- **nothing in the runtime invokes it yet**, and the trade executor does not
-  use it. An authorization gate nobody calls authorizes nothing.
+- ~~**nothing in the runtime invokes it yet**, and the trade executor does not
+  use it. An authorization gate nobody calls authorizes nothing.~~ **Repaid.**
+  The executor now authorises every entry against it when a `spendAuthority`
+  is configured — reserved before the order goes out, settled against the
+  exchange's own report of what opened, released on a definite rejection, and
+  left standing when the outcome is unknown. See `risk/spend-authority.ts` and
+  `tests/acceptance/spend-authority.test.ts`.
+
+  This closes the gap the `Capability` item above named: human confirmation
+  for irreversible financial actions is no longer satisfied by configuration
+  alone. It also adds a control `RiskConfig` cannot express at all — a limit
+  that spans time rather than a trade.
+
+  Still open within it: the gate is **optional**, so a deployment that omits it
+  is unchanged (deliberate, Art. X §37, but it means the default is ungated);
+  and it covers entries only. A close is not authorised, on the grounds that
+  refusing to *reduce* exposure is not a safety property anyone wants — but
+  that is a judgement, not a specification, and the `Capability` contract
+  should settle it.
 
 **What it adds.** `SpendPolicy` is a `Policy` in substance, exactly as
 `RiskConfig` is, and carries the same gap: a policy change is not itself
@@ -187,8 +204,8 @@ which makes a change *detectable* after the fact — the receipt will fail
 
 **Repayment**, in addition to the three steps above:
 
-4. Express the guard as a `Capability` with the irreversible tier declared,
-   and route the executor's order submission through it so one authorization
-   gate serves both.
+4. Express the guard as a `Capability` with the irreversible tier declared.
+   *(The routing half is done — see the extension above. What remains is the
+   tier declaration, which needs the contract.)*
 5. Journal `SpendPolicy` versions as events, so a decision replays against the
    policy that actually produced it rather than the policy on disk today.

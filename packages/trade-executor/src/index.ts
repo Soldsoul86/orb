@@ -60,6 +60,18 @@ export { hardExitTriggerPrice, protectiveStopPrice } from "./risk/stop-price.js"
 export type { StopPriceInput } from "./risk/stop-price.js";
 
 export { validateEntry, preflightEntry } from "./risk/entry-guards.js";
+
+/* -- Spend authority ------------------------------------------------------- */
+export {
+  NOTIONAL_ASSET,
+  NOTIONAL_DECIMALS,
+  NOTIONAL_UNIT,
+  usdToBaseUnits,
+  baseUnitsToUsd,
+  entryDraft,
+  confirmedNotional,
+} from "./risk/spend-authority.js";
+export type { SpendAuthority, SpendAuthorityConfig } from "./risk/spend-authority.js";
 export type {
   EntryContext,
   PreflightContext,

@@ -166,9 +166,11 @@ requirement rather than a new idea beside it:
 executor* becomes *a payment may be requested by anyone; **spend authority
 belongs to the policy***.
 
-**Outstanding debt.** The same three contracts, plus one of its own: nothing
-in the runtime yet *invokes* this engine as a Capability, and the trade
-executor does not use it. Recorded in `ARCHITECTURAL_DEBT.md`.
+**Outstanding debt.** The same three contracts. The engine is now invoked by
+the trade executor — every entry is authorised against it when a
+`spendAuthority` is configured — but it is still a library rather than a
+`Capability` with a declared permission tier, and the gate is optional so the
+default remains ungated. Recorded in `ARCHITECTURAL_DEBT.md`.
 
 ---
 

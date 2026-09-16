@@ -41,11 +41,23 @@ verification against a different claimed limit, a different claimed amount, a
 different ledger, or a tampered public signal — otherwise the commitments bind
 nothing.
 
-**What the verifier sees, and does not.** Four field elements. The limit and
-every bucket total are asserted **absent from the serialised proof** — not
-redacted or omitted by convention, but absent, because they were never inputs
-to anything the verifier receives. Two different ledgers under the same limit
-produce the same policy commitment and different ledger commitments.
+**What the verifier sees, and does not.** Exactly four field elements, each
+checked by value against the commitment it is supposed to be: `policyCommit`,
+`requestCommit`, `bucketRoot`, `baseIndex`. The limit, the amount and every
+bucket total are inputs to a Poseidon hash and never values on the wire, which
+is asserted by checking that no public signal **equals** any of them. Two
+different ledgers under the same limit produce the same policy commitment and
+different ledger commitments.
+
+> **This assertion used to be wrong, and randomly so.** It grepped the
+> serialised proof for the decimal strings `"10000"`, `"3000"`, `"4000"`,
+> `"2000"`. A Groth16 proof is **857 decimal digits** of uniformly random field
+> elements — measured, not estimated — so a given four-digit string turns up by
+> chance about **8%** of the time, and across the four secrets about **23%** of
+> runs failed for no reason connected to secrecy. It also proved nothing when
+> it passed: a secret does not leak as a decimal substring of a random group
+> element, it leaks as a public signal. Absence of a substring is not absence
+> of a value. The replacement is deterministic and about the right property.
 
 ## What is *not* covered
 

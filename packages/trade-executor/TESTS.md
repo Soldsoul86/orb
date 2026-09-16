@@ -144,6 +144,41 @@ what share of gross profit went to the exchange; computes break-even from
 *realised* geometry rather than an assumed one; flags a flattering short sample
 as not yet significant; totals reconcile with the sum of the trades.
 
+## Spend authority (8 acceptance tests)
+
+In `tests/acceptance/spend-authority.test.ts`, driving the real executor, the
+real guard and a real `JournalLedgerStore` over the same journal the executor
+audits to. Only the exchange and the clock are simulated.
+
+**The test that carries the file** is *"a budget stops what no per-trade limit
+can"*. Three $2,000 entries against a $5,000 day, each one inside every
+`RiskConfig` limit — $10,000 per position, three concurrent, 10x leverage. Only
+their sum is too much, and a per-trade cap cannot see a sum. The third is
+refused as `SPEND_NOT_AUTHORIZED`, explicitly *not* `RISK_LIMIT_EXCEEDED`,
+because a reader must be able to tell which control stopped the trade.
+
+**The refused entry never reaches the venue** — a gate that refuses after the
+order is placed is not a gate.
+
+**Nothing changes without a guard.** With no `spendAuthority` configured, every
+entry opens as before. Art. X §37: adding a control to the codebase must not
+change an existing deployment's behaviour.
+
+**Settlement is the exchange's number.** A confirmed position moves its
+reservation to `SETTLED` against the size and price the venue reports.
+
+**A rejected order frees its budget**, and the freed budget is usable by the
+next entry.
+
+**The two "we do not know" paths**, which are the subtle ones:
+
+- an exchange that fails the *confirming* read (the second account read, not
+  the first — failing both would reject the signal before authorization and
+  prove nothing) leaves the reservation `PENDING`, neither settled nor
+  reversed, and still held against the budget;
+- a guard that throws yields `SPEND_AUTHORITY_UNAVAILABLE` and no trade —
+  *could not ask* is not *was told yes*.
+
 ## Not covered, deliberately
 
 - **Multi-symbol portfolio risk.** Limits are per-position and per-count. A
