@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **92 tests, all passing.** (486 across the repo.)
+`npm test -w @orb/payment-policy` — **109 tests, all passing.** (503 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -111,6 +111,37 @@ returning `DUPLICATE` **without running the operation**; an unknown account
 denying with `NO_POLICY`; `onDecision` firing for allowed and refused alike
 (and not for duplicates); and budget windows moving with an injected clock.
 
+### The journal-backed ledger (`journal-store.test.ts`)
+
+The tests the in-memory store could not pass. **A reservation survives a
+restart**, and — the one that matters — a restarted process enforces the
+budget it left behind: 9,000 of a 10,000 envelope spent before the restart,
+and the 2,000 request after it is refused. With `MemoryLedgerStore` that
+request is allowed.
+
+Also: settlements and reversals replay; the fold is deterministic across
+repeated replays; a `2^80` amount round-trips through an encoding that refuses
+`bigint`; history cannot be corrected (duplicate reservation, double settle,
+settling something never reserved all reject); a **replicated** reservation
+from another device's lane consumes the shared envelope; and the hash chain
+still verifies after a full lifecycle.
+
+### Reconciliation (`reconcile.test.ts`)
+
+An observed `SETTLED` records the sensor's figure, not the reserved estimate.
+`NOT_SPENT` reverses and the envelope is whole again — proven by the next call
+fitting.
+
+The refusals are tested harder than the resolutions, because they are what
+makes it trustworthy: **`UNKNOWN` leaves the entry `PENDING`**, still
+consuming budget, and offers it again on the next sweep. An observer that
+throws is recorded in `failed` and its entry is left untouched rather than
+guessed at — and the sweep continues to the next one. Reservations that are
+not yet stale are never examined; settled entries are never touched.
+
+The last test walks the full cycle: decide, act, fail indeterminately, hold
+the budget, observe, close.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -119,9 +150,12 @@ denying with `NO_POLICY`; `onDecision` firing for allowed and refused alike
 - **Settlement, confirmation, reversal detection.** Not in this package. The
   ledger is an input; producing it is the settlement layer's job.
 - **Rail behaviour, custody, key handling.** None of it is here.
-- **Durable or multi-process stores.** `MemoryLedgerStore` is the reference;
-  a store that must survive a restart or be shared across processes needs its
-  own atomicity tests, against its own engine.
+- **Two processes over one journal file.** Covered for two devices with their
+  own lanes, which is the supported shape. A single journal file with
+  concurrent writers needs the journal store itself to be safe for that, and
+  would need its own tests there.
+- **Real observers.** `ScriptedObserver` drives the reconciler; a vendor
+  adapter is tested where the adapter lives.
 - **Performance under a large ledger.** `spentWithin` is linear by design
   (`DESIGN.md` → Known limits). No benchmark is asserted because no threshold
   has been agreed; asserting an arbitrary one would be theatre.

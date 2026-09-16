@@ -162,19 +162,34 @@ journal entry — not a flag on a request.
 **Local timezones in `TIME_WINDOW`.** Rejected: a decision must not depend on
 where it was evaluated. UTC minutes only.
 
-## The guard: why `authorize` is synchronous
+## The critical section, and a correction
 
-`SpendGuard.authorize` reads the ledger, evaluates, and appends the
-reservation with **no `await` anywhere in between**. That is the whole
-concurrency argument, and it is the executor's `claimExit` argument
-unchanged: on a single-threaded runtime a synchronous read-decide-write
-cannot be interleaved. Put one suspension point in that path and ten
-simultaneous callers each observe an untouched budget.
+An earlier version of this package made `authorize` and the whole
+`LedgerStore` synchronous, and argued that synchrony was what kept the
+critical section safe. That was half right, and the missing half mattered.
 
-This is why every `LedgerStore` method is synchronous. A durable store must do
-its own atomicity internally — a transaction, a compare-and-set, a
-single-threaded writer — and present a synchronous face. An `async` store
-would reopen exactly the window this design exists to close.
+Synchrony is *sufficient* for atomicity on a single-threaded runtime. It is
+not *necessary* — and it buys atomicity at the cost of durability, because a
+durable append cannot be synchronous. The invariant was never "the critical
+section is synchronous". It is:
+
+> **Read, decide and reserve must not interleave with another caller doing the
+> same, and the reservation must be durable before the operation runs.**
+
+A lock delivers both. Synchrony delivers only the first. So `SpendGuard`
+serialises every ledger mutation through a promise chain — the same mechanism
+the Journal uses to keep its own hash chain intact — and awaits the append
+before returning.
+
+Settlements go through the same lock, not just reservations: a settle landing
+between another caller's read and its reservation would let that caller decide
+against a ledger that no longer exists.
+
+Note that losing a reservation is *not* like losing an audit line. The
+executor's audit sink deliberately does not await the journal, because a
+dropped record is recovered by reconciling against the exchange. A dropped
+reservation silently returns budget that may already have been spent, and
+nothing outside the ledger knows it existed.
 
 ## The guard: why a failed operation is not reversed
 
@@ -201,6 +216,55 @@ budgeted at 4,000 tokens that really consumed 4,231 must land in the ledger as
 **recorded, not prevented** — the spend has already happened — and the next
 decision sees the true, higher figure, so the budget self-corrects.
 
+## The ledger is a projection, not a source of truth
+
+Art. I §3: the journal is the single source of truth, everything else is a
+derived projection that may be discarded and rebuilt. Holding the ledger in a
+`Map` and calling it authoritative was a violation of this package's own
+constitution, and the reason a reservation could not survive a restart.
+
+`JournalLedgerStore` makes the ledger a fold over three immutable facts —
+`payment.reserved`, `payment.settled`, `payment.reversed` — and three things
+follow for free:
+
+- **A restart resumes**, because the fold is deterministic (Art. II §9).
+- **Devices share an envelope.** Replicated lanes carry the same facts and
+  `orderEvents` puts them in HLC order, so two devices spending from one
+  budget converge rather than double-count (Art. IV §18).
+- **Reconciliation is a fold**, not a special case: an open reservation is a
+  `reserved` with no matching `settled` or `reversed`.
+
+Reads are served from an in-memory projection so deciding costs no I/O; the
+projection is only ever advanced by the journal's own listener, so local
+appends and replicated events take the identical path and cannot diverge.
+
+Amounts are written as decimal strings. `canonicalJson` refuses `bigint` —
+correctly, since JSON has no unambiguous encoding for one — and a lossy
+`Number` in a money ledger is the exact bug this package exists to prevent.
+
+A partially replicated lane can legitimately contain a `settled` whose
+`reserved` has not arrived yet. That is a gap in replication, not corruption,
+so an orphan is skipped rather than thrown: refusing to open would make a
+partially synced device unusable.
+
+## Reconciliation: why UNKNOWN resolves nothing
+
+The guard refusing to guess is correct but incomplete — a system that only
+accumulates unresolvable reservations is honestly stuck rather than safe.
+Art. XI §42 says how it ends: the loop closes only when a Sensor confirms.
+`SpendObserver` is that sensor, and it is the one component here that looks at
+the outside world.
+
+The rule that makes it trustworthy is what happens on `UNKNOWN`: **nothing.**
+The reservation stays open, keeps consuming budget, and is offered again next
+sweep. A reconciler that resolved uncertainty by assumption would be worse
+than no reconciler, because it would look authoritative while guessing.
+
+Observation happens outside the lock — a vendor call is slow and must not
+block every decision in the process — and only the resulting write is
+serialised. One unreachable vendor is recorded and skipped rather than
+abandoning the sweep.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -219,5 +283,12 @@ decision sees the true, higher figure, so the budget self-corrects.
   is refused. If you need a per-call ceiling enforced against the actual
   spend, the operation itself has to enforce it; nothing outside the call can.
 - **`MemoryLedgerStore` is in-process.** A reservation does not survive a
-  restart, and two processes do not share a budget. Both need a durable store
-  with its own atomicity.
+  restart and two processes do not share a budget. Use `JournalLedgerStore`
+  for anything that must remember.
+- **One journal, one writer.** `JournalLedgerStore` serialises through the
+  guard's lock within a process. Two processes over the *same* journal file
+  need the journal's own store to be safe for concurrent writers; two devices
+  with their own lanes are fine, and that is the supported shape.
+- **Reconciliation is only as good as its sensor.** An observer that returns a
+  confident wrong number writes it into an immutable ledger. `UNKNOWN` is
+  always the safer answer.

@@ -173,15 +173,29 @@ class ManualClock implements Clock { constructor(startAt: number); advance(ms); 
 ```
 
 ```ts
-interface LedgerStore {                       // every method SYNCHRONOUS — see DESIGN.md
-  entries(account: string): readonly LedgerEntry[];
-  find(requestId: string): LedgerEntry | undefined;
-  append(entry: LedgerEntry): void;           // throws on a duplicate request id
-  settle(requestId: string, actualAmount: Amount): void;
-  reverse(requestId: string): void;
-  staleReservations(asOf: number, ageMs: number): readonly LedgerEntry[];
+interface LedgerStore {                       // async; the guard holds the lock
+  entries(account: string): Promise<readonly LedgerEntry[]>;
+  find(requestId: string): Promise<LedgerEntry | undefined>;
+  append(entry: LedgerEntry): Promise<void>;  // rejects on a duplicate request id
+  settle(requestId: string, actualAmount: Amount): Promise<void>;
+  reverse(requestId: string): Promise<void>;
+  staleReservations(asOf: number, ageMs: number): Promise<readonly LedgerEntry[]>;
 }
-class MemoryLedgerStore implements LedgerStore {}
+
+class MemoryLedgerStore implements LedgerStore {}        // in-process; forgets on exit
+class LedgerProjection {}                                // the shared fold both stores use
+
+class JournalLedgerStore implements LedgerStore {
+  static open(options: { journal: Journal }): Promise<JournalLedgerStore>;
+  close(): void;                                         // stops following the journal
+  readonly size: number;
+}
+
+const LEDGER_SCHEMA: SchemaRef;                          // orb.payment.ledger v1
+const RESERVED = "payment.reserved";
+const SETTLED  = "payment.settled";
+const REVERSED = "payment.reversed";
+function applyLedgerEvent(projection: LedgerProjection, event: OrbEvent): boolean;
 ```
 
 ```ts
@@ -196,10 +210,36 @@ class SpendGuard {
     onDecision?: (d: Decision, r: SpendRequest) => void;   // the journal seam
   });
 
-  authorize(draft: SpendDraft): Authorization;              // SYNCHRONOUS, atomic
+  authorize(draft: SpendDraft): Promise<Authorization>;     // serialised + durable
   run<T>(draft: SpendDraft, operation: (grant: Grant) => Promise<T>): Promise<GuardOutcome<T>>;
-  openReservations(ageMs: number): readonly LedgerEntry[];
+  openReservations(ageMs: number): Promise<readonly LedgerEntry[]>;
+  reconcile(observer: SpendObserver, ageMs: number): Promise<ReconciliationReport>;
 }
+```
+
+## Reconciliation
+
+```ts
+type SpendObservation =
+  | { state: "SETTLED"; actualAmount: Amount }   // it happened, this is the real cost
+  | { state: "NOT_SPENT" }                       // it provably did not happen
+  | { state: "UNKNOWN" };                        // say so; do not resolve it
+
+interface SpendObserver { observe(entry: LedgerEntry): Promise<SpendObservation> }
+
+interface ReconciliationReport {
+  examined: number;
+  settled:  readonly { requestId: string; amount: Amount }[];
+  reversed: readonly string[];
+  unresolved: readonly LedgerEntry[];                        // still open, on purpose
+  failed: readonly { requestId: string; error: unknown }[];  // also still open
+}
+
+function reconcile(options: {
+  store: LedgerStore; observer: SpendObserver;
+  asOf: number; ageMs: number;
+  serialize?: <T>(work: () => Promise<T>) => Promise<T>;
+}): Promise<ReconciliationReport>;
 ```
 
 `SpendDraft` is a `SpendRequest` with `requestedAt`, `approvals`,

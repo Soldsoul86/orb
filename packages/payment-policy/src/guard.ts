@@ -7,12 +7,16 @@
  *
  * Two things make it more than a convenience wrapper.
  *
- * **The critical section.** `authorize` reads the ledger, evaluates, and
- * appends the reservation with no `await` anywhere between. That is the entire
- * concurrency argument, and it is the same one that makes the executor's
- * `claimExit` safe: on a single-threaded runtime, a synchronous
- * read-decide-write cannot be interleaved. Introduce one suspension point in
- * that path and simultaneous callers will each see an untouched budget.
+ * **The critical section.** Read, decide and reserve must not interleave with
+ * another caller doing the same, *and* the reservation must be durable before
+ * the operation runs. An earlier version got the first half by making the
+ * whole path synchronous — which works in one process, but forecloses the
+ * second half, because a durable append cannot be synchronous.
+ *
+ * So the path is serialised by a promise chain instead: each call queues
+ * behind the last, exactly as the Journal serialises its own appends to keep
+ * the hash chain intact. Same guarantee as `claimExit`, reached with a lock
+ * rather than with synchrony, and durable as well.
  *
  * **What happens when the operation fails.** Constitution Art. XI §42: Orb
  * never assumes an Action changed reality. A thrown error does not tell you
@@ -32,6 +36,8 @@ import type { LedgerEntry } from "./ledger.js";
 import type { LedgerStore } from "./store.js";
 import type { Clock } from "./clock.js";
 import { systemClock } from "./clock.js";
+import type { ReconciliationReport, SpendObserver } from "./reconcile.js";
+import { reconcile } from "./reconcile.js";
 
 /** A request without the bookkeeping the shell can fill in. */
 export interface SpendDraft {
@@ -85,9 +91,9 @@ export type Authorization =
       readonly decision: Decision;
       readonly reservation: LedgerEntry;
       /** Records what was actually spent, which may differ from the estimate. */
-      settle(actualAmount: Amount): void;
+      settle(actualAmount: Amount): Promise<void>;
       /** Records that the spend provably did not happen. */
-      reverse(): void;
+      reverse(): Promise<void>;
     }
   | {
       readonly granted: false;
@@ -163,6 +169,8 @@ export class SpendGuard {
   readonly #policyFor: PolicySource;
   readonly #clock: Clock;
   readonly #onDecision: ((decision: Decision, request: SpendRequest) => void) | null;
+  /** Serialises every ledger mutation. See the note on the critical section. */
+  #tail: Promise<unknown> = Promise.resolve();
 
   constructor(options: GuardOptions) {
     this.#store = options.store;
@@ -172,16 +180,35 @@ export class SpendGuard {
   }
 
   /**
-   * Decides and reserves, atomically.
+   * Runs `work` with exclusive access to the ledger.
    *
-   * **Synchronous on purpose.** There is no `await` between reading the ledger
-   * and writing the reservation, so two callers cannot both observe the same
-   * unspent budget. Keep it that way.
+   * Every mutation goes through here, settlements included: a settle landing
+   * between another caller's read and its reservation would let that caller
+   * decide against a ledger that no longer exists.
    */
-  authorize(draft: SpendDraft): Authorization {
+  #serialize<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.#tail.then(work);
+    // The chain must survive a rejection, or one failure wedges every later
+    // caller behind a promise that never settles.
+    this.#tail = result.catch(() => undefined);
+    return result;
+  }
+
+  /**
+   * Decides and reserves, atomically and durably.
+   *
+   * Queued behind any other ledger mutation, so two callers cannot both
+   * observe the same unspent budget, and the reservation is in history before
+   * this resolves.
+   */
+  authorize(draft: SpendDraft): Promise<Authorization> {
+    return this.#serialize(() => this.#authorizeNow(draft));
+  }
+
+  async #authorizeNow(draft: SpendDraft): Promise<Authorization> {
     const request = materialize(draft, this.#clock.now());
 
-    const existing = this.#store.find(request.requestId);
+    const existing = await this.#store.find(request.requestId);
     if (existing !== undefined) {
       // A repeated id is a retry, and a retry must never spend twice. A
       // genuinely new attempt needs a new id — the same rule every idempotency
@@ -190,7 +217,7 @@ export class SpendGuard {
     }
 
     const policy = this.#policyFor(request.account) ?? EMPTY_POLICY(request.account);
-    const decision = evaluate(request, policy, this.#store.entries(request.account));
+    const decision = evaluate(request, policy, await this.#store.entries(request.account));
     this.#onDecision?.(decision, request);
 
     if (decision.outcome !== "ALLOW") {
@@ -198,7 +225,7 @@ export class SpendGuard {
     }
 
     const reservation = authorizedEntry(request, decision);
-    this.#store.append(reservation);
+    await this.#store.append(reservation);
 
     const store = this.#store;
     return {
@@ -206,8 +233,8 @@ export class SpendGuard {
       request,
       decision,
       reservation,
-      settle: (actualAmount) => store.settle(request.requestId, actualAmount),
-      reverse: () => store.reverse(request.requestId),
+      settle: (actualAmount) => this.#serialize(() => store.settle(request.requestId, actualAmount)),
+      reverse: () => this.#serialize(() => store.reverse(request.requestId)),
     };
   }
 
@@ -219,7 +246,7 @@ export class SpendGuard {
    * requested.
    */
   async run<T>(draft: SpendDraft, operation: (grant: Grant) => Promise<T>): Promise<GuardOutcome<T>> {
-    const auth = this.authorize(draft);
+    const auth = await this.authorize(draft);
 
     if (!auth.granted) {
       return auth.refusal === "DUPLICATE"
@@ -251,13 +278,13 @@ export class SpendGuard {
           reservation: auth.reservation,
         };
       }
-      auth.settle(declared);
+      await auth.settle(declared);
       return { outcome: "FAILED", error, decision: auth.decision, actual: declared };
     }
 
     const reserved = auth.request.amount;
     const actual: Amount = reported ?? reserved;
-    auth.settle(actual);
+    await auth.settle(actual);
 
     return {
       outcome: "COMPLETED",
@@ -272,7 +299,21 @@ export class SpendGuard {
   }
 
   /** Reservations left open longer than `ageMs`. These need reconciling, not guessing. */
-  openReservations(ageMs: number): readonly LedgerEntry[] {
+  openReservations(ageMs: number): Promise<readonly LedgerEntry[]> {
     return this.#store.staleReservations(this.#clock.now(), ageMs);
+  }
+
+  /**
+   * Closes the loop on open reservations by asking a sensor what really
+   * happened (Art. XI §42). See `reconcile.ts` for why an unknown stays open.
+   */
+  reconcile(observer: SpendObserver, ageMs: number): Promise<ReconciliationReport> {
+    return reconcile({
+      store: this.#store,
+      observer,
+      asOf: this.#clock.now(),
+      ageMs,
+      serialize: (work) => this.#serialize(work),
+    });
   }
 }

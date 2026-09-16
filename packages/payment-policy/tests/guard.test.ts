@@ -111,7 +111,7 @@ describe("recording what actually happened", () => {
     strictEqual(result.reserved, 1_000n);
     strictEqual(result.actual, 742n);
     strictEqual(result.overage, 0n);
-    strictEqual(store.find("a")?.amount, 742n);
+    strictEqual((await store.find("a"))?.amount, 742n);
   });
 
   it("records an overage rather than pretending it did not happen", async () => {
@@ -125,7 +125,7 @@ describe("recording what actually happened", () => {
     if (result.outcome !== "COMPLETED") return;
     strictEqual(result.actual, 1_400n);
     strictEqual(result.overage, 400n);
-    strictEqual(store.find("a")?.amount, 1_400n);
+    strictEqual((await store.find("a"))?.amount, 1_400n);
   });
 
   it("the next decision sees the true figure, so the budget self-corrects", async () => {
@@ -145,8 +145,8 @@ describe("recording what actually happened", () => {
   it("settles at the estimate when the operation reports nothing", async () => {
     const { guard, store } = build();
     await guard.run(draft("a", 900n), async () => "done");
-    strictEqual(store.find("a")?.amount, 900n);
-    strictEqual(store.find("a")?.state, "SETTLED");
+    strictEqual((await store.find("a"))?.amount, 900n);
+    strictEqual((await store.find("a"))?.state, "SETTLED");
   });
 });
 
@@ -160,7 +160,7 @@ describe("when the operation fails", () => {
     strictEqual(result.outcome, "INDETERMINATE");
     // Still open, still consuming budget. Guessing would be the expensive
     // kind of wrong.
-    strictEqual(store.find("a")?.state, "PENDING");
+    strictEqual((await store.find("a"))?.state, "PENDING");
   });
 
   it("settles at zero when the operation proves nothing was spent", async () => {
@@ -173,8 +173,8 @@ describe("when the operation fails", () => {
     strictEqual(result.outcome, "FAILED");
     if (result.outcome !== "FAILED") return;
     strictEqual(result.actual, 0n);
-    strictEqual(store.find("a")?.state, "SETTLED");
-    strictEqual(store.find("a")?.amount, 0n);
+    strictEqual((await store.find("a"))?.state, "SETTLED");
+    strictEqual((await store.find("a"))?.amount, 0n);
   });
 
   it("a zero-cost attempt still counts against a velocity limit", async () => {
@@ -210,7 +210,7 @@ describe("when the operation fails", () => {
     strictEqual(result.outcome, "FAILED");
     if (result.outcome !== "FAILED") return;
     strictEqual(result.actual, 600n);
-    strictEqual(store.find("a")?.amount, 600n);
+    strictEqual((await store.find("a"))?.amount, 600n);
   });
 
   it("surfaces held reservations for reconciliation", async () => {
@@ -219,9 +219,9 @@ describe("when the operation fails", () => {
       throw new Error("socket hang up");
     });
 
-    strictEqual(guard.openReservations(60_000).length, 0);
+    strictEqual((await guard.openReservations(60_000)).length, 0);
     clock.advance(61_000);
-    const stale = guard.openReservations(60_000);
+    const stale = await guard.openReservations(60_000);
     strictEqual(stale.length, 1);
     strictEqual(stale[0]?.requestId, "a");
   });
@@ -294,14 +294,14 @@ describe("the journal seam", () => {
 });
 
 describe("the clock", () => {
-  it("stamps the request, and a draft may override it", () => {
+  it("stamps the request, and a draft may override it", async () => {
     const { guard, clock } = build();
     clock.set(T0 + 5_000);
-    const auth = guard.authorize(draft("a"));
+    const auth = await guard.authorize(draft("a"));
     ok(auth.granted);
     strictEqual(auth.request.requestedAt, T0 + 5_000);
 
-    const fixed = guard.authorize({ ...draft("b"), requestedAt: T0 });
+    const fixed = await guard.authorize({ ...draft("b"), requestedAt: T0 });
     ok(fixed.granted);
     strictEqual(fixed.request.requestedAt, T0);
   });

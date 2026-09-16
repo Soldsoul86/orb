@@ -76,6 +76,23 @@ Outcomes are `COMPLETED`, `REFUSED`, `DUPLICATE`, `FAILED` and
 it spent anything, so the reservation is deliberately left open for
 reconciliation rather than guessed at.
 
+## It remembers, and it recovers
+
+`JournalLedgerStore` makes the ledger a projection of the Event Journal rather
+than a `Map` — so a reservation survives a restart, two devices spending from
+one envelope converge instead of double-counting, and the whole budget is
+rebuildable by replay.
+
+`guard.reconcile(observer, ageMs)` closes the loop on reservations left open
+by an indeterminate failure. A `SpendObserver` is the sensor Art. XI §42
+requires: it looks at the vendor, the chain, the statement, and reports
+`SETTLED`, `NOT_SPENT` or `UNKNOWN`.
+
+**`UNKNOWN` resolves nothing.** The reservation stays open, keeps consuming
+budget, and comes back next sweep. A reconciler that resolved uncertainty by
+assumption would be worse than none, because it would look authoritative
+while guessing.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

@@ -44,7 +44,18 @@ export type { Clock } from "./clock.js";
 export { systemClock, ManualClock } from "./clock.js";
 
 export type { LedgerStore } from "./store.js";
-export { MemoryLedgerStore, LedgerStoreError } from "./store.js";
+export { MemoryLedgerStore, LedgerProjection, LedgerStoreError } from "./store.js";
+
+export { JournalLedgerStore, applyLedgerEvent, LEDGER_SCHEMA, RESERVED, SETTLED, REVERSED } from "./journal-store.js";
+export type { JournalLedgerStoreOptions } from "./journal-store.js";
+
+export { reconcile } from "./reconcile.js";
+export type {
+  SpendObserver,
+  SpendObservation,
+  ReconciliationReport,
+  ReconcileOptions,
+} from "./reconcile.js";
 
 export type {
   SpendDraft,
