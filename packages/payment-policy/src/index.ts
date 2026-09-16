@@ -119,6 +119,26 @@ export {
 
 export { toWire, canonicalText, canonicalBytes, digestOf } from "./wire.js";
 
+/* -- Commitments and the circuit relation --------------------------------- */
+export type { InclusionProof, PathStep } from "./commitment.js";
+export { LedgerCommitment, verifyInclusion, emptyRoot } from "./commitment.js";
+
+export type {
+  BudgetStatement,
+  BudgetWitness,
+  BudgetProofBundle,
+  WitnessEntry,
+  ConstraintId,
+  ConstraintResult,
+  RelationResult,
+} from "./circuit.js";
+export {
+  IS_ZERO_KNOWLEDGE,
+  MAX_WINDOW_ENTRIES,
+  checkBudgetRelation,
+  explainRelation,
+} from "./circuit.js";
+
 /* -- Transport ------------------------------------------------------------ */
 export type {
   PaymentAuthorization,

@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **191 tests, all passing.** (585 across the repo.)
+`npm test -w @orb/payment-policy` — **221 tests, all passing.** (615 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -236,6 +236,37 @@ is refused as `WRONG_QUOTE`, because the seller compares against its own quote
 and not the buyer's copy. Also covered: a stranger's signature, an expired
 quote, a mismatched asset, and an authorisation for less than the ceiling.
 
+### Commitments (`commitment.test.ts`)
+
+Two tests are about attacks rather than behaviour. **An internal node cannot be
+presented as a leaf** — without the `0x00`/`0x01` domain separation that is a
+second-preimage attack producing an inclusion proof for something never
+inserted. And **two ledgers of different length never collide**: the common
+shortcut of padding an odd level by duplicating the last leaf makes `[a,b,b]`
+and `[a,b]` share a root, which is exactly what a commitment must never do.
+
+Every leaf proves at sizes 1, 2, 3, 4, 5, 8, 9, 16 and 33 — the odd ones are
+where a hand-rolled tree breaks. Proofs do not transfer to another value or
+another root. Malformed proofs (bad indices, non-hex paths, a 100-deep path)
+return `false` rather than throwing.
+
+### The circuit relation (`circuit.test.ts`)
+
+**Soundness**: each of the six constraints is forged in turn and caught —
+swapped policy, swapped request, shifted time, an invented entry, the same leaf
+presented twice, an entry dragged in from outside the window, and a payment
+that does not fit.
+
+**Fidelity to the engine, not an approximation of it**: a reversed entry gives
+its budget back, another asset does not consume this one, and the request never
+counts against itself — the same three rules `evaluate` follows.
+
+**Honesty**, which is why these tests exist: `IS_ZERO_KNOWLEDGE` is `false`; the
+limit appears nowhere in the public half of an honest bundle; completeness is
+reported as an assumption and not as a constraint; and **a bundle that omits an
+in-window entry satisfies every constraint** — that test passes on purpose, and
+if the gap is ever closed it should start failing.
+
 ## What is *not* covered, and why
 
 - **Approval authenticity.** The engine counts approvals; it does not verify
@@ -258,6 +289,9 @@ quote, a mismatched asset, and an authorisation for less than the ceiling.
   test claims they do.
 - **Actual HTTP.** The module encodes and decodes header values; wiring them to
   a server belongs where a server lives.
+- **An actual zero-knowledge proof.** None exists here, and the tests assert
+  that rather than obscuring it. Writing the circuit needs a proving toolchain
+  and a field-native hash.
 - **Transport.** `PaymentRequired` is the 402 payload as data; carrying it over
   HTTP, and the rails in `accepts`, belong to an adapter.
 - **Performance under a large ledger.** `spentWithin` is linear by design

@@ -215,6 +215,38 @@ so a decoder that silently normalises has broken the signature scheme.
 seller holds, never the one the buyer echoes back** — a protocol that compares
 a payload to a copy of itself proves only that the peer can echo.
 
+## Groundwork for a zero-knowledge proof
+
+> **`IS_ZERO_KNOWLEDGE` is exported as `false`.** A `BudgetProofBundle`
+> carries its witness in the clear. It is not a proof and must not be handed
+> to a counterparty as one.
+
+`LedgerCommitment` is real, working cryptography — an RFC 6962 Merkle tree, so
+you can publish one hash fixing an entire ledger and later prove one entry
+belongs without revealing the others. `checkBudgetRelation` is the **relation a
+circuit would enforce**, written in ordinary code.
+
+That code is what has to exist first. A circuit is useless without a precise
+split of public from private, and it needs a reference implementation to test
+against — you write the relation twice and check the two agree. This is the
+half that can exist today.
+
+| | |
+|---|---|
+| **Public** | policy digest, ledger root, request digest, time, `ALLOW` |
+| **Private** | the policy *including its limits*, the request, your other transactions |
+
+The valuable property: you prove *"this was within my budget"* **without
+revealing what the budget is or what else you spent it on.** A test asserts the
+limit appears nowhere in the public half.
+
+And one honest gap, reported by the code as an **assumption** rather than a
+constraint: a Merkle tree proves membership, never that nothing else exists, so
+a prover who omits an in-window entry satisfies every constraint. There is a
+test that does exactly that and passes, on purpose. The fix is a different
+commitment — a running total per window rather than individual entries — not
+more cryptography.
+
 ## What it is not
 
 It does not move money. It holds no keys, signs nothing, talks to no chain and

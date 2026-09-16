@@ -435,3 +435,59 @@ before believing a decoded settlement.**
 
 `AdmissionRejection`: `NOT_ATTRIBUTED`, `WRONG_QUOTE`, `QUOTE_EXPIRED`,
 `ASSET_MISMATCH`, `AMOUNT_MISMATCH`.
+
+## Commitments
+
+```ts
+class LedgerCommitment<T> {
+  constructor(values: readonly T[]);
+  readonly root: string;            // RFC 6962 Merkle root
+  readonly size: number;
+  values(): readonly T[];
+  prove(index: number): InclusionProof | null;
+}
+
+interface InclusionProof { index: number; size: number; path: readonly PathStep[] }
+interface PathStep { hash: string; right: boolean }
+
+function verifyInclusion(value: unknown, proof: InclusionProof, root: string): boolean;
+function emptyRoot(): string;
+```
+
+Leaves carry a `0x00` prefix and nodes `0x01`, so an internal node cannot be
+presented as a leaf. Odd levels are promoted, never duplicated, so two
+different ledgers cannot share a root.
+
+## The circuit relation — NOT a proof
+
+```ts
+const IS_ZERO_KNOWLEDGE = false;   // assert on it
+const MAX_WINDOW_ENTRIES = 64;     // a circuit is fixed-size
+
+interface BudgetStatement {        // public
+  policyDigest: string; ledgerRoot: string; requestDigest: string;
+  requestedAt: number; claimedOutcome: "ALLOW";
+}
+interface BudgetWitness {          // private in a real circuit; revealed here
+  policy: SpendPolicy; request: SpendRequest; ruleId: string;
+  windowEntries: readonly { entry: LedgerEntry; inclusion: InclusionProof }[];
+}
+interface BudgetProofBundle { statement: BudgetStatement; witness: BudgetWitness }
+
+function checkBudgetRelation(bundle: BudgetProofBundle): RelationResult;
+function explainRelation(result: RelationResult): string;
+```
+
+| | Constraint | In a circuit |
+|---|---|---|
+| C1 | `hash(policy) == policyDigest` | hash gadget |
+| C2 | `hash(request) == requestDigest` | hash gadget |
+| C3 | request time matches the statement | one equality |
+| C4 | each entry included under `ledgerRoot` | **dominates the cost** |
+| C5 | each entry inside the window | two comparisons |
+| C6 | `sum + amount <= maxTotal` | addition + one comparison |
+
+`RelationResult.assumptions` carries **COMPLETENESS** — the witness is assumed
+to hold every in-window entry, which no Merkle inclusion proof can establish.
+Reported apart from `constraints` so a caller cannot mistake five checks for
+six.

@@ -392,6 +392,53 @@ second, weaker validator at the boundary would become a second opinion people
 trusted by mistake. The decode establishes that the envelope is well-formed and
 says so plainly, and the docs push the caller to the verifier.
 
+## The circuit: why the statement comes before the cryptography
+
+The proving system is not the hard part of making a policy decision private,
+and it is not the part that has to come first.
+
+A circuit is useless without a **statement**: a precise split of public from
+private, and a relation between them expressible as arithmetic. Getting that
+wrong yields a proof of the wrong thing, which is worse than no proof, and no
+proving system rescues it. A circuit also needs a **test oracle** — the
+relation written twice, once in constraints and once in ordinary code, checked
+to agree on every input. Ordinary code is the half that can exist today, and
+the half a cryptographer needs in order to write the other.
+
+So `circuit.ts` is that statement and that oracle, and `IS_ZERO_KNOWLEDGE` is
+exported as `false` so the claim sits somewhere type-checked rather than only
+in prose.
+
+The split puts the **limit on the private side**. That is the property worth
+having: proving "this was within my budget" without revealing what the budget
+is or what else it was spent on. The tests assert the limit appears nowhere in
+the public half.
+
+C4 — Merkle inclusion — dominates the cost. SHA-256 is tens of thousands of
+constraints per path step, so a real circuit swaps in a field-native hash
+(Poseidon, Rescue) and the tree here is rebuilt with it. C1–C3 move for the
+same reason. C5 and C6 are integer comparisons and nearly free. That ordering
+is the useful output of doing this in plain code first: it says where the
+engineering will actually go.
+
+### The gap no proving system closes
+
+A prover who omits an in-window entry produces a smaller sum, and **every
+constraint still passes**. A Merkle tree proves membership; it does not prove
+that nothing else exists. There is a test that omits an entry and satisfies
+the relation, kept passing on purpose so the gap cannot be forgotten.
+
+This is a property of the commitment, not of the proving system, so no
+cryptography bolted on later fixes it. The fix is to commit to a **running
+total per (account, asset, window)** instead of to individual entries: the
+circuit then proves inclusion of one aggregate leaf, and completeness becomes
+the committer's responsibility — discharged by the journal's hash chain, which
+already exists.
+
+`checkBudgetRelation` reports it under `assumptions`, separately from
+`constraints`, because a result that folded an unchecked assumption in with six
+checked constraints would be a lie told by a data structure.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
@@ -431,6 +478,10 @@ says so plainly, and the docs push the caller to the verifier.
 - **No HTTP.** This module encodes and decodes header values. Binding them to a
   server or client belongs in an app, not in a package that must compile
   without a network.
+- **There is no zero-knowledge proof here.** `circuit.ts` reveals its witness.
+  It is the statement and the test oracle, not the proof.
+- **Completeness is assumed, not proven.** See above; the fix is a different
+  commitment shape.
 - **One algorithm.** Ed25519 only. `SignatureAlgorithm` is a union so adding
   another is an addition the compiler then enforces everywhere, but nothing
   else is implemented today.
