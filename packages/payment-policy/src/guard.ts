@@ -107,6 +107,14 @@ export type Authorization =
       readonly refusal: "DUPLICATE";
       readonly request: SpendRequest;
       readonly existing: LedgerEntry;
+      /**
+       * The decision that authorised the original attempt.
+       *
+       * A retry is owed the answer it was given, not a fresh evaluation
+       * against a ledger that has moved on since. `null` only for a
+       * reservation recorded before decisions were kept.
+       */
+      readonly decision: Decision | null;
     }
   /**
    * The id has been seen, but for a different spend.
@@ -151,7 +159,20 @@ export type GuardOutcome<T> =
       readonly overage: Amount;
     }
   | { readonly outcome: "REFUSED"; readonly decision: Decision }
-  | { readonly outcome: "DUPLICATE"; readonly existing: LedgerEntry }
+  /**
+   * Already seen, and the same request.
+   *
+   * Carries the original decision and the reservation as it now stands, so a
+   * caller that lost its first answer — to a timeout, a crash, a dropped
+   * connection — can recover it instead of asking again and getting a
+   * different one. Read `existing.state` and `existing.amount` for how it
+   * turned out.
+   */
+  | {
+      readonly outcome: "DUPLICATE";
+      readonly existing: LedgerEntry;
+      readonly decision: Decision | null;
+    }
   /** The id was reused for a different spend. The operation does not run. */
   | {
       readonly outcome: "MISMATCH";
@@ -249,7 +270,13 @@ export class SpendGuard {
             `(${existing.intent.slice(0, 12)}), not ${intent.slice(0, 12)}`,
         };
       }
-      return { granted: false, refusal: "DUPLICATE", request, existing };
+      return {
+        granted: false,
+        refusal: "DUPLICATE",
+        request,
+        existing,
+        decision: existing.decision,
+      };
     }
 
     const policy = this.#policyFor(request.account) ?? EMPTY_POLICY(request.account);
@@ -287,7 +314,7 @@ export class SpendGuard {
     if (!auth.granted) {
       switch (auth.refusal) {
         case "DUPLICATE":
-          return { outcome: "DUPLICATE", existing: auth.existing };
+          return { outcome: "DUPLICATE", existing: auth.existing, decision: auth.decision };
         case "MISMATCH":
           return { outcome: "MISMATCH", existing: auth.existing, detail: auth.detail };
         case "DENIED":

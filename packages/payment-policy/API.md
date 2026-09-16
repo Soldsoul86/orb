@@ -93,6 +93,7 @@ interface LedgerEntry {
   at: number;                          // when authorized, not when settled
   state: LedgerState;
   intent: string;                      // requestIntent at reservation; "" = unknown (legacy)
+  decision: Decision | null;           // why it was allowed; null = unknown (legacy)
 }
 
 interface WindowQuery {
@@ -256,14 +257,14 @@ declares what it cost (or, with `0n`, that it cost nothing).
 |---|---|---|
 | `COMPLETED` | ran; carries `reserved`, `actual`, `overage` | `SETTLED` at `actual` |
 | `REFUSED` | policy said no; carries the `decision` | nothing written |
-| `DUPLICATE` | same id, same request; **the operation never runs** | unchanged |
+| `DUPLICATE` | same id, same request; **the operation never runs**. Carries the **original** `decision` and `existing` (read `state` and `amount` for how it turned out) | unchanged |
 | `MISMATCH` | same id, **different** request; the operation never runs | unchanged |
 | `FAILED` | threw, but declared its cost | `SETTLED` at that cost |
 | `INDETERMINATE` | threw without declaring; we do not guess | stays `PENDING` |
 
 `Authorization` is a four-way union — `{granted: true, …}`,
 `{granted: false, refusal: "DENIED", decision}`,
-`{granted: false, refusal: "DUPLICATE", existing}`, or
+`{granted: false, refusal: "DUPLICATE", existing, decision}`, or
 `{granted: false, refusal: "MISMATCH", existing, detail}`. Granted
 authorizations carry `settle(actual)` and `reverse()`.
 
@@ -284,6 +285,12 @@ record of what was asked for.
 
 `intent: ""` means unknown: an entry replayed from history written before
 fingerprints existed. Such a retry falls back to plain duplicate detection.
+
+A duplicate returns **the answer given the first time**, not a fresh
+evaluation. A retry that arrives after the budget has filled, or after the
+policy changed, still gets the original `ALLOW` — re-deciding would tell a
+caller its payment was refused when it was in fact allowed and may already
+have happened.
 
 The canonical encoding is `wire.ts`'s. For anyone comparing against protocols
 that mandate **RFC 8785 (JCS)**: this is canonical and deterministic but is not

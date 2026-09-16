@@ -48,6 +48,7 @@ const reservation = (requestId: string, amount: bigint, at = T0): LedgerEntry =>
   at,
   state: "PENDING",
   intent: "",
+  decision: null,
 });
 
 async function openStore(journalStore: JournalStore, lane = "device-a") {
@@ -222,6 +223,65 @@ describe("the idempotency fingerprint", () => {
       async () => "done",
     );
     strictEqual(changed.outcome, "MISMATCH");
+  });
+});
+
+describe("the recorded decision", () => {
+  it("survives a restart, so a retry still gets its original answer", async () => {
+    const disk = new MemoryJournalStore();
+    const clock = new ManualClock(T0);
+    const spend = (requestId: string, amount: bigint) => ({
+      requestId,
+      account: ACCOUNT,
+      requester: { kind: "AGENT", agentId: "researcher" } as const,
+      asset: TOKENS,
+      amount,
+      destination: "vendor:api",
+    });
+
+    const first = await openStore(disk);
+    const guardA = new SpendGuard({ store: first.store, clock, policyFor: singlePolicy(policy) });
+    await guardA.run(spend("call-1", 1_000n), async () => "done");
+    first.store.close();
+    await first.journal.close();
+
+    const second = await openStore(disk);
+    const restored = await second.store.find("call-1");
+    strictEqual(restored?.decision?.outcome, "ALLOW");
+    strictEqual(restored?.decision?.policyDigest.length, 64);
+
+    const guardB = new SpendGuard({ store: second.store, clock, policyFor: singlePolicy(policy) });
+    const retry = await guardB.run(spend("call-1", 1_000n), async () => "done");
+    strictEqual(retry.outcome, "DUPLICATE");
+    if (retry.outcome !== "DUPLICATE") return;
+    strictEqual(retry.decision?.outcome, "ALLOW");
+  });
+
+  it("keeps every rule the decision evaluated, not just the verdict", async () => {
+    const { store, journal } = await openStore(new MemoryJournalStore());
+    const guard = new SpendGuard({
+      store,
+      clock: new ManualClock(T0),
+      policyFor: singlePolicy(policy),
+    });
+    await guard.run(
+      {
+        requestId: "call-1",
+        account: ACCOUNT,
+        requester: { kind: "AGENT", agentId: "researcher" },
+        asset: TOKENS,
+        amount: 1_000n,
+        destination: "vendor:api",
+      },
+      async () => "done",
+    );
+
+    // The audit value of a decision is the rules it passed, not only the one
+    // that would have failed.
+    const evaluations = (await store.find("call-1"))?.decision?.evaluations ?? [];
+    strictEqual(evaluations.length, policy.rules.length);
+    store.close();
+    await journal.close();
   });
 });
 

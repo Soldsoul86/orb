@@ -516,16 +516,41 @@ detection: no worse than the behaviour it replaces, and it never passes a
 changed request off as a matching one. `payment.reserved` is schema v2 for the
 added field; v1 events still replay (Art. X §37).
 
+## A retry is owed the answer it was given
+
+Detecting a duplicate is only half of an idempotency guarantee. The other half
+is what comes back: a caller that lost its first answer — to a timeout, a
+crash, a dropped connection — retries precisely because it does not know what
+happened, and handing it a *fresh* evaluation answers a different question.
+
+Between two attempts the ledger moves: other spends land, budgets fill,
+policies are edited. Re-deciding a retry against that newer world can refuse a
+payment that was allowed and may already have been made. So a reservation
+records the decision that authorised it, and a duplicate returns that.
+
+**Where the decision lives, and why not in its own event.** It sits on the
+reservation rather than in a separate `payment.decided` event, because a
+reservation exists *because* a decision allowed it: two events that can never
+appear apart are one event pretending to be two. `LedgerEntry` therefore
+type-imports `Decision` from `evaluate.ts`, which under
+`verbatimModuleSyntax` erases completely — the apparent cycle does not exist
+at runtime.
+
+An entry recorded before decisions were kept returns `null` rather than a
+re-derived one. Inventing an answer would be the same error as guessing at an
+ambiguous settlement: it would look authoritative while being a fresh opinion
+about a past event.
+
 ## Known limits
 
 - **Window queries are linear in ledger size.** `spentWithin` scans every
   entry. At realistic volumes this is irrelevant, and Art. IX §36 says build
   the simplest correct thing. A caller with a large history may pre-filter to
   the longest window; correctness does not depend on it.
-- **A duplicate does not return the original decision.** It returns the
-  existing ledger entry. Protocols that require replay to return the *original
-  response* (including server-generated ids) want more than this; decisions are
-  not currently stored alongside reservations.
+- **A duplicate returns the original decision, not the original operation
+  result.** The value an operation returned is the caller's data — arbitrary
+  and potentially large — and is not stored. Protocols that require replay to
+  reproduce the full original response body want more than this.
 - **The canonical encoding is not RFC 8785.** It is canonical and
   deterministic, and never emits a float — which is where the two would differ
   — but a protocol that mandates JCS by name is not satisfied by it.

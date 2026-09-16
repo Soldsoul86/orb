@@ -389,6 +389,7 @@ export function authorizedEntry(request: SpendRequest, decision: Decision): Ledg
     at: request.requestedAt,
     state: "PENDING",
     intent: requestIntent(request),
+    decision,
   };
 }
 

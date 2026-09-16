@@ -304,6 +304,98 @@ describe("a reused id must be the same request", () => {
   });
 });
 
+describe("a duplicate returns the answer it gave the first time", () => {
+  it("carries the original decision, not just the ledger entry", async () => {
+    const { guard } = build();
+    const first = await guard.run(draft("same"), async () => "done");
+    strictEqual(first.outcome, "COMPLETED");
+
+    const second = await guard.run(draft("same"), async () => "done");
+    strictEqual(second.outcome, "DUPLICATE");
+    if (second.outcome !== "DUPLICATE") return;
+    strictEqual(second.decision?.outcome, "ALLOW");
+    strictEqual(second.decision?.requestId, "same");
+  });
+
+  it("reports how the original turned out", async () => {
+    const { guard } = build();
+    await guard.run(draft("same", 1_000n), async (grant) => {
+      grant.report(640n);
+      return "done";
+    });
+
+    const retry = await guard.run(draft("same", 1_000n), async () => "done");
+    strictEqual(retry.outcome, "DUPLICATE");
+    if (retry.outcome !== "DUPLICATE") return;
+    // A caller that lost its first answer can recover both halves: what was
+    // decided, and what it ended up costing.
+    strictEqual(retry.existing.state, "SETTLED");
+    strictEqual(retry.existing.amount, 640n);
+  });
+
+  it("returns the ORIGINAL answer even though a fresh one would differ", async () => {
+    // This is the whole point. Between the two attempts the budget fills up,
+    // so re-evaluating now would deny. A retry must not be told its payment
+    // was refused when it was in fact allowed and may already have happened.
+    const { guard } = build();
+    await guard.run(draft("same", 1_000n), async () => "done");
+    await guard.run(draft("filler-a", 1_000n), async () => "done");
+    await guard.run(draft("filler-b", 1_000n), async () => "done");
+
+    // Proof the ledger really has moved on.
+    strictEqual((await guard.run(draft("fresh", 1_000n), async () => "x")).outcome, "REFUSED");
+
+    const retry = await guard.run(draft("same", 1_000n), async () => "done");
+    strictEqual(retry.outcome, "DUPLICATE");
+    if (retry.outcome !== "DUPLICATE") return;
+    strictEqual(retry.decision?.outcome, "ALLOW");
+  });
+
+  it("returns the decision made under the policy in force at the time", async () => {
+    const store = new MemoryLedgerStore();
+    const clock = new ManualClock(T0);
+    let current = policy;
+    const guard = new SpendGuard({ store, clock, policyFor: () => current });
+
+    await guard.run(draft("same"), async () => "done");
+
+    // The rules change afterwards. The recorded decision names the old ones.
+    current = { ...policy, version: 99 };
+    const retry = await guard.run(draft("same"), async () => "done");
+
+    strictEqual(retry.outcome, "DUPLICATE");
+    if (retry.outcome !== "DUPLICATE") return;
+    strictEqual(retry.decision?.policyVersion, 7);
+  });
+
+  it("an entry from before decisions were recorded says so, rather than inventing one", async () => {
+    const store = new MemoryLedgerStore();
+    await store.append({
+      requestId: "legacy",
+      account: ACCOUNT,
+      asset: TOKENS,
+      amount: 1_000n,
+      destination: "vendor:api",
+      requester: { kind: "AGENT", agentId: "researcher" },
+      at: T0,
+      state: "SETTLED",
+      intent: "",
+      decision: null,
+    });
+    const guard = new SpendGuard({
+      store,
+      clock: new ManualClock(T0),
+      policyFor: singlePolicy(policy),
+    });
+
+    const retry = await guard.run(draft("legacy"), async () => "x");
+    strictEqual(retry.outcome, "DUPLICATE");
+    if (retry.outcome !== "DUPLICATE") return;
+    // Re-deriving it now would answer a different question.
+    strictEqual(retry.decision, null);
+  });
+});
+
 describe("an honest retry is still a duplicate", () => {
   /* A fingerprint that is too wide rejects retries that were never wrong.
      These are the fields a genuine retry is expected to differ on. */
@@ -363,6 +455,7 @@ describe("an honest retry is still a duplicate", () => {
       at: T0,
       state: "SETTLED",
       intent: "",
+      decision: null,
     });
     const guard = new SpendGuard({
       store,

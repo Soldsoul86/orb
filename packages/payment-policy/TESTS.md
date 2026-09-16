@@ -1,6 +1,6 @@
 # Tests — @orb/payment-policy
 
-`npm test -w @orb/payment-policy` — **240 tests, all passing.** (665 across the repo.)
+`npm test -w @orb/payment-policy` — **247 tests, all passing.** (672 across the repo.)
 
 Unit tests only. The package has no I/O to integrate with, which is the point
 — the guard's clock and store are both injected.
@@ -235,6 +235,15 @@ different amount, destination, asset or requester is refused as `MISMATCH`, and
 the operation does not run. Conversely, the fields an honest retry is *expected*
 to differ on — a later timestamp, approvals collected since, a changed memo —
 remain ordinary duplicates.
+
+**A duplicate returns the answer given the first time.** The sharpest case:
+between two attempts the budget fills, so a fresh evaluation would *deny* — the
+test proves the ledger really has moved on, then checks the retry still gets
+the original `ALLOW`. Another changes the policy between attempts and checks
+the returned decision names the version in force at the time. An entry from
+before decisions were recorded returns `null` rather than a re-derived answer.
+A restart-and-reload test proves the decision, including every rule it
+evaluated, is persisted rather than held in memory.
 
 The sharpest one: **the fingerprint survives settlement.** `settle` overwrites
 `amount` with what was really spent, so a request for 1,000 settled at 400 must

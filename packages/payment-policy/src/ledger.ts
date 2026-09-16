@@ -19,6 +19,9 @@
  */
 import type { Amount, AssetId, Requester } from "./model.js";
 import { requesterKey } from "./model.js";
+// Type-only, so it erases entirely under `verbatimModuleSyntax` and the
+// apparent cycle with `evaluate.ts` never exists at runtime.
+import type { Decision } from "./evaluate.js";
 
 /**
  * Where a spend stands.
@@ -55,6 +58,19 @@ export interface LedgerEntry {
    * matching one.
    */
   readonly intent: string;
+  /**
+   * The decision that authorised this reservation.
+   *
+   * Kept because a retry deserves the answer it was given the first time, not
+   * a fresh evaluation against a ledger that has moved on. Storing it here
+   * rather than in a second event is deliberate: a reservation exists
+   * *because* a decision allowed it, and two events that can never appear
+   * separately are one event pretending to be two.
+   *
+   * `null` means unknown — an entry replayed from history written before
+   * decisions were recorded.
+   */
+  readonly decision: Decision | null;
 }
 
 /** Does this entry still hold budget? */

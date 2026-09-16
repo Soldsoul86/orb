@@ -34,19 +34,22 @@ import { orderEvents } from "@orb/journal";
 
 import type { Amount } from "./model.js";
 import type { Requester } from "./model.js";
+import type { Decision } from "./evaluate.js";
 import type { LedgerEntry } from "./ledger.js";
 import type { LedgerStore } from "./store.js";
 import { LedgerProjection, LedgerStoreError } from "./store.js";
 
 /**
- * Version 2 adds `intent` to `payment.reserved`.
+ * Version 3 adds `decision` to `payment.reserved`; version 2 added `intent`.
  *
- * Art. X §37 — the kernel evolves through addition. A v1 event carries no
- * fingerprint and replays with `intent: ""`, meaning "cannot be compared";
- * such a reservation falls back to plain duplicate detection rather than
- * failing to load.
+ * Art. X §37 — the kernel evolves through addition. Older events replay with
+ * the newer fields absent and read as "unknown" (`intent: ""`,
+ * `decision: null`) rather than failing to load. Unknown is always treated as
+ * the cautious case: an uncomparable fingerprint falls back to plain duplicate
+ * detection, and a missing decision is reported as missing rather than
+ * re-derived, because re-evaluating now would answer a different question.
  */
-export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 2 };
+export const LEDGER_SCHEMA: SchemaRef = { id: "orb.payment.ledger", version: 3 };
 
 export const RESERVED = "payment.reserved";
 export const SETTLED = "payment.settled";
@@ -63,6 +66,8 @@ interface ReservedPayload {
   readonly at: number;
   /** Absent on v1 events. */
   readonly intent?: string;
+  /** Absent before v3. */
+  readonly decision?: Decision;
 }
 
 interface SettledPayload {
@@ -76,6 +81,19 @@ interface ReversedPayload {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/**
+ * Reads a recorded decision, or `null` when there is nothing usable.
+ *
+ * Only shape is checked, not contents: this is our own event, written by this
+ * package, so a deep validator here would be re-verifying our own output. A
+ * pre-v3 event, or anything unrecognisable, reads as absent rather than
+ * throwing — history that cannot be loaded is worse than history with a gap.
+ */
+function readDecision(value: unknown): Decision | null {
+  if (!isRecord(value)) return null;
+  return typeof value["outcome"] === "string" ? (value as unknown as Decision) : null;
 }
 
 /** The request a ledger event concerns, or `null` if it is not a ledger event. */
@@ -115,6 +133,7 @@ export function applyLedgerEvent(projection: LedgerProjection, event: OrbEvent):
         state: "PENDING",
         // A v1 event has none. Unknown, never guessed at.
         intent: typeof p.intent === "string" ? p.intent : "",
+        decision: readDecision(p.decision),
       });
       return true;
     }
@@ -228,6 +247,7 @@ export class JournalLedgerStore implements LedgerStore {
       requester: entry.requester,
       at: entry.at,
       intent: entry.intent,
+      ...(entry.decision === null ? {} : { decision: entry.decision }),
     };
     await this.#journal.appendOne({ type: RESERVED, schema: LEDGER_SCHEMA, payload });
   }

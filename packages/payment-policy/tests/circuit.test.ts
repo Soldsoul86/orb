@@ -54,6 +54,7 @@ const entry = (id: string, amount: bigint, at: number): LedgerEntry => ({
   at,
   state: "SETTLED",
   intent: "",
+  decision: null,
 });
 
 const request: SpendRequest = {
