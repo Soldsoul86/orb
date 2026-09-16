@@ -80,6 +80,14 @@ Authorization scales with consequence and reversibility:
 - Financial actions and anything that moves money or sends communications on the
   user's behalf are irreversible-tier by default.
 
+**Implemented for money movement.** `packages/payment-policy` is the first
+implementation of this tier's authorization requirement. Its `WINDOW_BUDGET`
+and `APPROVAL_THRESHOLD` rules are per-scope authorization in the sense used
+above — a scope's budget is never authorization for another scope — and its
+`APPROVAL_THRESHOLD` expresses the human confirmation this section requires as
+a rule rather than as configuration. It is not yet expressed as a `Capability`
+contract, because that contract does not exist yet; see `ARCHITECTURAL_DEBT.md`.
+
 ---
 
 ## 6. Local-First Capabilities

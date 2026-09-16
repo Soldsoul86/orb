@@ -127,6 +127,51 @@ them when they are accepted. Recorded in `ARCHITECTURAL_DEBT.md`.
 
 ---
 
+### Amendment — the payment policy engine
+
+An executable spend-authorization engine (`packages/payment-policy`,
+`packages/payment-circuit`) was built ahead of this phase's gate, at the
+operator's explicit direction. Recorded here for the same reason as the
+executor above: phases are sequential, and a deviation that is not written
+down is not a deviation, it is a lie of omission.
+
+**What it deviates from.** The same Phase 3b/3c gap as the executor. No
+contract specification exists for `Capability`, `Action` or `Policy`, and
+implementation interfaces were written before contract specs were accepted.
+
+**What it does not deviate from.** Less than the executor, and this is the
+point worth recording. `CAPABILITY_MODEL.md` §5 already placed *"make a
+payment"* in the irreversible tier and required *"explicit, per-scope
+authorization"* for it. This package is the first implementation of that
+requirement rather than a new idea beside it:
+
+- `WINDOW_BUDGET` and `APPROVAL_THRESHOLD` **are** per-scope authorization;
+  a scope's budget is never authorization for another scope (§5).
+- `APPROVAL_THRESHOLD` is the human confirmation §5 requires for irreversible
+  actions, expressed as a rule rather than as configuration.
+- the ledger is a **projection** over the journal, never a source of truth
+  (Art. IX §33); every reservation, settlement and reversal enters through
+  the journal (Art. IX §34), append-only and hash-chained (Art. I).
+- `evaluate()` is pure and total: the same request, policy and ledger produce
+  the same decision and the same explanation forever (Art. II §9, §10).
+- Art. XI §42 is honoured literally. A spend is **never** assumed to have
+  happened because it was authorized; the reconciler settles only on a
+  Sensor's confirmation, and an observer that answers `UNKNOWN` resolves
+  nothing.
+- Art. III §11: no provider is named anywhere in the package. Assets, rails
+  and directories are all caller-supplied ports.
+
+**The governing rule** is the executor's, one layer down and pointed at money:
+*entry may come from the signal provider; exit authority belongs to the
+executor* becomes *a payment may be requested by anyone; **spend authority
+belongs to the policy***.
+
+**Outstanding debt.** The same three contracts, plus one of its own: nothing
+in the runtime yet *invokes* this engine as a Capability, and the trade
+executor does not use it. Recorded in `ARCHITECTURAL_DEBT.md`.
+
+---
+
 ## Phase 4 — Runtime Skeleton
 
 Only after contracts are accepted. The **first executable component is the Event

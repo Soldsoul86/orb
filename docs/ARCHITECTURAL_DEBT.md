@@ -115,9 +115,10 @@ durable reflection-state need materializes.
 
 ---
 
-## Trade executor built ahead of its contract specifications
+## Executables built ahead of their contract specifications
 
 **Recorded:** Phase 3, alongside the Hyperliquid trade executor.
+**Extended:** Phase 3, alongside the payment policy engine.
 
 The executor (`packages/trade-executor`, `packages/hyperliquid`,
 `apps/executor`) was implemented at the operator's direction before Phase 3b
@@ -154,3 +155,40 @@ Nothing about the implementation forecloses any of the three specifications.
    mutation).
 3. Journal `RiskConfig` changes as events, so the threshold in force at any past
    moment is replayable rather than inferred.
+
+### Extension — the payment policy engine
+
+`packages/payment-policy` and `packages/payment-circuit` were built under the
+same deviation, recorded in `ROADMAP.md`. Two things changed about this entry
+as a result, one of them good.
+
+**What it partly discharges.** The `Capability` item above observes that for
+the executor, *"human confirmation for irreversible actions is currently
+satisfied by configuration … rather than by a per-action authorization gate."*
+`payment-policy` **is** that per-action gate, built and tested — per-scope
+budgets, approval thresholds, attestation requirements, and a decision that
+recomputes identically from the journal. `CAPABILITY_MODEL.md` §5 now points
+at it.
+
+The debt is only partly discharged, and the remainder is stated plainly:
+
+- it gates **money**, not every irreversible action;
+- it is a library, not a `Capability` — it declares no permission tier,
+  because the contract that would carry one does not exist;
+- **nothing in the runtime invokes it yet**, and the trade executor does not
+  use it. An authorization gate nobody calls authorizes nothing.
+
+**What it adds.** `SpendPolicy` is a `Policy` in substance, exactly as
+`RiskConfig` is, and carries the same gap: a policy change is not itself
+journalled, so the policy in force at a past moment is inferred rather than
+replayed. `policyDigest` is recorded in every decision and every receipt,
+which makes a change *detectable* after the fact — the receipt will fail
+`POLICY_BINDING` against the wrong policy — but detectable is not replayable.
+
+**Repayment**, in addition to the three steps above:
+
+4. Express the guard as a `Capability` with the irreversible tier declared,
+   and route the executor's order submission through it so one authorization
+   gate serves both.
+5. Journal `SpendPolicy` versions as events, so a decision replays against the
+   policy that actually produced it rather than the policy on disk today.
