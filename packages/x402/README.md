@@ -51,6 +51,12 @@ one answer to that question rather than as a fix for an acknowledged defect.
 `examples/12-x402-retry-pays-once.mjs` reproduces it against the real
 reference wrapper, then shows the same client paying once behind the guard.
 
+**Checked rather than claimed.** The seven properties in
+[`@spendcap/x402-conformance`](../x402-conformance) ask what a client does when
+the settlement outcome is unknown, and this package answers all seven. The same
+battery is run against a deliberately wrong client that fails five of them, so
+the questions are known to discriminate rather than merely to be passed.
+
 **Why the client's own spend controls do not prevent it.** `SpendControls` is
 a per-payment USD cap plus an asset allowlist. It holds no ledger and no
 record of what has already been paid, so it cannot tell a retry from a new

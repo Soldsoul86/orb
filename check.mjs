@@ -526,5 +526,77 @@ section("@spendcap/x402: a retry pays once");
       && purchaseId("acct", buyer, pr) !== purchaseId("acct", buyer, { ...pr, accepts: [{ ...terms, amount: "10001" }] }));
 }
 
+/* -- The conformance battery, run as properties ---------------------------- *
+ * The harness in packages/x402-conformance asks seven questions of any
+ * client. Two of them are asserted here against a deliberately wrong client
+ * as well, because a battery its own author's implementation always passes is
+ * not measuring anything. The negative control is the check that the checks
+ * work. */
+{
+  const { runBattery } = await import("@spendcap/x402-conformance");
+  const { wrapFetchWithPayment: wrap, x402Client } = await import("@x402/fetch");
+  const { guardX402 } = await import("@spendcap/x402");
+  const { MemoryLedgerStore, SpendGuard, singlePolicy } = await import("@spendcap/policy");
+
+  const NET = "eip155:8453";
+  const A = `${NET}/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`;
+  const mkClient = (scheme) =>
+    new x402Client().register(NET, scheme).setSpendControls({ allowedAssets: true, maxAmountPerPayment: "$1" });
+
+  let ledgerStore = null;
+  const guardedUnderTest = {
+    paying: (scheme, serverFetch) => {
+      ledgerStore = new MemoryLedgerStore();
+      const g = guardX402(mkClient(scheme), {
+        guard: new SpendGuard({
+          store: ledgerStore,
+          policyFor: singlePolicy({ account: "acct", version: 1, rules: [
+            { id: "cap", kind: "PER_TRANSACTION_LIMIT", scope: { kind: "ANY" }, asset: A, maxAmount: 1_000_000n },
+          ]}),
+        }),
+        account: "acct",
+        requester: { kind: "AGENT", agentId: "buyer" },
+      });
+      const pay = g.fetch(serverFetch);
+      return (url) => pay(url);
+    },
+    ledger: async () => (ledgerStore === null ? [] : (await ledgerStore.entries("acct")).map((e) => e.state)),
+  };
+
+  const guardedReport = await runBattery("guarded", guardedUnderTest);
+  check(`the guarded client satisfies all ${guardedReport.results.length} conformance properties`,
+    guardedReport.failed === 0 && guardedReport.inapplicable === 0,
+    guardedReport.results.filter((r) => r.verdict.ok !== true).map((r) => `${r.id} ${r.verdict.detail}`).join("; "));
+
+  // The reference client, unmodified, with its own spend controls on.
+  const referenceReport = await runBattery("reference", {
+    paying: (scheme, serverFetch) => { const pay = wrap(serverFetch, mkClient(scheme)); return (url) => pay(url); },
+  });
+  check("the battery discriminates: the reference client fails the two it can be asked",
+    referenceReport.failed === 2 && referenceReport.results.filter((r) => r.verdict.ok === false).map((r) => r.id).join() === "P1,P2",
+    referenceReport.results.filter((r) => r.verdict.ok === false).map((r) => r.id).join());
+
+  // A client that resolves optimistically: anything not a clean 200 means
+  // "nothing moved". Both mistakes -- settling and reversing on no evidence.
+  let naiveStates = [];
+  const naiveReport = await runBattery("naive", {
+    paying: (scheme, serverFetch) => {
+      naiveStates = [];
+      const pay = wrap(serverFetch, mkClient(scheme));
+      return async (url) => {
+        naiveStates.push("PENDING");
+        try {
+          const r = await pay(url);
+          naiveStates[naiveStates.length - 1] = r.status === 200 ? "SETTLED" : "REVERSED";
+          return r;
+        } catch (e) { naiveStates[naiveStates.length - 1] = "REVERSED"; throw e; }
+      };
+    },
+    ledger: async () => naiveStates,
+  });
+  check("the negative control fails five properties, so they are not vacuous",
+    naiveReport.failed === 5, `failed: ${naiveReport.results.filter((r) => r.verdict.ok === false).map((r) => r.id).join()}`);
+}
+
 process.stdout.write(failures === 0 ? "\nall checks passed\n" : `\n${failures} check(s) FAILED\n`);
 process.exit(failures === 0 ? 0 : 1);

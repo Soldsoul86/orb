@@ -24,6 +24,7 @@ node examples/05-two-person-approval.mjs   # just one
 | 10 | Ledger on disk survives a restart; ambiguous failure reconciled; receipt verifies | `JournalLedgerStore`, `reconcile`, `verifyReceipt` |
 | 11 | The Anthropic SDK behind the guard, with a model allowlist and a token budget | `@spendcap/anthropic`, `DESTINATION_ALLOWLIST`, `WINDOW_BUDGET` |
 | 12 | x402: a retry after a lost response pays once, not twice; the reference client pays twice | `@spendcap/x402`, `PER_TRANSACTION_LIMIT`, `DESTINATION_ALLOWLIST`, `reconcile` |
+| 13 | The same seven conformance questions asked of two clients, side by side | `@spendcap/x402-conformance`, `runBattery`, `compare` |
 
 Every limit in these files is a field you can change: the asset name, the
 number, the window, and who the rule applies to. Nothing is hard-coded in the

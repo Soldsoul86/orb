@@ -22,6 +22,7 @@ Programmable spend authority for AI agents, published on npm under the
 | [`@spendcap/circuit`](packages/circuit) | Prove a spend stayed inside a budget without revealing the budget |
 | [`@spendcap/anthropic`](packages/anthropic) | The Anthropic SDK behind the guard: swap one import, every call is decided, reserved and settled |
 | [`@spendcap/x402`](packages/x402) | x402 behind the guard: the policy decides before anything is signed, and a retry pays once |
+| [`@spendcap/x402-conformance`](packages/x402-conformance) | Seven properties any x402 client must satisfy when it cannot tell whether the money moved |
 
 ```bash
 npm install @spendcap/policy

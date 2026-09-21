@@ -1,0 +1,51 @@
+{
+  "name": "@spendcap/x402-conformance",
+  "version": "0.1.0",
+  "description": "Does an x402 client do the right thing when it cannot tell whether the money moved? Seven properties, any client.",
+  "keywords": [
+    "x402",
+    "conformance",
+    "testing",
+    "agentic-payments",
+    "idempotency",
+    "settlement",
+    "double-spend"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Soldsoul86/allowance/tree/main/packages/x402-conformance#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Soldsoul86/allowance.git",
+    "directory": "packages/x402-conformance"
+  },
+  "bugs": {
+    "url": "https://github.com/Soldsoul86/allowance/issues"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@x402/core": "^2.26.0"
+  }
+}
