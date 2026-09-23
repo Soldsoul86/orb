@@ -61,7 +61,8 @@ Mac, `adb pair <ip:port> <code>`, then `npm run sync -- --connect <ip:port>`
 (the address on the main Wireless debugging screen). After that, plain
 `npm run sync` finds the phone by itself while Wireless debugging is on. With no phone connected,
 `npm run sync` prints these steps. It prints a short summary; the full report is
-in `private/report.txt`. What it could not read goes to `private/feedback.txt`,
+in `private/report.txt`. Raw copies (all SMS, contacts, calls) are read in
+memory and not kept on the computer (`--keep-raw` keeps them). What it could not read goes to `private/feedback.txt`,
 masked and safe to paste into a chat, so the readers can be improved against
 your real formats.
 

@@ -56,10 +56,16 @@ const summary = collector.result();
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'mail.json'), JSON.stringify(summary, null, 2));
 
-// Rebuild the profile with the mail added to whatever the last sync pulled.
+// Rebuild the profile with the mail added, when the last sync kept its raw
+// copies; otherwise the next sync (manual or scheduled) adds it.
 const inputs: ImportInput[] = [];
 for (const f of ['sms.txt', 'apps.txt', 'phone.txt', 'contacts.txt', 'calls.txt']) {
   if (existsSync(join(out, f))) inputs.push({ name: f, text: readFileSync(join(out, f), 'utf8') });
+}
+if (inputs.length === 0) {
+  console.log(`Saved ${join(out, 'mail.json')} (no mail text): ${summary.messages} mails, ${summary.receipts.length} receipts, ${summary.bookings.length} bookings.`);
+  console.log('It joins your profile on the next sync: npm run sync (or wait for the scheduled one).');
+  process.exit(0);
 }
 if (existsSync(join(out, 'usage'))) {
   for (const f of readdirSync(join(out, 'usage')).filter((f) => f.endsWith('.txt')).sort()) inputs.push({ name: `usage/${f}`, text: readFileSync(join(out, 'usage', f), 'utf8') });

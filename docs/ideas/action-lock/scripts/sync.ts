@@ -9,7 +9,7 @@
 // summary from `npm run mail` if there is one. Everything stays in ./private
 // on this computer.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatFeedback, formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
 import { PHONE_SCRIPT } from '../src/import/phone.ts';
@@ -107,7 +107,14 @@ function syncOnce(): boolean {
     return false;
   }
   mkdirSync(join(out, 'usage'), { recursive: true });
-  writeFileSync(join(out, 'sms.txt'), sms.out);
+  // Raw copies (every SMS, contacts, calls) are read in memory and not kept on
+  // this computer unless asked: the phone already has them. Old copies are removed.
+  const keepRaw = args.includes('--keep-raw');
+  const save = (file: string, text: string) => {
+    if (keepRaw) writeFileSync(join(out, file), text);
+    else if (existsSync(join(out, file))) unlinkSync(join(out, file));
+  };
+  save('sms.txt', sms.out);
   const inputs: ImportInput[] = [{ name: 'sms.txt', text: sms.out }];
   const skipped: string[] = [];
 
@@ -118,7 +125,7 @@ function syncOnce(): boolean {
       skipped.push(what);
       return;
     }
-    writeFileSync(join(out, file), r.out);
+    save(file, r.out);
     inputs.push({ name: file, text: r.out });
   };
   pull('apps.txt', 'installed apps', 'pm', 'list', 'packages');
