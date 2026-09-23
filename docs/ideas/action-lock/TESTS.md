@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 37 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 69 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -40,6 +40,18 @@ The app page (`public/app.html`) was also run in a 412 px browser with the
 stand-in bridge: typed payment to a new payee → 10 s countdown → paid; repeat
 payment → no wait; scanned QR → stopped; ₹25,000 new payee → fingerprint; a
 shorter buffer shows the 24 h delay. No script errors.
+
+## Your data — `test/sensitive.test.ts`, `test/import.test.ts`, `test/profile.test.ts`, `test/run.test.ts`
+
+| Area | What is proven |
+|---|---|
+| Confidential data | OTPs in four wordings · card numbers only with a valid checksum · PAN · Aadhaar only in context or printed form · full account numbers but not masked ones · recovery phrases · private keys with a key word, **not transaction hashes** · API keys · passwords · redaction keeps the last four digits only |
+| False positives avoided | Amounts in "never share your OTP" alerts · a UPI reference that passes the Aadhaar checksum · ordinary sentences as phrases |
+| Bank alerts | UPI debits from HDFC, SBI, ICICI, Axis, Kotak · credits · card spends · names trimmed · OTPs and offers ignored · unreadable alerts reported |
+| Exports | ADB with body last or in the middle · SMS Backup XML with entities and newlines · Google Pay Takeout JSON with unknown wordings counted |
+| Your normal | Payees, amount percentiles, hours · quiet hours across midnight · the same payment in SMS and Google Pay merged once, keeping the UPI ID · two real payments not merged |
+| Personal severity | ₹5,000 to a new payee is level 3 for someone who usually pays ₹450, level 2 under generic rules · quiet hours replace midnight–6 am · generic rules until 30 payments |
+| Report | Formats detected · nothing confidential printed or saved in the profile |
 
 ## Checked that the tests can fail
 

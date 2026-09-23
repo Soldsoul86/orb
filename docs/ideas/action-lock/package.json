@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "start": "node src/server.ts",
     "build:phone": "node scripts/build-phone.mjs",
-    "build:android": "node scripts/build-android.mjs"
+    "build:android": "node scripts/build-android.mjs",
+    "import": "node scripts/import.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

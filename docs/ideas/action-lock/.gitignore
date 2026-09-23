@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Your imported data: never commit
+private/
