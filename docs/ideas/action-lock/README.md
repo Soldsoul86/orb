@@ -53,7 +53,9 @@ npm run sync                  # reads SMS + installed apps over adb, rebuilds pr
 npm run sync -- --every 6     # keep syncing every 6 hours while it runs
 ```
 
-Connect once by USB, or over Wi-Fi with **Wireless debugging**: on the phone,
+Easiest: `npm run pair`, then on the phone Developer options → Wireless
+debugging → *Pair device with QR code* and scan. It pairs, connects and runs the
+first sync. Or connect once by USB, or over Wi-Fi with **Wireless debugging**: on the phone,
 Developer options → Wireless debugging → *Pair device with pairing code*; on the
 Mac, `adb pair <ip:port> <code>`, then `npm run sync -- --connect <ip:port>`
 (the address on the main Wireless debugging screen). After that, plain

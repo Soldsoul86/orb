@@ -18,7 +18,8 @@
     "build:app-preview": "node scripts/build-app-preview.mjs",
     "sync": "node scripts/sync.ts",
     "mail": "node scripts/mail.ts",
-    "schedule": "node scripts/schedule.ts"
+    "schedule": "node scripts/schedule.ts",
+    "pair": "node scripts/pair.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
