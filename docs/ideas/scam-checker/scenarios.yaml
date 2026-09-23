@@ -9,7 +9,7 @@
 #   channel     sms | whatsapp | call_summary | screenshot_text | email
 #   input       what the user forwarded (links are defanged: hxxps, [.])
 #   expect
-#     verdict   act_now | likely_scam | suspicious | no_scam_signs
+#     verdict   stop_now | likely_scam | suspicious | no_scam_signs
 #     scam_type id from SCAM_TAXONOMY.md section 1 (none for non-scams)
 #     entity    impersonated_entity answer (section 2, question 4)
 #     stage     victim_stage answer (only for scams)
@@ -42,9 +42,9 @@ scenarios:
     input: >
       My father got a call from a "CBI officer" yesterday. He was on video for
       6 hours and sent ₹8,40,000 by RTGS to their account. Now they want more.
-    expect: { verdict: act_now, scam_type: digital_arrest, entity: police_or_agency,
+    expect: { verdict: stop_now, scam_type: digital_arrest, entity: police_or_agency,
               stage: money_or_info_already_given, flags: [payment], pressure: 4 }
-    note: Money already sent. Emergency advice (1930) must come first.
+    note: Money already sent. First line must stop the next payment ("now they want more").
 
   - id: A03
     lang: hinglish
@@ -198,7 +198,7 @@ scenarios:
       Telegram group: "Merchant task 7: deposit ₹25,000 to unlock
       commission of ₹38,500. Complete within 30 minutes or your previous
       ₹14,000 will be frozen."
-    expect: { verdict: act_now, scam_type: task_job, entity: employer,
+    expect: { verdict: stop_now, scam_type: task_job, entity: employer,
               stage: money_or_info_already_given, flags: [payment], pressure: 4 }
     note: Victim has already paid earlier tasks. Must not advise paying to "unfreeze".
 
@@ -285,7 +285,7 @@ scenarios:
       I put ₹50,000 in the trading app from the group and withdrew ₹5,000 profit
       easily. Now they say deposit ₹5 lakh for a special block trade with 300%
       returns.
-    expect: { verdict: act_now, scam_type: investment_trading, entity: brand_or_shop,
+    expect: { verdict: stop_now, scam_type: investment_trading, entity: brand_or_shop,
               stage: money_or_info_already_given, flags: [payment], pressure: 3 }
     note: >
       The small withdrawal is bait. Money already in a fake app counts as lost:
@@ -297,7 +297,7 @@ scenarios:
     input: >
       App me mera balance ₹9,40,000 dikha raha hai. Withdraw karne gaya to bol
       raha hai pehle 20% SEBI tax aur service charge ₹1,88,000 jama karo.
-    expect: { verdict: act_now, scam_type: investment_trading, entity: government,
+    expect: { verdict: stop_now, scam_type: investment_trading, entity: government,
               stage: money_or_info_already_given, flags: [payment], pressure: 4 }
     note: The final stage. Never advise paying the "tax" to release funds.
 
@@ -308,7 +308,7 @@ scenarios:
       My dad (64) joined some WhatsApp stock group and has put ₹2 lakh into
       their app over the last month. He says the returns are amazing and
       won't listen to me. Is this legit?
-    expect: { verdict: act_now, scam_type: investment_trading, entity: brand_or_shop,
+    expect: { verdict: stop_now, scam_type: investment_trading, entity: brand_or_shop,
               stage: money_or_info_already_given, flags: [payment], pressure: 1 }
     note: >
       The victim does not doubt; the child does. This is the family path the
@@ -360,9 +360,9 @@ scenarios:
     input: >
       You have not repaid your ₹3,000 loan from QuickCash. Pay ₹9,800 today or
       we will send your morphed photos to all your contacts.
-    expect: { verdict: act_now, scam_type: loan_app, entity: none,
+    expect: { verdict: stop_now, scam_type: loan_app, entity: none,
               stage: money_or_info_already_given, flags: [payment], pressure: 4 }
-    note: Victim already gave contact access. Advice includes reporting, not paying.
+    note: Victim already gave contact access. Paying does not stop the harassment; do not pay.
 
   - id: D02
     lang: en
@@ -516,6 +516,19 @@ scenarios:
       pending. To release it I must pay 10% GST first.
     expect: { verdict: likely_scam, scam_type: insurance_policy, entity: government,
               stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  - id: H02
+    lang: en
+    channel: whatsapp
+    input: >
+      I lost ₹6 lakh in a crypto trading app. A "blockchain recovery expert"
+      on Instagram says he can trace the USDT and get it back for a 15% advance
+      fee. He showed me a certificate from the cyber cell.
+    expect: { verdict: stop_now, scam_type: recovery_scam, entity: police_or_agency,
+              stage: money_or_info_already_given, flags: [payment], pressure: 2 }
+    note: >
+      Victims are re-targeted right after a loss. Nobody legitimate charges an
+      advance fee to recover scam money.
 
   # ── Real messages that look like scams (must NOT be flagged) ──────────────
 

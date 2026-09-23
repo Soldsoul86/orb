@@ -16,8 +16,9 @@ listed at the end; they are reported complaints, so real losses are higher.
 | Victims who don't report UPI fraud at all | 51% | LocalCircles |
 
 **Reading:** losses are flat year on year (₹22,845 crore in 2024) but cases
-are up 24% — more people are being hit, for smaller amounts each. Fast
-reporting demonstrably recovers money, and half of victims never report.
+are up 24% — more people are being hit, for smaller amounts each. Recovery is
+small next to losses (₹7,130 crore saved in total since launch, against
+₹22,000+ crore lost each year), so the product is built on prevention only.
 
 ## 2. Bangalore is the right launch city
 
@@ -91,21 +92,24 @@ The product has to win on what these don't do.
    children are the ones who doubt (scenario C12). No existing checker is built
    around "my dad is in this group, help me convince him". This is also the
    distribution plan.
-3. **The first hour after a loss.** ₹7,130 crore has been saved through fast
-   reporting, yet 51% of victims don't report. `act_now` should walk the person
-   through 1930, the bank and cybercrime.gov.in step by step, and draft the
-   complaint for them.
+3. **Stop the next payment.** Once money has left, it is effectively lost —
+   recovery is not part of the product (practitioner view, and consistent with
+   under 10% returned in Bengaluru). But these scams take money in rounds: the
+   ₹31.8 crore Bengaluru digital-arrest case was 187 transactions over six
+   months, and investment scams always end with a "tax to withdraw" demand and
+   then a "recovery agent". Every one of those is a prevention point.
+   `stop_now` exists to stop the next payment, not to recover the last one.
 4. **Kannada first.** Of the checkers whose languages are published (RealCheck:
    English, Hindi, Marathi, Telugu, Tamil, Bengali; ScamRadar: Hindi, English),
    none lists Kannada. Not yet checked for the others.
 
-Items 1–3 are what the product is. Detecting a single message is table stakes.
+Items 1–3 are what the product is — all three act before money leaves. Detecting a single message is table stakes.
 
 ## 6. What could still make this fail
 
 | Risk | Why it matters | What would tell us early |
 |---|---|---|
-| People who are being scammed don't doubt | A checker only helps people who ask | Share of `act_now` cases sent by a family member vs the victim |
+| People who are being scammed don't doubt | A checker only helps people who ask | Share of `stop_now` cases sent by a family member vs the victim |
 | Airtel / Jio / Google build it into the phone | Free, built-in, no forwarding needed | Watch their launches; our edge is situations and family, not link-blocking |
 | Nobody pays | Consumers won't; banks might | One bank or UPI app pilot before month 9 |
 | Jev is weak on Kannada and Hinglish | Wrong verdicts lose trust fast | Run scenarios.yaml against Jev before building the bot |

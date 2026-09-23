@@ -16,7 +16,7 @@ Ids and verdicts come from [`SCAM_TAXONOMY.md`](SCAM_TAXONOMY.md).
 
 ## Message scenarios at a glance
 
-59 scenarios. Every scam type in the taxonomy is covered at least once, and the
+60 scenarios. Every scam type in the taxonomy is covered at least once, and the
 set is weighted towards investment fraud, which is 76% of money lost in India
 (see [`RESEARCH.md`](RESEARCH.md)).
 
@@ -29,7 +29,7 @@ set is weighted towards investment fraud, which is 76% of money lost in India
 | E. People you know | E01–E07 | "Hi Papa" with and without money, voice clone, sextortion and its fake-police second stage, matrimony gift, army officer |
 | F. Shopping | F01–F04 | Fake helpline, fake sale, Tirupati darshan (Tamil), HSR rental advance |
 | G. Schemes | G01–G03 | PM Kisan (Hindi), Jio giveaway, charity appeal |
-| H. Other | H01 | Insurance bonus |
+| H. Other | H01–H02 | Insurance bonus, "recovery expert" targeting a crypto-scam victim |
 | N. Real messages | N01–N12 | Bank OTP, real challan, BESCOM bill, real interview, friend's GPay request, UIDAI, Amazon OTP, Kannada rental, Zerodha, family chat, SIP confirmation, friends discussing stocks |
 | X. Unknown | X01 | FASTag scam with no type yet → `other_scam` |
 
@@ -45,8 +45,9 @@ Hard cases worth reading first:
   to verify, not "this is a scam".
 - **C10, C12** — the investment funnel after money is in. C12 is the family
   path: the victim believes, the child doubts.
-- **A02, C02, D01** — money already lost. Emergency steps come first; never
-  advise paying more to "unfreeze" or "settle".
+- **A02, C02, D01, H02** — money already sent. The bot's job is to stop the
+  *next* payment, not to recover the last one. Never advise paying more to
+  "unfreeze", "settle" or "recover".
 
 Known gaps (add before the Bangalore launch):
 
@@ -111,20 +112,18 @@ plan; if it is below 0.5, the plan does not work.
 now asked for ₹25,000 more (scenario C02).
 
 1. He forwards the screenshot.
-2. Bot (verdict `act_now`), first message:
-   - **Stop. Do not pay anything more. This is a task scam and the money will
-     not come back by paying more.**
-   - Call **1930** now — reporting within the first hours gives the best chance
-     of freezing the money.
-   - Call your bank and ask them to raise a fraud complaint on the transaction.
-   - Report at **cybercrime.gov.in**. Keep the screenshots.
-3. Second message: what task scams are, briefly, and that many people are
-   caught by them — no blame.
+2. Bot (verdict `stop_now`), first message:
+   - **Stop. Do not pay the ₹25,000. This is a task scam. Every payment after
+     the first is another loss — the ₹14,000 does not come back by paying more.**
+   - One line: report it on **1930** so the accounts can be flagged for others.
+3. Second message: what comes next in this scam (a "tax" or "unfreeze" fee,
+   then a "recovery agent") so he recognises each one. No blame.
 
 **Must hold:**
-- Emergency steps come before any explanation.
-- The bot never suggests paying to "unfreeze", "settle" or "release".
-- The tone is not judgemental. People who feel foolish stop reporting.
+- The first line stops the next payment. Nothing comes before it.
+- The bot never suggests paying to "unfreeze", "settle", "release" or "recover".
+- The bot never promises or pursues recovery of money already sent.
+- The tone is not judgemental. People who feel foolish stop asking.
 
 ### J4. A real message the bot must not scare people about
 
@@ -179,5 +178,6 @@ on his father's phone (scenario E02).
 - Reading messages automatically. The user always chooses to forward.
 - Joining groups. One-to-one chats only.
 - Voice notes and live call listening.
-- Recovering money. The bot points to 1930, the bank and cybercrime.gov.in.
+- Recovering money. Once money has left, it is treated as lost; the bot only
+  prevents the next payment and mentions 1930 in one line.
 - Political or general news fact-checking.

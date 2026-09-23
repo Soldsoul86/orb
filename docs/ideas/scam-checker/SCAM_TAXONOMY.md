@@ -96,6 +96,7 @@ checker vs fact checker: non-political, verifiable, money at stake).
 | id | Meaning |
 |---|---|
 | `insurance_policy` | Fake policy bonus, lapsed-policy refund, "IRDA officer". |
+| `recovery_scam` | "We can recover your lost money" — fake lawyers, hackers, "cyber cell agents" or blockchain tracers who charge a fee. Targets people who were just scammed. |
 | `other_scam` | Clearly a scam but none of the types above. Reviewed weekly to find new types. |
 | `none` | No scam type applies. |
 
@@ -136,7 +137,7 @@ Thresholds are placeholders until measured on real Indian scam samples.
 
 | Condition | Verdict shown | What happens |
 |---|---|---|
-| `victim_stage = money_or_info_already_given` | **Act now** | Immediately: call **1930**, report at **cybercrime.gov.in**, call your bank to freeze the account. Shown before any explanation. |
+| `victim_stage = money_or_info_already_given` | **Stop now** | First line: do not pay anything more — not for tax, fees, unfreezing, settling or recovery. Money sent to get money back is always lost too. Then one line: report on **1930**. The bot does not promise or pursue recovery. |
 | `is_scam ≥ 0.85` and `scam_type` confidence ≥ 0.7 | **Likely scam** | LLM explains why, in the user's language, with the advice for that type |
 | `is_scam` between 0.4 and 0.85, or low confidence on `scam_type` | **Suspicious** | Second check by an LLM; advice: don't pay, don't share OTP, verify through the official number |
 | `is_scam < 0.4`, `asks_for_otp_or_pin` < 0.3 and `asks_to_install_app` < 0.3 | **No scam signs found** | Never say "safe". Always add: "If anyone asks for OTP, PIN or money, stop." |
