@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Action Lock</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --card: #ffffff; --text: #1d1b18; --muted: #6b665e; --line: #e4e0d8;
+    --accent: #2f5bd3; --stop: #c8322b; --ok: #1f7a4a;
+    --l0: #8a8478; --l1: #3b7bd6; --l2: #c98a12; --l3: #d4631c; --l4: #c8322b;
+    --bar: #e8e4dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a59f94; --line: #2e2c29;
+      --accent: #7c9cf5; --stop: #ef6a5f; --ok: #5ec48d; --bar: #2b2926;
+      --l0: #a59f94; --l1: #7aa7ec; --l2: #e7b04a; --l3: #f08a4b; --l4: #ef6a5f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 440px; margin: 0 auto; padding: 16px 16px 40px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 0 14px; }
+  header svg { width: 26px; height: 26px; color: var(--accent); }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin: -8px 0 16px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .title { font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; white-space: nowrap; }
+  .fb { margin: 10px 0 0; padding: 0; list-style: none; }
+  .fb li { font-size: 14px; padding: 6px 10px; border-radius: 10px; background: color-mix(in srgb, var(--l2) 14%, transparent); margin-top: 6px; }
+  .bar { height: 6px; border-radius: 6px; background: var(--bar); overflow: hidden; margin: 12px 0 6px; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .2s linear; }
+  .wait { font-size: 13px; color: var(--muted); }
+  .btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button { font: inherit; border: 0; border-radius: 12px; padding: 12px 14px; cursor: pointer; font-weight: 600; }
+  .stop { background: var(--stop); color: #fff; flex: 1; }
+  .unlock, .confirm { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); flex: 1; }
+  .done { opacity: .75; }
+  .status { font-size: 12px; font-weight: 700; }
+  .executed { color: var(--ok); } .stopped { color: var(--stop); } .failed { color: var(--stop); }
+  .sim { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sim button { background: var(--card); color: var(--text); border: 1px solid var(--line); font-weight: 500; font-size: 13px; text-align: left; }
+  .policy button { background: var(--card); border: 1px solid var(--line); color: var(--text); font-weight: 500; font-size: 13px; flex: 1; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 18px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 10px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+    </svg>
+    <h1>Action Lock</h1>
+  </header>
+  <p class="sub">Nothing irreversible happens until its buffer ends. You set the buffer.</p>
+
+  <h2>Held now</h2>
+  <div id="held"></div>
+
+  <h2>Simulate an agent</h2>
+  <div class="sim" id="sim"></div>
+
+  <h2>Your policy</h2>
+  <div class="card policy">
+    <div class="meta" id="policyText"></div>
+    <div class="btns">
+      <button data-change="loosen">Make new payees instant</button>
+      <button data-change="tighten">New payees: 30 s</button>
+    </div>
+  </div>
+
+  <h2>History</h2>
+  <div id="history"></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const MODE = { pass: 'No hold', countdown: 'Countdown', unlock: 'Fingerprint', second_person: 'Second person', block: 'Blocked' };
+  const KIND = { payment: 'Pay', message: 'Message', email: 'Email', post: 'Post', delete: 'Delete', other: 'Action' };
+  let state = null;
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (n) => '₹' + Number(n).toLocaleString('en-IN');
+  const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
+
+  function describe(a) {
+    const what = a.kind === 'payment' ? `${KIND[a.kind]} ${money(a.amount)}` : KIND[a.kind];
+    return `${what} → ${a.recipient}`;
+  }
+
+  function waitText(a, now) {
+    const left = secs(a.releaseAt - now);
+    if (a.waiting === 'blocked') return 'Blocked by your policy. It will not be sent.';
+    if (a.waiting === 'unlock') return left > 0 ? `Needs your fingerprint · buffer ${left}s` : 'Needs your fingerprint';
+    if (a.waiting === 'second_person') return left > 0 ? `Needs Priya to confirm · buffer ${left}s` : 'Needs Priya to confirm';
+    if (a.waiting === 'time') return `Sends in ${left}s unless you stop it`;
+    return 'Sending…';
+  }
+
+  function heldCard(a, now) {
+    const total = Math.max(1, a.gate.holdSeconds * 1000);
+    const pct = Math.min(100, Math.max(0, ((now - a.requestedAt) / total) * 100));
+    const fb = a.feedback.length ? `<ul class="fb">${a.feedback.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : '';
+    const unlock = a.waiting === 'unlock' ? `<button class="unlock" data-act="unlock" data-id="${a.id}">Unlock with fingerprint</button>` : '';
+    const confirm = a.waiting === 'second_person' ? `<button class="confirm" data-act="confirm" data-id="${a.id}">Priya confirms</button>` : '';
+    return `<div class="card">
+      <div class="row"><span class="title">${esc(describe(a))}</span>
+        <span class="chip" style="background:var(--l${a.level})">Level ${a.level}</span></div>
+      <div class="meta">by ${esc(a.agentId)} · ${MODE[a.gate.mode]}${a.text ? ' · “' + esc(a.text) + '”' : ''}</div>
+      ${fb}
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="wait">${esc(waitText(a, now))}</div>
+      <div class="btns"><button class="stop" data-act="stop" data-id="${a.id}">Stop</button>${unlock}${confirm}</div>
+    </div>`;
+  }
+
+  function historyCard(a) {
+    const label = { executed: 'Sent', stopped: 'Stopped', failed: 'Failed', released: 'Sending' }[a.status] || a.status;
+    return `<div class="card done"><div class="row"><span>${esc(describe(a))}</span>
+      <span class="status ${a.status}">${label}</span></div>
+      <div class="meta">Level ${a.level} · ${MODE[a.gate.mode]}${a.gate.holdSeconds ? ' ' + a.gate.holdSeconds + 's' : ''}</div></div>`;
+  }
+
+  function render() {
+    if (!state) return;
+    const now = Date.now() - skew;
+    const held = state.actions.filter((a) => a && a.status === 'held');
+    const done = state.actions.filter((a) => a && a.status !== 'held');
+    $('held').innerHTML = held.length ? held.map((a) => heldCard(a, now)).join('') : '<div class="card empty">Nothing held. Every action so far has been sent or stopped.</div>';
+    $('history').innerHTML = done.length ? done.map(historyCard).join('') : '<div class="empty">No actions yet.</div>';
+    const l2 = state.policy.level2;
+    let p = `Payments to new people (level 2): ${MODE[l2.mode]}${l2.holdSeconds ? ' ' + l2.holdSeconds + 's' : ''}.`;
+    if (state.policy.pending) p += ` A change is waiting: loosening applies in ${secs(state.policy.pending.effectiveAt - now)}s, tightening applied now.`;
+    $('policyText').textContent = p;
+  }
+
+  let skew = 0;
+  async function refresh() {
+    const r = await fetch('/api/state');
+    state = await r.json();
+    skew = Date.now() - state.now;
+    render();
+  }
+
+  async function post(url, body) {
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const data = await r.json();
+    if (data.result && !data.result.ok) toast(data.result.reason);
+    if (data.actions) { state = data; skew = Date.now() - state.now; render(); }
+  }
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.act) post(`/api/actions/${b.dataset.id}/${b.dataset.act}`);
+    else if (b.dataset.preset) post('/api/actions', { preset: b.dataset.preset });
+    else if (b.dataset.change) post('/api/policy', { change: b.dataset.change });
+  });
+
+  fetch('/api/state').then((r) => r.json()).then((s) => {
+    $('sim').innerHTML = s.presets.map((p) => `<button data-preset="${p.key}">${esc(p.label)}</button>`).join('');
+    state = s; skew = Date.now() - s.now; render();
+  });
+  setInterval(refresh, 500);
+  setInterval(render, 100);
+</script>
+</body>
+</html>
