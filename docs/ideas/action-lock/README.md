@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 28 tests
+npm test          # 37 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -46,6 +46,12 @@ In the demo, tap a scenario under **Simulate an agent**:
 Under **Your policy**, "Make new payees instant" shows loosening waiting (60 s
 in the demo, 24 h by default) while "New payees: 30 s" applies immediately.
 
+## On the Pixel
+
+`android/` is a native app that makes the lock a delayed press for UPI: it
+holds every UPI payment for your buffer, then opens your UPI app pre-filled.
+See [`android/README.md`](android/README.md).
+
 ## Files
 
 | File | What it is |
@@ -58,3 +64,7 @@ in the demo, 24 h by default) while "New payees: 30 s" applies immediately.
 | `public/index.html` | The phone page (talks to the server, or to the bundled lock) |
 | `src/demo.ts`, `src/browser.ts` | Demo backend shared by the server and the phone build |
 | `scripts/build-phone.mjs` | Builds the self-contained phone page |
+| `src/upi.ts` | UPI link and response parsing (NPCI linking spec) |
+| `src/android.ts`, `public/app.html` | The Pixel app's lock and screen |
+| `scripts/build-android.mjs` | Bundles them into the Android app's assets |
+| `android/` | Kotlin shell for the Pixel |

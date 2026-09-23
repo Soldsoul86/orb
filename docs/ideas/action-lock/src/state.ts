@@ -102,3 +102,20 @@ export function waitingFor(h: HeldAction, now: number): Waiting {
 export function canRelease(h: HeldAction, now: number): boolean {
   return h.status === 'held' && waitingFor(h, now) === 'nothing';
 }
+
+/** Key for "have I sent this kind of action to this destination before?". */
+export function destinationKey(kind: string, recipient: string): string {
+  return `${kind}:${recipient.trim().toLowerCase()}`;
+}
+
+/**
+ * Destinations that have received a completed action. Derived from history,
+ * not stored separately: replaying the journal rebuilds it.
+ */
+export function knownDestinations(state: LockState): ReadonlySet<string> {
+  const known = new Set<string>();
+  for (const h of state.actions.values()) {
+    if (h.status === 'executed') known.add(destinationKey(h.action.kind, h.action.recipient));
+  }
+  return known;
+}

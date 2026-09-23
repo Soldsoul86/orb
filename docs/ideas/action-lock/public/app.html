@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Action Lock</title>
+<style>
+  :root {
+    --bg: #f3f2ef; --card: #ffffff; --text: #1c1b19; --muted: #67635c; --line: #e2dfd8;
+    --accent: #2f5bd3; --accent-soft: #e3e9fa; --stop: #c8322b; --ok: #1f7a4a; --bar: #e7e4dd; --note: #f6ecd6;
+    --l0: #8a8478; --l1: #3b7bd6; --l2: #b27a0e; --l3: #d4631c; --l4: #c8322b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a59f94; --line: #2e2c29;
+      --accent: #8aa6f6; --accent-soft: #232a3d; --stop: #e5574c; --ok: #5ec48d; --bar: #2b2926; --note: #33291a;
+      --l0: #7d776d; --l1: #4f86d8; --l2: #b8860b; --l3: #d06a2a; --l4: #d8483d;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a59f94; --line: #2e2c29;
+    --accent: #8aa6f6; --accent-soft: #232a3d; --stop: #e5574c; --ok: #5ec48d; --bar: #2b2926; --note: #33291a;
+    --l0: #7d776d; --l1: #4f86d8; --l2: #b8860b; --l3: #d06a2a; --l4: #d8483d;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; color: var(--text); font: 16px/1.45 system-ui, -apple-system, Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding-block: max(16px, env(safe-area-inset-top)) 48px; padding-inline: 16px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 6px 0 4px; }
+  header svg { width: 26px; height: 26px; color: var(--accent); }
+  h1 { font-size: 21px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .amount { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .payee { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .chip { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; color: #fff; white-space: nowrap; }
+  .fb { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .fb li { font-size: 15px; padding: 8px 11px; border-radius: 11px; background: var(--note); }
+  .bar { height: 7px; border-radius: 7px; background: var(--bar); overflow: hidden; margin: 14px 0 6px; }
+  .bar > div { height: 100%; background: var(--accent); }
+  .wait { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  button { font: inherit; border: 0; border-radius: 14px; padding: 14px 16px; cursor: pointer; font-weight: 600; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .primary { background: var(--accent); color: #fff; flex: 1; }
+  .stop { background: var(--stop); color: #fff; flex: 1; }
+  .soft { background: var(--accent-soft); color: var(--accent); flex: 1; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input { width: 100%; font: inherit; padding: 12px 13px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .status { font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .executed { color: var(--ok); } .stopped, .failed { color: var(--stop); } .released { color: var(--accent); }
+  .hist .amount { font-size: 17px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { font-size: 13px; padding: 4px 10px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .opts button { padding: 8px 12px; font-size: 14px; font-weight: 500; background: var(--bg); color: var(--text); border: 1px solid var(--line); }
+  .opts button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .policy-row + .policy-row { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 10px; }
+  .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 11px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+    </svg>
+    <h1>Action Lock</h1>
+  </header>
+  <p class="sub">Every UPI payment waits for the buffer you set before your UPI app opens.</p>
+
+  <div id="held"></div>
+  <div id="draft"></div>
+
+  <h2>Pay</h2>
+  <div class="card">
+    <form id="payForm" autocomplete="off">
+      <label for="vpa">UPI ID</label>
+      <input id="vpa" inputmode="email" placeholder="name@bank" required>
+      <div class="grid2">
+        <div><label for="amt">Amount (₹)</label><input id="amt" inputmode="decimal" placeholder="0" required></div>
+        <div><label for="note">Note</label><input id="note" placeholder="Optional"></div>
+      </div>
+      <div class="btns">
+        <button type="submit" class="primary">Start payment</button>
+        <button type="button" class="soft" id="scanBtn">Scan QR</button>
+      </div>
+    </form>
+  </div>
+
+  <h2>Your buffers</h2>
+  <div class="card" id="policy"></div>
+
+  <h2>Paid before</h2>
+  <div id="known"></div>
+
+  <h2>History</h2>
+  <div id="history"></div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const A = window.ActionLockApp;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
+  const dur = (s) => (s >= 60 ? `${Math.round(s / 60)} min` : `${s} s`);
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600); }
+
+  let draft = null; // a link waiting for an amount
+  let state = A.view();
+
+  function waitText(a, now) {
+    const left = secs(a.releaseAt - now);
+    if (a.waiting === 'blocked') return 'Blocked by your buffers. It will not be sent.';
+    if (a.waiting === 'unlock') return left > 0 ? `Needs your fingerprint · ${left} s left in the buffer` : 'Needs your fingerprint';
+    if (a.waiting === 'time') return `Opens your UPI app in ${left} s unless you stop it`;
+    return 'Opening your UPI app…';
+  }
+
+  function heldCard(a, now) {
+    const total = Math.max(1, a.gate.holdSeconds * 1000);
+    const pct = Math.min(100, Math.max(0, ((now - a.requestedAt) / total) * 100));
+    const fb = a.feedback.length ? `<ul class="fb">${a.feedback.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : '';
+    const unlock = a.waiting === 'unlock' ? `<button class="soft" data-unlock="${a.id}">Unlock with fingerprint</button>` : '';
+    return `<div class="card">
+      <div class="row"><span class="amount">${money(a.amount)}</span><span class="chip" style="background:var(--l${a.level})">Level ${a.level}</span></div>
+      <div class="payee">${esc(a.recipient)}</div>
+      ${a.note ? `<div class="meta">${esc(a.note)}</div>` : ''}
+      ${fb}
+      <div class="bar"><div style="width:${pct}%"></div></div>
+      <div class="wait">${esc(waitText(a, now))}</div>
+      <div class="btns"><button class="stop" data-stop="${a.id}">Stop</button>${unlock}</div>
+    </div>`;
+  }
+
+  function historyCard(a) {
+    const label = { executed: 'Paid', stopped: 'Stopped', failed: 'Not paid', released: 'In UPI app' }[a.status] || a.status;
+    const detail = a.status === 'executed' ? (a.ref ? `Ref ${a.ref}` : '') : a.status === 'failed' ? a.error || '' : a.status === 'stopped' ? 'Stopped during the buffer' : '';
+    return `<div class="card hist"><div class="row"><span class="amount">${money(a.amount)}</span><span class="status ${a.status}">${label}</span></div>
+      <div class="payee">${esc(a.recipient)}</div>${detail ? `<div class="meta">${esc(detail)}</div>` : ''}</div>`;
+  }
+
+  function draftCard(d) {
+    return `<div class="card">
+      <div class="meta">${d.known ? 'Paid before' : 'New payee'}</div>
+      <div class="payee">${esc(d.name || d.payee)}</div>${d.name ? `<div class="meta">${esc(d.payee)}</div>` : ''}
+      ${d.note ? `<div class="meta">${esc(d.note)}</div>` : ''}
+      <label for="draftAmt">Amount (₹)</label><input id="draftAmt" inputmode="decimal" placeholder="0">
+      <div class="btns"><button class="primary" id="draftPay">Start payment</button><button class="soft" id="draftCancel">Cancel</button></div>
+    </div>`;
+  }
+
+  const LEVELS = [
+    { level: 1, name: 'Paid before, ₹1,000 or more', options: [['pass', 0], ['countdown', 2], ['countdown', 10], ['countdown', 30]] },
+    { level: 2, name: 'New payee', options: [['pass', 0], ['countdown', 10], ['countdown', 30], ['countdown', 120], ['countdown', 600]] },
+    { level: 3, name: 'New payee, ₹10,000 or more', options: [['countdown', 30], ['unlock', 30], ['unlock', 120], ['unlock', 600]] },
+  ];
+  const optLabel = (mode, s) => (mode === 'pass' ? 'No wait' : mode === 'unlock' ? `Fingerprint + ${dur(s)}` : dur(s));
+
+  function renderPolicy() {
+    const p = state.policy;
+    const shown = p.pending ? p.pending.defaults : p.active;
+    let html = LEVELS.map((l) => {
+      const cur = shown[l.level];
+      const opts = l.options.map(([m, s]) => `<button data-level="${l.level}" data-mode="${m}" data-hold="${s}" aria-pressed="${cur.mode === m && cur.holdSeconds === s}">${optLabel(m, s)}</button>`).join('');
+      return `<div class="policy-row"><div class="payee">${l.name}</div><div class="opts">${opts}</div></div>`;
+    }).join('');
+    if (p.pending) {
+      const hours = Math.ceil((p.pending.effectiveAt - state.now) / 3600000);
+      html += `<p class="meta" style="margin:12px 0 0">Shorter buffers start in about ${hours} h. Longer ones already apply. This delay stops anyone from talking you into switching the lock off.</p>`;
+    }
+    $('policy').innerHTML = html;
+  }
+
+  function render() {
+    state = A.view();
+    const now = Date.now();
+    const held = state.actions.filter((a) => a.status === 'held');
+    const done = state.actions.filter((a) => a.status !== 'held');
+    $('held').innerHTML = held.map((a) => heldCard(a, now)).join('');
+    $('history').innerHTML = done.length ? done.slice(0, 30).map(historyCard).join('') : '<div class="empty">No payments yet.</div>';
+    $('known').innerHTML = state.known.length ? `<div class="chips">${state.known.map((k) => `<span>${esc(k)}</span>`).join('')}</div>` : '<div class="empty">Payees you complete a payment to appear here. Payments to them wait less.</div>';
+  }
+
+  function renderDraft() {
+    $('draft').innerHTML = draft ? draftCard(draft) : '';
+    if (draft) $('draftAmt').focus();
+  }
+
+  function takeLink(link) {
+    const r = A.preview(link);
+    if (!r.ok) return toast(r.reason);
+    if (r.draft.amount) {
+      const p = A.pay(link);
+      if (!p.ok) toast(p.reason);
+      draft = null;
+    } else draft = { ...r.draft, known: r.known };
+    renderDraft(); render();
+    window.scrollTo({ top: 0 });
+  }
+  window.onIncomingLink = takeLink;
+  window.onScanned = takeLink;
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.stop) { const r = A.stop(b.dataset.stop); toast(r.ok ? 'Stopped. Nothing was sent.' : r.reason); render(); }
+    else if (b.dataset.unlock) A.unlock(b.dataset.unlock);
+    else if (b.dataset.level) { A.setLevel(Number(b.dataset.level), { mode: b.dataset.mode, holdSeconds: Number(b.dataset.hold) }); state = A.view(); renderPolicy(); }
+    else if (b.id === 'scanBtn') A.scan();
+    else if (b.id === 'draftCancel') { draft = null; renderDraft(); }
+    else if (b.id === 'draftPay') {
+      const r = A.pay(draft.link, $('draftAmt').value.trim());
+      if (!r.ok) return toast(r.reason);
+      draft = null; renderDraft(); render();
+    }
+  });
+
+  $('payForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const vpa = $('vpa').value.trim();
+    const note = $('note').value.trim();
+    const link = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(vpa)}${note ? `&tn=${encodeURIComponent(note)}` : ''}`;
+    const r = A.pay(link, $('amt').value.trim());
+    if (!r.ok) return toast(r.reason);
+    $('payForm').reset(); render();
+    window.scrollTo({ top: 0 });
+  });
+
+  A.onChange((msg) => { if (msg) toast(msg); render(); });
+  render(); renderPolicy();
+  setInterval(render, 200);
+  const first = A.takeIncomingLink();
+  if (first) takeLink(first);
+</script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+package app.actionlock
+
+import android.annotation.SuppressLint
+import android.content.ComponentName
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import org.json.JSONObject
+
+/**
+ * Imperative shell. The lock itself (severity, buffers, history) runs as
+ * JavaScript in the WebView — the same TypeScript core the tests cover.
+ * This class only provides what the page cannot: opening a UPI app, the
+ * fingerprint prompt, the QR scanner, storage and incoming upi:// links.
+ */
+class MainActivity : FragmentActivity() {
+
+    private lateinit var web: WebView
+    private lateinit var journal: JournalFile
+    private var incomingLink: String? = null
+    private var pendingUpiActionId: String? = null
+
+    private val upiResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val id = pendingUpiActionId ?: return@registerForActivityResult
+        pendingUpiActionId = null
+        callJs("ActionLockApp.onUpiResult", id, UpiResponse.from(result.data))
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        journal = JournalFile(filesDir)
+        incomingLink = upiLinkOf(intent)
+
+        val assets = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        web = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            webViewClient = object : WebViewClientCompat() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                    assets.shouldInterceptRequest(request.url)
+
+                // The page never navigates anywhere else.
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
+            }
+            addJavascriptInterface(Bridge(), "AndroidLock")
+        }
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        setContentView(web)
+        web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        upiLinkOf(intent)?.let { callJs("ActionLockApp.onIncoming", it) }
+    }
+
+    override fun onDestroy() {
+        web.destroy()
+        super.onDestroy()
+    }
+
+    private fun upiLinkOf(intent: Intent?): String? =
+        intent?.data?.takeIf { it.scheme.equals("upi", ignoreCase = true) }?.toString()
+
+    /** Calls a page function with JSON-encoded arguments, on the UI thread. */
+    private fun callJs(fn: String, vararg args: Any?) {
+        val encoded = args.joinToString(",") { arg ->
+            when (arg) {
+                null -> "null"
+                is Boolean -> arg.toString()
+                else -> JSONObject.quote(arg.toString())
+            }
+        }
+        web.post { web.evaluateJavascript("$fn($encoded)", null) }
+    }
+
+    private fun launchUpi(actionId: String, link: String) {
+        val pay = Intent(Intent.ACTION_VIEW, Uri.parse(link))
+        val upiApps = packageManager.queryIntentActivities(pay, 0).filter { it.activityInfo.packageName != packageName }
+        if (upiApps.isEmpty()) {
+            Toast.makeText(this, R.string.no_upi_app, Toast.LENGTH_LONG).show()
+            callJs("ActionLockApp.onUpiResult", actionId, null)
+            return
+        }
+        // Never hand the payment back to ourselves.
+        val chooser = Intent.createChooser(pay, getString(R.string.pay_with)).apply {
+            putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this@MainActivity, MainActivity::class.java)))
+        }
+        pendingUpiActionId = actionId
+        upiResult.launch(chooser)
+    }
+
+    private fun authenticate(actionId: String, title: String) {
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    callJs("ActionLockApp.onBiometric", actionId, true, "")
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    callJs("ActionLockApp.onBiometric", actionId, false, errString.toString())
+                }
+            },
+        )
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setSubtitle(getString(R.string.unlock_subtitle))
+            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+            .build()
+        prompt.authenticate(info)
+    }
+
+    private fun scanQr() {
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+        GmsBarcodeScanning.getClient(this, options).startScan()
+            .addOnSuccessListener { code -> callJs("ActionLockApp.onScan", code.rawValue ?: "", "Unreadable QR code.") }
+            .addOnCanceledListener { callJs("ActionLockApp.onScan", "", "Scan cancelled.") }
+            .addOnFailureListener { e -> callJs("ActionLockApp.onScan", "", e.message ?: "Scanner unavailable.") }
+    }
+
+    /** Exposed to the page as `AndroidLock`. Called on a background thread. */
+    private inner class Bridge {
+        @android.webkit.JavascriptInterface
+        fun loadJournal(): String = journal.read()
+
+        @android.webkit.JavascriptInterface
+        fun saveJournal(json: String) = journal.write(json)
+
+        @android.webkit.JavascriptInterface
+        fun launchUpi(actionId: String, link: String) = runOnUiThread { this@MainActivity.launchUpi(actionId, link) }
+
+        @android.webkit.JavascriptInterface
+        fun authenticate(actionId: String, title: String) = runOnUiThread { this@MainActivity.authenticate(actionId, title) }
+
+        @android.webkit.JavascriptInterface
+        fun scanQr() = runOnUiThread { this@MainActivity.scanQr() }
+
+        @android.webkit.JavascriptInterface
+        fun takeIncomingLink(): String = synchronized(this@MainActivity) {
+            val link = incomingLink ?: ""
+            incomingLink = null
+            link
+        }
+    }
+}

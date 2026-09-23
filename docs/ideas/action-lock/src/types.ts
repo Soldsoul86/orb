@@ -10,6 +10,8 @@ export interface Action {
   readonly recipient: string;
   readonly amount?: number;
   readonly text?: string;
+  /** Opaque data the executor needs, e.g. the UPI link to hand to the UPI app. */
+  readonly payload?: string;
 }
 
 /** Device signals at the moment of the request. Supplied by the shell. */

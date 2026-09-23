@@ -15,7 +15,15 @@ export interface LockDeps {
   readonly analyzer: SeverityAnalyzer;
   readonly executor: Executor;
   readonly initialPolicy: Policy;
+  /**
+   * What to do with actions that were released but never finished when the
+   * lock last stopped (app killed mid-payment). The default never runs them
+   * again: re-sending a payment whose outcome is unknown could pay twice.
+   */
+  readonly interrupted?: 'mark_unknown' | 'execute';
 }
+
+export const OUTCOME_UNKNOWN = 'Outcome unknown: the app stopped during this action. Check your payment app before trying again.';
 
 export type Outcome = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
@@ -45,6 +53,12 @@ export function createActionLock(deps: LockDeps): ActionLock {
     state = apply(state, stored);
     return stored;
   };
+
+  if ((deps.interrupted ?? 'mark_unknown') === 'mark_unknown') {
+    for (const id of state.order) {
+      if (state.actions.get(id)?.status === 'released') record({ type: 'ActionFailed', id, error: OUTCOME_UNKNOWN });
+    }
+  }
 
   const held = (id: string): HeldAction | undefined => {
     const h = state.actions.get(id);
