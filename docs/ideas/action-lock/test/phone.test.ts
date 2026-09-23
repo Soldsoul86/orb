@@ -11,6 +11,7 @@ package:com.whatsapp  installer=com.android.vending
 package:com.pushbullet.android  installer=com.android.vending
 package:com.kyc.update.helper  installer=com.google.android.packageinstaller
 package:com.company.vpn  installer=null
+package:org.chromium.webapk.ab259a146a4972097_v2  installer=com.android.chrome
 ##orb app com.phonepe.app
       android.permission.READ_SMS: granted=true, flags=[ USER_SET ]
       android.permission.READ_CONTACTS: granted=true, flags=[ USER_SET ]
@@ -34,6 +35,8 @@ com.kyc.update.helper/com.kyc.update.helper.Svc:com.google.android.marvin.talkba
 ##orb notification_listeners
 com.pushbullet.android/com.pushbullet.android.notifications.Listener
 ##orb sms_app
+null
+##orb sms_role
 com.google.android.apps.messaging
 ##orb device_admins
 ComponentInfo{com.company.vpn
@@ -50,7 +53,8 @@ describe('phone check', () => {
 
   it('reads installers, permissions and special access', () => {
     const c = checkPhone(DUMP);
-    assert.equal(c.apps, 5);
+    assert.equal(c.apps, 6);
+    assert.equal(c.webApps, 1); // a website installed from Chrome is not "not from the Play Store"
     assert.deepEqual(c.notFromPlay.map((a) => a.id), ['com.kyc.update.helper', 'com.company.vpn']);
     assert.deepEqual(c.accessibility, ['com.kyc.update.helper']); // TalkBack is a system app: not judged
     assert.deepEqual(c.notificationReaders, ['com.pushbullet.android']);
@@ -71,7 +75,7 @@ describe('phone check', () => {
     assert.match(serious[1]!.text, /com\.company\.vpn .* device admin/);
     const checks = c.findings.filter((f) => f.level === 'check').map((f) => f.text).join('\n');
     assert.match(checks, /com\.pushbullet\.android reads all your notifications/);
-    assert.match(checks, /PhonePe can read your SMS/);
+    assert.match(checks, /2 apps can read all your SMS, OTPs included: PhonePe, com\.pushbullet\.android\./);
     assert.match(checks, /KYC_Update\.apk/);
     assert.doesNotMatch(checks, /com\.kyc\.update\.helper can read your screen/); // not repeated
   });

@@ -374,7 +374,7 @@ function formatPhone(c: PhoneCheck | undefined): string[] {
   const serious = c.findings.filter((f) => f.level === 'serious');
   lines.push(serious.length > 0 ? `⚠ PHONE CHECK: ${serious.length} serious` : '✓ PHONE CHECK: nothing serious');
   for (const f of c.findings) lines.push(`    ${f.level === 'serious' ? '!!' : ' ·'} ${f.text}`);
-  lines.push(`  Apps you installed: ${c.apps} · not from the Play Store: ${c.notFromPlay.length} · default SMS app: ${c.smsApp ?? 'unknown'}`);
+  lines.push(`  Apps you installed: ${c.apps} · not from the Play Store: ${c.notFromPlay.length} · websites installed as apps: ${c.webApps} · default SMS app: ${c.smsApp ?? 'unknown'}`);
   if (c.drawOverApps.length > 0) lines.push(`  Can draw over other apps (fake screens on top of your bank app): ${c.drawOverApps.length}`);
   lines.push('');
   return lines;

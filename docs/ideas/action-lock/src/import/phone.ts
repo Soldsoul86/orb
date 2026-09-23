@@ -27,6 +27,8 @@ export const PHONE_SCRIPT = [
   'settings get secure enabled_notification_listeners',
   `echo '##orb sms_app'`,
   'settings get secure sms_default_application',
+  `echo '##orb sms_role'`,
+  'cmd role get-role-holders android.app.role.SMS 2>/dev/null',
   `echo '##orb device_admins'`,
   `dumpsys device_policy 2>/dev/null | grep -oE 'ComponentInfo\\{[^/}]+' | sort -u`,
   `echo '##orb apk_files'`,
@@ -44,6 +46,36 @@ const WATCHED: Readonly<Record<string, string>> = {
 };
 
 const PLAY = new Set(['com.android.vending', 'com.google.android.feedback']);
+/** Websites installed as apps from Chrome (PWAs): no more access than the site had. */
+const isWebApp = (id: string, installer: string | null) => id.startsWith('org.chromium.webapk.') || (installer === 'com.android.chrome' && /webapk/.test(id));
+
+/** Friendly names for common apps; others show their package ID. */
+const NAMES: Readonly<Record<string, string>> = {
+  'com.jio.myjio': 'MyJio',
+  'com.truecaller': 'Truecaller',
+  'in.amazon.mShop.android.shopping': 'Amazon',
+  'com.myairtelapp': 'Airtel Thanks',
+  'com.flipkart.android': 'Flipkart',
+  'com.whatsapp': 'WhatsApp',
+  'com.whatsapp.w4b': 'WhatsApp Business',
+  'com.zeptoconsumerapp': 'Zepto',
+  'in.swiggy.android': 'Swiggy',
+  'com.application.zomato': 'Zomato',
+  'in.redbus.android': 'redBus',
+  'com.grofers.customerapp': 'Blinkit',
+  'com.grofers.customerapp.lit': 'Blinkit Lite',
+  'com.makemytrip': 'MakeMyTrip',
+  'com.ubercab': 'Uber',
+  'com.olacabs.customer': 'Ola',
+  'com.bigbasket.mobileapp': 'BigBasket',
+  'com.myntra.android': 'Myntra',
+  'com.nextbillion.groww': 'Groww',
+  'com.zerodha.kite3': 'Kite',
+  'org.telegram.messenger': 'Telegram',
+  'com.instagram.android': 'Instagram',
+  'com.facebook.katana': 'Facebook',
+};
+const nameOf = (id: string) => NAMES[id] ?? appName(id);
 const PKG = /\b[a-zA-Z][\w]*(?:\.[\w]+)+\b/g;
 
 export interface AppInfo {
@@ -65,6 +97,8 @@ export interface PhoneFinding {
 export interface PhoneCheck {
   readonly apps: number;
   readonly notFromPlay: readonly AppInfo[];
+  /** Websites installed as apps from Chrome; not counted as "not from the Play Store". */
+  readonly webApps: number;
   /** Third-party apps that can read the screen and tap for you. */
   readonly accessibility: readonly string[];
   /** Third-party apps that read every notification, OTPs included. */
@@ -115,7 +149,7 @@ export function checkPhone(text: string): PhoneCheck {
     const m = line.match(/^package:([\w.]+)\s+installer=(\S+)/) ?? line.match(/^package:([\w.]+)/);
     if (!m) continue;
     const installer = m[2] === undefined || m[2] === 'null' ? null : m[2];
-    apps.set(m[1]!, { id: m[1]!, name: appName(m[1]!), installer, fromPlay: installer !== null && PLAY.has(installer), can: [] });
+    apps.set(m[1]!, { id: m[1]!, name: nameOf(m[1]!), installer, fromPlay: installer !== null && PLAY.has(installer), can: [] });
   }
   for (const [key, lines] of s) {
     const id = key.match(/^app (\S+)$/)?.[1];
@@ -134,17 +168,21 @@ export function checkPhone(text: string): PhoneCheck {
 
   const third = (ids: readonly string[]) => ids.filter((p) => apps.has(p));
   const opHolders = (op: string) => third([...new Set((s.get(`appop ${op}`) ?? []).flatMap((l) => l.match(PKG) ?? []))]);
-  const name = (id: string) => apps.get(id)?.name ?? appName(id);
+  const name = (id: string) => apps.get(id)?.name ?? nameOf(id);
 
   const accessibility = third(componentPackages(s.get('accessibility') ?? []));
   const notificationReaders = third(componentPackages(s.get('notification_listeners') ?? []));
-  const smsApp = (s.get('sms_app') ?? []).join('').trim();
+  // Newer Android keeps the default SMS app as a "role"; older versions in settings.
+  const fromSetting = (s.get('sms_app') ?? []).join('').trim();
+  const fromRole = (s.get('sms_role') ?? []).join(' ').match(PKG)?.[0] ?? '';
+  const smsApp = fromSetting !== '' && fromSetting !== 'null' ? fromSetting : fromRole;
   const deviceAdmins = third((s.get('device_admins') ?? []).map((l) => l.replace(/^ComponentInfo\{/, '').trim()));
   const readSms = [...apps.values()].filter((a) => a.can.includes(WATCHED['android.permission.READ_SMS']!) && a.id !== smsApp).map((a) => a.id);
   const drawOverApps = opHolders('SYSTEM_ALERT_WINDOW');
   const installApps = opHolders('REQUEST_INSTALL_PACKAGES');
   const apkFiles = (s.get('apk_files') ?? []).map((l) => l.trim());
-  const notFromPlay = [...apps.values()].filter((a) => !a.fromPlay);
+  const webApps = [...apps.values()].filter((a) => isWebApp(a.id, a.installer)).length;
+  const notFromPlay = [...apps.values()].filter((a) => !a.fromPlay && !isWebApp(a.id, a.installer));
 
   // Banking trojans in India arrive as an APK over WhatsApp, then ask for
   // SMS, notification or accessibility access to read OTPs and tap "Pay".
@@ -163,16 +201,26 @@ export function checkPhone(text: string): PhoneCheck {
   const serious = new Set(notFromPlay.filter((a) => powers(a.id).length > 0).map((a) => a.id));
   for (const id of accessibility) if (!serious.has(id)) findings.push({ level: 'check', text: `${name(id)} can read your screen and tap for you (Accessibility). Turn it off unless you need it.` });
   for (const id of notificationReaders) if (!serious.has(id)) findings.push({ level: 'check', text: `${name(id)} reads all your notifications, OTPs included.` });
-  for (const id of readSms) if (!serious.has(id)) findings.push({ level: 'check', text: `${name(id)} can read your SMS, OTPs included.` });
+  // Many Play Store apps hold SMS access for OTP autofill: one line, not one per app.
+  const smsReaders = readSms.filter((id) => !serious.has(id));
+  if (smsReaders.length > 0) {
+    findings.push({
+      level: 'check',
+      text: `${smsReaders.length} app${smsReaders.length === 1 ? '' : 's'} can read all your SMS, OTPs included: ${smsReaders.map(name).join(', ')}. Most only need it to fill OTPs; remove it from any that don't (Settings → Security & privacy → Privacy → Permission manager → SMS).`,
+    });
+  }
   for (const id of deviceAdmins) if (!serious.has(id)) findings.push({ level: 'check', text: `${name(id)} is a device admin, so it is hard to uninstall.` });
   const others = notFromPlay.filter((a) => !serious.has(a.id));
-  if (others.length > 0) findings.push({ level: 'check', text: `Not from the Play Store: ${others.map((a) => `${a.name}${a.installer ? ` (by ${a.installer})` : ''}`).join(', ')}.` });
+  const how = (a: AppInfo) =>
+    a.installer === null ? 'installed over a cable or by an unknown app' : a.installer === 'com.google.android.packageinstaller' ? 'installed from an .apk file' : `installed by ${nameOf(a.installer)}`;
+  if (others.length > 0) findings.push({ level: 'check', text: `Not from the Play Store: ${others.map((a) => `${a.name} (${how(a)})`).join(', ')}. Fine if you know where it came from.` });
   if (apkFiles.length > 0) findings.push({ level: 'check', text: `${apkFiles.length} app installer file${apkFiles.length === 1 ? '' : 's'} (.apk) on the phone: ${apkFiles.map((f) => f.split('/').pop()).join(', ')}. Delete any you didn't mean to keep; never open one sent on WhatsApp.` });
   if (installApps.length > 0) findings.push({ level: 'check', text: `Allowed to install other apps: ${installApps.map(name).join(', ')}.` });
 
   return {
     apps: apps.size,
     notFromPlay,
+    webApps,
     accessibility,
     notificationReaders,
     deviceAdmins,

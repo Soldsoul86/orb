@@ -113,8 +113,12 @@ export function isPromotional(sender: string): boolean {
   return /-P$/i.test(sender.trim());
 }
 
-const NAME = "[A-Za-z][A-Za-z0-9 .&'()-]{0,48}?";
+// A name may start with digits when a letter follows ("8Club", "1mg").
+const NAME = "(?:[A-Za-z]|\\d+[A-Za-z])[A-Za-z0-9 .&'()-]{0,48}?";
 const COUNTERPARTY: readonly RegExp[] = [
+  /\bNEFT Cr-[A-Z]{4}0[A-Z0-9]{6}-([A-Za-z][A-Za-z0-9 .&'()]{1,48}?)-/, // HDFC salary: NEFT Cr-IFSC-PAYER-Your Name-ref
+  /-TPT-(?:[A-Z0-9]*\d[A-Z0-9]*-|[A-Z]-)*([A-Za-z][A-Za-z .&']{1,48}?)\s*\.\s*Avl/, // HDFC own-bank transfer: …6121-TPT-HDFC52AD…-NAME.Avl bal
+  /\bFor IMPS\s*-\s*([A-Za-z][A-Za-z .&']{1,48}?)\s*-/i, // HDFC: For IMPS -NAME- F6261…
   new RegExp(`UPI\\/(?:P2[AMP]|CR|DR)\\/\\d+\\/(${NAME})(?:\\/|\\.(?:\\s|$)|\\n|$)`, 'i'), // Axis, AU and others
   new RegExp(`\\bRef\\s+(?:IMPS|NEFT|RTGS)[-/ ]?\\d*\\s*-\\s*(${NAME})\\s*(?:-|\\.|$)`, 'i'), // AU: "Ref IMPS-6245… -NAME -IC"
   new RegExp(`\\btrf to\\s+(${NAME})\\s+Ref`, 'i'), // SBI
@@ -154,6 +158,8 @@ export function senderBrand(sender: string): string | undefined {
 const MARKETING = /\b(?:T&C|T & C|\d+%\s*off|flat\s+\d+%|use code|coupon|sale\b|shop now|offer ends|limited period)/i;
 /** Money moving inside an app's own wallet, not a bank account. */
 const WALLET_ONLY = /\bwallet\b/i;
+/** A biller confirming a bill payment ("Rs 275 has been credited to your Airtel Wi-Fi Id …"): the bank alert already has it. */
+const BILLER = /\bcredited to your (?:[\w-]+ ){1,3}(?:id|number|connection)\b/i;
 /** A payment that did not go through. */
 const FAILED = /\b(?:has|have|had)\s+failed\b|\bpayment failed\b|\btransaction (?:has )?failed\b|\bwill be refunded\b/i;
 
@@ -162,6 +168,9 @@ function counterpartyOf(body: string): { name: string; vpa?: string } | undefine
   // ICICI transfer to another account: "… debited … & Acct XX106 credited."
   const toAccount = body.match(/&\s*Acc(?:t|ount)?\.?\s+(X+\d{3,4})\s+credited/i);
   if (toAccount) return { name: `Account ${toAccount[1]!.toUpperCase()}` };
+  // HDFC IMPS: "To A/c xxxxxxxxxx2041" on its own line: the account is the payee.
+  const toAc = body.match(/(?:^|\n)To A\/c\s+[xX*]+(\d{3,4})\b/);
+  if (toAc) return { name: `Account XX${toAc[1]}` };
   for (const re of COUNTERPARTY) {
     const name = body.match(re)?.[1]?.trim().replace(/[.,;:-]+$/, '').replace(/_+/g, ' ').trim();
     if (name !== undefined && !/^(?:a\/?c|acct|account|your|ac)\b/i.test(name) && !/bank a\/?c/i.test(name)) {
@@ -180,7 +189,7 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (isPromotional(sms.address)) return null;
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
-  if (MARKETING.test(body) || FAILED.test(body)) return null;
+  if (MARKETING.test(body) || FAILED.test(body) || BILLER.test(body)) return null;
   // Credits into an app's own wallet (exchange rewards, cashback) are not bank money.
   if (WALLET_ONLY.test(body) && !/\b(a\/c|acct|acc|account)\b/i.test(body)) return null;
   if (!/\b(a\/c|acct|acc|ac|account|card|upi|vpa)\b/i.test(body)) return null;
@@ -221,6 +230,7 @@ export function looksLikeUnreadAlert(sms: Sms): boolean {
     !MARKETING.test(sms.body) &&
     !(WALLET_ONLY.test(sms.body) && !/\b(a\/c|acct|acc|account)\b/i.test(sms.body)) &&
     !FAILED.test(sms.body) &&
+    !BILLER.test(sms.body) &&
     /\b(debited|credited)\b/i.test(sms.body) &&
     MONEY.test(sms.body) &&
     (parseBankAlert(sms) === null || parseBankAlert(sms)?.unnamed === true)

@@ -181,4 +181,22 @@ describe('fourth run', () => {
     assert.equal(r.biggest.out[0]?.amount, 90_000);
     assert.match(formatReport(r), /Biggest out: ₹90,000 to SOME BUILDER/);
   });
+
+  it('fifth run: HDFC salary, own-bank and IMPS transfers, names starting with a digit, biller notices', () => {
+    const hdfc = (body: string) => parseBankAlert(sms('JM-HDFCBK-S', body));
+    const neft = hdfc('Update! INR 3,10,338.00 deposited in HDFC Bank A/c XX6111 on 01-SEP-26 for NEFT Cr-YESB0000001-ACME TECHNOLOGIES-Your Name-YESIG62440270133.Avl bal INR 3,10,848.10. Cheque deposits in A/C are subject to clearing');
+    assert.deepEqual([neft?.direction, neft?.amount, neft?.counterparty, neft?.unnamed], ['credit', 310_338, 'ACME TECHNOLOGIES', undefined]);
+    const tpt = hdfc('Update! INR 5,000.00 deposited in HDFC Bank A/c XX6111 on 21-JUL-26 for XXXXXXXXXX6121-TPT-HDFC52ADBB425BA1-ASHA MENON.Avl bal INR 31,044.03. Cheque deposits in A/C are subject to clearing');
+    assert.equal(tpt?.counterparty, 'ASHA MENON');
+    assert.equal(hdfc('Update! INR 10,000.00 deposited in HDFC Bank A/c XX6111 on 18-AUG-25 for XXXXXXXXXX6121-TPT-T-ASHA MENON.Avl bal INR 2,38,255.57.')?.counterparty, 'ASHA MENON');
+    const imps = hdfc('Received!\nINR 1,000.00 in HDFC Bank A/c xx6111\nOn 18-09-26\nFor IMPS -ASHA MENON- F62611040136\nAvl bal INR 1,024.52');
+    assert.deepEqual([imps?.direction, imps?.counterparty], ['credit', 'ASHA MENON']);
+    const toAc = hdfc('IMPS INR 57,000.00\nsent from HDFC Bank A/c XX6111 on 02-08-26\nTo A/c xxxxxxxxxx2041\nRef-621454202605\nNot you?Call 18002586161/SMS BLOCK OB to 7308080808');
+    assert.deepEqual([toAc?.direction, toAc?.counterparty], ['debit', 'Account XX2041']);
+    const club = hdfc('Sent Rs.266.63\nFrom HDFC Bank A/C *6111\nTo 8Club\nOn 21/08/26\nRef 304893449225\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808');
+    assert.equal(club?.counterparty, '8Club');
+    const airtel = sms('AA-AIRTEL', 'Dear Customer, Rs 275.06 has been credited to your Airtel Wi-Fi Id 08041102854 . Your current balance due amount is Rs 1021.76 . You can view & pay with your AirtelThanks App https://i.airtel.in/x');
+    assert.equal(parseBankAlert(airtel), null);
+    assert.equal(looksLikeUnreadAlert(airtel), false);
+  });
 });

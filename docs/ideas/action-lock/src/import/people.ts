@@ -172,7 +172,9 @@ export function summariseUsage(dumps: readonly string[]): ScreenSummary {
   // The first and last day are usually partial; count only full days when there are enough.
   const days = [...dayHours.keys()].sort();
   const full = days.length > 2 ? days.slice(1, -1) : [];
-  const byHour = Array.from({ length: 24 }, (_, h) => (full.length === 0 ? 0 : full.filter((d) => dayHours.get(d)!.has(h)).length / full.length));
+  // Off-phone hours need full days; the by-hour picture uses every day until there are some.
+  const shown = full.length > 0 ? full : days;
+  const byHour = Array.from({ length: 24 }, (_, h) => (shown.length === 0 ? 0 : shown.filter((d) => dayHours.get(d)!.has(h)).length / shown.length));
   return {
     days: days.length,
     events: seen.size,
