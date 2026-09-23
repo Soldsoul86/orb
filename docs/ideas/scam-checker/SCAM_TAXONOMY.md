@@ -117,7 +117,7 @@ be able to answer the same questions.
 | 1 | `is_scam` | Probability | 0–1 | Main verdict |
 | 2 | `scam_type` | Choice | ids from section 1 | Picks the explanation and advice |
 | 3 | `victim_stage` | Choice | `first_contact`, `engaged`, `money_or_info_requested`, `money_or_info_already_given` | `already_given` switches to emergency advice |
-| 4 | `impersonated_entity` | Choice | `police_or_agency`, `bank`, `telecom`, `courier`, `utility`, `government_scheme`, `employer`, `relative_or_friend`, `brand_or_shop`, `none` | Tells the user who is being faked |
+| 4 | `impersonated_entity` | Choice | `police_or_agency`, `bank`, `telecom`, `courier`, `utility`, `government`, `employer`, `relative_or_friend`, `brand_or_shop`, `none` | Tells the user who is being faked |
 | 5 | `asks_for_otp_or_pin` | Probability | 0–1 | Red flag on its own |
 | 6 | `asks_for_payment` | Probability | 0–1 | Red flag on its own |
 | 7 | `asks_to_install_app` | Probability | 0–1 | APK or remote-access app |
@@ -139,13 +139,14 @@ Thresholds are placeholders until measured on real Indian scam samples.
 | `victim_stage = money_or_info_already_given` | **Act now** | Immediately: call **1930**, report at **cybercrime.gov.in**, call your bank to freeze the account. Shown before any explanation. |
 | `is_scam ≥ 0.85` and `scam_type` confidence ≥ 0.7 | **Likely scam** | LLM explains why, in the user's language, with the advice for that type |
 | `is_scam` between 0.4 and 0.85, or low confidence on `scam_type` | **Suspicious** | Second check by an LLM; advice: don't pay, don't share OTP, verify through the official number |
-| `is_scam < 0.4` and all red-flag questions < 0.3 | **No scam signs found** | Never say "safe". Always add: "If anyone asks for OTP, PIN or money, stop." |
+| `is_scam < 0.4`, `asks_for_otp_or_pin` < 0.3 and `asks_to_install_app` < 0.3 | **No scam signs found** | Never say "safe". Always add: "If anyone asks for OTP, PIN or money, stop." |
 
 Rules that override the model:
 
 - Any `.apk` file → at least **Suspicious**.
 - Any request for OTP or UPI PIN → at least **Suspicious**.
 - A verdict of "safe" is never shown.
+- A payment request on its own does not block **No scam signs found** — friends split bills over UPI (scenario N05).
 
 ---
 

@@ -1,0 +1,513 @@
+# Scam Checker — message scenarios
+#
+# The test set every checker version must pass before the bot ships.
+# Source of truth for expected behaviour; SCAM_TAXONOMY.md defines the ids.
+#
+# Fields
+#   id          stable id, never reused
+#   lang        en | hi | kn | ta | te | mr | bn | ml | hinglish | kanglish
+#   channel     sms | whatsapp | call_summary | screenshot_text | email
+#   input       what the user forwarded (links are defanged: hxxps, [.])
+#   expect
+#     verdict   act_now | likely_scam | suspicious | no_scam_signs
+#     scam_type id from SCAM_TAXONOMY.md section 1 (none for non-scams)
+#     entity    impersonated_entity answer (section 2, question 4)
+#     stage     victim_stage answer (only for scams)
+#     flags     red flags that must be detected: otp_or_pin, payment, install_app
+#     pressure  0..4, pressure_level answer
+#   note        why the case exists (hard cases only)
+#
+# Probabilities are not asserted exactly; the verdict is the contract.
+# All phone numbers, names and domains are invented.
+
+scenarios:
+
+  # ── A. Impersonating authority ────────────────────────────────────────────
+
+  - id: A01
+    lang: en
+    channel: call_summary
+    input: >
+      Got a video call from a man in police uniform saying he is from Mumbai
+      Cyber Crime. He says my Aadhaar was used to open a bank account for money
+      laundering and I am under digital arrest. I must not tell my family and
+      must transfer my savings to an RBI verification account for checking.
+      He is still on the call.
+    expect: { verdict: likely_scam, scam_type: digital_arrest, entity: police_or_agency,
+              stage: money_or_info_requested, flags: [payment], pressure: 4 }
+
+  - id: A02
+    lang: en
+    channel: call_summary
+    input: >
+      My father got a call from a "CBI officer" yesterday. He was on video for
+      6 hours and sent ₹8,40,000 by RTGS to their account. Now they want more.
+    expect: { verdict: act_now, scam_type: digital_arrest, entity: police_or_agency,
+              stage: money_or_info_already_given, flags: [payment], pressure: 4 }
+    note: Money already sent. Emergency advice (1930) must come first.
+
+  - id: A03
+    lang: hinglish
+    channel: call_summary
+    input: >
+      FedEx se call aaya, bole mere naam pe Taiwan ka parcel pakda gaya hai
+      jisme 5 passport aur MDMA drugs hain. Press 1 kiya to Mumbai police ko
+      connect kar diya.
+    expect: { verdict: likely_scam, scam_type: courier_parcel, entity: courier,
+              stage: engaged, flags: [], pressure: 4 }
+
+  - id: A04
+    lang: en
+    channel: call_summary
+    input: >
+      Automated call: "This is TRAI. Your mobile number will be disconnected
+      within 2 hours because it was used for illegal activities. Press 9 to
+      speak to an officer."
+    expect: { verdict: likely_scam, scam_type: telecom_disconnect, entity: telecom,
+              stage: first_contact, flags: [], pressure: 4 }
+
+  - id: A05
+    lang: en
+    channel: sms
+    input: >
+      Dear Consumer, your electricity power will be disconnected tonight at
+      9.30 PM from electricity office because your previous month bill was not
+      updated. Please immediately contact our electricity officer 98XXXXXX21.
+    expect: { verdict: likely_scam, scam_type: utility_bill, entity: utility,
+              stage: first_contact, flags: [payment], pressure: 4 }
+
+  - id: A06
+    lang: kn
+    channel: sms
+    input: >
+      ಆತ್ಮೀಯ ಗ್ರಾಹಕರೇ, ನಿಮ್ಮ ವಿದ್ಯುತ್ ಬಿಲ್ ಬಾಕಿ ಇರುವುದರಿಂದ ಇಂದು ರಾತ್ರಿ 9 ಗಂಟೆಗೆ
+      ಸಂಪರ್ಕ ಕಡಿತಗೊಳ್ಳುತ್ತದೆ. ತಕ್ಷಣ ಅಧಿಕಾರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ: 97XXXXXX45
+    expect: { verdict: likely_scam, scam_type: utility_bill, entity: utility,
+              stage: first_contact, flags: [payment], pressure: 4 }
+    note: Kannada script version of A05.
+
+  - id: A07
+    lang: en
+    channel: whatsapp
+    input: >
+      Vahan Parivahan: You have a pending traffic challan of Rs 500. Download
+      the attached app to pay and avoid court action. [attachment: RTO_Challan.apk]
+    expect: { verdict: likely_scam, scam_type: traffic_challan, entity: government,
+              stage: first_contact, flags: [install_app, payment], pressure: 3 }
+
+  - id: A08
+    lang: en
+    channel: sms
+    input: >
+      Income Tax Dept: You are eligible for a refund of Rs 15,490. Verify your
+      account at hxxps://incometax-refund-verify[.]top to receive it today.
+    expect: { verdict: likely_scam, scam_type: tax_refund, entity: government,
+              stage: first_contact, flags: [], pressure: 2 }
+
+  # ── B. Banking and payments ───────────────────────────────────────────────
+
+  - id: B01
+    lang: en
+    channel: sms
+    input: >
+      Dear SBI user, your YONO account will be blocked today. Update your PAN
+      now: hxxps://sbi-kyc-update[.]in/verify
+    expect: { verdict: likely_scam, scam_type: kyc_update, entity: bank,
+              stage: first_contact, flags: [], pressure: 4 }
+
+  - id: B02
+    lang: hinglish
+    channel: call_summary
+    input: >
+      Bank se call aaya, bole card upgrade ho raha hai, abhi jo OTP aaya hai
+      woh bata do verification ke liye.
+    expect: { verdict: likely_scam, scam_type: otp_sharing, entity: bank,
+              stage: money_or_info_requested, flags: [otp_or_pin], pressure: 3 }
+
+  - id: B03
+    lang: en
+    channel: whatsapp
+    input: >
+      Hi, I want to buy your sofa listed on OLX for ₹12,000. I have sent a QR
+      code, just scan and enter your UPI PIN to receive the payment.
+    expect: { verdict: likely_scam, scam_type: upi_collect, entity: none,
+              stage: money_or_info_requested, flags: [otp_or_pin], pressure: 1 }
+
+  - id: B04
+    lang: hinglish
+    channel: whatsapp
+    input: >
+      Bhaiya galti se aapke account me 10,000 bhej diya, SMS check karo. Please
+      wapas bhej do, hospital ka paisa tha.
+    expect: { verdict: likely_scam, scam_type: wrong_transfer, entity: none,
+              stage: money_or_info_requested, flags: [payment], pressure: 3 }
+    note: Real case would show a fake "credited" SMS from a personal number.
+
+  - id: B05
+    lang: en
+    channel: sms
+    input: >
+      Your HDFC credit card reward points worth Rs 7,850 expire today. Redeem
+      now: hxxp://hdfc-rewardz[.]co/redeem
+    expect: { verdict: likely_scam, scam_type: reward_points, entity: bank,
+              stage: first_contact, flags: [], pressure: 3 }
+
+  - id: B06
+    lang: en
+    channel: whatsapp
+    input: >
+      You are invited to our wedding! Please open the invitation card.
+      [attachment: Wedding_Invitation.apk]
+    expect: { verdict: suspicious, scam_type: malicious_apk, entity: relative_or_friend,
+              stage: first_contact, flags: [install_app], pressure: 0 }
+    note: Hard rule — any .apk is at least suspicious, even with no pressure.
+
+  - id: B07
+    lang: en
+    channel: call_summary
+    input: >
+      Bank customer care said to fix my refund I should install AnyDesk and
+      read out the code so the executive can help me.
+    expect: { verdict: likely_scam, scam_type: remote_access, entity: bank,
+              stage: money_or_info_requested, flags: [install_app], pressure: 2 }
+
+  - id: B08
+    lang: en
+    channel: call_summary
+    input: >
+      Caller from "Airtel" says my SIM needs 5G eSIM upgrade, asked me to send
+      an SMS "ESIM myemail@example.com" to 121 and then forward the code he gets.
+    expect: { verdict: likely_scam, scam_type: sim_swap, entity: telecom,
+              stage: money_or_info_requested, flags: [otp_or_pin], pressure: 2 }
+
+  # ── C. Easy money ─────────────────────────────────────────────────────────
+
+  - id: C01
+    lang: en
+    channel: whatsapp
+    input: >
+      Hello! We are hiring part-time. Like YouTube videos and earn ₹150 per
+      like, up to ₹3,000 daily. Contact our HR on Telegram @xyz_hr_desk
+    expect: { verdict: likely_scam, scam_type: task_job, entity: employer,
+              stage: first_contact, flags: [], pressure: 1 }
+
+  - id: C02
+    lang: en
+    channel: screenshot_text
+    input: >
+      Telegram group: "Merchant task 7: deposit ₹25,000 to unlock
+      commission of ₹38,500. Complete within 30 minutes or your previous
+      ₹14,000 will be frozen."
+    expect: { verdict: act_now, scam_type: task_job, entity: employer,
+              stage: money_or_info_already_given, flags: [payment], pressure: 4 }
+    note: Victim has already paid earlier tasks. Must not advise paying to "unfreeze".
+
+  - id: C03
+    lang: en
+    channel: email
+    input: >
+      From: hr.infosys.careers@gmail.com — Congratulations, you are selected for
+      Software Engineer. Pay ₹4,999 refundable training fee to receive your
+      offer letter.
+    expect: { verdict: likely_scam, scam_type: fake_job_offer, entity: employer,
+              stage: money_or_info_requested, flags: [payment], pressure: 1 }
+
+  - id: C04
+    lang: en
+    channel: whatsapp
+    input: >
+      Welcome to "Stock Learning Club 88". Our professor gives daily picks with
+      guaranteed 30% monthly returns. Download our institutional trading app
+      to get IPO allotment.
+    expect: { verdict: likely_scam, scam_type: investment_trading, entity: brand_or_shop,
+              stage: first_contact, flags: [install_app], pressure: 1 }
+
+  - id: C05
+    lang: en
+    channel: whatsapp
+    input: >
+      Invest 1 USDT and get 2 USDT in 24 hours. Our mining platform is 100%
+      safe. Refer 3 friends for bonus.
+    expect: { verdict: likely_scam, scam_type: crypto, entity: none,
+              stage: first_contact, flags: [payment], pressure: 1 }
+
+  - id: C06
+    lang: hi
+    channel: whatsapp
+    input: >
+      बधाई हो! आपने KBC लॉटरी में ₹25,00,000 जीते हैं। इनाम पाने के लिए ₹12,500
+      टैक्स जमा करें। संपर्क करें राणा प्रताप सिंह 98XXXXXX76
+    expect: { verdict: likely_scam, scam_type: lottery_prize, entity: brand_or_shop,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  # ── D. Loans ──────────────────────────────────────────────────────────────
+
+  - id: D01
+    lang: en
+    channel: whatsapp
+    input: >
+      You have not repaid your ₹3,000 loan from QuickCash. Pay ₹9,800 today or
+      we will send your morphed photos to all your contacts.
+    expect: { verdict: act_now, scam_type: loan_app, entity: none,
+              stage: money_or_info_already_given, flags: [payment], pressure: 4 }
+    note: Victim already gave contact access. Advice includes reporting, not paying.
+
+  - id: D02
+    lang: en
+    channel: sms
+    input: >
+      Congratulations! Your pre-approved personal loan of ₹5,00,000 is ready.
+      Pay processing fee ₹2,999 to disburse today. Call 70XXXXXX12.
+    expect: { verdict: likely_scam, scam_type: loan_advance_fee, entity: bank,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  # ── E. Impersonating people you know ──────────────────────────────────────
+
+  - id: E01
+    lang: en
+    channel: whatsapp
+    input: >
+      Hi Papa, this is my new number. Phone fell in water. I need ₹18,000
+      urgently for hostel fees, please send to this UPI, can't talk now.
+    expect: { verdict: likely_scam, scam_type: relative_impersonation, entity: relative_or_friend,
+              stage: money_or_info_requested, flags: [payment], pressure: 3 }
+
+  - id: E02
+    lang: en
+    channel: whatsapp
+    input: >
+      Hi Papa, this is my new number, save it.
+    expect: { verdict: suspicious, scam_type: relative_impersonation, entity: relative_or_friend,
+              stage: first_contact, flags: [], pressure: 0 }
+    note: >
+      Could be genuine. No money yet, but this is how the scam starts.
+      Advice is "call them on the old number", not "this is a scam".
+
+  - id: E03
+    lang: en
+    channel: call_summary
+    input: >
+      Got a call that sounded exactly like my nephew crying, said he was
+      arrested in an accident and a police officer took the phone and asked
+      for ₹50,000 by GPay to settle.
+    expect: { verdict: likely_scam, scam_type: relative_impersonation, entity: relative_or_friend,
+              stage: money_or_info_requested, flags: [payment], pressure: 4 }
+    note: AI voice clone variant.
+
+  - id: E04
+    lang: en
+    channel: whatsapp
+    input: >
+      We have recorded your video call. Pay ₹20,000 in 1 hour or we will send
+      it to your family and post it on YouTube.
+    expect: { verdict: likely_scam, scam_type: sextortion, entity: none,
+              stage: money_or_info_requested, flags: [payment], pressure: 4 }
+    note: Explanation must be non-judgemental; do not pay, report on cybercrime.gov.in.
+
+  - id: E05
+    lang: en
+    channel: whatsapp
+    input: >
+      My match from the matrimony site, a doctor in London, sent me a gift.
+      Customs officer called, I must pay ₹35,000 clearance to receive it.
+    expect: { verdict: likely_scam, scam_type: romance_matrimonial, entity: courier,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  - id: E06
+    lang: en
+    channel: whatsapp
+    input: >
+      I am Major Sharma posted at Army cantonment, I will buy your bike. Army
+      rule, first you send ₹1 to test, then I send full amount. [photo: army ID]
+    expect: { verdict: likely_scam, scam_type: army_marketplace, entity: police_or_agency,
+              stage: money_or_info_requested, flags: [payment], pressure: 1 }
+
+  # ── F. Shopping and bookings ──────────────────────────────────────────────
+
+  - id: F01
+    lang: en
+    channel: call_summary
+    input: >
+      Searched Google for Swiggy customer care, called the number. He said to
+      get my ₹450 refund I must pay ₹10 through a link he sends.
+    expect: { verdict: likely_scam, scam_type: fake_customer_care, entity: brand_or_shop,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  - id: F02
+    lang: en
+    channel: whatsapp
+    input: >
+      iPhone 16 Pro at ₹14,999 only! Big Billion clearance sale, prepaid only.
+      Order at hxxps://flipkart-bigsale[.]shop
+    expect: { verdict: likely_scam, scam_type: fake_shopping, entity: brand_or_shop,
+              stage: first_contact, flags: [payment], pressure: 2 }
+
+  - id: F03
+    lang: ta
+    channel: whatsapp
+    input: >
+      திருப்பதி சிறப்பு தரிசனம் டிக்கெட் கிடைக்கும். ஒரு நபருக்கு ₹1,500.
+      இந்த UPI க்கு பணம் அனுப்புங்கள்: tirupati.darshan@okxyz
+    expect: { verdict: likely_scam, scam_type: fake_booking, entity: brand_or_shop,
+              stage: money_or_info_requested, flags: [payment], pressure: 1 }
+    note: Tamil. Payment to a personal UPI ID for temple darshan.
+
+  - id: F04
+    lang: en
+    channel: whatsapp
+    input: >
+      2BHK in HSR Layout for ₹18,000/month. I am working in Dubai so can't show
+      the flat now. Send ₹25,000 token advance and I will courier the keys.
+    expect: { verdict: likely_scam, scam_type: rental_advance, entity: none,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+    note: Bangalore launch case. Below-market rent in HSR is itself a signal.
+
+  # ── G. Fake government schemes and giveaways ──────────────────────────────
+
+  - id: G01
+    lang: hi
+    channel: whatsapp
+    input: >
+      PM किसान योजना: सभी किसानों को ₹6,000 की अगली किस्त। अभी रजिस्टर करें:
+      hxxps://pmkisan-yojana-apply[.]online (रजिस्ट्रेशन शुल्क ₹99)
+    expect: { verdict: likely_scam, scam_type: fake_govt_scheme, entity: government,
+              stage: first_contact, flags: [payment], pressure: 1 }
+
+  - id: G02
+    lang: en
+    channel: whatsapp
+    input: >
+      Jio is giving FREE 3 months ₹399 recharge on its anniversary! Click, answer
+      3 questions and share with 10 groups to activate. hxxp://jio-offer-free[.]xyz
+    expect: { verdict: likely_scam, scam_type: fake_giveaway, entity: brand_or_shop,
+              stage: first_contact, flags: [], pressure: 1 }
+
+  - id: G03
+    lang: en
+    channel: whatsapp
+    input: >
+      Please help! 4-year-old Aarav needs ₹12 lakh for heart surgery. Every
+      rupee counts. Send to aarav.help@okxyz. Forward to all groups.
+    expect: { verdict: suspicious, scam_type: fake_charity, entity: none,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+    note: >
+      Some such appeals are real. Suspicious, not likely_scam: advice is to
+      donate only through registered platforms or the hospital directly.
+
+  # ── H. Other ──────────────────────────────────────────────────────────────
+
+  - id: H01
+    lang: en
+    channel: call_summary
+    input: >
+      Caller from "IRDA" says my lapsed LIC policy has a bonus of ₹3,40,000
+      pending. To release it I must pay 10% GST first.
+    expect: { verdict: likely_scam, scam_type: insurance_policy, entity: government,
+              stage: money_or_info_requested, flags: [payment], pressure: 2 }
+
+  # ── Real messages that look like scams (must NOT be flagged) ──────────────
+
+  - id: N01
+    lang: en
+    channel: sms
+    input: >
+      482913 is your OTP for txn of INR 1,250.00 at SWIGGY on HDFC Bank card
+      xx4417. Valid for 5 mins. Do not share OTP with anyone. -HDFC Bank
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 1 }
+    note: A real OTP message. Nobody is asking for it. Must not trigger otp_or_pin.
+
+  - id: N02
+    lang: en
+    channel: sms
+    input: >
+      Challan No. KA0123456789 issued against KA01AB1234 for Rs 500. Pay at
+      https://echallan.parivahan.gov.in or visit nearest traffic police station.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 1 }
+    note: Official domain, no app, no personal number. Link check must pass.
+
+  - id: N03
+    lang: en
+    channel: sms
+    input: >
+      BESCOM: Bill for A/c 1234567890 for Aug-2026 is Rs 1,842. Due date
+      15-09-2026. Pay via BESCOM website or app.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Real utility bill. Contrast with A05 — account number, no threat, no personal number.
+
+  - id: N04
+    lang: en
+    channel: email
+    input: >
+      From: talent@company-careers.example — Thank you for applying. Your
+      interview is scheduled for 26 Sep, 11 AM on Google Meet. There is no fee
+      at any stage of our hiring process.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+
+  - id: N05
+    lang: en
+    channel: whatsapp
+    input: >
+      Da, I've sent a GPay request for ₹640 for last night's dinner, approve
+      when you're free.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [payment], pressure: 0 }
+    note: >
+      Payment request from a friend for a shared bill. The payment flag is
+      true but the verdict stays clean; the model must not treat every UPI
+      request as upi_collect.
+
+  - id: N06
+    lang: en
+    channel: sms
+    input: >
+      UIDAI: Update your Aadhaar documents free of cost till 14-Dec-2026 at
+      https://myaadhaar.uidai.gov.in. UIDAI never asks for OTP over call.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 1 }
+    note: Real KYC-style reminder on an official domain.
+
+  - id: N07
+    lang: en
+    channel: sms
+    input: >
+      Your Amazon order will be delivered today. Share OTP 5521 with the
+      delivery agent only at the time of delivery.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Delivery OTP is meant to be shared with the agent in person.
+
+  - id: N08
+    lang: kanglish
+    channel: whatsapp
+    input: >
+      Flat visit ge Saturday 11 ge banni, owner iddare. Token advance visit
+      aadmele agreement time alli kodi saaku.
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Genuine rental message in Kannada-English. Contrast with F04 — visit first, pay later.
+
+  - id: N09
+    lang: en
+    channel: sms
+    input: >
+      Bought 10 shares of INFY at ₹1,892.40 on NSE. Order ID 1200000012345678.
+      -Zerodha
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+
+  - id: N10
+    lang: hi
+    channel: whatsapp
+    input: >
+      बेटा, खाना खाया? रविवार को फ़ोन करना, नानी तुमसे बात करना चाहती हैं।
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Ordinary family message. Parents will forward these too.
+
+  # ── Unknown pattern ───────────────────────────────────────────────────────
+
+  - id: X01
+    lang: en
+    channel: whatsapp
+    input: >
+      Your FASTag has been flagged by NHAI for duplicate registration. To avoid
+      blacklisting, re-verify with ₹199 through the link sent by our officer.
+    expect: { verdict: likely_scam, scam_type: other_scam, entity: government,
+              stage: money_or_info_requested, flags: [payment], pressure: 3 }
+    note: >
+      No FASTag type exists yet. Must still be caught as a scam and land in
+      other_scam for the weekly review — the signal to add a new type.
