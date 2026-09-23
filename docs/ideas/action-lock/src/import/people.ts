@@ -144,6 +144,8 @@ export function parseUsage(dump: string): { events: UsageEvent[]; appTime: Map<s
 export interface ScreenSummary {
   /** Days with any recorded use. */
   readonly days: number;
+  /** Foreground events read (0 means the dump's format was not recognised). */
+  readonly events: number;
   /** Share of days you were on the phone, per local hour 0–23. */
   readonly byHour: readonly number[];
   /** The longest stretch of hours you are almost never on the phone; null until 3 days are known. */
@@ -173,6 +175,7 @@ export function summariseUsage(dumps: readonly string[]): ScreenSummary {
   const byHour = Array.from({ length: 24 }, (_, h) => (full.length === 0 ? 0 : full.filter((d) => dayHours.get(d)!.has(h)).length / full.length));
   return {
     days: days.length,
+    events: seen.size,
     byHour,
     offHours: full.length >= 3 ? longestOff(byHour) : null,
     topApps: [...appTime.entries()]

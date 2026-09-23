@@ -441,6 +441,86 @@ function formatMail(m: MailSummary | undefined): string[] {
   return lines;
 }
 
+/** One line per distinct format: digits and long codes don't make two lines different. */
+function varied(lines: readonly string[], max: number): string[] {
+  const seen = new Map<string, string>();
+  for (const l of lines) {
+    const shape = l.replace(/\d+/g, '9').replace(/[A-Z0-9•]{5,}/g, 'X').slice(0, 70);
+    if (!seen.has(shape)) seen.set(shape, l);
+    if (seen.size >= max) break;
+  }
+  return [...seen.values()];
+}
+
+/**
+ * What the import could not understand, masked, for pasting into the
+ * conversation that improves the readers (private/feedback.txt). Contains no
+ * unmasked confidential data, no contact names and no full phone numbers.
+ */
+export function formatFeedback(r: ImportResult, inputs: readonly ImportInput[]): string {
+  const out: string[] = ['ACTION LOCK · FEEDBACK (safe to paste: confidential items are masked)', ''];
+  const kinds = new Set(r.files.map((f) => f.kind));
+  out.push(`Files: ${r.files.map((f) => `${f.name}=${f.kind}:${f.records}`).join(' · ')}`, '');
+
+  const noName = r.unreadAll.filter((l) => l.startsWith('(no payee name)'));
+  const unread = r.unreadAll.filter((l) => !l.startsWith('(no payee name)'));
+  out.push(`SMS: ${r.txns.length} transactions · ${r.unreadCount} bank alerts not read · ${r.unnamedCount} with no payee name`);
+  for (const l of varied(unread, 30)) out.push(`  ? ${l.slice(0, 300)}`);
+  if (noName.length > 0) out.push('  No payee name (different formats):');
+  for (const l of varied(noName, 10)) out.push(`  ? ${l.slice(0, 300)}`);
+  out.push('');
+
+  if (!kinds.has('android_phone')) out.push('PHONE CHECK: the phone did not share app details.');
+  else if (r.phone !== undefined) {
+    const c = r.phone;
+    out.push(`PHONE CHECK: ${c.apps} apps · not from Play ${c.notFromPlay.length} · accessibility ${c.accessibility.length} · notification readers ${c.notificationReaders.length} · SMS readers ${c.readSms.length} · admins ${c.deviceAdmins.length} · draw-over ${c.drawOverApps.length} · install ${c.installApps.length} · apk files ${c.apkFiles.length} · sms app ${c.smsApp ?? 'unknown'}`);
+    if (c.apps === 0) {
+      const dump = inputs.find((i) => detectSource(i.text) === 'android_phone')?.text ?? '';
+      out.push('  No apps read. Start of the dump:', ...dump.split('\n').slice(0, 15).map((l) => `  | ${l.slice(0, 160)}`));
+    }
+  }
+  out.push('');
+
+  for (const [kind, label] of [['android_contacts', 'Contacts'], ['android_calls', 'Call log']] as const) {
+    const f = r.files.find((x) => x.kind === kind);
+    if (f === undefined) out.push(`${label}: not shared by the phone.`);
+    else {
+      const raw = inputs.find((i) => i.name === f.name)?.text ?? '';
+      const rows = (raw.match(/^Row: \d+ /gm) ?? []).length;
+      out.push(`${label}: ${f.records} read of ${rows} rows`);
+      if (rows > 0 && f.records < rows * 0.9) {
+        // Show the layout, not the data: values replaced by their length.
+        const first = raw.split('\n').find((l) => l.startsWith('Row:')) ?? '';
+        out.push(`  Layout: ${first.replace(/=([^,]*)/g, (_, v: string) => `=<${v.trim().length}>`)}`);
+      }
+    }
+  }
+  if (r.calls) out.push(`  calls ${r.calls.calls} · from contacts ${pct(r.calls.incomingFromContacts)} · unknown incoming ${r.calls.unknownIncoming}`);
+  out.push('');
+
+  if (r.screen === undefined) out.push('SCREEN TIME: not shared by the phone.');
+  else {
+    out.push(`SCREEN TIME: ${r.screen.events} events · ${r.screen.days} days · apps with totals ${r.screen.topApps.length} · off-phone ${r.screen.offHours ? `${hh(r.screen.offHours.from)}–${hh(r.screen.offHours.to)}` : 'not yet'}`);
+    out.push(`  on the phone by hour (share of days): ${r.screen.byHour.map((x) => Math.round(x * 9)).join('')}`);
+    if (r.screen.events === 0 || r.screen.topApps.length === 0) {
+      const dump = inputs.filter((i) => detectSource(i.text) === 'android_usage').pop()?.text ?? '';
+      const all = dump.split('\n').filter((l) => l.trim() !== '' && !l.startsWith('##orb'));
+      const hinted = all.filter((l) => /time=|totalTime|package=|stats|events|RESUMED|FOREGROUND/i.test(l));
+      const sample = hinted.length > 0 ? hinted : all;
+      out.push('  Format not fully read. Sample lines:', ...varied(sample, 20).map((l) => `  | ${l.trim().slice(0, 200)}`));
+    }
+  }
+  out.push('');
+
+  if (r.mail === undefined) out.push('MAIL: not imported yet (npm run mail).');
+  else {
+    out.push(`MAIL: ${r.mail.messages} mails · ${r.mail.receipts.length} receipts · ${r.mail.bookings.length} bookings · ${r.mail.skipped} unreadable`);
+    if (r.mail.missed && r.mail.missed.receipts.length > 0) out.push('  Looked like receipts, no amount found:', ...r.mail.missed.receipts.map((l) => `  ? ${l}`));
+    if (r.mail.missed && r.mail.missed.bookings.length > 0) out.push('  From travel companies, not read as bookings:', ...r.mail.missed.bookings.map((l) => `  ? ${l}`));
+  }
+  return out.join('\n');
+}
+
 /** A few lines for `npm run sync`; the full report goes to a file. */
 export function formatSummary(r: ImportResult): string {
   const p = r.profile;

@@ -299,6 +299,8 @@ export interface MailSummary {
   readonly sensitive: readonly { readonly kind: string; readonly count: number }[];
   /** The most serious, with sender and date. */
   readonly alarms: readonly string[];
+  /** Mails that looked like receipts or bookings but could not be read (sender domain and masked subject), for improving the reader. */
+  readonly missed?: { readonly receipts: readonly string[]; readonly bookings: readonly string[] };
 }
 
 const SERIOUS = new Set(['recovery_phrase', 'private_key', 'password', 'api_key', 'card_number', 'aadhaar']);
@@ -314,6 +316,12 @@ export function mailCollector(builtAt: number) {
   const trials: { at: number; merchant: string }[] = [];
   const kinds = new Map<string, number>();
   const alarms: string[] = [];
+  const missed = { receipts: new Map<string, string>(), bookings: new Map<string, string>() };
+  const miss = (into: Map<string, string>, mail: Mail) => {
+    const line = `${mail.domain}: ${redact(mail.subject).slice(0, 100)}`;
+    const shape = `${mail.domain}|${mail.subject.replace(/\d+/g, '9').replace(/[A-Z0-9]{5,}/g, 'X').slice(0, 50)}`;
+    if (into.size < 40 && !into.has(shape)) into.set(shape, line);
+  };
   return {
     add(raw: string): void {
       const m = parseMail(raw);
@@ -331,6 +339,8 @@ export function mailCollector(builtAt: number) {
       const t = readTrialEnding(m);
       if (t !== null) trials.push(t);
       if (m.labels.some((l) => SKIP_LABELS.test(l)) || m.labels.includes('Sent')) return;
+      if (r === null && RECEIPT_SUBJECT.test(m.subject)) miss(missed.receipts, m);
+      if (b === null && TRAVEL_DOMAINS.some(([re, kind]) => kind !== 'cab' && re.test(m.domain)) && !/\b(?:offer|sale|deal|% off|newsletter)\b/i.test(m.subject)) miss(missed.bookings, m);
       const hits: SensitiveHit[] = scanSensitive(`${m.subject}\n${m.text.slice(0, 5_000)}`);
       for (const h of hits) {
         kinds.set(h.kind, (kinds.get(h.kind) ?? 0) + 1);
@@ -349,6 +359,7 @@ export function mailCollector(builtAt: number) {
         trialsEnding: trials.sort((a, b) => a.at - b.at),
         sensitive: [...kinds.entries()].map(([kind, count]) => ({ kind, count })).sort((a, b) => b.count - a.count),
         alarms,
+        missed: { receipts: [...missed.receipts.values()], bookings: [...missed.bookings.values()] },
       };
     },
   };

@@ -9,7 +9,7 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, sta
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { mailCollector, MBOX_FROM } from '../src/import/mail.ts';
-import { formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
+import { formatFeedback, formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
 
 const args = process.argv.slice(2);
 const outAt = args.indexOf('--out');
@@ -68,5 +68,6 @@ inputs.push({ name: 'mail.json', text: JSON.stringify(summary) });
 const result = runImport(inputs, Date.now());
 writeFileSync(join(out, 'profile.json'), JSON.stringify(result.profile, null, 2));
 writeFileSync(join(out, 'report.txt'), formatReport(result) + '\n');
+writeFileSync(join(out, 'feedback.txt'), formatFeedback(result, inputs) + '\n');
 console.log(formatSummary(result));
 console.log(`\nSaved ${join(out, 'mail.json')} (no mail text) · profile: ${join(out, 'profile.json')} · full report: ${join(out, 'report.txt')}`);

@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 138 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 140 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -88,6 +88,15 @@ and apps, writes the profile and report, and prints the summary.
 
 `npm run sync` was run against a stand-in `adb` that answers every command, and
 `npm run mail` on a 776 MB generated mailbox (40,000 mails, 4 s).
+
+## Feedback file — `test/feedback.test.ts`
+
+`private/feedback.txt` lists what could not be read, one line per format (two
+alerts that differ only in numbers show once): unread bank alerts, contacts or
+calls read short of their rows (layout only, values replaced by their length),
+screen-time lines when the format isn't recognised, mails that looked like
+receipts or bookings but weren't read. Proven safe to paste: no passwords, no
+contact names, no full phone numbers.
 
 ## Checked that the tests can fail
 

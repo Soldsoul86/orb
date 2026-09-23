@@ -11,7 +11,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
+import { formatFeedback, formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
 import { PHONE_SCRIPT } from '../src/import/phone.ts';
 import { USAGE_MARKER } from '../src/import/people.ts';
 
@@ -120,7 +120,9 @@ function syncOnce(): boolean {
   if (result.unreadAll.length > 0) writeFileSync(join(out, 'unread-alerts.txt'), result.unreadAll.join('\n') + '\n');
 
   console.log('\n' + formatSummary(result));
+  writeFileSync(join(out, 'feedback.txt'), formatFeedback(result, inputs) + '\n');
   console.log(`\nProfile: ${join(out, 'profile.json')} · full report: ${join(out, 'report.txt')}`);
+  console.log(`To improve what it reads: paste ${join(out, 'feedback.txt')} into the chat (masked, safe to share).`);
   return true;
 }
 
