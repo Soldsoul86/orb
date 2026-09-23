@@ -16,19 +16,21 @@ Ids and verdicts come from [`SCAM_TAXONOMY.md`](SCAM_TAXONOMY.md).
 
 ## Message scenarios at a glance
 
-49 scenarios. Every scam type in the taxonomy is covered at least once.
+59 scenarios. Every scam type in the taxonomy is covered at least once, and the
+set is weighted towards investment fraud, which is 76% of money lost in India
+(see [`RESEARCH.md`](RESEARCH.md)).
 
 | Group | Ids | What they test |
 |---|---|---|
 | A. Authority | A01–A08 | Digital arrest, courier, TRAI, electricity (English and Kannada), challan APK, tax refund |
 | B. Banking | B01–B08 | KYC link, OTP request, receive-money QR, wrong transfer, reward points, APK invitation, AnyDesk, eSIM swap |
-| C. Easy money | C01–C06 | Task job (first contact and already paid), fake offer letter, stock club, crypto, KBC lottery (Hindi) |
+| C. Easy money | C01–C13 | Task job (English, Hindi, already paid), fake offer letter, crypto, KBC lottery (Hindi), and the full investment funnel: ad → group → APK → bait withdrawal → "tax" to withdraw → worried child (C07–C12) |
 | D. Loans | D01–D02 | Loan-app harassment, advance fee |
-| E. People you know | E01–E06 | "Hi Papa" with and without money, voice clone, sextortion, matrimony gift, army officer |
+| E. People you know | E01–E07 | "Hi Papa" with and without money, voice clone, sextortion and its fake-police second stage, matrimony gift, army officer |
 | F. Shopping | F01–F04 | Fake helpline, fake sale, Tirupati darshan (Tamil), HSR rental advance |
 | G. Schemes | G01–G03 | PM Kisan (Hindi), Jio giveaway, charity appeal |
 | H. Other | H01 | Insurance bonus |
-| N. Real messages | N01–N10 | Bank OTP, real challan, BESCOM bill, real interview, friend's GPay request, UIDAI, Amazon OTP, Kannada rental, Zerodha, family chat |
+| N. Real messages | N01–N12 | Bank OTP, real challan, BESCOM bill, real interview, friend's GPay request, UIDAI, Amazon OTP, Kannada rental, Zerodha, family chat, SIP confirmation, friends discussing stocks |
 | X. Unknown | X01 | FASTag scam with no type yet → `other_scam` |
 
 Hard cases worth reading first:
@@ -41,6 +43,8 @@ Hard cases worth reading first:
 - **F04 vs N08** — fake vs real rental. Real: visit first, pay at agreement.
 - **E02, G03** — could be genuine. Verdict is `suspicious` and the advice is how
   to verify, not "this is a scam".
+- **C10, C12** — the investment funnel after money is in. C12 is the family
+  path: the victim believes, the child doubts.
 - **A02, C02, D01** — money already lost. Emergency steps come first; never
   advise paying more to "unfreeze" or "settle".
 

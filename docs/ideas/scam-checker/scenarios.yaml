@@ -240,6 +240,118 @@ scenarios:
     expect: { verdict: likely_scam, scam_type: lottery_prize, entity: brand_or_shop,
               stage: money_or_info_requested, flags: [payment], pressure: 2 }
 
+  # ── C (cont.). Investment scam funnel — 76% of money lost in 2025 ─────────
+  # Stages follow the pattern Bengaluru police describe: ad → WhatsApp group →
+  # fake profit screenshots → APK trading app → small withdrawal works →
+  # big deposit → "tax" to withdraw.
+
+  - id: C07
+    lang: en
+    channel: screenshot_text
+    input: >
+      Facebook ad: "Learn stock market from India's top analyst. Free daily
+      picks. Join our WhatsApp group now — limited seats."
+    expect: { verdict: suspicious, scam_type: investment_trading, entity: brand_or_shop,
+              stage: first_contact, flags: [], pressure: 1 }
+    note: >
+      The usual entry point. Real courses advertise too, so suspicious, not
+      likely_scam. Advice: check the analyst's SEBI registration number.
+
+  - id: C08
+    lang: en
+    channel: screenshot_text
+    input: >
+      Group "182 Alpha Market Intelligence": "Thank you Professor! +42% today 🙏"
+      "Got ₹1.8 lakh profit this week" "Only 10 VIP seats left for tomorrow's
+      block trade, DM assistant Riya."
+    expect: { verdict: likely_scam, scam_type: investment_trading, entity: brand_or_shop,
+              stage: engaged, flags: [payment], pressure: 3 }
+    note: Members posting profits are usually the scammers themselves.
+
+  - id: C09
+    lang: en
+    channel: whatsapp
+    input: >
+      Assistant Riya: To get IPO allotment at institutional discount you must
+      use our institutional account. Install from this link, not Play Store:
+      hxxps://alpha-inst-trade[.]com/app.apk
+    expect: { verdict: likely_scam, scam_type: investment_trading, entity: brand_or_shop,
+              stage: money_or_info_requested, flags: [install_app, payment], pressure: 2 }
+
+  - id: C10
+    lang: en
+    channel: call_summary
+    input: >
+      I put ₹50,000 in the trading app from the group and withdrew ₹5,000 profit
+      easily. Now they say deposit ₹5 lakh for a special block trade with 300%
+      returns.
+    expect: { verdict: act_now, scam_type: investment_trading, entity: brand_or_shop,
+              stage: money_or_info_already_given, flags: [payment], pressure: 3 }
+    note: >
+      The small withdrawal is bait. Money already in a fake app counts as lost:
+      report now, do not deposit more.
+
+  - id: C11
+    lang: hinglish
+    channel: screenshot_text
+    input: >
+      App me mera balance ₹9,40,000 dikha raha hai. Withdraw karne gaya to bol
+      raha hai pehle 20% SEBI tax aur service charge ₹1,88,000 jama karo.
+    expect: { verdict: act_now, scam_type: investment_trading, entity: government,
+              stage: money_or_info_already_given, flags: [payment], pressure: 4 }
+    note: The final stage. Never advise paying the "tax" to release funds.
+
+  - id: C12
+    lang: en
+    channel: whatsapp
+    input: >
+      My dad (64) joined some WhatsApp stock group and has put ₹2 lakh into
+      their app over the last month. He says the returns are amazing and
+      won't listen to me. Is this legit?
+    expect: { verdict: act_now, scam_type: investment_trading, entity: brand_or_shop,
+              stage: money_or_info_already_given, flags: [payment], pressure: 1 }
+    note: >
+      The victim does not doubt; the child does. This is the family path the
+      product depends on. Reply must give the child something to show the parent.
+
+  - id: C13
+    lang: hi
+    channel: whatsapp
+    input: >
+      घर बैठे कमाएं! होटल को 5 स्टार रेटिंग दें और हर टास्क पर ₹200 पाएं।
+      रोज़ ₹5,000 तक। अभी टेलीग्राम पर जुड़ें।
+    expect: { verdict: likely_scam, scam_type: task_job, entity: employer,
+              stage: first_contact, flags: [], pressure: 1 }
+
+  - id: E07
+    lang: en
+    channel: call_summary
+    input: >
+      After the video call blackmail, someone called saying he is from Cyber
+      Police Delhi, a case is filed against me, and I must pay ₹45,000 to the
+      "YouTube video deletion officer" to close it.
+    expect: { verdict: likely_scam, scam_type: sextortion, entity: police_or_agency,
+              stage: money_or_info_requested, flags: [payment], pressure: 4 }
+    note: Common second stage of sextortion (19% of all cases in 2025).
+
+  - id: N11
+    lang: en
+    channel: sms
+    input: >
+      Your SIP of Rs 5,000 in Parag Parikh Flexi Cap Fund - Direct Growth has
+      been processed. Units allotted: 58.214. -CAMS
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Real investment message. Contrast with the C07–C12 funnel.
+
+  - id: N12
+    lang: en
+    channel: whatsapp
+    input: >
+      College group: "Anyone holding Tata Motors? Thinking of averaging down."
+      "I'm out, too volatile for me."
+    expect: { verdict: no_scam_signs, scam_type: none, entity: none, flags: [], pressure: 0 }
+    note: Friends discussing stocks is not a stock-tips scam.
+
   # ── D. Loans ──────────────────────────────────────────────────────────────
 
   - id: D01
