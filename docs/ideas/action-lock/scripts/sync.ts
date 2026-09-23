@@ -58,8 +58,14 @@ function device(): string | undefined {
   if (list.ok && connect === undefined && !/\tdevice$/m.test(list.out)) {
     // Paired over Wi-Fi before: try where the phone was last time, then ask it to announce itself.
     const last = existsSync(LAST) ? readFileSync(LAST, 'utf8').trim() : '';
-    const mdns = adb('mdns', 'services');
-    const found = mdns.out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
+    // A freshly started adb needs a few seconds to hear the phone announce itself.
+    let mdns = adb('mdns', 'services');
+    let found = mdns.out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
+    for (let i = 0; found === undefined && i < 5; i++) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2_000);
+      mdns = adb('mdns', 'services');
+      found = mdns.out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
+    }
     for (const address of [found, last].filter((a): a is string => a !== undefined && a !== '')) {
       const c = adb('connect', address);
       tried.push(`${address}: ${(c.out + c.err).trim()}`);
