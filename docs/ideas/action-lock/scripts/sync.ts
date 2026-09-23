@@ -45,6 +45,8 @@ No phone connected. Connect it once, either way:
   Wireless debugging is on; if not, repeat step 5 (the port changes when it restarts).
 `;
 
+const LAST = join(out, 'last-phone.txt');
+
 function device(): string | undefined {
   const connect = option('connect');
   if (connect !== undefined) {
@@ -52,13 +54,19 @@ function device(): string | undefined {
     console.log(c.out.trim() || c.err.trim());
   }
   let list = adb('devices');
+  const tried: string[] = [];
   if (list.ok && connect === undefined && !/\tdevice$/m.test(list.out)) {
-    // Paired over Wi-Fi before: the phone announces its current address.
-    const found = adb('mdns', 'services').out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
-    if (found !== undefined) {
-      console.log(adb('connect', found).out.trim());
+    // Paired over Wi-Fi before: try where the phone was last time, then ask it to announce itself.
+    const last = existsSync(LAST) ? readFileSync(LAST, 'utf8').trim() : '';
+    const mdns = adb('mdns', 'services');
+    const found = mdns.out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
+    for (const address of [found, last].filter((a): a is string => a !== undefined && a !== '')) {
+      const c = adb('connect', address);
+      tried.push(`${address}: ${(c.out + c.err).trim()}`);
       list = adb('devices');
+      if (/\tdevice$/m.test(list.out)) break;
     }
+    if (!/\tdevice$/m.test(list.out)) tried.push(`mdns: ${(mdns.out + mdns.err).trim().split('\n').slice(0, 4).join(' | ') || 'nothing announced'}`);
   }
   if (!list.ok) {
     console.error(list.err.includes('ENOENT') ? 'adb is not installed. Mac: brew install android-platform-tools' : list.err);
@@ -67,10 +75,18 @@ function device(): string | undefined {
   const ready = list.out.split('\n').filter((l) => /\tdevice$/.test(l)).map((l) => l.split('\t')[0]!);
   if (ready.length === 0) {
     if (/\tunauthorized/.test(list.out)) console.error('The phone is connected but not allowed yet: unlock it and tap Allow.');
-    else console.error(PAIRING);
+    else if (existsSync(LAST) && !process.stdout.isTTY) {
+      // Scheduled run: a short line, not the whole guide.
+      console.error(`Phone not reachable (Wireless debugging off, other Wi-Fi, or asleep); will try next time. ${tried.join(' · ')}`);
+    } else console.error(PAIRING + (tried.length > 0 ? `\n  Tried: ${tried.join(' · ')}\n` : ''));
     return undefined;
   }
-  return option('serial') ?? ready[0];
+  const chosen = option('serial') ?? ready[0]!;
+  if (/:\d+$/.test(chosen) && /^\d/.test(chosen)) {
+    mkdirSync(out, { recursive: true });
+    writeFileSync(LAST, chosen + '\n');
+  }
+  return chosen;
 }
 
 function syncOnce(): boolean {
