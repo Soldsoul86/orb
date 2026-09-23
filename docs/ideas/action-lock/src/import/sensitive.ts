@@ -23,7 +23,7 @@ export interface SensitiveHit {
 export const LABELS: Readonly<Record<SensitiveKind, string>> = {
   otp: 'One-time codes (OTPs)',
   card_number: 'Full card numbers',
-  account_number: 'Full bank account numbers',
+  account_number: 'Full account or customer numbers',
   pan: 'PAN numbers',
   aadhaar: 'Aadhaar numbers',
   recovery_phrase: 'Possible wallet recovery phrases',

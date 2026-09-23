@@ -52,8 +52,12 @@ export interface Autopay {
   readonly frequency?: string;
   readonly nextDebitAt?: number;
   readonly lastEventAt: number;
-  readonly status: 'active' | 'revoked';
+  /** dormant: no message about it for 60 days before your latest data. */
+  readonly status: 'active' | 'dormant' | 'revoked';
 }
+
+/** An autopay with no message for this long is treated as dormant, not active. */
+export const DORMANT_AFTER_DAYS = 60;
 
 function median(xs: readonly number[]): number {
   const s = [...xs].sort((a, b) => a - b);
@@ -147,6 +151,12 @@ export function detectSubscriptions(txns: readonly Txn[], now: number): Subscrip
   return found.sort((a, b) => b.monthly - a.monthly);
 }
 
+/** PhonePe and others use hashed UPI IDs for autopays; show them as unnamed rather than as gibberish. */
+export function displayMerchant(merchant: string): string {
+  const hashed = merchant.match(/^[0-9a-f]{20,}@([a-z]+)$/i);
+  return hashed ? `Unnamed autopay (…@${hashed[1]!.toLowerCase()})` : merchant;
+}
+
 const letters = (s: string) => s.toLowerCase().replace(/@.*$/, '').replace(/[^a-z]/g, '');
 
 /** Loose match between a mandate's merchant ("NETFLIX") and a payee ("netflix.upi@icici", "Netflix India"). */
@@ -156,8 +166,11 @@ export function sameMerchant(a: string, b: string): boolean {
   return x.length >= 4 && y.length >= 4 && (x.includes(y) || y.includes(x));
 }
 
-/** The latest state of each autopay, from its SMS events. */
-export function summariseAutopays(events: readonly MandateEvent[]): Autopay[] {
+/** The latest state of each autopay, from its SMS events, as of `asOf` (your latest data). */
+export function summariseAutopays(
+  events: readonly MandateEvent[],
+  asOf: number = events.reduce((m, e) => Math.max(m, e.at), 0),
+): Autopay[] {
   const byMerchant = new Map<string, MandateEvent[]>();
   for (const e of [...events].sort((a, b) => a.at - b.at)) {
     const key = [...byMerchant.keys()].find((k) => sameMerchant(k, e.merchant)) ?? e.merchant;
@@ -172,7 +185,7 @@ export function summariseAutopays(events: readonly MandateEvent[]): Autopay[] {
     return {
       merchant,
       lastEventAt: last.at,
-      status: last.event === 'revoked' ? 'revoked' : 'active',
+      status: last.event === 'revoked' ? 'revoked' : asOf - last.at > DORMANT_AFTER_DAYS * DAY ? 'dormant' : 'active',
       ...(created !== undefined ? { createdAt: created.at } : {}),
       ...(amount !== undefined ? { amount } : {}),
       ...(frequency !== undefined ? { frequency } : {}),

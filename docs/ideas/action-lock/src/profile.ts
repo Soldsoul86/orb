@@ -142,7 +142,7 @@ export function buildProfile(
     // "Lapsed" is judged against your latest data, not today: an export from
     // last month must not make every subscription look cancelled.
     subscriptions: detectSubscriptions(all, all.length === 0 ? builtAt : all[all.length - 1]!.at),
-    autopays: summariseAutopays(mandates),
+    autopays: summariseAutopays(mandates, mandates.reduce((m, e) => Math.max(m, e.at), all.length === 0 ? 0 : all[all.length - 1]!.at)),
   };
 }
 

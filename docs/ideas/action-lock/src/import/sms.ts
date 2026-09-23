@@ -105,9 +105,18 @@ function amountOf(body: string): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+/**
+ * Indian sender IDs end in a DLT category: -P promotional, -S service,
+ * -T transactional, -G government. Promotional messages are never alerts.
+ */
+export function isPromotional(sender: string): boolean {
+  return /-P$/i.test(sender.trim());
+}
+
 const NAME = "[A-Za-z][A-Za-z0-9 .&'()-]{0,48}?";
 const COUNTERPARTY: readonly RegExp[] = [
-  new RegExp(`UPI\\/(?:P2[AMP]|CR|DR)\\/\\d+\\/(${NAME})(?:\\/|\\n|$)`, 'i'), // Axis, some others
+  new RegExp(`UPI\\/(?:P2[AMP]|CR|DR)\\/\\d+\\/(${NAME})(?:\\/|\\.(?:\\s|$)|\\n|$)`, 'i'), // Axis, AU and others
+  new RegExp(`\\bRef\\s+(?:IMPS|NEFT|RTGS)[-/ ]?\\d*\\s*-\\s*(${NAME})\\s*(?:-|\\.|$)`, 'i'), // AU: "Ref IMPS-6245… -NAME -IC"
   new RegExp(`\\btrf to\\s+(${NAME})\\s+Ref`, 'i'), // SBI
   new RegExp(`;\\s*(${NAME})\\s+credited`, 'i'), // ICICI
   new RegExp(`(?:^|\\n)To\\s+(${NAME})\\s*(?:\\n|$)`, 'i'), // HDFC "To NAME" on its own line
@@ -115,6 +124,7 @@ const COUNTERPARTY: readonly RegExp[] = [
   new RegExp(`\\b(?:to|towards)\\s+(${NAME})\\s+(?:on|via|ref|upi)\\b`, 'i'),
   new RegExp(`\\b(?:from|by)\\s+(${NAME})\\s+(?:on|via|ref|upi)\\b`, 'i'),
   new RegExp(`\\bat\\s+(${NAME})\\s+(?:on|via|ref)\\b`, 'i'), // card spends: "spent … at SWIGGY on …"
+  /\bRef\s+([A-Z][A-Z ]{3,40}?)\.\s/, // AU: "Ref MONTHLY INTEREST PAYOUT. Bal …" (upper case only)
 ];
 
 function counterpartyOf(body: string): { name: string; vpa?: string } | undefined {
@@ -134,6 +144,7 @@ const REF = /\b(?:ref(?:\s*no)?|refno|rrn|upi(?:\s*ref)?)[:\s.#-]*(\d{10,16})\b/
 /** Bank or UPI alert → transaction; null for anything else (OTPs, offers, reminders). */
 export function parseBankAlert(sms: Sms): Txn | null {
   const body = sms.body;
+  if (isPromotional(sms.address)) return null;
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
   if (!/\b(a\/c|acct|ac|account|card|upi|vpa)\b/i.test(body)) return null;
@@ -163,12 +174,18 @@ export function parseBankAlert(sms: Sms): Txn | null {
 
 /** Looks like a bank/UPI alert we could not read: worth reporting so the parser can learn it. */
 export function looksLikeUnreadAlert(sms: Sms): boolean {
-  return /\b(debited|credited)\b/i.test(sms.body) && MONEY.test(sms.body) && parseBankAlert(sms) === null;
+  return (
+    !isPromotional(sms.address) &&
+    !FUTURE.test(sms.body) &&
+    /\b(debited|credited)\b/i.test(sms.body) &&
+    MONEY.test(sms.body) &&
+    parseBankAlert(sms) === null
+  );
 }
 
 // ── Autopay / e-mandate alerts ─────────────────────────────────────────────
 
-const FUTURE = /\bwill be (?:debited|charged|deducted|auto-?debited)\b|\bis due on\b|\bscheduled (?:for|on)\b|\bupcoming\b/i;
+const FUTURE = /\b(?:will|shall) be (?:debited|charged|deducted|auto-?debited)\b|\bis due on\b|\bscheduled (?:for|on)\b|\bupcoming\b/i;
 const MANDATE = /\b(auto\s?-?pay|e-?mandate|mandate|standing instruction|si\b|recurring payment|subscription)\b/i;
 const MONTHS: Readonly<Record<string, number>> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
@@ -194,7 +211,7 @@ const MERCHANT: readonly RegExp[] = [
 /** Autopay / e-mandate alert → event; null for anything else. */
 export function parseMandateAlert(sms: Sms): MandateEvent | null {
   const body = sms.body;
-  if (!MANDATE.test(body)) return null;
+  if (isPromotional(sms.address) || !MANDATE.test(body)) return null;
   const event: MandateEvent['event'] | undefined = /\b(revoked|cancell?ed|paused|deactivated|stopped)\b/i.test(body)
     ? 'revoked'
     : FUTURE.test(body)
@@ -212,7 +229,9 @@ export function parseMandateAlert(sms: Sms): MandateEvent | null {
       ?.trim()
       .replace(/[.,;:-]+$/, '')
       .replace(/\s+(?:upi\s+)?(?:auto\s?-?pay|e-?mandate|mandate|standing instruction|si|subscription)$/i, '');
-    if (m !== undefined && m !== '' && !/^(?:a\/?c|acct|account|your|ac|upi|the)\b/i.test(m)) {
+    // Promo phrases ("continue enjoying 3 months", "view details") are not merchants.
+    const junk = /^(?:a\/?c|acct|account|your|ac|upi|the|view|continue|click|tap|up to|details|enjoying|more|autopay)\b/i;
+    if (m !== undefined && (m.match(/[a-z]/gi)?.length ?? 0) >= 3 && !junk.test(m)) {
       merchant = m;
       break;
     }

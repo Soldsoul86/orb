@@ -3,15 +3,16 @@
 
 import { buildProfile, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
-import type { MandateEvent } from '../subscriptions.ts';
+import { displayMerchant, type MandateEvent } from '../subscriptions.ts';
 import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
 import { parseGooglePayActivity } from './takeout.ts';
 import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
-export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'unknown';
+export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'empty' | 'unknown';
 
 export function detectSource(text: string): SourceKind {
   const head = text.trimStart().slice(0, 2000);
+  if (head === '') return 'empty';
   if (/^Row: \d+ /.test(head)) return 'adb_sms';
   if (/<smses[\s>]/.test(head) || /<sms\s/.test(head)) return 'sms_backup_xml';
   if (head.startsWith('[') && /"(?:header|products)"\s*:/.test(head) && text.includes('Google Pay')) return 'google_pay_takeout';
@@ -33,6 +34,8 @@ export interface ImportResult {
   /** Bank alerts that could not be read, redacted, so their format can be added. */
   readonly unreadSamples: readonly string[];
   readonly unreadCount: number;
+  /** Every unread alert, redacted, for private/unread-alerts.txt. */
+  readonly unreadAll: readonly string[];
 }
 
 const SERIOUS = new Set(['recovery_phrase', 'private_key', 'card_number', 'aadhaar', 'account_number', 'password', 'api_key']);
@@ -43,6 +46,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   const hits: SensitiveHit[][] = [];
   const alarms: string[] = [];
   const unreadSamples: string[] = [];
+  const unreadAll: string[] = [];
   let unreadCount = 0;
   const files: ImportResult['files'][number][] = [];
 
@@ -61,7 +65,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
       files.push({ name: input.name, kind, records: r.txns.length + r.unread, txns: r.txns.length });
       continue;
     }
-    if (kind === 'unknown') {
+    if (kind === 'unknown' || kind === 'empty') {
       files.push({ name: input.name, kind, records: 0, txns: 0 });
       continue;
     }
@@ -81,7 +85,9 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
         found++;
       } else if (mandate === null && looksLikeUnreadAlert(m)) {
         unreadCount++;
-        if (unreadSamples.length < 5) unreadSamples.push(`${m.address}: ${redact(m.body).replace(/\n/g, ' ⏎ ')}`);
+        const line = `${m.address}: ${redact(m.body).replace(/\n/g, ' ⏎ ')}`;
+        if (unreadSamples.length < 5) unreadSamples.push(line);
+        if (unreadAll.length < 5_000) unreadAll.push(line);
       }
     }
     files.push({ name: input.name, kind, records: messages.length, txns: found });
@@ -95,6 +101,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     alarms,
     unreadSamples,
     unreadCount,
+    unreadAll,
   };
 }
 
@@ -108,7 +115,13 @@ export function formatReport(r: ImportResult): string {
   const lines: string[] = [];
   lines.push('ACTION LOCK · IMPORT REPORT', '');
   for (const f of r.files) {
-    lines.push(f.kind === 'unknown' ? `  ✗ ${f.name}: format not recognised (skipped)` : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`);
+    lines.push(
+      f.kind === 'empty'
+        ? `  ✗ ${f.name}: the file is empty. If it came from adb, check \`adb devices\` shows your phone as "device".`
+        : f.kind === 'unknown'
+          ? `  ✗ ${f.name}: format not recognised (skipped)`
+          : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`,
+    );
   }
   lines.push('');
 
@@ -140,7 +153,7 @@ export function formatReport(r: ImportResult): string {
   lines.push('', ...formatSubscriptions(p));
 
   if (r.unreadCount > 0) {
-    lines.push('', `? ${r.unreadCount} bank alerts could not be read. Samples (redacted) — share them to add the format:`);
+    lines.push('', `? ${r.unreadCount} bank alerts could not be read. All of them (redacted) are in unread-alerts.txt. Samples:`);
     for (const s of r.unreadSamples) lines.push(`    ${s}`);
   }
   return lines.join('\n');
@@ -149,7 +162,7 @@ export function formatReport(r: ImportResult): string {
 const shortDay = (ms: number) => new Date(ms + 330 * 60_000).toISOString().slice(0, 10);
 
 function formatSubscriptions(p: Profile): string[] {
-  const lines: string[] = ['SUBSCRIPTIONS AND AUTOPAYS'];
+  const lines: string[] = ['RECURRING PAYMENTS AND AUTOPAYS'];
   const active = p.subscriptions.filter((s) => s.status === 'active');
   if (p.subscriptions.length === 0 && p.autopays.length === 0) return [...lines, '  None found yet.'];
 
@@ -161,7 +174,7 @@ function formatSubscriptions(p: Profile): string[] {
   const lastSeen = p.range?.to ?? p.builtAt;
   for (const a of p.autopays) {
     if (a.status === 'active' && a.createdAt !== undefined && lastSeen - a.createdAt <= 30 * 86_400_000) {
-      notes.push(`New autopay set up for ${a.merchant} on ${shortDay(a.createdAt)}${a.amount !== undefined ? ` (up to ${rupees(a.amount)})` : ''}. Recognise it?`);
+      notes.push(`New autopay set up for ${displayMerchant(a.merchant)} on ${shortDay(a.createdAt)}${a.amount !== undefined ? ` (up to ${rupees(a.amount)})` : ''}. Recognise it?`);
     }
   }
   if (notes.length > 0) {
@@ -178,11 +191,16 @@ function formatSubscriptions(p: Profile): string[] {
   if (lapsed.length > 0) lines.push(`  Stopped: ${lapsed.map((s) => `${s.name} (last ${shortDay(s.lastAt)})`).join(', ')}`);
   const autopays = p.autopays.filter((a) => a.status === 'active');
   if (autopays.length > 0) {
-    lines.push('  Autopays that can take money without asking:');
+    lines.push('  Active autopays (can take money without asking):');
     for (const a of autopays) {
-      const bits = [a.amount !== undefined ? `up to ${rupees(a.amount)}` : '', a.frequency ?? '', a.nextDebitAt !== undefined ? `next ${shortDay(a.nextDebitAt)}` : ''].filter(Boolean);
-      lines.push(`    ${a.merchant}${bits.length ? ` · ${bits.join(' · ')}` : ''}`);
+      const when = a.nextDebitAt === undefined ? '' : a.nextDebitAt > lastSeen ? `next ${shortDay(a.nextDebitAt)}` : `last notice ${shortDay(a.nextDebitAt)}`;
+      const bits = [a.amount !== undefined ? `up to ${rupees(a.amount)}` : '', a.frequency ?? '', when].filter(Boolean);
+      lines.push(`    ${displayMerchant(a.merchant)}${bits.length ? ` · ${bits.join(' · ')}` : ''}`);
     }
+  }
+  const dormant = p.autopays.filter((a) => a.status === 'dormant');
+  if (dormant.length > 0) {
+    lines.push(`  Older autopays with no message for 60+ days: ${dormant.length}. Check in your UPI app that they are cancelled.`);
   }
   return lines;
 }

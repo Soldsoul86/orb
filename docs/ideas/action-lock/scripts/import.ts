@@ -24,5 +24,6 @@ const result = runImport(
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'profile.json'), JSON.stringify(result.profile, null, 2));
 writeFileSync(join(out, 'transactions.json'), JSON.stringify(result.txns, null, 2));
+if (result.unreadAll.length > 0) writeFileSync(join(out, 'unread-alerts.txt'), result.unreadAll.join('\n') + '\n');
 console.log(formatReport(result));
 console.log(`\nSaved ${join(out, 'profile.json')} and ${join(out, 'transactions.json')} (keep this folder private).`);

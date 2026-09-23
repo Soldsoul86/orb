@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 87 tests
+npm test          # 95 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -74,7 +74,8 @@ flagged, and setting up a **new autopay** is held for the fingerprint, because
 it lets someone take money later without asking.
 
 `private/` is git-ignored. Bank alerts the parser can't read yet are listed
-(redacted) at the end of the report so their formats can be added.
+(redacted) at the end of the report, and all of them go to
+`private/unread-alerts.txt`, so their formats can be added.
 
 ## On the Pixel
 
