@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 118 tests
+npm test          # 138 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -59,8 +59,33 @@ Mac, `adb pair <ip:port> <code>`, then `npm run sync -- --connect <ip:port>`
 (the address on the main Wireless debugging screen). After that, plain
 `npm run sync` finds the phone by itself while Wireless debugging is on. With no phone connected,
 `npm run sync` prints these steps. It prints a short summary; the full report is
-in `private/report.txt`. Installed apps add payment, bank and crypto apps to the
-profile and warn if a screen-sharing app (AnyDesk, TeamViewer…) is installed.
+in `private/report.txt`.
+
+What it reads (read-only) and what you get:
+
+| From the phone | You get |
+|---|---|
+| SMS | Payments, subscriptions, autopays, scam messages, passwords sitting in SMS |
+| Installed apps, who installed them, their permissions | **Phone check**: apps not from the Play Store that read your SMS or notifications, control the screen (Accessibility) or are device admins, the way banking trojans work; `.apk` files lying around; screen-sharing apps |
+| Contacts and call log | How many calls come from people you know; unknown numbers that keep calling (masked); a payee whose name matches a contact is pointed out |
+| Screen time | The hours you're usually off your phone; a payment then is flagged ("You're usually off your phone between 00:00 and 07:00"). Android keeps only a few days, so each sync saves that day's and the picture grows |
+
+### Gmail
+
+```bash
+npm run mail -- ~/Downloads/Takeout/Mail/*.mbox
+```
+
+Get the file at takeout.google.com → *Deselect all* → **Mail** → create the
+export, download and unzip it. The mailbox is read on your computer, streamed so
+any size works, and only a summary is saved to `private/mail.json`: receipts,
+travel bookings, free trials ending, and counts of confidential items (masked).
+No mail text is kept. Promotions, social, spam and trash are skipped.
+
+You get subscriptions that never send an SMS (cards, app stores, foreign
+services), a list of your trips (flights, trains, hotels, with routes), and
+passwords or keys sitting in mail. `npm run sync` includes the mail summary
+from then on.
 
 ## Your normal: import your history
 
@@ -137,6 +162,9 @@ See [`android/README.md`](android/README.md).
 | `src/subscriptions.ts` | Recurring charges, price changes, restarts; autopay events |
 | `src/judge.ts`, `scripts/check.ts` | How the lock treats one payment given your profile; `npm run check` |
 | `src/import/apps.ts`, `scripts/sync.ts` | Installed-app classification; `npm run sync` |
+| `src/import/phone.ts` | Phone check: installers, permissions, Accessibility, notification access |
+| `src/import/people.ts` | Contacts, call log, screen time |
+| `src/import/mail.ts`, `scripts/mail.ts` | Gmail Takeout: receipts, trips, confidential data; `npm run mail` |
 | `src/import/scam.ts` | Likely scam messages found while importing |
 | `src/profile.ts` | Your normal (payees, amounts, quiet hours) and personal severity thresholds |
 | `scripts/import.ts` | `npm run import` |

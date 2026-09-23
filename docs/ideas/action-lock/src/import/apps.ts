@@ -46,6 +46,11 @@ export interface InstalledApps {
   readonly remote_access: readonly string[];
 }
 
+/** A friendly name for known apps; the package ID otherwise. */
+export function appName(id: string): string {
+  return KNOWN.find(([pkg]) => pkg === id)?.[1] ?? id;
+}
+
 export function isPackageList(text: string): boolean {
   return /^package:[\w.]+/m.test(text.trimStart().slice(0, 200));
 }

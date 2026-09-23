@@ -15,7 +15,7 @@ export interface Txn {
   /** Masked account, e.g. "XX1234". */
   readonly account?: string;
   readonly bank?: string;
-  readonly source: 'sms' | 'google_pay';
+  readonly source: 'sms' | 'google_pay' | 'gmail';
   /** The alert named no payee: kept for amounts and hours, left out of payee lists. */
   readonly unnamed?: boolean;
 }

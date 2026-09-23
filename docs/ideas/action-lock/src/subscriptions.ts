@@ -33,6 +33,8 @@ export interface Subscription {
   readonly priceChange?: { readonly from: number; readonly to: number; readonly at: number };
   /** The latest charge came after a long gap: something you may have thought was cancelled. */
   readonly restartedAfterDays?: number;
+  /** Found only in mail receipts (cards and app stores often send no SMS). */
+  readonly from?: 'mail';
 }
 
 export interface MandateEvent {

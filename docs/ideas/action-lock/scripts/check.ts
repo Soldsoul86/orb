@@ -56,6 +56,7 @@ const wait = j.gate.mode === 'pass' ? 'opens your UPI app at once' : `${MODE[j.g
 console.log(`\n${flag('autopay') ? 'Autopay' : 'Pay'} ${rupees(amount)} → ${to}${name ? ` (${name})` : ''} at ${String(hour).padStart(2, '0')}:00`);
 console.log(`  Judged against: ${profile ? `your profile (${profilePath})` : 'generic rules (no profile found)'}`);
 console.log(`  Payee: ${j.payee ? `paid ${j.payee.count}× before, usual ${rupees(j.payee.median)}, max ${rupees(j.payee.max)}` : 'never paid before'}`);
+if (j.contact !== undefined) console.log(`  Name matches your contact "${j.contact}" (still treated as new: check the UPI ID is theirs)`);
 console.log(`  Level ${j.analysis.level} → ${wait}`);
 for (const f of j.analysis.feedback) console.log(`  · ${f}`);
 console.log('');

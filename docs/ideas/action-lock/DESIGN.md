@@ -197,6 +197,8 @@ Dependencies (clock, journal, analyzer, executor) are injected.
 | Coercion: user is talked into unlocking | Critical floor + second person + feedback during the buffer |
 | Bypass: agent holds raw tokens | Only credentials held by the lock are protected; vault is mandatory in the real system |
 | Phone offline | Nothing is released — fails safe |
+| Personal data (contacts, calls, mail) leaks | Read only on the user's computer, into a git-ignored folder; nothing is uploaded; mail bodies are never saved, only receipts, bookings and masked counts |
+| A payee's name matches a contact | Shown to the user, but the payee still counts as new: a UPI name is not proof of who holds the account |
 
 ## 12. Relation to Orb
 

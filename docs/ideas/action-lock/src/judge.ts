@@ -2,7 +2,7 @@
 // Used by the phone app and by `npm run check`.
 
 import { decide, PHONE_POLICY } from './policy.ts';
-import { findPayee, personalThresholds, type PayeeStats, type Profile } from './profile.ts';
+import { findContact, findPayee, personalThresholds, type PayeeStats, type Profile } from './profile.ts';
 import { createAnalyzer, DEFAULT_THRESHOLDS, ruleBasedAnalyzer, type SeverityAnalyzer } from './severity.ts';
 import type { Analysis, Gate, Policy } from './types.ts';
 
@@ -31,6 +31,8 @@ export interface Judgement {
   readonly payee?: PayeeStats;
   readonly newRecipient: boolean;
   readonly personal: boolean;
+  /** A contact with the payee's name. Shown, but it does not make the payee known: names can be shared. */
+  readonly contact?: string;
 }
 
 export function judge(profile: Profile | null, q: PaymentQuestion, policy: Policy = PHONE_POLICY): Judgement {
@@ -39,11 +41,13 @@ export function judge(profile: Profile | null, q: PaymentQuestion, policy: Polic
   const action = { id: 'check', agentId: 'You', kind: q.kind, recipient: q.to, amount: q.amount } as const;
   const context = { localHour: q.localHour, newRecipient, onCallWithUnknown: q.onCallWithUnknown === true };
   const analysis = analyzerFor(profile).analyze(action, context);
+  const contact = profile === null || payee !== undefined ? undefined : findContact(profile, q.name);
   return {
     analysis,
     gate: decide(policy, action, context, analysis),
     ...(payee !== undefined ? { payee } : {}),
     newRecipient,
     personal: profile !== null,
+    ...(contact !== undefined ? { contact } : {}),
   };
 }

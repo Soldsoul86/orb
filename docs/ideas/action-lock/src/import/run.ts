@@ -3,18 +3,40 @@
 
 import { buildProfile, mergeDuplicates, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
-import { displayMerchant, type MandateEvent } from '../subscriptions.ts';
+import { detectSubscriptions, displayMerchant, sameMerchant, type MandateEvent, type Subscription } from '../subscriptions.ts';
+import { checkPhone, isPhoneDump, type PhoneCheck } from './phone.ts';
+import {
+  contactNames, isCallLogDump, isContactsDump, isUsageDump, parseCallLog, parseContacts, summariseCalls, summariseUsage,
+  type Call, type CallSummary, type Contact, type ScreenSummary,
+} from './people.ts';
+import { isMailSummary, type MailSummary } from './mail.ts';
 import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
 import { classifyPackages, isPackageList, type InstalledApps } from './apps.ts';
 import { looksLikeScam } from './scam.ts';
 import { parseGooglePayActivity } from './takeout.ts';
 import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
-export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'android_packages' | 'empty' | 'unknown';
+export type SourceKind =
+  | 'adb_sms'
+  | 'sms_backup_xml'
+  | 'google_pay_takeout'
+  | 'android_packages'
+  | 'android_phone'
+  | 'android_contacts'
+  | 'android_calls'
+  | 'android_usage'
+  | 'gmail_summary'
+  | 'empty'
+  | 'unknown';
 
 export function detectSource(text: string): SourceKind {
   const head = text.trimStart().slice(0, 2000);
   if (head === '') return 'empty';
+  if (isPhoneDump(head)) return 'android_phone';
+  if (isUsageDump(head)) return 'android_usage';
+  if (isMailSummary(head)) return 'gmail_summary';
+  if (isContactsDump(head)) return 'android_contacts';
+  if (isCallLogDump(head)) return 'android_calls';
   if (/^Row: \d+ /.test(head)) return 'adb_sms';
   if (isPackageList(head)) return 'android_packages';
   if (/<smses[\s>]/.test(head) || /<sms\s/.test(head)) return 'sms_backup_xml';
@@ -46,6 +68,10 @@ export interface ImportResult {
   readonly unnamedCount: number;
   /** The largest payments each way, after merging duplicates: for checking the totals. */
   readonly biggest: { readonly out: readonly Txn[]; readonly in: readonly Txn[] };
+  readonly phone?: PhoneCheck;
+  readonly calls?: CallSummary;
+  readonly screen?: ScreenSummary;
+  readonly mail?: MailSummary;
 }
 
 const SERIOUS = new Set(['recovery_phrase', 'private_key', 'card_number', 'aadhaar', 'account_number', 'password', 'api_key']);
@@ -63,6 +89,11 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   let unreadCount = 0;
   const files: ImportResult['files'][number][] = [];
   let apps: InstalledApps | undefined;
+  let phone: PhoneCheck | undefined;
+  let mail: MailSummary | undefined;
+  const contacts: Contact[] = [];
+  const calls: Call[] = [];
+  const usage: string[] = [];
 
   const scan = (where: string, text: string) => {
     const h = scanSensitive(text);
@@ -82,6 +113,26 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     if (kind === 'android_packages') {
       apps = classifyPackages(input.text);
       files.push({ name: input.name, kind, records: apps.total, txns: 0 });
+      continue;
+    }
+    if (kind === 'android_phone') {
+      phone = checkPhone(input.text);
+      files.push({ name: input.name, kind, records: phone.apps, txns: 0 });
+      continue;
+    }
+    if (kind === 'android_contacts' || kind === 'android_calls') {
+      const n = kind === 'android_contacts' ? contacts.push(...parseContacts(input.text)) : calls.push(...parseCallLog(input.text));
+      files.push({ name: input.name, kind, records: n, txns: 0 });
+      continue;
+    }
+    if (kind === 'android_usage') {
+      usage.push(input.text);
+      files.push({ name: input.name, kind, records: 1, txns: 0 });
+      continue;
+    }
+    if (kind === 'gmail_summary') {
+      mail = JSON.parse(input.text) as MailSummary;
+      files.push({ name: input.name, kind, records: mail.messages, txns: 0 });
       continue;
     }
     if (kind === 'unknown' || kind === 'empty') {
@@ -122,8 +173,17 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     files.push({ name: input.name, kind, records: messages.length, txns: found });
   }
 
+  const base = buildProfile(txns, now, tzOffsetMinutes, mandates);
+  const screen = usage.length > 0 ? summariseUsage(usage) : undefined;
+  const people = contacts.length > 0 ? contactNames(contacts) : undefined;
   return {
-    profile: { ...buildProfile(txns, now, tzOffsetMinutes, mandates), ...(apps !== undefined ? { apps } : {}) },
+    profile: {
+      ...base,
+      ...(mail !== undefined ? { subscriptions: withMailSubscriptions(base.subscriptions, mail) } : {}),
+      ...(apps !== undefined ? { apps } : {}),
+      ...(people !== undefined ? { people } : {}),
+      ...(screen?.offHours ? { screenOff: screen.offHours } : {}),
+    },
     txns,
     files,
     sensitive: sensitiveReport(hits),
@@ -135,7 +195,28 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     scamCount,
     unnamedCount,
     biggest: biggestEachWay(txns),
+    ...(phone !== undefined ? { phone } : {}),
+    ...(calls.length > 0 ? { calls: summariseCalls(calls, contacts) } : {}),
+    ...(screen !== undefined ? { screen } : {}),
+    ...(mail !== undefined ? { mail } : {}),
   };
+}
+
+/**
+ * Subscriptions seen only in mail (cards, app stores and foreign services
+ * often send no SMS) join the ones found in bank alerts. Only merchants whose
+ * receipts say subscription, membership or renewal, in rupees, are used:
+ * a foreign-currency amount can't be compared with a rupee charge.
+ */
+export function withMailSubscriptions(fromSms: readonly Subscription[], mail: MailSummary): Subscription[] {
+  const recurring = new Set(mail.receipts.filter((r) => r.recurring).map((r) => r.merchant));
+  const txns: Txn[] = mail.receipts
+    .filter((r) => r.currency === 'INR' && recurring.has(r.merchant))
+    .map((r) => ({ at: r.at, direction: 'debit', amount: r.amount, counterparty: r.merchant, key: counterpartyKey(r.merchant), source: 'gmail' }));
+  const found = detectSubscriptions(txns, mail.range?.to ?? mail.builtAt)
+    .filter((s) => !fromSms.some((x) => sameMerchant(x.name, s.name)))
+    .map((s): Subscription => ({ ...s, from: 'mail' }));
+  return [...fromSms, ...found].sort((a, b) => b.monthly - a.monthly);
 }
 
 function biggestEachWay(txns: readonly Txn[]): ImportResult['biggest'] {
@@ -161,7 +242,17 @@ export function formatReport(r: ImportResult): string {
           ? `  ✗ ${f.name}: format not recognised (skipped)`
           : f.kind === 'android_packages'
             ? `  ✓ ${f.name}: ${f.records} installed apps`
-            : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`,
+            : f.kind === 'android_phone'
+              ? `  ✓ ${f.name}: phone check, ${f.records} apps you installed`
+              : f.kind === 'android_contacts'
+                ? `  ✓ ${f.name}: ${f.records} contact numbers`
+                : f.kind === 'android_calls'
+                  ? `  ✓ ${f.name}: ${f.records} calls`
+                  : f.kind === 'android_usage'
+                    ? `  ✓ ${f.name}: screen time`
+                    : f.kind === 'gmail_summary'
+                      ? `  ✓ ${f.name}: ${f.records} mails (summary from npm run mail)`
+                      : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`,
     );
   }
   lines.push('');
@@ -188,6 +279,7 @@ export function formatReport(r: ImportResult): string {
     lines.push('  Report them on sancharsaathi.gov.in (Chakshu). They were not counted as bank alerts.', '');
   }
 
+  lines.push(...formatPhone(r.phone));
   lines.push(...formatApps(r.profile.apps));
 
   lines.push('YOUR NORMAL');
@@ -204,6 +296,8 @@ export function formatReport(r: ImportResult): string {
   if (r.biggest.in.length > 0) lines.push(`  Biggest in:  ${r.biggest.in.map(big).join(' · ')}`);
 
   lines.push('', ...formatSubscriptions(p));
+  lines.push(...formatPeople(r.calls, r.screen));
+  lines.push(...formatMail(r.mail));
 
   if (r.unreadCount > 0) {
     lines.push('', `? ${r.unreadCount} bank alerts could not be read. All of them (redacted) are in unread-alerts.txt. Samples:`);
@@ -238,7 +332,7 @@ function formatSubscriptions(p: Profile): string[] {
   if (active.length > 0) {
     const perMonth = active.reduce((s, x) => s + x.monthly, 0);
     lines.push(`  Active: ${active.length} · about ${rupees(perMonth)} a month`);
-    for (const s of active) lines.push(`    ${s.name}  ${rupees(s.usualAmount)} ${s.cycle} · next about ${shortDay(s.nextDueAt)}`);
+    for (const s of active) lines.push(`    ${s.name}  ${rupees(s.usualAmount)} ${s.cycle} · next about ${shortDay(s.nextDueAt)}${s.from === 'mail' ? ' (from mail receipts)' : ''}`);
   }
   const lapsed = p.subscriptions.filter((s) => s.status === 'lapsed');
   if (lapsed.length > 0) lines.push(`  Stopped: ${lapsed.map((s) => `${s.name} (last ${shortDay(s.lastAt)})`).join(', ')}`);
@@ -272,18 +366,106 @@ function formatApps(apps: InstalledApps | undefined): string[] {
   return lines;
 }
 
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+function formatPhone(c: PhoneCheck | undefined): string[] {
+  if (c === undefined) return [];
+  const lines: string[] = [];
+  const serious = c.findings.filter((f) => f.level === 'serious');
+  lines.push(serious.length > 0 ? `⚠ PHONE CHECK: ${serious.length} serious` : '✓ PHONE CHECK: nothing serious');
+  for (const f of c.findings) lines.push(`    ${f.level === 'serious' ? '!!' : ' ·'} ${f.text}`);
+  lines.push(`  Apps you installed: ${c.apps} · not from the Play Store: ${c.notFromPlay.length} · default SMS app: ${c.smsApp ?? 'unknown'}`);
+  if (c.drawOverApps.length > 0) lines.push(`  Can draw over other apps (fake screens on top of your bank app): ${c.drawOverApps.length}`);
+  lines.push('');
+  return lines;
+}
+
+function formatPeople(calls: CallSummary | undefined, screen: ScreenSummary | undefined): string[] {
+  const lines: string[] = [];
+  if (calls !== undefined) {
+    lines.push('', 'PEOPLE AND CALLS');
+    lines.push(`  Calls: ${calls.calls}${calls.range ? `, ${day(calls.range.from)} → ${day(calls.range.to)}` : ''} · contacts: ${calls.contacts}`);
+    lines.push(`  Calls to you from people in your contacts: ${pct(calls.incomingFromContacts)} · from unknown numbers: ${calls.unknownIncoming}`);
+    if (calls.persistentUnknown.length > 0) {
+      lines.push('  Unknown numbers that keep calling (block them if you don\'t know them):');
+      for (const u of calls.persistentUnknown) lines.push(`    ${u.number}  ${u.calls} calls, last ${day(u.last)}`);
+    }
+    if (calls.topPeople.length > 0) lines.push(`  Talk to most: ${calls.topPeople.slice(0, 5).map((x) => x.name).join(', ')}`);
+  }
+  if (screen !== undefined) {
+    lines.push('', 'SCREEN TIME');
+    lines.push(`  Days recorded: ${screen.days} (grows with each sync; Android keeps only the last few days)`);
+    lines.push(screen.offHours ? `  Usually off your phone: ${hh(screen.offHours.from)}–${hh(screen.offHours.to)}` : '  Off-phone hours: not clear yet (needs 3+ full days)');
+    if (screen.topApps.length > 0) lines.push(`  Most used: ${screen.topApps.slice(0, 5).map((a) => `${a.app} ${a.hours} h`).join(' · ')}`);
+  }
+  return lines;
+}
+
+function formatMail(m: MailSummary | undefined): string[] {
+  if (m === undefined) return [];
+  const lines = ['', 'MAIL'];
+  lines.push(`  Read: ${m.messages.toLocaleString('en-IN')} mails${m.range ? `, ${day(m.range.from)} → ${day(m.range.to)}` : ''}`);
+  if (m.alarms.length > 0 || m.sensitive.some((s) => s.kind !== 'otp')) {
+    lines.push('  ⚠ Confidential data in mail (masked here):');
+    for (const s of m.sensitive) lines.push(`    ${String(s.count).padStart(5)}  ${s.kind.replace('_', ' ')}`);
+    for (const a of m.alarms) lines.push(`    · ${a}`);
+  }
+  const byMerchant = new Map<string, { n: number; total: number; currency: string; last: number }>();
+  for (const r of m.receipts) {
+    const k = `${r.merchant}|${r.currency}`;
+    const e = byMerchant.get(k) ?? { n: 0, total: 0, currency: r.currency, last: 0 };
+    byMerchant.set(k, { n: e.n + 1, total: e.total + r.amount, currency: r.currency, last: Math.max(e.last, r.at) });
+  }
+  const money = (n: number, c: string) => (c === 'INR' ? rupees(n) : `${c} ${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
+  lines.push(`  Receipts: ${m.receipts.length} from ${byMerchant.size} merchants. Most often:`);
+  for (const [k, e] of [...byMerchant.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 10)) {
+    lines.push(`    ${String(e.n).padStart(4)}×  ${k.split('|')[0]}  ${money(e.total, e.currency)} in total, last ${day(e.last)}`);
+  }
+  const foreign = [...new Set(m.receipts.filter((r) => r.recurring && r.currency !== 'INR').map((r) => `${r.merchant} (${r.currency})`))];
+  if (foreign.length > 0) lines.push(`  Foreign-currency subscriptions: ${foreign.join(', ')}`);
+  const recentTrials = m.trialsEnding.filter((t) => (m.range?.to ?? 0) - t.at < 60 * 86_400_000);
+  if (recentTrials.length > 0) lines.push(`  Free trials ending recently (a charge follows): ${recentTrials.map((t) => `${t.merchant} ${day(t.at)}`).join(', ')}`);
+  const trips = m.bookings.filter((b) => !b.cancelled);
+  lines.push(`  Travel bookings: ${trips.length}${m.bookings.length > trips.length ? ` (+${m.bookings.length - trips.length} cancelled)` : ''}`);
+  const years = new Map<string, number>();
+  for (const b of trips) years.set(day(b.travelAt ?? b.at).slice(0, 4), (years.get(day(b.travelAt ?? b.at).slice(0, 4)) ?? 0) + 1);
+  if (years.size > 0) lines.push(`    by year: ${[...years.entries()].sort().map(([y, n]) => `${y}: ${n}`).join(' · ')}`);
+  const kinds = new Map<string, number>();
+  for (const b of trips) kinds.set(b.kind, (kinds.get(b.kind) ?? 0) + 1);
+  if (kinds.size > 0) lines.push(`    by kind: ${[...kinds.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · ')}`);
+  const routes = new Map<string, number>();
+  for (const b of trips) if (b.route) routes.set(b.route, (routes.get(b.route) ?? 0) + 1);
+  if (routes.size > 0) lines.push(`    top routes: ${[...routes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([r, n]) => `${r} (${n})`).join(', ')}`);
+  const latest = [...trips].sort((a, b) => (b.travelAt ?? b.at) - (a.travelAt ?? a.at)).slice(0, 5);
+  for (const b of latest) lines.push(`    ${day(b.travelAt ?? b.at)}  ${b.kind}  ${b.provider}${b.route ? `  ${b.route}` : ''}`);
+  return lines;
+}
+
 /** A few lines for `npm run sync`; the full report goes to a file. */
 export function formatSummary(r: ImportResult): string {
   const p = r.profile;
   const lines = [
-    `Synced: ${r.txns.length.toLocaleString('en-IN')} transactions from ${r.files.filter((f) => f.kind !== 'android_packages').reduce((s, f) => s + f.records, 0).toLocaleString('en-IN')} messages` +
+    `Synced: ${r.txns.length.toLocaleString('en-IN')} transactions from ${r.files.filter((f) => f.kind === 'adb_sms' || f.kind === 'sms_backup_xml' || f.kind === 'google_pay_takeout').reduce((s, f) => s + f.records, 0).toLocaleString('en-IN')} messages` +
       (p.range ? `, ${day(p.range.from)} → ${day(p.range.to)}` : ''),
     `Your normal: usual ${rupees(p.debits.p50)} · 90% under ${rupees(p.debits.p90)} · ${p.payees.length.toLocaleString('en-IN')} payees` +
       (p.quietHours ? ` · quiet ${hh(p.quietHours.from)}–${hh(p.quietHours.to)}` : ''),
     `Recurring: ${p.subscriptions.filter((s) => s.status === 'active').length} subscriptions · ${p.autopays.filter((a) => a.status === 'active').length} active autopays`,
   ];
   if (p.apps) lines.push(`Phone: ${p.apps.payment.length} payment · ${p.apps.bank.length} bank · ${p.apps.crypto.length} crypto apps`);
+  if (r.phone) {
+    const serious = r.phone.findings.filter((f) => f.level === 'serious').length;
+    lines.push(`Phone check: ${serious > 0 ? `${serious} serious · ` : 'nothing serious · '}${r.phone.findings.length - serious} to look at · ${r.phone.notFromPlay.length} apps not from the Play Store`);
+  }
+  if (r.calls) lines.push(`Calls: ${r.calls.calls} · ${pct(r.calls.incomingFromContacts)} of calls to you from contacts · ${r.calls.persistentUnknown.length} unknown numbers keep calling`);
+  if (r.screen) lines.push(r.screen.offHours ? `Screen: usually off ${hh(r.screen.offHours.from)}–${hh(r.screen.offHours.to)} (${r.screen.days} days)` : `Screen: ${r.screen.days} days recorded; off-phone hours need 3+ full days`);
+  if (r.mail) {
+    const trips = r.mail.bookings.filter((b) => !b.cancelled).length;
+    const fromMail = p.subscriptions.filter((s) => s.from === 'mail' && s.status === 'active').length;
+    lines.push(`Mail: ${r.mail.messages.toLocaleString('en-IN')} mails · ${r.mail.receipts.length} receipts · ${fromMail} more subscriptions · ${trips} travel bookings`);
+  }
   const warn: string[] = [];
+  if (r.phone?.findings.some((f) => f.level === 'serious')) warn.push('phone check found an app to remove (see report)');
+  if (r.mail && r.mail.alarms.length > 0) warn.push('passwords or keys sitting in mail');
   if (p.apps && p.apps.remote_access.length > 0) warn.push(`screen-sharing app installed (${p.apps.remote_access.join(', ')})`);
   if (r.scamCount > 0) warn.push(`${r.scamCount} likely scam messages`);
   if (r.sensitive.byKind.some((k) => k.kind === 'password' || k.kind === 'recovery_phrase' || k.kind === 'private_key')) warn.push('passwords or keys sitting in SMS');

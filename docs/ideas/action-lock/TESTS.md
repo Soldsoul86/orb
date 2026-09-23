@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 118 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 138 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -68,6 +68,26 @@ screen-sharing · apps added to the profile, with a warning for screen-sharing
 apps in the report and the sync summary. `npm run sync` was also run against a
 stand-in `adb`: with no phone it prints the pairing steps; with one it pulls SMS
 and apps, writes the profile and report, and prints the summary.
+
+## Phone check, people, screen time — `test/phone.test.ts`, `test/people.test.ts`
+
+| Area | What is proven |
+|---|---|
+| Phone check | The script run on the phone only reads (no install, grant, settings put) · installers, watched permissions, Accessibility, notification access, device admins, draw-over and install rights, `.apk` files read · system apps (TalkBack) not judged · an app not from the Play Store that reads SMS or controls the screen is serious, each app named once · a clean phone has no findings |
+| Contacts and calls | Numbers compared by their last 10 digits · names with commas · share of calls from contacts · unknown numbers calling 3+ times, masked, never printed in full · a payee named like a contact is pointed out but still new; short names (<8 letters) never match |
+| Screen time | Off-phone hours from foreground events · needs 3 full days (first and last are partial) · repeated dumps counted once · off-phone hours flag a payment even with little payment history |
+
+## Gmail — `test/mail.test.ts`
+
+| Area | What is proven |
+|---|---|
+| Reading | mbox split, `>From` unescaped · encoded headers · quoted-printable with soft breaks · base64 in multipart · HTML to text |
+| Receipts | Merchant from the sender, amount and currency, subscription wording · promotions skipped |
+| Bookings | Flight from an airline with route, travel date and masked PNR · hotel from Booking.com · itinerary and check-in reminder counted once |
+| Summary | No mail text saved · passwords reported with sender and date, masked · rupee subscriptions join the profile, dollar ones are listed only · a subscription already found in SMS is not added twice |
+
+`npm run sync` was run against a stand-in `adb` that answers every command, and
+`npm run mail` on a 776 MB generated mailbox (40,000 mails, 4 s).
 
 ## Checked that the tests can fail
 

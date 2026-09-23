@@ -4,12 +4,16 @@
 //   npm run sync -- --every 6          again every 6 hours while this runs
 //   npm run sync -- --connect IP:PORT  connect over Wi-Fi first (after pairing)
 //
-// Reads SMS and the list of installed apps over adb (USB or Wireless
-// debugging). Everything stays in ./private on this computer.
+// Reads over adb (USB or Wireless debugging), read-only: SMS, installed apps
+// and their permissions, contacts, call log and screen time. Adds the Gmail
+// summary from `npm run mail` if there is one. Everything stays in ./private
+// on this computer.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { formatReport, formatSummary, runImport } from '../src/import/run.ts';
+import { formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
+import { PHONE_SCRIPT } from '../src/import/phone.ts';
+import { USAGE_MARKER } from '../src/import/people.ts';
 
 const args = process.argv.slice(2);
 const option = (name: string) => {
@@ -79,16 +83,37 @@ function syncOnce(): boolean {
     console.error('The phone refused to share SMS over adb. Use the SMS Backup & Restore app instead (see README).');
     return false;
   }
-  const apps = adb('-s', serial, 'shell', 'pm', 'list', 'packages');
-
-  mkdirSync(out, { recursive: true });
+  mkdirSync(join(out, 'usage'), { recursive: true });
   writeFileSync(join(out, 'sms.txt'), sms.out);
-  if (apps.ok) writeFileSync(join(out, 'apps.txt'), apps.out);
+  const inputs: ImportInput[] = [{ name: 'sms.txt', text: sms.out }];
+  const skipped: string[] = [];
 
-  const result = runImport(
-    [{ name: 'sms.txt', text: sms.out }, ...(apps.ok ? [{ name: 'apps.txt', text: apps.out }] : [])],
-    Date.now(),
-  );
+  // Each is optional: a phone that refuses one still gives the rest.
+  const pull = (file: string, what: string, ...cmd: string[]) => {
+    const r = adb('-s', serial, 'shell', ...cmd);
+    if (!r.ok || /Permission Denial|SecurityException/.test(r.out.slice(0, 500) + r.err)) {
+      skipped.push(what);
+      return;
+    }
+    writeFileSync(join(out, file), r.out);
+    inputs.push({ name: file, text: r.out });
+  };
+  pull('apps.txt', 'installed apps', 'pm', 'list', 'packages');
+  pull('phone.txt', 'app permissions', PHONE_SCRIPT);
+  pull('contacts.txt', 'contacts', 'content', 'query', '--uri', 'content://com.android.contacts/data/phones', '--projection', 'data1:display_name');
+  pull('calls.txt', 'call log', 'content', 'query', '--uri', 'content://call_log/calls', '--projection', 'number:date:duration:type');
+
+  // Android keeps only a few days of screen time: keep one dump per day so history grows.
+  const usage = adb('-s', serial, 'shell', 'dumpsys', 'usagestats');
+  if (usage.ok) writeFileSync(join(out, 'usage', `${new Date().toISOString().slice(0, 10)}.txt`), `${USAGE_MARKER}\n${usage.out}`);
+  else skipped.push('screen time');
+  for (const f of readdirSync(join(out, 'usage')).filter((f) => f.endsWith('.txt')).sort()) {
+    inputs.push({ name: `usage/${f}`, text: readFileSync(join(out, 'usage', f), 'utf8') });
+  }
+  if (existsSync(join(out, 'mail.json'))) inputs.push({ name: 'mail.json', text: readFileSync(join(out, 'mail.json'), 'utf8') });
+  if (skipped.length > 0) console.log(`The phone did not share: ${skipped.join(', ')} (skipped).`);
+
+  const result = runImport(inputs, Date.now());
   writeFileSync(join(out, 'profile.json'), JSON.stringify(result.profile, null, 2));
   writeFileSync(join(out, 'transactions.json'), JSON.stringify(result.txns, null, 2));
   writeFileSync(join(out, 'report.txt'), formatReport(result) + '\n');

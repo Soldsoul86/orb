@@ -37,6 +37,10 @@ export interface Profile {
   readonly autopays: readonly Autopay[];
   /** Payment, bank, crypto and screen-sharing apps on the phone, when synced. */
   readonly apps?: InstalledApps;
+  /** Contact names, when synced: a payee with the same name is pointed out. */
+  readonly people?: readonly string[];
+  /** Hours you are almost never on your phone, from screen time. */
+  readonly screenOff?: { readonly from: number; readonly to: number };
 }
 
 /** Enough payments to say what is unusual for you. */
@@ -184,6 +188,16 @@ export function knowsPayee(profile: Profile, recipient: string, name?: string): 
   return findPayee(profile, recipient, name) !== undefined;
 }
 
+/** A contact with exactly this name (8+ letters), if any. Not proof: anyone can register a common name. */
+export function findContact(profile: Profile, name: string | undefined): string | undefined {
+  if (name === undefined || profile.people === undefined) return undefined;
+  const n = onlyLetters(name);
+  if (n.length < 8) return undefined;
+  return profile.people.find((p) => onlyLetters(p) === n);
+}
+
+const inHours = (hour: number, r: { from: number; to: number }) => (r.from <= r.to ? hour >= r.from && hour < r.to : hour >= r.from || hour < r.to);
+
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 const rupees = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
@@ -197,8 +211,10 @@ export function personalThresholds(profile: Profile, fallback: Thresholds): Thre
     if (s === undefined || Math.abs(amount - s.usualAmount) <= s.usualAmount * 0.05) return null;
     return `${s.name} usually charges ${rupees(s.usualAmount)} ${s.cycle}; this is ${rupees(amount)}.`;
   };
-  // Subscriptions need only a few charges, so they apply even with a short history.
-  if (profile.debits.count < MIN_HISTORY) return { ...fallback, subscriptionChange };
+  const off = profile.screenOff;
+  const offPhone = (hour: number) => (off !== undefined && inHours(hour, off) ? `You're usually off your phone between ${hh(off.from)} and ${hh(off.to)}.` : null);
+  // Subscriptions and screen time need little history, so they apply even with a short one.
+  if (profile.debits.count < MIN_HISTORY) return { ...fallback, unusualHour: (h) => offPhone(h) ?? fallback.unusualHour(h), subscriptionChange };
   const { p50, p90 } = profile.debits;
   const quiet = profile.quietHours;
   return {
@@ -209,9 +225,8 @@ export function personalThresholds(profile: Profile, fallback: Thresholds): Thre
       return times >= 2 ? `${rupees(amount)} is ${times}× your usual payment (${rupees(p50)}).` : `${rupees(amount)} is larger than almost all your payments.`;
     },
     unusualHour(hour) {
-      if (quiet === null) return fallback.unusualHour(hour);
-      const inQuiet = quiet.from <= quiet.to ? hour >= quiet.from && hour < quiet.to : hour >= quiet.from || hour < quiet.to;
-      return inQuiet ? `You rarely pay between ${hh(quiet.from)} and ${hh(quiet.to)}.` : null;
+      if (quiet === null) return offPhone(hour) ?? fallback.unusualHour(hour);
+      return inHours(hour, quiet) ? `You rarely pay between ${hh(quiet.from)} and ${hh(quiet.to)}.` : offPhone(hour);
     },
     subscriptionChange,
   };

@@ -45,6 +45,25 @@ interface Journal         { append(event: NewEvent): LockEvent; all(): readonly 
 | `decide(policy, action, context, analysis)` | `policy.ts` |
 | `decideAt(policyState, now, action, context, analysis)` | `policy.ts` |
 | `apply(state, event)`, `fold(policy, events)`, `canRelease(held, now)`, `waitingFor(held, now)` | `state.ts` |
+| `runImport(inputs, now)`, `detectSource(text)`, `formatReport(r)`, `formatSummary(r)`, `withMailSubscriptions(subs, mail)` | `import/run.ts` |
+| `checkPhone(dump)`, `PHONE_SCRIPT` (read-only, runs on the phone) | `import/phone.ts` |
+| `parseContacts`, `parseCallLog`, `summariseCalls`, `contactNames`, `parseUsage`, `summariseUsage`, `phoneKey` | `import/people.ts` |
+| `parseMail(raw)`, `splitMbox`, `readReceipt`, `readBooking`, `readTrialEnding`, `mailCollector(now)` | `import/mail.ts` |
+| `findPayee`, `findContact`, `personalThresholds` | `profile.ts` |
+
+### What `npm run sync` reads (all read-only, over adb)
+
+| File in `private/` | Command on the phone | Used for |
+|---|---|---|
+| `sms.txt` | `content query --uri content://sms/inbox` | Payments, autopays, scams, confidential data |
+| `apps.txt` | `pm list packages` | Payment, bank, crypto, screen-sharing apps |
+| `phone.txt` | `PHONE_SCRIPT`: installers, watched permissions, accessibility, notification access, device admins, `.apk` files | Phone check |
+| `contacts.txt` | `content query --uri content://com.android.contacts/data/phones` | Calls from known people; payee names that match a contact |
+| `calls.txt` | `content query --uri content://call_log/calls` | Unknown numbers that keep calling |
+| `usage/<date>.txt` | `dumpsys usagestats` (one per day, so history grows) | Hours you are off your phone |
+| `mail.json` | none: written by `npm run mail` from a Gmail Takeout mbox | Receipts, subscriptions, travel bookings |
+
+Each is optional: if the phone refuses one, the sync says so and uses the rest.
 
 ## Demo HTTP API (`src/server.ts`)
 
