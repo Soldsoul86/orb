@@ -152,6 +152,8 @@ export function senderBrand(sender: string): string | undefined {
 
 /** Marketing that mentions money ("Rs.1000 credited in your wallet … 50% OFF"). */
 const MARKETING = /\b(?:T&C|T & C|\d+%\s*off|flat\s+\d+%|use code|coupon|sale\b|shop now|offer ends|limited period)/i;
+/** Money moving inside an app's own wallet, not a bank account. */
+const WALLET_ONLY = /\bwallet\b/i;
 /** A payment that did not go through. */
 const FAILED = /\b(?:has|have|had)\s+failed\b|\bpayment failed\b|\btransaction (?:has )?failed\b|\bwill be refunded\b/i;
 
@@ -179,6 +181,8 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
   if (MARKETING.test(body) || FAILED.test(body)) return null;
+  // Credits into an app's own wallet (exchange rewards, cashback) are not bank money.
+  if (WALLET_ONLY.test(body) && !/\b(a\/c|acct|acc|account)\b/i.test(body)) return null;
   if (!/\b(a\/c|acct|acc|ac|account|card|upi|vpa)\b/i.test(body)) return null;
   // Pre-debit notices ("will be debited on 25-09-2025") are not payments yet.
   if (FUTURE.test(body)) return null;
@@ -215,6 +219,7 @@ export function looksLikeUnreadAlert(sms: Sms): boolean {
     !isPromotional(sms.address) &&
     !FUTURE.test(sms.body) &&
     !MARKETING.test(sms.body) &&
+    !(WALLET_ONLY.test(sms.body) && !/\b(a\/c|acct|acc|account)\b/i.test(sms.body)) &&
     !FAILED.test(sms.body) &&
     /\b(debited|credited)\b/i.test(sms.body) &&
     MONEY.test(sms.body) &&
@@ -224,7 +229,7 @@ export function looksLikeUnreadAlert(sms: Sms): boolean {
 
 // ── Autopay / e-mandate alerts ─────────────────────────────────────────────
 
-const FUTURE = /\b(?:will|shall) be (?:debited|charged|deducted|auto-?debited)\b|\bis due on\b|\bscheduled (?:for|on)\b|\bupcoming\b/i;
+const FUTURE = /\b(?:will|shall) be (?:debited|charged|deducted|auto-?debited|credited)\b|\bhas been initiated\b|\bis due on\b|\bscheduled (?:for|on)\b|\bupcoming\b/i;
 const MANDATE = /\b(auto\s?-?pay|e-?mandate|mandate|standing instruction|si\b|recurring payment|subscription)\b/i;
 const MONTHS: Readonly<Record<string, number>> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 

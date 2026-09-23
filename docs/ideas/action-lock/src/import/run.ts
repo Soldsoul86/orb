@@ -1,7 +1,7 @@
 // Turns export files into your profile and a report. Pure except for the
 // file list it is given; the command-line wrapper is scripts/import.ts.
 
-import { buildProfile, type Profile } from '../profile.ts';
+import { buildProfile, mergeDuplicates, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
 import { displayMerchant, type MandateEvent } from '../subscriptions.ts';
 import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
@@ -42,6 +42,8 @@ export interface ImportResult {
   readonly scamCount: number;
   /** Payments whose alert named no payee (kept for totals). */
   readonly unnamedCount: number;
+  /** The largest payments each way, after merging duplicates: for checking the totals. */
+  readonly biggest: { readonly out: readonly Txn[]; readonly in: readonly Txn[] };
 }
 
 const SERIOUS = new Set(['recovery_phrase', 'private_key', 'card_number', 'aadhaar', 'account_number', 'password', 'api_key']);
@@ -124,7 +126,14 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     scams,
     scamCount,
     unnamedCount,
+    biggest: biggestEachWay(txns),
   };
+}
+
+function biggestEachWay(txns: readonly Txn[]): ImportResult['biggest'] {
+  const merged = mergeDuplicates(txns);
+  const top = (dir: Txn['direction']) => merged.filter((t) => t.direction === dir).sort((a, b) => b.amount - a.amount).slice(0, 5);
+  return { out: top('debit'), in: top('credit') };
 }
 
 const rupees = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -178,6 +187,9 @@ export function formatReport(r: ImportResult): string {
   for (const x of p.payees.slice(0, 10)) lines.push(`    ${String(x.count).padStart(4)}×  ${x.name}  (usual ${rupees(x.median)}, max ${rupees(x.max)})`);
   lines.push(`  Payees in total: ${p.payees.length}`);
   if (r.unnamedCount > 0) lines.push(`  Payments whose alert named no payee: ${r.unnamedCount} (counted in amounts and hours only)`);
+  const big = (t: Txn) => `${rupees(t.amount)} ${t.direction === 'debit' ? 'to' : 'from'} ${t.unnamed ? '(no name)' : t.counterparty} on ${day(t.at)}`;
+  if (r.biggest.out.length > 0) lines.push(`  Biggest out: ${r.biggest.out.map(big).join(' · ')}`);
+  if (r.biggest.in.length > 0) lines.push(`  Biggest in:  ${r.biggest.in.map(big).join(' · ')}`);
 
   lines.push('', ...formatSubscriptions(p));
 

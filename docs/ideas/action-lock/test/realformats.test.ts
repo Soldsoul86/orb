@@ -149,3 +149,36 @@ describe('third run', () => {
     assert.equal(t?.counterparty, 'NO1 SOME COMPLEX 481');
   });
 });
+
+describe('fourth run', () => {
+  const at4 = Date.UTC(2025, 3, 25, 6, 30);
+  const s = (address: string, body: string, date = at4): Sms => ({ address, date, body });
+
+  it('counts a transfer once when the bank sends two alerts for it', async () => {
+    const { mergeDuplicates } = await import('../src/profile.ts');
+    const a = parseBankAlert(s('JX-ICICIT', 'ICICI Bank Acct XX668 debited with Rs 40,000.00 on 25-Apr-25 & Acct XX106 credited.IMPS:511509365845. Call 18002662'))!;
+    const b = parseBankAlert(s('VA-ICICIT', 'ICICI Bank Acc XXXX4668 debited with Rs 40,000.00 on 25-Apr-2025. credit via :4054604678.Call 18002662', at4 + 60_000))!;
+    const merged = mergeDuplicates([a, b]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]?.counterparty, 'Account XX106', 'keeps the copy with a payee');
+  });
+
+  it('does not count refunds that are only initiated, or app-wallet rewards', () => {
+    const zomato = s('CP-ZOMATO', "Refund of Rs. 307.50 for your Zomato order from Some Place has been initiated and will be credited by Apr 15, 2025. -ZOMATO");
+    const giottus = s('AX-GIOTTU', 'Dear Hari, Your Giottus wallet is credited with Rs 500 for your trade of Rs 10,000 plus. https://gio.short.gy/x. Giottus');
+    for (const m of [zomato, giottus]) {
+      assert.equal(parseBankAlert(m), null);
+      assert.equal(looksLikeUnreadAlert(m), false);
+    }
+  });
+
+  it('shows the biggest payments each way, for checking totals', () => {
+    const dump = [
+      `Row: 0 address=VM-HDFCBK-S, date=${at4}, body=Sent Rs.500.00\nFrom HDFC Bank A/C *1234\nTo RAVI KUMAR\nRef 526512345678`,
+      `Row: 1 address=VM-HDFCBK-S, date=${at4 + 1000}, body=Sent Rs.90,000.00\nFrom HDFC Bank A/C *1234\nTo SOME BUILDER\nRef 526512345679`,
+    ].join('\n');
+    const r = runImport([{ name: 'sms.txt', text: dump }], at4);
+    assert.equal(r.biggest.out[0]?.amount, 90_000);
+    assert.match(formatReport(r), /Biggest out: ₹90,000 to SOME BUILDER/);
+  });
+});

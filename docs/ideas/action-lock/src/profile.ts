@@ -52,7 +52,8 @@ export function localHour(at: number, tzOffsetMinutes: number): number {
 /**
  * The same payment often appears twice: in the bank SMS and in Google Pay.
  * Within 15 minutes, the same reference, or the same amount and direction from
- * two different sources, is one payment; the copy with a UPI ID is kept.
+ * two different sources, or a second alert that names no payee, is one payment;
+ * the copy with a payee name and UPI ID is kept.
  */
 export function mergeDuplicates(txns: readonly Txn[]): Txn[] {
   const sorted = [...txns].sort((a, b) => a.at - b.at);
@@ -65,13 +66,16 @@ export function mergeDuplicates(txns: readonly Txn[]): Txn[] {
       const k = kept[i]!;
       const sameRef = t.ref !== undefined && k.ref === t.ref;
       const sameMove = k.direction === t.direction && k.amount === t.amount && k.source !== t.source;
-      if (sameRef || sameMove) {
+      // Some banks send two SMS for one transfer, one of them naming no payee
+      // ("…credit via :4054604678"): the same amount, same way, minutes apart.
+      const secondAlert = k.direction === t.direction && k.amount === t.amount && (k.unnamed === true || t.unnamed === true);
+      if (sameRef || sameMove || secondAlert) {
         twin = i;
         break;
       }
     }
     if (twin < 0) kept.push(t);
-    else if (kept[twin]!.vpa === undefined && t.vpa !== undefined) kept[twin] = t;
+    else if ((kept[twin]!.vpa === undefined && t.vpa !== undefined) || (kept[twin]!.unnamed === true && t.unnamed !== true)) kept[twin] = t;
   }
   return kept;
 }
