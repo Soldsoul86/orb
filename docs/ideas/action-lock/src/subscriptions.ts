@@ -52,6 +52,8 @@ export interface Autopay {
   readonly frequency?: string;
   readonly nextDebitAt?: number;
   readonly lastEventAt: number;
+  /** For autopays with a hidden merchant: the payee of a matching charge, if one was found. */
+  readonly likelyMerchant?: string;
   /** dormant: no message about it for 60 days before your latest data. */
   readonly status: 'active' | 'dormant' | 'revoked';
 }
@@ -139,10 +141,35 @@ function withLatest(s: Subscription, last: Txn, usual: number, now: number, rest
   };
 }
 
+/**
+ * The same merchant under two long names ("Netflix Entertainment" and
+ * "Netflix Entertainment Services IndiaLLP") is one payee. Only long names
+ * where one begins the other are merged, so different people are not.
+ */
+function canonicalKeys(keys: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const byLength = [...keys].sort((a, b) => letters(a).length - letters(b).length);
+  const canon: string[] = [];
+  for (const k of byLength) {
+    const lk = letters(k);
+    const c = k.includes('@') || lk.length < 10 ? undefined : canon.find((x) => lk.startsWith(letters(x)));
+    if (c === undefined) {
+      if (!k.includes('@') && lk.length >= 10) canon.push(k);
+      out.set(k, k);
+    } else out.set(k, c);
+  }
+  return out;
+}
+
 /** Recurring payments in your history, most expensive per month first. */
 export function detectSubscriptions(txns: readonly Txn[], now: number): Subscription[] {
+  const debits = txns.filter((t) => t.direction === 'debit');
+  const canon = canonicalKeys([...new Set(debits.map((t) => t.key))]);
   const byKey = new Map<string, Txn[]>();
-  for (const t of txns) if (t.direction === 'debit') byKey.set(t.key, [...(byKey.get(t.key) ?? []), t]);
+  for (const t of debits) {
+    const k = canon.get(t.key) ?? t.key;
+    byKey.set(k, [...(byKey.get(k) ?? []), t]);
+  }
   const found: Subscription[] = [];
   for (const ts of byKey.values()) {
     const s = asSubscription([...ts].sort((a, b) => a.at - b.at), now);
@@ -191,5 +218,21 @@ export function summariseAutopays(
       ...(frequency !== undefined ? { frequency } : {}),
       ...(upcoming !== undefined ? { nextDebitAt: upcoming.dueAt ?? upcoming.at } : {}),
     };
+  });
+}
+
+/**
+ * Autopays with a hidden merchant (PhonePe's hashed IDs) are named from a
+ * charge of the same amount within a few days of their debit notice.
+ */
+export function nameAutopays(autopays: readonly Autopay[], txns: readonly Txn[]): Autopay[] {
+  const debits = txns.filter((t) => t.direction === 'debit');
+  return autopays.map((a) => {
+    if (!/^[0-9a-f]{20,}@/i.test(a.merchant) || a.amount === undefined || a.nextDebitAt === undefined) return a;
+    const due = a.nextDebitAt;
+    const match = debits
+      .filter((t) => t.amount === a.amount && t.at >= due - 2 * DAY && t.at <= due + 4 * DAY)
+      .sort((x, y) => Math.abs(x.at - due) - Math.abs(y.at - due))[0];
+    return match === undefined ? a : { ...a, likelyMerchant: match.counterparty };
   });
 }

@@ -125,12 +125,40 @@ const COUNTERPARTY: readonly RegExp[] = [
   new RegExp(`\\b(?:from|by)\\s+(${NAME})\\s+(?:on|via|ref|upi)\\b`, 'i'),
   new RegExp(`\\bat\\s+(${NAME})\\s+(?:on|via|ref)\\b`, 'i'), // card spends: "spent … at SWIGGY on …"
   /\bRef\s+([A-Z][A-Z ]{3,40}?)\.\s/, // AU: "Ref MONTHLY INTEREST PAYOUT. Bal …" (upper case only)
+  /(?:^|\n)[A-Z]{2,6}[-/][\w/-]+\s+-\s*([A-Z][A-Za-z .&'-]{1,40}?)\s*(?:\n|$)/, // AU: "NDA-4795-18226161 -NAME" on its own line
+  /\bfor\s+([A-Za-z][A-Za-z0-9_ -]{2,40}?)\.(?:\s|$)/, // bank charges: "Debited … for SMS_Alert_Charge_JAN26."
 ];
+
+/** Brands behind common service sender IDs, for alerts that name no counterparty (refunds). */
+const SENDER_BRANDS: readonly [RegExp, string][] = [
+  [/MMTRIP|MAKEMY/i, 'MakeMyTrip'],
+  [/AIRINF|AIRTEL/i, 'Airtel'],
+  [/JIOINF|JIOPAY|MYJIO/i, 'Jio'],
+  [/SWIGGY/i, 'Swiggy'],
+  [/ZOMATO/i, 'Zomato'],
+  [/AMAZON|AMZN/i, 'Amazon'],
+  [/FLPKRT|FLIPKT|FKRT/i, 'Flipkart'],
+  [/IRCTC/i, 'IRCTC'],
+  [/UBER/i, 'Uber'],
+  [/OLA/i, 'Ola'],
+];
+
+/** "AD-MMTRIP-S" → "MakeMyTrip"; unknown headers → their middle part. */
+export function senderBrand(sender: string): string | undefined {
+  const core = sender.trim().replace(/^[A-Z]{2}-/, '').replace(/-[PSTG]$/i, '');
+  if (!/^[A-Za-z0-9]{3,9}$/.test(core) || /^\d+$/.test(core)) return undefined;
+  return SENDER_BRANDS.find(([re]) => re.test(core))?.[1] ?? core;
+}
+
+/** Marketing that mentions money ("Rs.1000 credited in your wallet … 50% OFF"). */
+const MARKETING = /\b(?:T&C|T & C|\d+%\s*off|flat\s+\d+%|use code|coupon|sale\b|shop now|offer ends|limited period)/i;
+/** A payment that did not go through. */
+const FAILED = /\b(?:has|have|had)\s+failed\b|\bpayment failed\b|\btransaction (?:has )?failed\b|\bwill be refunded\b/i;
 
 function counterpartyOf(body: string): { name: string; vpa?: string } | undefined {
   const vpa = body.match(VPA)?.[1]?.toLowerCase();
   for (const re of COUNTERPARTY) {
-    const name = body.match(re)?.[1]?.trim().replace(/[.,;:-]+$/, '');
+    const name = body.match(re)?.[1]?.trim().replace(/[.,;:-]+$/, '').replace(/_+/g, ' ').trim();
     if (name !== undefined && !/^(?:a\/?c|acct|account|your|ac)\b/i.test(name) && !/bank a\/?c/i.test(name)) {
       return vpa !== undefined ? { name, vpa } : { name };
     }
@@ -147,13 +175,16 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (isPromotional(sms.address)) return null;
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
+  if (MARKETING.test(body) || FAILED.test(body)) return null;
   if (!/\b(a\/c|acct|ac|account|card|upi|vpa)\b/i.test(body)) return null;
   // Pre-debit notices ("will be debited on 25-09-2025") are not payments yet.
   if (FUTURE.test(body)) return null;
   const dir = direction(body);
   const amount = amountOf(body);
   if (dir === undefined || amount === undefined) return null;
-  const who = counterpartyOf(body);
+  // Refunds from a merchant often name no one: the sender is the counterparty.
+  const brand = /\brefund/i.test(body) ? senderBrand(sms.address) : undefined;
+  const who = counterpartyOf(body) ?? (brand !== undefined ? { name: brand } : undefined);
   if (who === undefined) return null;
   const account = body.match(ACCOUNT)?.[1];
   const ref = body.match(REF)?.[1] ?? body.match(/\b(\d{12})\b/)?.[1];
@@ -177,6 +208,8 @@ export function looksLikeUnreadAlert(sms: Sms): boolean {
   return (
     !isPromotional(sms.address) &&
     !FUTURE.test(sms.body) &&
+    !MARKETING.test(sms.body) &&
+    !FAILED.test(sms.body) &&
     /\b(debited|credited)\b/i.test(sms.body) &&
     MONEY.test(sms.body) &&
     parseBankAlert(sms) === null

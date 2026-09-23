@@ -3,7 +3,7 @@
 
 import type { Txn } from './import/types.ts';
 import type { Thresholds } from './severity.ts';
-import { detectSubscriptions, sameMerchant, summariseAutopays, type Autopay, type MandateEvent, type Subscription } from './subscriptions.ts';
+import { detectSubscriptions, nameAutopays, sameMerchant, summariseAutopays, type Autopay, type MandateEvent, type Subscription } from './subscriptions.ts';
 
 export interface PayeeStats {
   readonly key: string;
@@ -142,7 +142,10 @@ export function buildProfile(
     // "Lapsed" is judged against your latest data, not today: an export from
     // last month must not make every subscription look cancelled.
     subscriptions: detectSubscriptions(all, all.length === 0 ? builtAt : all[all.length - 1]!.at),
-    autopays: summariseAutopays(mandates, mandates.reduce((m, e) => Math.max(m, e.at), all.length === 0 ? 0 : all[all.length - 1]!.at)),
+    autopays: nameAutopays(
+      summariseAutopays(mandates, mandates.reduce((m, e) => Math.max(m, e.at), all.length === 0 ? 0 : all[all.length - 1]!.at)),
+      all,
+    ),
   };
 }
 

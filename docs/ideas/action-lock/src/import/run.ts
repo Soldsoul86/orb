@@ -195,7 +195,8 @@ function formatSubscriptions(p: Profile): string[] {
     for (const a of autopays) {
       const when = a.nextDebitAt === undefined ? '' : a.nextDebitAt > lastSeen ? `next ${shortDay(a.nextDebitAt)}` : `last notice ${shortDay(a.nextDebitAt)}`;
       const bits = [a.amount !== undefined ? `up to ${rupees(a.amount)}` : '', a.frequency ?? '', when].filter(Boolean);
-      lines.push(`    ${displayMerchant(a.merchant)}${bits.length ? ` · ${bits.join(' · ')}` : ''}`);
+      const name = a.likelyMerchant !== undefined ? `${a.likelyMerchant} (likely; hidden ID …@${a.merchant.split('@')[1]})` : displayMerchant(a.merchant);
+      lines.push(`    ${name}${bits.length ? ` · ${bits.join(' · ')}` : ''}`);
     }
   }
   const dormant = p.autopays.filter((a) => a.status === 'dormant');
