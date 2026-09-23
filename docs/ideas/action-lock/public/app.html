@@ -66,6 +66,11 @@
   .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg);
            padding: 11px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; width: max-content; max-width: calc(100vw - 32px); }
   .toast.show { opacity: 1; }
+  .preview { background: var(--note); border-radius: 12px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin: 8px 0 0; }
+  .facts dt { color: var(--muted); } .facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .file { position: relative; overflow: hidden; display: inline-flex; }
+  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 </style>
 </head>
@@ -78,6 +83,7 @@
     <h1>Action Lock</h1>
   </header>
   <p class="sub">Every UPI payment waits for the buffer you set before your UPI app opens.</p>
+  <p class="preview" id="previewNote" hidden><strong>Preview.</strong> No real payment is made here: "Opening your UPI app" is simulated. In the Pixel app it opens Google Pay or PhonePe.</p>
 
   <div id="held"></div>
   <div id="draft"></div>
@@ -97,6 +103,9 @@
       </div>
     </form>
   </div>
+
+  <h2>Your normal</h2>
+  <div class="card" id="normal"></div>
 
   <h2>Your buffers</h2>
   <div class="card" id="policy"></div>
@@ -184,6 +193,37 @@
     $('policy').innerHTML = html;
   }
 
+  const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const hh = (h) => `${String(h).padStart(2, '0')}:00`;
+  function renderNormal() {
+    const p = state.profile;
+    const picker = (label) => `<label class="file soft" style="border-radius:14px;padding:12px 16px;font-weight:600">${label}<input type="file" id="profileFile" accept="application/json,.json"></label>`;
+    $('normal').innerHTML = p === null
+      ? `<p class="meta" style="margin:0">Payments are judged by generic rules. Load <strong>profile.json</strong> from <code>npm run import</code> to judge them against your own history. It stays on this device.</p>
+         <div class="btns">${picker('Load profile.json')}</div>`
+      : `<p class="meta" style="margin:0">Payments are judged against your history. It stays on this device.</p>
+         <dl class="facts">
+           <dt>History</dt><dd>${p.from ? day(p.from) : '—'} → ${p.to ? day(p.to) : '—'}</dd>
+           <dt>Payments</dt><dd>${p.payments.toLocaleString('en-IN')} · usual ${money(p.usual)}</dd>
+           <dt>Payees known</dt><dd>${p.payees.toLocaleString('en-IN')}</dd>
+           <dt>Quiet hours</dt><dd>${p.quiet ? `${hh(p.quiet.from)}–${hh(p.quiet.to)}` : 'not clear yet'}</dd>
+           <dt>Recurring</dt><dd>${p.subscriptions} subscriptions · ${p.autopays} active autopays</dd>
+         </dl>
+         <div class="btns">${picker('Replace')}<button class="soft" id="removeProfile">Remove</button></div>`;
+    const input = $('profileFile');
+    input.addEventListener('change', () => {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = A.setProfile(String(reader.result));
+        toast(r.ok ? 'Profile loaded. Payments are now judged against your history.' : r.reason);
+        state = A.view(); renderNormal(); render();
+      };
+      reader.readAsText(f);
+    });
+  }
+
   function render() {
     state = A.view();
     const now = Date.now();
@@ -220,6 +260,7 @@
     else if (b.dataset.unlock) A.unlock(b.dataset.unlock);
     else if (b.dataset.level) { A.setLevel(Number(b.dataset.level), { mode: b.dataset.mode, holdSeconds: Number(b.dataset.hold) }); state = A.view(); renderPolicy(); }
     else if (b.id === 'scanBtn') A.scan();
+    else if (b.id === 'removeProfile') { A.setProfile(''); toast('Profile removed. Generic rules apply.'); state = A.view(); renderNormal(); }
     else if (b.id === 'draftCancel') { draft = null; renderDraft(); }
     else if (b.id === 'draftPay') {
       const r = A.pay(draft.link, $('draftAmt').value.trim());
@@ -240,7 +281,8 @@
   });
 
   A.onChange((msg) => { if (msg) toast(msg); render(); });
-  render(); renderPolicy();
+  render(); renderPolicy(); renderNormal();
+  $('previewNote').hidden = !!window.AndroidLock;
   setInterval(render, 200);
   const first = A.takeIncomingLink();
   if (first) takeLink(first);

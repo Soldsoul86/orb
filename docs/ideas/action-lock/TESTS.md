@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 107 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 115 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -56,6 +56,9 @@ shorter buffer shows the 24 h delay. No script errors.
 | Autopays | Set-up, upcoming (with due date) and cancelled alerts read · a "will be debited" notice is **not** a payment · merchant names matched loosely · latest state per autopay |
 | Lock checks | Subscription charging ₹799 instead of ₹649 flagged · usual renewal passes at level 0 · a new autopay needs the fingerprint (level 3) |
 | From the first real import — `test/realformats.test.ts` | AU Bank IMPS, UPI and interest credits · Canara "shall be debited" is a notice · promotional (-P) senders ignored · promo phrases not taken as autopay merchants · hashed autopay IDs shown as unnamed · autopays silent 60+ days are dormant · empty export reported · all unread alerts listed, redacted · second run: merchant refunds named from the sender · bank charges and "CODE -NAME" lines · marketing and failed payments skipped · one merchant under two long names merged, short different names not · hidden-merchant autopays named from the matching charge · third run: likely scam SMS (personal number + money bait + link) flagged and kept out of bank alerts, friends and banks not flagged · ICICI transfers to another account and "Acc" wording · payments with no payee kept for totals only · names starting with a digit · renamed merchant shown once without mixing histories · fourth run: one transfer with two bank alerts counted once · initiated refunds and app-wallet rewards not counted · biggest payments each way shown for checking totals |
+| Profile in the lock — `test/judge.test.ts` | Payees found by UPI ID, exact name, or a long name that begins the other, never short fragments · usual payment to a known payee passes · large new payee needs the fingerprint with your numbers · generic rules without a profile · new autopay held · "ready to be credited" lures flagged from registered senders too, real bank credits not |
+
+The app screen was also run in a 412 px browser: the profile loads through the file picker and its summary shows; a known payee's usual amount goes straight through; a new payee is held for the fingerprint with "₹5,000 is 13× your usual payment".
 | Found by running the report | "Lapsed" judged against the latest data, not today · no quiet hours when payment times are not spread enough |
 
 ## Checked that the tests can fail
@@ -71,7 +74,7 @@ Three deliberate bugs were introduced and each was caught:
 
 ## Not tested yet
 
-- The Kotlin shell: not compiled yet (Android SDK host blocked in the build
+- The Kotlin shell (now also the file picker and profile storage): not compiled yet (Android SDK host blocked in the build
   environment); needs a device test with Google Pay and PhonePe.
 - Real executors for Gmail and Slack, and the credential vault.
 - Concurrency across processes; the prototype is single-process and in memory.

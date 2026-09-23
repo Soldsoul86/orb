@@ -16,7 +16,13 @@ export interface ScamFlag {
   readonly reason: string;
 }
 
+/** "Rs.4,50,000 is ready to be credited … complete KYC": a lure from any sender, registered or not. */
+const PENDING_MONEY = /\bready to (?:be )?credit(?:ed)?\b|\bcan be (?:successfully )?credited\b|\bcomplete (?:your )?kyc\b.{0,40}\bcredit/i;
+
 export function looksLikeScam(sms: Sms): ScamFlag | null {
+  if (PENDING_MONEY.test(sms.body) && LINK.test(sms.body)) {
+    return { reason: 'money "ready to be credited" behind a link' };
+  }
   if (!PERSONAL_NUMBER.test(sms.address.trim())) return null;
   const bait = sms.body.match(BAIT)?.[1];
   if (bait === undefined || !LINK.test(sms.body)) return null;

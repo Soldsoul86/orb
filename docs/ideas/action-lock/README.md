@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 107 tests
+npm test          # 115 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -77,6 +77,24 @@ it lets someone take money later without asking.
 (redacted) at the end of the report, and all of them go to
 `private/unread-alerts.txt`, so their formats can be added.
 
+## Use your profile in the lock
+
+On the laptop, see how the lock would treat a payment, judged against your
+history (`private/profile.json`):
+
+```bash
+npm run check -- 5000 goa-trips@okxyz            # new payee, amount vs your usual
+npm run check -- 160 ravi.k@okaxis --name "RAVIKUMAR M" --hour 23
+npm run check -- "upi://pay?pa=shop@ybl&pn=Shop&am=2500"
+npm run check -- 1500 quickloan@ybl --autopay    # a new autopay
+```
+
+On the phone, the app screen has a **Your normal** card: load `profile.json`
+and every payment is judged against your history (payees matched by UPI ID or
+by the name in the payment link). To get the file onto the Pixel:
+`adb push private/profile.json /sdcard/Download/`, then pick it from Downloads.
+The profile stays on the device.
+
 ## On the Pixel
 
 `android/` is a native app that makes the lock a delayed press for UPI: it
@@ -101,5 +119,7 @@ See [`android/README.md`](android/README.md).
 | `android/` | Kotlin shell for the Pixel |
 | `src/import/` | SMS and Google Pay importers, confidential-data scanner, import run and report |
 | `src/subscriptions.ts` | Recurring charges, price changes, restarts; autopay events |
+| `src/judge.ts`, `scripts/check.ts` | How the lock treats one payment given your profile; `npm run check` |
+| `src/import/scam.ts` | Likely scam messages found while importing |
 | `src/profile.ts` | Your normal (payees, amounts, quiet hours) and personal severity thresholds |
 | `scripts/import.ts` | `npm run import` |

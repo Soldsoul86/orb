@@ -44,6 +44,21 @@ export function decide(policy: Policy, action: Action, context: Context, analysi
   return stricter(base, { mode: policy.criticalFloor, holdSeconds: policy.defaults[4].holdSeconds });
 }
 
+/**
+ * Defaults for the phone. No second person is set up yet, so the most
+ * serious level asks for the fingerprint and a longer hold instead.
+ */
+export const PHONE_POLICY: Policy = {
+  ...DEFAULT_POLICY,
+  defaults: {
+    0: { mode: 'pass', holdSeconds: 0 },
+    1: { mode: 'countdown', holdSeconds: 2 },
+    2: { mode: 'countdown', holdSeconds: 10 },
+    3: { mode: 'unlock', holdSeconds: 30 },
+    4: { mode: 'unlock', holdSeconds: 120 },
+  },
+};
+
 /** The user's policy over time: the active one plus at most one pending change. */
 export interface PolicyState {
   readonly active: Policy;

@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -31,7 +33,15 @@ import org.json.JSONObject
 class MainActivity : FragmentActivity() {
 
     private lateinit var web: WebView
-    private lateinit var journal: JournalFile
+    private lateinit var journal: PrivateFile
+    private lateinit var profile: PrivateFile
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    // The page's "Load profile.json" button: WebView needs the app to open the file picker.
+    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        fileCallback?.onReceiveValue(if (uri == null) null else arrayOf(uri))
+        fileCallback = null
+    }
     private var incomingLink: String? = null
     private var pendingUpiActionId: String? = null
 
@@ -44,7 +54,8 @@ class MainActivity : FragmentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        journal = JournalFile(filesDir)
+        journal = PrivateFile(filesDir, "journal.json", "[]")
+        profile = PrivateFile(filesDir, "profile.json", "")
         incomingLink = upiLinkOf(intent)
 
         val assets = WebViewAssetLoader.Builder()
@@ -62,6 +73,18 @@ class MainActivity : FragmentActivity() {
 
                 // The page never navigates anywhere else.
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = true
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    view: WebView,
+                    callback: ValueCallback<Array<Uri>>,
+                    params: FileChooserParams,
+                ): Boolean {
+                    fileCallback?.onReceiveValue(null)
+                    fileCallback = callback
+                    pickFile.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    return true
+                }
             }
             addJavascriptInterface(Bridge(), "AndroidLock")
         }
@@ -159,6 +182,12 @@ class MainActivity : FragmentActivity() {
 
         @android.webkit.JavascriptInterface
         fun scanQr() = runOnUiThread { this@MainActivity.scanQr() }
+
+        @android.webkit.JavascriptInterface
+        fun loadProfile(): String = profile.read()
+
+        @android.webkit.JavascriptInterface
+        fun saveProfile(json: String) = profile.write(json)
 
         @android.webkit.JavascriptInterface
         fun takeIncomingLink(): String = synchronized(this@MainActivity) {

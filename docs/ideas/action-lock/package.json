@@ -13,7 +13,9 @@
     "start": "node src/server.ts",
     "build:phone": "node scripts/build-phone.mjs",
     "build:android": "node scripts/build-android.mjs",
-    "import": "node scripts/import.ts"
+    "import": "node scripts/import.ts",
+    "check": "node scripts/check.ts",
+    "build:app-preview": "node scripts/build-app-preview.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

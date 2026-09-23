@@ -1,10 +1,11 @@
 // Entry for the Pixel app. The lock core runs here, inside the app's WebView;
 // the Kotlin shell supplies storage, the UPI app launch, the fingerprint
 // prompt and the QR scanner through the `AndroidLock` bridge.
+import { analyzerFor } from './judge.ts';
 import { persistentJournal } from './journal.ts';
 import { createActionLock, type Outcome } from './lock.ts';
-import { DEFAULT_POLICY, settle } from './policy.ts';
-import { ruleBasedAnalyzer } from './severity.ts';
+import { PHONE_POLICY, settle } from './policy.ts';
+import { knowsPayee, type Profile } from './profile.ts';
 import { destinationKey, knownDestinations, waitingFor } from './state.ts';
 import type { Gate, LockEvent, Policy, Severity } from './types.ts';
 import { buildUpiLink, parseUpiLink, parseUpiResponse } from './upi.ts';
@@ -21,6 +22,9 @@ interface NativeBridge {
   scanQr(): void;
   /** The upi:// link that opened the app, once; empty if none. */
   takeIncomingLink(): string;
+  /** Your profile (from `npm run import`), stored on the device only; empty if none. */
+  loadProfile(): string;
+  saveProfile(json: string): void;
 }
 
 /** Stand-in used when the page runs outside the app (browser preview). */
@@ -46,24 +50,44 @@ function browserBridge(): NativeBridge {
     authenticate: (id) => setTimeout(() => app().onBiometric(id, true, ''), 300),
     scanQr: () => setTimeout(() => app().onScan('upi://pay?pa=cafe.coffee@okicici&pn=Corner%20Cafe&am=180', ''), 300),
     takeIncomingLink: () => '',
+    loadProfile: () => {
+      try {
+        return localStorage.getItem('action-lock-profile') ?? '';
+      } catch {
+        return '';
+      }
+    },
+    saveProfile: (json) => {
+      try {
+        if (json === '') localStorage.removeItem('action-lock-profile');
+        else localStorage.setItem('action-lock-profile', json);
+      } catch {
+        /* preview only */
+      }
+    },
   };
 }
 
 const native: NativeBridge =
   (globalThis as unknown as { AndroidLock?: NativeBridge }).AndroidLock ?? browserBridge();
 
-// Defaults for the phone. No second person is set up in this version, so the
-// most serious level asks for the fingerprint and a longer hold instead.
-export const PHONE_POLICY: Policy = {
-  ...DEFAULT_POLICY,
-  defaults: {
-    0: { mode: 'pass', holdSeconds: 0 },
-    1: { mode: 'countdown', holdSeconds: 2 },
-    2: { mode: 'countdown', holdSeconds: 10 },
-    3: { mode: 'unlock', holdSeconds: 30 },
-    4: { mode: 'unlock', holdSeconds: 120 },
-  },
-};
+
+/** A profile file from `npm run import`, checked before use. */
+function readProfile(json: string): Profile | null {
+  if (json.trim() === '') return null;
+  const p = JSON.parse(json) as Partial<Profile>;
+  if (p.version !== 1 || !Array.isArray(p.payees) || !Array.isArray(p.hourly) || p.debits === undefined) {
+    throw new Error('This is not a profile.json from npm run import.');
+  }
+  return { subscriptions: [], autopays: [], ...p } as Profile;
+}
+
+let profile: Profile | null = null;
+try {
+  profile = readProfile(native.loadProfile());
+} catch {
+  profile = null;
+}
 
 const clock = (): number => Date.now();
 const stored = JSON.parse(native.loadJournal() || '[]') as LockEvent[];
@@ -76,7 +100,8 @@ let queue: Promise<unknown> = Promise.resolve();
 const lock = createActionLock({
   clock,
   journal,
-  analyzer: ruleBasedAnalyzer,
+  // Always the current profile: loading one changes how the next payment is judged.
+  analyzer: { analyze: (action, context) => analyzerFor(profile).analyze(action, context) },
   initialPolicy: PHONE_POLICY,
   executor: {
     execute: (action) => {
@@ -117,7 +142,10 @@ function pay(link: string, amount?: string): Outcome {
   const p = parsed.payment;
   const am = amount ?? p.am;
   if (am === undefined || !/^\d+(\.\d{1,2})?$/.test(am) || Number(am) <= 0) return { ok: false, reason: 'Enter an amount.' };
-  const newRecipient = !knownDestinations(lock.state()).has(destinationKey('payment', p.pa));
+  const newRecipient = !(
+    knownDestinations(lock.state()).has(destinationKey('payment', p.pa)) ||
+    (profile !== null && knowsPayee(profile, p.pa, p.pn))
+  );
   lock.submit(
     {
       id: newId(),
@@ -150,6 +178,19 @@ function view() {
   return {
     now,
     known,
+    profile:
+      profile === null
+        ? null
+        : {
+            from: profile.range?.from ?? null,
+            to: profile.range?.to ?? null,
+            payments: profile.debits.count,
+            usual: profile.debits.p50,
+            payees: profile.payees.length,
+            quiet: profile.quietHours,
+            subscriptions: profile.subscriptions.filter((s) => s.status === 'active').length,
+            autopays: profile.autopays.filter((a) => a.status === 'active').length,
+          },
     policy: {
       active: settled.active.defaults,
       pending: settled.pending === undefined ? null : { defaults: settled.pending.policy.defaults, effectiveAt: settled.pending.effectiveAt },
@@ -185,6 +226,8 @@ export interface ActionLockApp {
   view: typeof view;
   pay: typeof pay;
   setLevel: typeof setLevel;
+  /** Load or replace your profile from the text of profile.json; '' removes it. */
+  setProfile(json: string): Outcome;
   preview(link: string): { ok: true; draft: Draft; known: boolean } | { ok: false; reason: string };
   stop(id: string): Outcome;
   unlock(id: string): void;
@@ -202,6 +245,16 @@ const app: ActionLockApp = {
   view,
   pay,
   setLevel,
+  setProfile(json) {
+    try {
+      const next = readProfile(json);
+      native.saveProfile(next === null ? '' : JSON.stringify(next));
+      profile = next;
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message : 'Could not read that file.' };
+    }
+  },
   preview(link) {
     const r = parseUpiLink(link);
     if (!r.ok) return r;
@@ -209,7 +262,9 @@ const app: ActionLockApp = {
     return {
       ok: true,
       draft: { link, payee: p.pa, name: p.pn ?? '', amount: p.am ?? '', note: p.tn ?? '' },
-      known: knownDestinations(lock.state()).has(destinationKey('payment', p.pa)),
+      known:
+        knownDestinations(lock.state()).has(destinationKey('payment', p.pa)) ||
+        (profile !== null && knowsPayee(profile, p.pa, p.pn)),
     };
   },
   stop: (id) => lock.stop(id),

@@ -153,10 +153,32 @@ export function buildProfile(
   };
 }
 
-/** Have you paid this UPI ID or name before, according to your history? */
-export function knowsPayee(profile: Profile, recipient: string): boolean {
+const onlyLetters = (s: string) => s.toLowerCase().replace(/@.*$/, '').replace(/[^a-z]/g, '');
+
+/**
+ * Your history of paying this UPI ID or name, if any. Bank SMS mostly give
+ * names ("RAVIKUMAR M") while UPI links give IDs, so both are tried; names
+ * match exactly, or when one long name begins the other ("RAVIKUMAR M" and
+ * "Ravikumar Murthy"), never on short fragments.
+ */
+export function findPayee(profile: Profile, recipient: string, name?: string): PayeeStats | undefined {
   const r = recipient.trim().toLowerCase();
-  return profile.payees.some((p) => p.key.toLowerCase() === r || p.name.toLowerCase() === r);
+  const byId = profile.payees.find((p) => p.key.toLowerCase() === r || p.name.toLowerCase() === r);
+  if (byId !== undefined || name === undefined || name.trim() === '') return byId;
+  const n = name.trim().toLowerCase();
+  const exact = profile.payees.find((p) => p.name.toLowerCase() === n || p.key.toLowerCase() === n);
+  if (exact !== undefined) return exact;
+  const ln = onlyLetters(name);
+  if (ln.length < 8) return undefined;
+  return profile.payees.find((p) => {
+    const lp = onlyLetters(p.name);
+    return lp.length >= 8 && (lp.startsWith(ln) || ln.startsWith(lp));
+  });
+}
+
+/** Have you paid this UPI ID or name before, according to your history? */
+export function knowsPayee(profile: Profile, recipient: string, name?: string): boolean {
+  return findPayee(profile, recipient, name) !== undefined;
 }
 
 const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
