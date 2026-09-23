@@ -17,7 +17,8 @@
     "check": "node scripts/check.ts",
     "build:app-preview": "node scripts/build-app-preview.mjs",
     "sync": "node scripts/sync.ts",
-    "mail": "node scripts/mail.ts"
+    "mail": "node scripts/mail.ts",
+    "schedule": "node scripts/schedule.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

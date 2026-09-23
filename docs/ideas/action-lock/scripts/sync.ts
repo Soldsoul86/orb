@@ -9,7 +9,7 @@
 // summary from `npm run mail` if there is one. Everything stays in ./private
 // on this computer.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatFeedback, formatReport, formatSummary, runImport, type ImportInput } from '../src/import/run.ts';
 import { PHONE_SCRIPT } from '../src/import/phone.ts';
@@ -122,7 +122,13 @@ function syncOnce(): boolean {
   console.log('\n' + formatSummary(result));
   writeFileSync(join(out, 'feedback.txt'), formatFeedback(result, inputs) + '\n');
   console.log(`\nProfile: ${join(out, 'profile.json')} · full report: ${join(out, 'report.txt')}`);
-  console.log(`To improve what it reads: paste ${join(out, 'feedback.txt')} into the chat (masked, safe to share).`);
+  const shareTo = option('share-to');
+  if (shareTo !== undefined) {
+    // Only the masked feedback leaves this folder, and only when asked.
+    mkdirSync(shareTo, { recursive: true });
+    copyFileSync(join(out, 'feedback.txt'), join(shareTo, 'feedback.txt'));
+    console.log(`Copied the masked feedback to ${shareTo}.`);
+  } else console.log(`To improve what it reads: paste ${join(out, 'feedback.txt')} into the chat (masked, safe to share).`);
   return true;
 }
 
