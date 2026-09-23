@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 69 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 87 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -52,6 +52,10 @@ shorter buffer shows the 24 h delay. No script errors.
 | Your normal | Payees, amount percentiles, hours · quiet hours across midnight · the same payment in SMS and Google Pay merged once, keeping the UPI ID · two real payments not merged |
 | Personal severity | ₹5,000 to a new payee is level 3 for someone who usually pays ₹450, level 2 under generic rules · quiet hours replace midnight–6 am · generic rules until 30 payments |
 | Report | Formats detected · nothing confidential printed or saved in the profile |
+| Subscriptions — `test/subscriptions.test.ts` | Monthly, quarterly and yearly charges with usual amount and next due date · daily groceries and irregular payments excluded · price change · lapsed · restarted after a gap · ordered by monthly cost |
+| Autopays | Set-up, upcoming (with due date) and cancelled alerts read · a "will be debited" notice is **not** a payment · merchant names matched loosely · latest state per autopay |
+| Lock checks | Subscription charging ₹799 instead of ₹649 flagged · usual renewal passes at level 0 · a new autopay needs the fingerprint (level 3) |
+| Found by running the report | "Lapsed" judged against the latest data, not today · no quiet hours when payment times are not spread enough |
 
 ## Checked that the tests can fail
 

@@ -3,9 +3,10 @@
 
 import { buildProfile, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
-import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseSmsBackupXml } from './sms.ts';
+import type { MandateEvent } from '../subscriptions.ts';
+import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
 import { parseGooglePayActivity } from './takeout.ts';
-import type { Sms, Txn } from './types.ts';
+import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
 export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'unknown';
 
@@ -38,6 +39,7 @@ const SERIOUS = new Set(['recovery_phrase', 'private_key', 'card_number', 'aadha
 
 export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetMinutes = 330): ImportResult {
   const txns: Txn[] = [];
+  const mandates: MandateEvent[] = [];
   const hits: SensitiveHit[][] = [];
   const alarms: string[] = [];
   const unreadSamples: string[] = [];
@@ -68,10 +70,16 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     for (const m of messages) {
       scan(`SMS from ${m.address} on ${new Date(m.date + tzOffsetMinutes * 60_000).toISOString().slice(0, 10)}`, m.body);
       const t = parseBankAlert(m);
+      const mandate = parseMandateAlert(m);
+      if (mandate !== null) mandates.push(mandate);
       if (t !== null) {
         txns.push(t);
         found++;
-      } else if (looksLikeUnreadAlert(m)) {
+      } else if (mandate?.event === 'executed' && mandate.amount !== undefined) {
+        // "AutoPay of Rs 649 for NETFLIX executed": a payment the bank-alert parser doesn't word-match.
+        txns.push({ at: m.date, direction: 'debit', amount: mandate.amount, counterparty: mandate.merchant, key: counterpartyKey(mandate.merchant), source: 'sms' });
+        found++;
+      } else if (mandate === null && looksLikeUnreadAlert(m)) {
         unreadCount++;
         if (unreadSamples.length < 5) unreadSamples.push(`${m.address}: ${redact(m.body).replace(/\n/g, ' ⏎ ')}`);
       }
@@ -80,7 +88,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   }
 
   return {
-    profile: buildProfile(txns, now, tzOffsetMinutes),
+    profile: buildProfile(txns, now, tzOffsetMinutes, mandates),
     txns,
     files,
     sensitive: sensitiveReport(hits),
@@ -124,14 +132,57 @@ export function formatReport(r: ImportResult): string {
   if (p.range !== null) lines.push(`  History: ${day(p.range.from)} → ${day(p.range.to)}`);
   lines.push(`  Payments: ${p.debits.count} · usual ${rupees(p.debits.p50)} · 90% under ${rupees(p.debits.p90)} · largest ${rupees(p.debits.max)}`);
   lines.push(`  Money in: ${p.credits.count} ${p.credits.count === 1 ? 'receipt' : 'receipts'}, ${rupees(p.credits.total)}`);
-  lines.push(p.quietHours === null ? '  Quiet hours: not enough history yet' : `  Quiet hours: you rarely pay between ${hh(p.quietHours.from)} and ${hh(p.quietHours.to)}`);
+  lines.push(p.quietHours === null ? '  Quiet hours: not clear yet (needs more payments at varied times)' : `  Quiet hours: you rarely pay between ${hh(p.quietHours.from)} and ${hh(p.quietHours.to)}`);
   lines.push('  Most paid:');
   for (const x of p.payees.slice(0, 10)) lines.push(`    ${String(x.count).padStart(4)}×  ${x.name}  (usual ${rupees(x.median)}, max ${rupees(x.max)})`);
   lines.push(`  Payees in total: ${p.payees.length}`);
+
+  lines.push('', ...formatSubscriptions(p));
 
   if (r.unreadCount > 0) {
     lines.push('', `? ${r.unreadCount} bank alerts could not be read. Samples (redacted) — share them to add the format:`);
     for (const s of r.unreadSamples) lines.push(`    ${s}`);
   }
   return lines.join('\n');
+}
+
+const shortDay = (ms: number) => new Date(ms + 330 * 60_000).toISOString().slice(0, 10);
+
+function formatSubscriptions(p: Profile): string[] {
+  const lines: string[] = ['SUBSCRIPTIONS AND AUTOPAYS'];
+  const active = p.subscriptions.filter((s) => s.status === 'active');
+  if (p.subscriptions.length === 0 && p.autopays.length === 0) return [...lines, '  None found yet.'];
+
+  const notes: string[] = [];
+  for (const s of p.subscriptions) {
+    if (s.priceChange) notes.push(`${s.name}: price changed ${rupees(s.priceChange.from)} → ${rupees(s.priceChange.to)} on ${shortDay(s.priceChange.at)}`);
+    if (s.restartedAfterDays) notes.push(`${s.name}: charged again on ${shortDay(s.lastAt)} after ${s.restartedAfterDays} days without charges. Did you mean to restart it?`);
+  }
+  const lastSeen = p.range?.to ?? p.builtAt;
+  for (const a of p.autopays) {
+    if (a.status === 'active' && a.createdAt !== undefined && lastSeen - a.createdAt <= 30 * 86_400_000) {
+      notes.push(`New autopay set up for ${a.merchant} on ${shortDay(a.createdAt)}${a.amount !== undefined ? ` (up to ${rupees(a.amount)})` : ''}. Recognise it?`);
+    }
+  }
+  if (notes.length > 0) {
+    lines.push('  Worth a look:');
+    for (const n of notes) lines.push(`    ! ${n}`);
+  }
+
+  if (active.length > 0) {
+    const perMonth = active.reduce((s, x) => s + x.monthly, 0);
+    lines.push(`  Active: ${active.length} · about ${rupees(perMonth)} a month`);
+    for (const s of active) lines.push(`    ${s.name}  ${rupees(s.usualAmount)} ${s.cycle} · next about ${shortDay(s.nextDueAt)}`);
+  }
+  const lapsed = p.subscriptions.filter((s) => s.status === 'lapsed');
+  if (lapsed.length > 0) lines.push(`  Stopped: ${lapsed.map((s) => `${s.name} (last ${shortDay(s.lastAt)})`).join(', ')}`);
+  const autopays = p.autopays.filter((a) => a.status === 'active');
+  if (autopays.length > 0) {
+    lines.push('  Autopays that can take money without asking:');
+    for (const a of autopays) {
+      const bits = [a.amount !== undefined ? `up to ${rupees(a.amount)}` : '', a.frequency ?? '', a.nextDebitAt !== undefined ? `next ${shortDay(a.nextDebitAt)}` : ''].filter(Boolean);
+      lines.push(`    ${a.merchant}${bits.length ? ` · ${bits.join(' · ')}` : ''}`);
+    }
+  }
+  return lines;
 }

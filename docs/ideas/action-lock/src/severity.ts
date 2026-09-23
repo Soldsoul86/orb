@@ -34,11 +34,14 @@ export interface Thresholds {
   largeAmount(amount: number): string | null;
   /** Feedback sentence if this local hour is unusual for the user, else null. */
   unusualHour(hour: number): string | null;
+  /** Feedback sentence if this is a known subscription charging an unusual amount, else null. */
+  subscriptionChange(recipient: string, amount: number): string | null;
 }
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
   largeAmount: (amount) => (amount >= LARGE_AMOUNT ? 'This is a large amount.' : null),
   unusualHour: (hour) => (hour < 6 ? 'It\'s late at night — make sure this isn\'t a rushed decision.' : null),
+  subscriptionChange: () => null,
 };
 
 function findingsFor(action: Action, context: Context, th: Thresholds): Finding[] {
@@ -63,6 +66,12 @@ function findingsFor(action: Action, context: Context, th: Thresholds): Finding[
   if (isPayment && !context.newRecipient) {
     add('known_payee', (action.amount ?? 0) < 1_000 ? 0 : 1, false, '');
   }
+  if (action.kind === 'mandate') {
+    // An autopay can take money later without asking each time.
+    add('new_mandate', context.newRecipient ? 3 : 2, false, `An autopay lets ${action.recipient} take money from you later without asking each time.`);
+  }
+  const change = isPayment ? th.subscriptionChange(action.recipient, action.amount ?? 0) : null;
+  if (change !== null) add('subscription_change', 2, false, change);
   const large = isPayment ? th.largeAmount(action.amount ?? 0) : null;
   if (large !== null) add('large_amount', 1, true, large);
   const hour = th.unusualHour(context.localHour);

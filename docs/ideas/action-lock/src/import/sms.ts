@@ -8,6 +8,7 @@
 // Bank wordings differ; the parser is tolerant and returns null when unsure.
 // Unrecognised formats are counted by the caller so they can be added.
 
+import type { MandateEvent } from '../subscriptions.ts';
 import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
 // ── Export readers ─────────────────────────────────────────────────────────
@@ -136,6 +137,8 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
   if (!/\b(a\/c|acct|ac|account|card|upi|vpa)\b/i.test(body)) return null;
+  // Pre-debit notices ("will be debited on 25-09-2025") are not payments yet.
+  if (FUTURE.test(body)) return null;
   const dir = direction(body);
   const amount = amountOf(body);
   if (dir === undefined || amount === undefined) return null;
@@ -161,4 +164,70 @@ export function parseBankAlert(sms: Sms): Txn | null {
 /** Looks like a bank/UPI alert we could not read: worth reporting so the parser can learn it. */
 export function looksLikeUnreadAlert(sms: Sms): boolean {
   return /\b(debited|credited)\b/i.test(sms.body) && MONEY.test(sms.body) && parseBankAlert(sms) === null;
+}
+
+// ── Autopay / e-mandate alerts ─────────────────────────────────────────────
+
+const FUTURE = /\bwill be (?:debited|charged|deducted|auto-?debited)\b|\bis due on\b|\bscheduled (?:for|on)\b|\bupcoming\b/i;
+const MANDATE = /\b(auto\s?-?pay|e-?mandate|mandate|standing instruction|si\b|recurring payment|subscription)\b/i;
+const MONTHS: Readonly<Record<string, number>> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+/** Dates as banks write them: 25-09-2025, 25/09/25, 25-Sep-25, 25Sep2025. Returns noon IST that day. */
+export function parseBankDate(s: string): number | undefined {
+  const num = s.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})\b/);
+  const mon = s.match(/\b(\d{1,2})[- ]?([A-Za-z]{3})[a-z]*[- ,]?(\d{2}|\d{4})\b/);
+  let d: number, m: number, y: number;
+  if (num) [d, m, y] = [Number(num[1]), Number(num[2]) - 1, Number(num[3])];
+  else if (mon && MONTHS[mon[2]!.toLowerCase()] !== undefined) [d, m, y] = [Number(mon[1]), MONTHS[mon[2]!.toLowerCase()]!, Number(mon[3])];
+  else return undefined;
+  if (y < 100) y += 2000;
+  if (m < 0 || m > 11 || d < 1 || d > 31) return undefined;
+  return Date.UTC(y, m, d, 6, 30); // 12:00 IST
+}
+
+const MERCHANT: readonly RegExp[] = [
+  new RegExp(`\\b(?:for|towards|to)\\s+(${NAME})\\s+(?:of|for|with|will|is|has|on|max|amount|rs|inr|₹)`, 'i'),
+  new RegExp(`\\b(?:for|towards)\\s+(${NAME})\\s*(?:[.,]|$)`, 'i'),
+  new RegExp(`\\bby\\s+(${NAME})\\s+(?:has been|is|was)\\s+(?:revoked|cancelled|paused)`, 'i'),
+];
+
+/** Autopay / e-mandate alert → event; null for anything else. */
+export function parseMandateAlert(sms: Sms): MandateEvent | null {
+  const body = sms.body;
+  if (!MANDATE.test(body)) return null;
+  const event: MandateEvent['event'] | undefined = /\b(revoked|cancell?ed|paused|deactivated|stopped)\b/i.test(body)
+    ? 'revoked'
+    : FUTURE.test(body)
+      ? 'upcoming'
+      : /\b(created|registered|set ?up|activated|approved|successfully (?:added|linked))\b/i.test(body)
+        ? 'created'
+        : /\b(executed|debited|paid|successful)\b/i.test(body)
+          ? 'executed'
+          : undefined;
+  if (event === undefined) return null;
+  let merchant: string | undefined;
+  for (const re of MERCHANT) {
+    const m = body
+      .match(re)?.[1]
+      ?.trim()
+      .replace(/[.,;:-]+$/, '')
+      .replace(/\s+(?:upi\s+)?(?:auto\s?-?pay|e-?mandate|mandate|standing instruction|si|subscription)$/i, '');
+    if (m !== undefined && m !== '' && !/^(?:a\/?c|acct|account|your|ac|upi|the)\b/i.test(m)) {
+      merchant = m;
+      break;
+    }
+  }
+  merchant ??= body.match(VPA)?.[1]?.toLowerCase();
+  if (merchant === undefined) return null;
+  const amount = amountOf(body);
+  const frequency = body.match(/\b(daily|weekly|fortnightly|monthly|bi-?monthly|quarterly|half-?yearly|yearly|annually|as presented|one ?time)\b/i)?.[1]?.toLowerCase();
+  const dueAt = event === 'upcoming' ? parseBankDate(body.slice(body.search(FUTURE))) : undefined;
+  return {
+    at: sms.date,
+    event,
+    merchant,
+    ...(amount !== undefined ? { amount } : {}),
+    ...(frequency !== undefined ? { frequency } : {}),
+    ...(dueAt !== undefined ? { dueAt } : {}),
+  };
 }

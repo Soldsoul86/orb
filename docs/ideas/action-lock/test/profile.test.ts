@@ -42,6 +42,17 @@ describe('profile', () => {
     assert.deepEqual(p.quietHours, { from: 21, to: 10 });
   });
 
+  it('gives no quiet hours when payment times are not spread enough to tell', () => {
+    const sameTime = Array.from({ length: 40 }, (_, d) => pay(day0 + d * 24 * H, 300, 'shop'));
+    assert.equal(buildProfile(sameTime, 0, IST).quietHours, null);
+  });
+
+  it('judges lapsed subscriptions against your latest data, not today', () => {
+    const monthly = Array.from({ length: 6 }, (_, m) => pay(day0 + m * 30.44 * 24 * H, 649, 'netflix'));
+    const yearLater = day0 + 400 * 24 * H;
+    assert.equal(buildProfile(monthly, yearLater, IST).subscriptions[0]?.status, 'active');
+  });
+
   it('merges the same payment seen in SMS and in Google Pay', () => {
     const sms = pay(day0, 500, 'ravi.k@okaxis', { vpa: 'ravi.k@okaxis', ref: '526512345678' });
     const gpay = pay(day0 + 60_000, 500, 'RAVI KUMAR', { source: 'google_pay' });
@@ -84,6 +95,8 @@ describe('personalised severity', () => {
 
   it('falls back to the generic rules until there is enough history', () => {
     const thin = buildProfile(history().slice(0, MIN_HISTORY - 1), 0, IST);
-    assert.equal(personalThresholds(thin, DEFAULT_THRESHOLDS), DEFAULT_THRESHOLDS);
+    const th = personalThresholds(thin, DEFAULT_THRESHOLDS);
+    for (const amount of [500, 5_000, 10_000, 50_000]) assert.equal(th.largeAmount(amount), DEFAULT_THRESHOLDS.largeAmount(amount));
+    for (let h = 0; h < 24; h++) assert.equal(th.unusualHour(h), DEFAULT_THRESHOLDS.unusualHour(h));
   });
 });

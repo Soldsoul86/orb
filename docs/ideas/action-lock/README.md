@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 69 tests
+npm test          # 87 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -66,6 +66,13 @@ Get the files:
 | SMS, no laptop | The "SMS Backup & Restore" app → back up messages → copy the `.xml` |
 | Google Pay | takeout.google.com → deselect all → **My Activity** → formats: **JSON** → include **Google Pay** → `My Activity/Google Pay/MyActivity.json` |
 
+The report also lists **subscriptions and autopays**: recurring charges with
+their cycle, usual amount and next due date; price changes; charges that
+restart after a long gap; and autopays or e-mandates set up in the last month
+("Recognise it?"). In the lock, a subscription charging an unusual amount is
+flagged, and setting up a **new autopay** is held for the fingerprint, because
+it lets someone take money later without asking.
+
 `private/` is git-ignored. Bank alerts the parser can't read yet are listed
 (redacted) at the end of the report so their formats can be added.
 
@@ -92,5 +99,6 @@ See [`android/README.md`](android/README.md).
 | `scripts/build-android.mjs` | Bundles them into the Android app's assets |
 | `android/` | Kotlin shell for the Pixel |
 | `src/import/` | SMS and Google Pay importers, confidential-data scanner, import run and report |
+| `src/subscriptions.ts` | Recurring charges, price changes, restarts; autopay events |
 | `src/profile.ts` | Your normal (payees, amounts, quiet hours) and personal severity thresholds |
 | `scripts/import.ts` | `npm run import` |

@@ -1,6 +1,7 @@
 // Core types for Action Lock. No behaviour here.
 
-export type ActionKind = 'payment' | 'message' | 'email' | 'post' | 'delete' | 'other';
+/** `mandate`: setting up an autopay that can take money later without asking. */
+export type ActionKind = 'payment' | 'mandate' | 'message' | 'email' | 'post' | 'delete' | 'other';
 
 /** An irreversible action requested by the user or by an agent acting for them. */
 export interface Action {

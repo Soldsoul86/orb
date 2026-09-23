@@ -3,6 +3,7 @@
 
 import type { Txn } from './import/types.ts';
 import type { Thresholds } from './severity.ts';
+import { detectSubscriptions, sameMerchant, summariseAutopays, type Autopay, type MandateEvent, type Subscription } from './subscriptions.ts';
 
 export interface PayeeStats {
   readonly key: string;
@@ -29,6 +30,10 @@ export interface Profile {
   readonly hourly: readonly number[];
   /** The longest stretch of hours in which you (almost) never pay; null until there is enough history. */
   readonly quietHours: { readonly from: number; readonly to: number } | null;
+  /** Recurring charges found in your payments. */
+  readonly subscriptions: readonly Subscription[];
+  /** Autopays and e-mandates from bank SMS. */
+  readonly autopays: readonly Autopay[];
 }
 
 /** Enough payments to say what is unusual for you. */
@@ -82,10 +87,16 @@ function longestQuietRun(hourly: readonly number[], total: number): { from: numb
     while (len < 24 && quiet[(start + len) % 24]) len++;
     if (best === null || len > best.len) best = { from: start, len };
   }
-  return best === null || best.len < 3 ? null : { from: best.from, to: (best.from + best.len) % 24 };
+  // Between 3 and 14 hours: shorter is noise, longer means the times are not spread enough to tell.
+  return best === null || best.len < 3 || best.len > 14 ? null : { from: best.from, to: (best.from + best.len) % 24 };
 }
 
-export function buildProfile(txns: readonly Txn[], builtAt: number, tzOffsetMinutes = 330): Profile {
+export function buildProfile(
+  txns: readonly Txn[],
+  builtAt: number,
+  tzOffsetMinutes = 330,
+  mandates: readonly MandateEvent[] = [],
+): Profile {
   const all = mergeDuplicates(txns);
   const debits = all.filter((t) => t.direction === 'debit');
   const credits = all.filter((t) => t.direction === 'credit');
@@ -128,6 +139,10 @@ export function buildProfile(txns: readonly Txn[], builtAt: number, tzOffsetMinu
     payees,
     hourly,
     quietHours: longestQuietRun(hourly, debits.length),
+    // "Lapsed" is judged against your latest data, not today: an export from
+    // last month must not make every subscription look cancelled.
+    subscriptions: detectSubscriptions(all, all.length === 0 ? builtAt : all[all.length - 1]!.at),
+    autopays: summariseAutopays(mandates),
   };
 }
 
@@ -145,7 +160,13 @@ const rupees = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
  * generic defaults apply, so a new install is never less careful.
  */
 export function personalThresholds(profile: Profile, fallback: Thresholds): Thresholds {
-  if (profile.debits.count < MIN_HISTORY) return fallback;
+  const subscriptionChange = (recipient: string, amount: number): string | null => {
+    const s = profile.subscriptions.find((x) => x.key.toLowerCase() === recipient.trim().toLowerCase() || sameMerchant(x.name, recipient));
+    if (s === undefined || Math.abs(amount - s.usualAmount) <= s.usualAmount * 0.05) return null;
+    return `${s.name} usually charges ${rupees(s.usualAmount)} ${s.cycle}; this is ${rupees(amount)}.`;
+  };
+  // Subscriptions need only a few charges, so they apply even with a short history.
+  if (profile.debits.count < MIN_HISTORY) return { ...fallback, subscriptionChange };
   const { p50, p90 } = profile.debits;
   const quiet = profile.quietHours;
   return {
@@ -160,5 +181,6 @@ export function personalThresholds(profile: Profile, fallback: Thresholds): Thre
       const inQuiet = quiet.from <= quiet.to ? hour >= quiet.from && hour < quiet.to : hour >= quiet.from || hour < quiet.to;
       return inQuiet ? `You rarely pay between ${hh(quiet.from)} and ${hh(quiet.to)}.` : null;
     },
+    subscriptionChange,
   };
 }
