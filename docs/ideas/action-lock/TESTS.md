@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 115 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 118 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -60,6 +60,14 @@ shorter buffer shows the 24 h delay. No script errors.
 
 The app screen was also run in a 412 px browser: the profile loads through the file picker and its summary shows; a known payee's usual amount goes straight through; a new payee is held for the fingerprint with "₹5,000 is 13× your usual payment".
 | Found by running the report | "Lapsed" judged against the latest data, not today · no quiet hours when payment times are not spread enough |
+
+## Phone sync — `test/apps.test.ts`
+
+Package lists recognised · known apps sorted into payment, bank, crypto and
+screen-sharing · apps added to the profile, with a warning for screen-sharing
+apps in the report and the sync summary. `npm run sync` was also run against a
+stand-in `adb`: with no phone it prints the pairing steps; with one it pulls SMS
+and apps, writes the profile and report, and prints the summary.
 
 ## Checked that the tests can fail
 

@@ -5,16 +5,18 @@ import { buildProfile, mergeDuplicates, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
 import { displayMerchant, type MandateEvent } from '../subscriptions.ts';
 import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
+import { classifyPackages, isPackageList, type InstalledApps } from './apps.ts';
 import { looksLikeScam } from './scam.ts';
 import { parseGooglePayActivity } from './takeout.ts';
 import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
-export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'empty' | 'unknown';
+export type SourceKind = 'adb_sms' | 'sms_backup_xml' | 'google_pay_takeout' | 'android_packages' | 'empty' | 'unknown';
 
 export function detectSource(text: string): SourceKind {
   const head = text.trimStart().slice(0, 2000);
   if (head === '') return 'empty';
   if (/^Row: \d+ /.test(head)) return 'adb_sms';
+  if (isPackageList(head)) return 'android_packages';
   if (/<smses[\s>]/.test(head) || /<sms\s/.test(head)) return 'sms_backup_xml';
   if (head.startsWith('[') && /"(?:header|products)"\s*:/.test(head) && text.includes('Google Pay')) return 'google_pay_takeout';
   return 'unknown';
@@ -60,6 +62,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   let unnamedCount = 0;
   let unreadCount = 0;
   const files: ImportResult['files'][number][] = [];
+  let apps: InstalledApps | undefined;
 
   const scan = (where: string, text: string) => {
     const h = scanSensitive(text);
@@ -74,6 +77,11 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
       txns.push(...r.txns);
       scan(input.name, input.text);
       files.push({ name: input.name, kind, records: r.txns.length + r.unread, txns: r.txns.length });
+      continue;
+    }
+    if (kind === 'android_packages') {
+      apps = classifyPackages(input.text);
+      files.push({ name: input.name, kind, records: apps.total, txns: 0 });
       continue;
     }
     if (kind === 'unknown' || kind === 'empty') {
@@ -115,7 +123,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   }
 
   return {
-    profile: buildProfile(txns, now, tzOffsetMinutes, mandates),
+    profile: { ...buildProfile(txns, now, tzOffsetMinutes, mandates), ...(apps !== undefined ? { apps } : {}) },
     txns,
     files,
     sensitive: sensitiveReport(hits),
@@ -151,7 +159,9 @@ export function formatReport(r: ImportResult): string {
         ? `  ✗ ${f.name}: the file is empty. If it came from adb, check \`adb devices\` shows your phone as "device".`
         : f.kind === 'unknown'
           ? `  ✗ ${f.name}: format not recognised (skipped)`
-          : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`,
+          : f.kind === 'android_packages'
+            ? `  ✓ ${f.name}: ${f.records} installed apps`
+            : `  ✓ ${f.name}: ${f.records} records → ${f.txns} transactions (${f.kind})`,
     );
   }
   lines.push('');
@@ -177,6 +187,8 @@ export function formatReport(r: ImportResult): string {
     for (const s of r.scams) lines.push(`    · ${s}`);
     lines.push('  Report them on sancharsaathi.gov.in (Chakshu). They were not counted as bank alerts.', '');
   }
+
+  lines.push(...formatApps(r.profile.apps));
 
   lines.push('YOUR NORMAL');
   if (p.range !== null) lines.push(`  History: ${day(p.range.from)} → ${day(p.range.to)}`);
@@ -245,4 +257,36 @@ function formatSubscriptions(p: Profile): string[] {
     lines.push(`  Older autopays with no message for 60+ days: ${dormant.length}. Check in your UPI app that they are cancelled.`);
   }
   return lines;
+}
+
+function formatApps(apps: InstalledApps | undefined): string[] {
+  if (apps === undefined) return [];
+  const lines: string[] = [];
+  if (apps.remote_access.length > 0) {
+    lines.push(`⚠ SCREEN-SHARING APP INSTALLED: ${apps.remote_access.join(', ')}.`,
+      '  Scammers ask people to install these to take over the phone. Uninstall unless you use it for work.', '');
+  }
+  lines.push('YOUR PHONE');
+  const list = (xs: readonly string[]) => (xs.length === 0 ? 'none found' : xs.join(', '));
+  lines.push(`  Payment apps: ${list(apps.payment)}`, `  Bank apps: ${list(apps.bank)}`, `  Crypto apps: ${list(apps.crypto)}`, '');
+  return lines;
+}
+
+/** A few lines for `npm run sync`; the full report goes to a file. */
+export function formatSummary(r: ImportResult): string {
+  const p = r.profile;
+  const lines = [
+    `Synced: ${r.txns.length.toLocaleString('en-IN')} transactions from ${r.files.filter((f) => f.kind !== 'android_packages').reduce((s, f) => s + f.records, 0).toLocaleString('en-IN')} messages` +
+      (p.range ? `, ${day(p.range.from)} → ${day(p.range.to)}` : ''),
+    `Your normal: usual ${rupees(p.debits.p50)} · 90% under ${rupees(p.debits.p90)} · ${p.payees.length.toLocaleString('en-IN')} payees` +
+      (p.quietHours ? ` · quiet ${hh(p.quietHours.from)}–${hh(p.quietHours.to)}` : ''),
+    `Recurring: ${p.subscriptions.filter((s) => s.status === 'active').length} subscriptions · ${p.autopays.filter((a) => a.status === 'active').length} active autopays`,
+  ];
+  if (p.apps) lines.push(`Phone: ${p.apps.payment.length} payment · ${p.apps.bank.length} bank · ${p.apps.crypto.length} crypto apps`);
+  const warn: string[] = [];
+  if (p.apps && p.apps.remote_access.length > 0) warn.push(`screen-sharing app installed (${p.apps.remote_access.join(', ')})`);
+  if (r.scamCount > 0) warn.push(`${r.scamCount} likely scam messages`);
+  if (r.sensitive.byKind.some((k) => k.kind === 'password' || k.kind === 'recovery_phrase' || k.kind === 'private_key')) warn.push('passwords or keys sitting in SMS');
+  if (warn.length > 0) lines.push(`⚠ ${warn.join(' · ')}`);
+  return lines.join('\n');
 }

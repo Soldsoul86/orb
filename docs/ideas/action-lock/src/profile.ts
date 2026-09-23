@@ -1,6 +1,7 @@
 // "Your normal": a profile built from your own transaction history, used to
 // judge new actions against your habits instead of generic thresholds. Pure.
 
+import type { InstalledApps } from './import/apps.ts';
 import type { Txn } from './import/types.ts';
 import type { Thresholds } from './severity.ts';
 import { detectSubscriptions, nameAutopays, sameMerchant, summariseAutopays, type Autopay, type MandateEvent, type Subscription } from './subscriptions.ts';
@@ -34,6 +35,8 @@ export interface Profile {
   readonly subscriptions: readonly Subscription[];
   /** Autopays and e-mandates from bank SMS. */
   readonly autopays: readonly Autopay[];
+  /** Payment, bank, crypto and screen-sharing apps on the phone, when synced. */
+  readonly apps?: InstalledApps;
 }
 
 /** Enough payments to say what is unusual for you. */

@@ -15,7 +15,8 @@
     "build:android": "node scripts/build-android.mjs",
     "import": "node scripts/import.ts",
     "check": "node scripts/check.ts",
-    "build:app-preview": "node scripts/build-app-preview.mjs"
+    "build:app-preview": "node scripts/build-app-preview.mjs",
+    "sync": "node scripts/sync.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

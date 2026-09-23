@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 115 tests
+npm test          # 118 tests
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
@@ -45,6 +45,21 @@ In the demo, tap a scenario under **Simulate an agent**:
 
 Under **Your policy**, "Make new payees instant" shows loosening waiting (60 s
 in the demo, 24 h by default) while "New payees: 30 s" applies immediately.
+
+## Sync your phone (the easy way)
+
+```bash
+npm run sync                  # reads SMS + installed apps over adb, rebuilds private/profile.json
+npm run sync -- --every 6     # keep syncing every 6 hours while it runs
+```
+
+Connect once by USB, or over Wi-Fi with **Wireless debugging**: on the phone,
+Developer options → Wireless debugging → *Pair device with pairing code*; on the
+Mac, `adb pair <ip:port> <code>`, then `npm run sync -- --connect <ip:port>`
+(the address on the main Wireless debugging screen). With no phone connected,
+`npm run sync` prints these steps. It prints a short summary; the full report is
+in `private/report.txt`. Installed apps add payment, bank and crypto apps to the
+profile and warn if a screen-sharing app (AnyDesk, TeamViewer…) is installed.
 
 ## Your normal: import your history
 
@@ -120,6 +135,7 @@ See [`android/README.md`](android/README.md).
 | `src/import/` | SMS and Google Pay importers, confidential-data scanner, import run and report |
 | `src/subscriptions.ts` | Recurring charges, price changes, restarts; autopay events |
 | `src/judge.ts`, `scripts/check.ts` | How the lock treats one payment given your profile; `npm run check` |
+| `src/import/apps.ts`, `scripts/sync.ts` | Installed-app classification; `npm run sync` |
 | `src/import/scam.ts` | Likely scam messages found while importing |
 | `src/profile.ts` | Your normal (payees, amounts, quiet hours) and personal severity thresholds |
 | `scripts/import.ts` | `npm run import` |
