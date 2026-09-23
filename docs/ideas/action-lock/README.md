@@ -56,7 +56,8 @@ npm run sync -- --every 6     # keep syncing every 6 hours while it runs
 Connect once by USB, or over Wi-Fi with **Wireless debugging**: on the phone,
 Developer options → Wireless debugging → *Pair device with pairing code*; on the
 Mac, `adb pair <ip:port> <code>`, then `npm run sync -- --connect <ip:port>`
-(the address on the main Wireless debugging screen). With no phone connected,
+(the address on the main Wireless debugging screen). After that, plain
+`npm run sync` finds the phone by itself while Wireless debugging is on. With no phone connected,
 `npm run sync` prints these steps. It prints a short summary; the full report is
 in `private/report.txt`. Installed apps add payment, bank and crypto apps to the
 profile and warn if a screen-sharing app (AnyDesk, TeamViewer…) is installed.

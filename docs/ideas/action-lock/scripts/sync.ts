@@ -37,8 +37,8 @@ No phone connected. Connect it once, either way:
               "IP address & Port" (a different port).
     5. Mac:   npm run sync -- --connect <that IP:port>
 
-  Then run npm run sync again. Later syncs usually reconnect by themselves;
-  if not, repeat step 5 (the port changes when Wireless debugging restarts).
+  Then run npm run sync again. Later syncs find the phone by themselves while
+  Wireless debugging is on; if not, repeat step 5 (the port changes when it restarts).
 `;
 
 function device(): string | undefined {
@@ -47,7 +47,15 @@ function device(): string | undefined {
     const c = adb('connect', connect);
     console.log(c.out.trim() || c.err.trim());
   }
-  const list = adb('devices');
+  let list = adb('devices');
+  if (list.ok && connect === undefined && !/\tdevice$/m.test(list.out)) {
+    // Paired over Wi-Fi before: the phone announces its current address.
+    const found = adb('mdns', 'services').out.match(/_adb-tls-connect\._tcp\S*\s+(\S+:\d+)/)?.[1];
+    if (found !== undefined) {
+      console.log(adb('connect', found).out.trim());
+      list = adb('devices');
+    }
+  }
   if (!list.ok) {
     console.error(list.err.includes('ENOENT') ? 'adb is not installed. Mac: brew install android-platform-tools' : list.err);
     return undefined;
