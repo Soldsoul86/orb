@@ -141,41 +141,32 @@ function withLatest(s: Subscription, last: Txn, usual: number, now: number, rest
   };
 }
 
-/**
- * The same merchant under two long names ("Netflix Entertainment" and
- * "Netflix Entertainment Services IndiaLLP") is one payee. Only long names
- * where one begins the other are merged, so different people are not.
- */
-function canonicalKeys(keys: readonly string[]): Map<string, string> {
-  const out = new Map<string, string>();
-  const byLength = [...keys].sort((a, b) => letters(a).length - letters(b).length);
-  const canon: string[] = [];
-  for (const k of byLength) {
-    const lk = letters(k);
-    const c = k.includes('@') || lk.length < 10 ? undefined : canon.find((x) => lk.startsWith(letters(x)));
-    if (c === undefined) {
-      if (!k.includes('@') && lk.length >= 10) canon.push(k);
-      out.set(k, k);
-    } else out.set(k, c);
-  }
-  return out;
-}
-
 /** Recurring payments in your history, most expensive per month first. */
 export function detectSubscriptions(txns: readonly Txn[], now: number): Subscription[] {
-  const debits = txns.filter((t) => t.direction === 'debit');
-  const canon = canonicalKeys([...new Set(debits.map((t) => t.key))]);
   const byKey = new Map<string, Txn[]>();
-  for (const t of debits) {
-    const k = canon.get(t.key) ?? t.key;
-    byKey.set(k, [...(byKey.get(k) ?? []), t]);
-  }
+  for (const t of txns) if (t.direction === 'debit' && t.unnamed !== true) byKey.set(t.key, [...(byKey.get(t.key) ?? []), t]);
   const found: Subscription[] = [];
   for (const ts of byKey.values()) {
     const s = asSubscription([...ts].sort((a, b) => a.at - b.at), now);
     if (s !== null) found.push(s);
   }
-  return found.sort((a, b) => b.monthly - a.monthly);
+  return dropRenamedDuplicates(found).sort((a, b) => b.monthly - a.monthly);
+}
+
+/**
+ * The same merchant under two long names ("Netflix Entertainment Services
+ * IndiaLLP", later "Netflix Entertainment") shows up as one stopped and one
+ * active subscription. Each is detected on its own (their amounts may
+ * differ); the older duplicate is then dropped. Only long names where one
+ * begins the other count, so different people are never merged.
+ */
+function dropRenamedDuplicates(subs: readonly Subscription[]): Subscription[] {
+  const same = (a: Subscription, b: Subscription) => {
+    const x = letters(a.name);
+    const y = letters(b.name);
+    return x.length >= 10 && y.length >= 10 && (x.startsWith(y) || y.startsWith(x));
+  };
+  return subs.filter((s) => !subs.some((o) => o !== s && same(o, s) && o.lastAt > s.lastAt));
 }
 
 /** PhonePe and others use hashed UPI IDs for autopays; show them as unnamed rather than as gibberish. */

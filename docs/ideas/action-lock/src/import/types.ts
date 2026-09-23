@@ -16,7 +16,11 @@ export interface Txn {
   readonly account?: string;
   readonly bank?: string;
   readonly source: 'sms' | 'google_pay';
+  /** The alert named no payee: kept for amounts and hours, left out of payee lists. */
+  readonly unnamed?: boolean;
 }
+
+export const UNNAMED_KEY = '(not named in the alert)';
 
 /** A text message as read from an export. */
 export interface Sms {

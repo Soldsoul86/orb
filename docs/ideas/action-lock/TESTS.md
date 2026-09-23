@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 100 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 104 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -55,7 +55,7 @@ shorter buffer shows the 24 h delay. No script errors.
 | Subscriptions — `test/subscriptions.test.ts` | Monthly, quarterly and yearly charges with usual amount and next due date · daily groceries and irregular payments excluded · price change · lapsed · restarted after a gap · ordered by monthly cost |
 | Autopays | Set-up, upcoming (with due date) and cancelled alerts read · a "will be debited" notice is **not** a payment · merchant names matched loosely · latest state per autopay |
 | Lock checks | Subscription charging ₹799 instead of ₹649 flagged · usual renewal passes at level 0 · a new autopay needs the fingerprint (level 3) |
-| From the first real import — `test/realformats.test.ts` | AU Bank IMPS, UPI and interest credits · Canara "shall be debited" is a notice · promotional (-P) senders ignored · promo phrases not taken as autopay merchants · hashed autopay IDs shown as unnamed · autopays silent 60+ days are dormant · empty export reported · all unread alerts listed, redacted · second run: merchant refunds named from the sender · bank charges and "CODE -NAME" lines · marketing and failed payments skipped · one merchant under two long names merged, short different names not · hidden-merchant autopays named from the matching charge |
+| From the first real import — `test/realformats.test.ts` | AU Bank IMPS, UPI and interest credits · Canara "shall be debited" is a notice · promotional (-P) senders ignored · promo phrases not taken as autopay merchants · hashed autopay IDs shown as unnamed · autopays silent 60+ days are dormant · empty export reported · all unread alerts listed, redacted · second run: merchant refunds named from the sender · bank charges and "CODE -NAME" lines · marketing and failed payments skipped · one merchant under two long names merged, short different names not · hidden-merchant autopays named from the matching charge · third run: likely scam SMS (personal number + money bait + link) flagged and kept out of bank alerts, friends and banks not flagged · ICICI transfers to another account and "Acc" wording · payments with no payee kept for totals only · names starting with a digit · renamed merchant shown once without mixing histories |
 | Found by running the report | "Lapsed" judged against the latest data, not today · no quiet hours when payment times are not spread enough |
 
 ## Checked that the tests can fail

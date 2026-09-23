@@ -5,6 +5,7 @@ import { buildProfile, type Profile } from '../profile.ts';
 import { redact, scanSensitive, sensitiveReport, type SensitiveHit, type SensitiveReport } from './sensitive.ts';
 import { displayMerchant, type MandateEvent } from '../subscriptions.ts';
 import { looksLikeUnreadAlert, parseAdbSms, parseBankAlert, parseMandateAlert, parseSmsBackupXml } from './sms.ts';
+import { looksLikeScam } from './scam.ts';
 import { parseGooglePayActivity } from './takeout.ts';
 import { counterpartyKey, type Sms, type Txn } from './types.ts';
 
@@ -36,6 +37,11 @@ export interface ImportResult {
   readonly unreadCount: number;
   /** Every unread alert, redacted, for private/unread-alerts.txt. */
   readonly unreadAll: readonly string[];
+  /** Likely scam messages found in the inbox, redacted, with why. */
+  readonly scams: readonly string[];
+  readonly scamCount: number;
+  /** Payments whose alert named no payee (kept for totals). */
+  readonly unnamedCount: number;
 }
 
 const SERIOUS = new Set(['recovery_phrase', 'private_key', 'card_number', 'aadhaar', 'account_number', 'password', 'api_key']);
@@ -47,6 +53,9 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   const alarms: string[] = [];
   const unreadSamples: string[] = [];
   const unreadAll: string[] = [];
+  const scams: string[] = [];
+  let scamCount = 0;
+  let unnamedCount = 0;
   let unreadCount = 0;
   const files: ImportResult['files'][number][] = [];
 
@@ -72,6 +81,12 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     const messages: Sms[] = kind === 'adb_sms' ? parseAdbSms(input.text) : parseSmsBackupXml(input.text);
     let found = 0;
     for (const m of messages) {
+      const scam = looksLikeScam(m);
+      if (scam !== null) {
+        scamCount++;
+        if (scams.length < 10) scams.push(`${new Date(m.date + tzOffsetMinutes * 60_000).toISOString().slice(0, 10)} ${m.address}: ${redact(m.body).replace(/\n/g, ' ⏎ ').slice(0, 160)} (${scam.reason})`);
+        continue;
+      }
       scan(`SMS from ${m.address} on ${new Date(m.date + tzOffsetMinutes * 60_000).toISOString().slice(0, 10)}`, m.body);
       const t = parseBankAlert(m);
       const mandate = parseMandateAlert(m);
@@ -79,6 +94,10 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
       if (t !== null) {
         txns.push(t);
         found++;
+        if (t.unnamed === true) {
+          unnamedCount++;
+          if (unreadAll.length < 5_000) unreadAll.push(`(no payee name) ${m.address}: ${redact(m.body).replace(/\n/g, ' ⏎ ')}`);
+        }
       } else if (mandate?.event === 'executed' && mandate.amount !== undefined) {
         // "AutoPay of Rs 649 for NETFLIX executed": a payment the bank-alert parser doesn't word-match.
         txns.push({ at: m.date, direction: 'debit', amount: mandate.amount, counterparty: mandate.merchant, key: counterpartyKey(mandate.merchant), source: 'sms' });
@@ -102,6 +121,9 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     unreadSamples,
     unreadCount,
     unreadAll,
+    scams,
+    scamCount,
+    unnamedCount,
   };
 }
 
@@ -141,6 +163,12 @@ export function formatReport(r: ImportResult): string {
     lines.push('✓ No confidential data found.', '');
   }
 
+  if (r.scamCount > 0) {
+    lines.push(`⚠ LIKELY SCAM MESSAGES IN YOUR INBOX: ${r.scamCount}. Don't tap their links or call back.`);
+    for (const s of r.scams) lines.push(`    · ${s}`);
+    lines.push('  Report them on sancharsaathi.gov.in (Chakshu). They were not counted as bank alerts.', '');
+  }
+
   lines.push('YOUR NORMAL');
   if (p.range !== null) lines.push(`  History: ${day(p.range.from)} → ${day(p.range.to)}`);
   lines.push(`  Payments: ${p.debits.count} · usual ${rupees(p.debits.p50)} · 90% under ${rupees(p.debits.p90)} · largest ${rupees(p.debits.max)}`);
@@ -149,6 +177,7 @@ export function formatReport(r: ImportResult): string {
   lines.push('  Most paid:');
   for (const x of p.payees.slice(0, 10)) lines.push(`    ${String(x.count).padStart(4)}×  ${x.name}  (usual ${rupees(x.median)}, max ${rupees(x.max)})`);
   lines.push(`  Payees in total: ${p.payees.length}`);
+  if (r.unnamedCount > 0) lines.push(`  Payments whose alert named no payee: ${r.unnamedCount} (counted in amounts and hours only)`);
 
   lines.push('', ...formatSubscriptions(p));
 

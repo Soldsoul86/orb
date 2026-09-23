@@ -62,7 +62,9 @@ describe('bank alerts', () => {
 
   it('flags alerts it could not read, so the format can be added', () => {
     const odd = sms('VM-HDFCBK', 'Your a/c XX12 is debited INR 99 for GoogleCloud autopay');
-    assert.equal(parseBankAlert(odd), null);
+    // Kept as a payment with no payee name, and still listed so the format can be learned.
+    assert.equal(parseBankAlert(odd)?.unnamed, true);
+    assert.equal(parseBankAlert(odd)?.amount, 99);
     assert.equal(looksLikeUnreadAlert(odd), true);
     assert.equal(looksLikeUnreadAlert(HDFC), false);
   });

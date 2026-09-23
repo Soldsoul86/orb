@@ -93,13 +93,14 @@ describe('formats from the first real import', () => {
     }
   });
 
-  it('merges one merchant under two long names, but not different short names', () => {
+  it('shows one merchant under two long names once, but keeps different short names apart', () => {
     const t = (at: number, key: string): Txn => ({ at, direction: 'debit', amount: 499, counterparty: key, key, source: 'sms' });
     const netflix = [0, 1, 2].map((m) => t(at + m * 30.44 * DAY, 'NETFLIX ENTERTAINMENT SERVICES INDIALLP'))
       .concat([3, 4, 5].map((m) => t(at + m * 30.44 * DAY, 'NETFLIX ENTERTAINMENT')));
     const subs = detectSubscriptions(netflix, at + 6 * 30.44 * DAY);
     assert.equal(subs.length, 1);
-    assert.equal(subs[0]?.count, 6);
+    assert.equal(subs[0]?.name, 'NETFLIX ENTERTAINMENT', 'the newer name is kept');
+    assert.equal(subs[0]?.status, 'active');
     const people = [0, 1, 2].map((m) => t(at + m * 30.44 * DAY, 'RAVI')).concat([0, 1, 2].map((m) => t(at + m * 30.44 * DAY + DAY, 'RAVIKUMAR M')));
     assert.equal(detectSubscriptions(people, at + 90 * DAY).length, 2);
   });
@@ -110,5 +111,41 @@ describe('formats from the first real import', () => {
     const other: Txn = { ...charge, amount: 500, counterparty: 'Someone' };
     assert.equal(nameAutopays([hidden], [charge, other])[0]?.likelyMerchant, 'Netflix Entertainment');
     assert.equal(nameAutopays([hidden], [other])[0]?.likelyMerchant, undefined);
+  });
+});
+
+describe('third run', () => {
+  const at3 = Date.UTC(2026, 8, 16, 6, 30);
+  const s = (address: string, body: string): Sms => ({ address, date: at3, body });
+
+  it('flags a fake loan SMS from a personal number as a likely scam, not a bank alert', async () => {
+    const { looksLikeScam } = await import('../src/import/scam.ts');
+    const fake = s('+919000000000', 'Mudra-Loan Scheme 2025 - Rs.9,45,000/- Can be Successfully Credited to 79044xxxxx on 16-Sept 12:56 PM. Withdraw Via UPI- m.sr3.in/abcd1234');
+    assert.ok(looksLikeScam(fake));
+    const dump = `Row: 0 address=+919000000000, date=${at3}, body=${fake.body}`;
+    const r = runImport([{ name: 'sms.txt', text: dump }], at3);
+    assert.equal(r.scamCount, 1);
+    assert.equal(r.unreadAll.length, 0, 'not listed as an unread bank alert');
+    assert.match(formatReport(r), /LIKELY SCAM MESSAGES IN YOUR INBOX: 1/);
+  });
+
+  it('does not flag a friend or a bank', async () => {
+    const { looksLikeScam } = await import('../src/import/scam.ts');
+    assert.equal(looksLikeScam(s('+919000000000', 'Reached home, will call you at 9')), null);
+    assert.equal(looksLikeScam(s('+919000000000', 'Sent you the loan papers, check email')), null, 'no link');
+    assert.equal(looksLikeScam(s('JM-AUBANK-S', 'Credited INR 50.00 to A/c X6810. Details: aubank.in/x')), null, 'registered sender');
+  });
+
+  it('reads ICICI transfers to another account, and keeps unnamed ones for totals only', () => {
+    const toAcct = parseBankAlert(s('JX-ICICIT', 'ICICI Bank Acct XX668 debited with Rs 40,000.00 on 25-Apr-25 & Acct XX106 credited.IMPS:511509365845. Call 18002662 for dispute'));
+    assert.deepEqual([toAcct?.amount, toAcct?.counterparty], [40_000, 'Account XX106']);
+    const via = parseBankAlert(s('VA-ICICIT', 'ICICI Bank Acc XXXX4668 debited with Rs 40,000.00 on 25-Apr-2025. credit via :4054604678.Call 18002662 for dispute'));
+    assert.equal(via?.unnamed, true);
+    assert.equal(via?.amount, 40_000);
+  });
+
+  it('reads names that start with a digit', () => {
+    const t = parseBankAlert(s('JD-AUBANK-S', 'Debited INR 9,500.00 from A/c X6810 on 13-SEP-2025\nNDA-1234-B0000000 -NO1 SOME COMPLEX 481\nBal INR 1,42,452.09\n-AU Bank'));
+    assert.equal(t?.counterparty, 'NO1 SOME COMPLEX 481');
   });
 });

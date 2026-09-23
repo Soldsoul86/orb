@@ -9,7 +9,7 @@
 // Unrecognised formats are counted by the caller so they can be added.
 
 import type { MandateEvent } from '../subscriptions.ts';
-import { counterpartyKey, type Sms, type Txn } from './types.ts';
+import { counterpartyKey, UNNAMED_KEY, type Sms, type Txn } from './types.ts';
 
 // ── Export readers ─────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ const COUNTERPARTY: readonly RegExp[] = [
   new RegExp(`\\b(?:from|by)\\s+(${NAME})\\s+(?:on|via|ref|upi)\\b`, 'i'),
   new RegExp(`\\bat\\s+(${NAME})\\s+(?:on|via|ref)\\b`, 'i'), // card spends: "spent … at SWIGGY on …"
   /\bRef\s+([A-Z][A-Z ]{3,40}?)\.\s/, // AU: "Ref MONTHLY INTEREST PAYOUT. Bal …" (upper case only)
-  /(?:^|\n)[A-Z]{2,6}[-/][\w/-]+\s+-\s*([A-Z][A-Za-z .&'-]{1,40}?)\s*(?:\n|$)/, // AU: "NDA-4795-18226161 -NAME" on its own line
+  /(?:^|\n)[A-Z]{2,6}[-/][\w/-]+\s+-\s*([A-Z0-9][A-Za-z0-9 .&'-]{1,40}?)\s*(?:\n|$)/, // AU: "NDA-4795-18226161 -NAME" on its own line
   /\bfor\s+([A-Za-z][A-Za-z0-9_ -]{2,40}?)\.(?:\s|$)/, // bank charges: "Debited … for SMS_Alert_Charge_JAN26."
 ];
 
@@ -157,6 +157,9 @@ const FAILED = /\b(?:has|have|had)\s+failed\b|\bpayment failed\b|\btransaction (
 
 function counterpartyOf(body: string): { name: string; vpa?: string } | undefined {
   const vpa = body.match(VPA)?.[1]?.toLowerCase();
+  // ICICI transfer to another account: "… debited … & Acct XX106 credited."
+  const toAccount = body.match(/&\s*Acc(?:t|ount)?\.?\s+(X+\d{3,4})\s+credited/i);
+  if (toAccount) return { name: `Account ${toAccount[1]!.toUpperCase()}` };
   for (const re of COUNTERPARTY) {
     const name = body.match(re)?.[1]?.trim().replace(/[.,;:-]+$/, '').replace(/_+/g, ' ').trim();
     if (name !== undefined && !/^(?:a\/?c|acct|account|your|ac)\b/i.test(name) && !/bank a\/?c/i.test(name)) {
@@ -166,7 +169,7 @@ function counterpartyOf(body: string): { name: string; vpa?: string } | undefine
   return vpa !== undefined ? { name: vpa, vpa } : undefined;
 }
 
-const ACCOUNT = /\b(?:a\/c|acct|ac|account|card)(?:\s*no\.?)?[^\dXx*\n]{0,6}[Xx*]*\s?(\d{3,4})\b/i;
+const ACCOUNT = /\b(?:a\/c|acct|acc|ac|account|card)(?:\s*no\.?)?[^\dXx*\n]{0,6}[Xx*]*\s?(\d{3,4})\b/i;
 const REF = /\b(?:ref(?:\s*no)?|refno|rrn|upi(?:\s*ref)?)[:\s.#-]*(\d{10,16})\b/i;
 
 /** Bank or UPI alert → transaction; null for anything else (OTPs, offers, reminders). */
@@ -176,7 +179,7 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (/\b(otp|one[- ]time password|verification code)\b/i.test(body) && /\b\d{4,8}\b\s+is\b|\b(otp)\s*(?:is|:)/i.test(body)) return null;
   if (/\b(offer|cashback up to|eligible for|pre-approved|apply now|win)\b/i.test(body) && !/\bdebited|credited\b/i.test(body)) return null;
   if (MARKETING.test(body) || FAILED.test(body)) return null;
-  if (!/\b(a\/c|acct|ac|account|card|upi|vpa)\b/i.test(body)) return null;
+  if (!/\b(a\/c|acct|acc|ac|account|card|upi|vpa)\b/i.test(body)) return null;
   // Pre-debit notices ("will be debited on 25-09-2025") are not payments yet.
   if (FUTURE.test(body)) return null;
   const dir = direction(body);
@@ -184,8 +187,10 @@ export function parseBankAlert(sms: Sms): Txn | null {
   if (dir === undefined || amount === undefined) return null;
   // Refunds from a merchant often name no one: the sender is the counterparty.
   const brand = /\brefund/i.test(body) ? senderBrand(sms.address) : undefined;
-  const who = counterpartyOf(body) ?? (brand !== undefined ? { name: brand } : undefined);
-  if (who === undefined) return null;
+  const found = counterpartyOf(body) ?? (brand !== undefined ? { name: brand } : undefined);
+  // No payee named ("… debited … credit via :4054604678."): keep the payment for
+  // your amounts and hours, but not as a payee.
+  const who = found ?? { name: UNNAMED_KEY };
   const account = body.match(ACCOUNT)?.[1];
   const ref = body.match(REF)?.[1] ?? body.match(/\b(\d{12})\b/)?.[1];
   const bank = bankOf(sms.address, body);
@@ -194,7 +199,8 @@ export function parseBankAlert(sms: Sms): Txn | null {
     direction: dir,
     amount,
     counterparty: who.name,
-    key: counterpartyKey(who.name, who.vpa),
+    key: found === undefined ? UNNAMED_KEY : counterpartyKey(who.name, who.vpa),
+    ...(found === undefined ? { unnamed: true } : {}),
     ...(who.vpa !== undefined ? { vpa: who.vpa } : {}),
     ...(ref !== undefined ? { ref } : {}),
     ...(account !== undefined ? { account: `XX${account.slice(-4)}` } : {}),
@@ -212,7 +218,7 @@ export function looksLikeUnreadAlert(sms: Sms): boolean {
     !FAILED.test(sms.body) &&
     /\b(debited|credited)\b/i.test(sms.body) &&
     MONEY.test(sms.body) &&
-    parseBankAlert(sms) === null
+    (parseBankAlert(sms) === null || parseBankAlert(sms)?.unnamed === true)
   );
 }
 

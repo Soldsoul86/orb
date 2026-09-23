@@ -103,7 +103,7 @@ export function buildProfile(
   const amounts = debits.map((t) => t.amount).sort((a, b) => a - b);
 
   const byPayee = new Map<string, Txn[]>();
-  for (const t of debits) byPayee.set(t.key, [...(byPayee.get(t.key) ?? []), t]);
+  for (const t of debits) if (t.unnamed !== true) byPayee.set(t.key, [...(byPayee.get(t.key) ?? []), t]);
   const payees = [...byPayee.entries()]
     .map(([key, ts]): PayeeStats => {
       const a = ts.map((t) => t.amount).sort((x, y) => x - y);
