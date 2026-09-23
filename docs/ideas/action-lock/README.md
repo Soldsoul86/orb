@@ -85,7 +85,8 @@ A macOS launchd job, so nothing needs to stay open. Runs missed while the Mac
 sleeps happen on wake. Options: `--every 12`; `--pull` to fetch the latest
 version of this tool first; `--share-to <folder>` to copy the masked
 `feedback.txt` to a folder after each run (for example a Google Drive folder, so
-the readers can be improved without pasting). Nothing else leaves `private/`.
+the readers can be improved without pasting); `--to-phone` to copy it to the
+phone's Documents/Orb folder instead, for a Drive sync app on the phone to upload. Nothing else leaves `private/`.
 The phone must be on the same Wi-Fi with Wireless debugging on; if it isn't, that
 run is skipped.
 

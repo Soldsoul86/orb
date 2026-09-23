@@ -46,6 +46,7 @@ No phone connected. Connect it once, either way:
 `;
 
 const LAST = join(out, 'last-phone.txt');
+const PHONE_FOLDER = '/sdcard/Documents/Orb';
 
 function device(): string | undefined {
   const connect = option('connect');
@@ -150,7 +151,15 @@ function syncOnce(): boolean {
     mkdirSync(shareTo, { recursive: true });
     copyFileSync(join(out, 'feedback.txt'), join(shareTo, 'feedback.txt'));
     console.log(`Copied the masked feedback to ${shareTo}.`);
-  } else console.log(`To improve what it reads: paste ${join(out, 'feedback.txt')} into the chat (masked, safe to share).`);
+  }
+  if (args.includes('--to-phone')) {
+    // Only the masked feedback goes to the phone, where a Drive sync app can pick it up.
+    const r = adb('-s', serial, 'push', join(out, 'feedback.txt'), `${PHONE_FOLDER}/feedback.txt`);
+    console.log(r.ok ? `Copied the masked feedback to the phone: ${PHONE_FOLDER}/feedback.txt` : `Could not copy the feedback to the phone: ${r.err.trim()}`);
+  }
+  if (shareTo === undefined && !args.includes('--to-phone')) {
+    console.log(`To improve what it reads: paste ${join(out, 'feedback.txt')} into the chat (masked, safe to share).`);
+  }
   return true;
 }
 

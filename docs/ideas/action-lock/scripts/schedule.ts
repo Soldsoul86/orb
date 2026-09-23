@@ -4,6 +4,7 @@
 //   npm run schedule -- --every 12
 //   npm run schedule -- --share-to <folder>  also copy the masked feedback.txt there
 //   npm run schedule -- --pull               fetch the latest version of this tool first
+//   npm run schedule -- --to-phone           also copy feedback.txt to the phone (Documents/Orb)
 //   npm run schedule -- --remove             stop
 //
 // Log: private/sync.log. The phone must be on the same Wi-Fi with Wireless
@@ -50,7 +51,7 @@ const steps = [
   `cd ${q(here)}`,
   'echo "── $(date)"',
   ...(args.includes('--pull') && git !== '' ? [`{ git pull --ff-only origin ${q(git)} || true; }`] : []),
-  `${q(process.execPath)} scripts/sync.ts${shareTo !== undefined ? ` --share-to ${q(resolve(shareTo))}` : ''}`,
+  `${q(process.execPath)} scripts/sync.ts${shareTo !== undefined ? ` --share-to ${q(resolve(shareTo))}` : ''}${args.includes('--to-phone') ? ' --to-phone' : ''}`,
 ];
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -82,4 +83,5 @@ if (load.status !== 0) {
 }
 console.log(`Syncing every ${every} h, starting now (runs missed while the Mac sleeps happen on wake).`);
 console.log(`Log: tail private/sync.log · stop: npm run schedule -- --remove`);
+if (args.includes('--to-phone')) console.log('The masked feedback.txt is copied to the phone (Documents/Orb) after each sync.');
 if (shareTo !== undefined) console.log(`The masked feedback.txt is copied to ${resolve(shareTo)} after each sync.`);
