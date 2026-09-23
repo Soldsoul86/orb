@@ -22,6 +22,16 @@ npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```
 
+### On a phone, with no server
+
+```bash
+npm run build:phone   # writes dist/action-lock.html (lock bundled into the page)
+```
+
+The same TypeScript core the tests cover is bundled into one page
+(`src/browser.ts` entry), so the phone runs the tested code, not a copy.
+It is published as a private claude.ai page for opening on a Pixel.
+
 In the demo, tap a scenario under **Simulate an agent**:
 
 | Scenario | Level | What the lock does |
@@ -45,4 +55,6 @@ in the demo, 24 h by default) while "New payees: 30 s" applies immediately.
 | `TESTS.md` | What the tests prove |
 | `src/` | Functional core (`gate`, `severity`, `policy`, `state`) and shell (`journal`, `lock`, `server`) |
 | `test/` | `node:test` suites |
-| `public/index.html` | The phone page |
+| `public/index.html` | The phone page (talks to the server, or to the bundled lock) |
+| `src/demo.ts`, `src/browser.ts` | Demo backend shared by the server and the phone build |
+| `scripts/build-phone.mjs` | Builds the self-contained phone page |
