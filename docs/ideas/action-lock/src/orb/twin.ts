@@ -123,6 +123,15 @@ function kindOf(t: Txn): EntityKind {
   return 'person';
 }
 
+/** Is this payee you? Names match when one begins the other, over at least 6 letters ("Hariharan V" / "Hariharan Viswanathan"). */
+export function isSelf(name: string, selfNames: readonly string[]): boolean {
+  const n = letters(name);
+  return n.length >= 6 && selfNames.some((s) => {
+    const l = letters(s);
+    return l.length >= 6 && (n.startsWith(l) || l.startsWith(n));
+  });
+}
+
 function entitiesOf(txns: readonly Txn[], people: readonly string[]): Entity[] {
   const byKey = new Map<string, Txn[]>();
   for (const t of txns) if (t.unnamed !== true && t.key !== UNNAMED_KEY) byKey.set(t.key, [...(byKey.get(t.key) ?? []), t]);
@@ -260,6 +269,7 @@ function candidates(r: ImportResult, entities: readonly Entity[], txns: readonly
   const p = r.profile;
   const regular = new Map(p.subscriptions.filter((s) => s.status === 'active').map((s) => [s.key, s]));
   for (const e of entities) {
+    if (e.relation === 'you') continue;
     const c = incomeRule(e, txns) ?? relationRule(e, regular.get(e.id)) ?? oneOffRule(e, txns);
     if (c !== null) out.push(c);
   }
@@ -366,7 +376,8 @@ function candidates(r: ImportResult, entities: readonly Entity[], txns: readonly
 /** The twin, from what the sensors read and every answer you gave. Same inputs, same twin. */
 export function buildTwin(r: ImportResult, answers: readonly AnswerEvent[], now: number): Twin {
   const txns = mergeDuplicates(r.txns);
-  const base = entitiesOf(txns, r.profile.people ?? []);
+  // Transfers to your own name are to yourself: labelled "you" without asking.
+  const base = entitiesOf(txns, r.profile.people ?? []).map((e) => (e.kind !== 'organisation' && isSelf(e.name, r.selfNames ?? []) ? { ...e, relation: 'you' } : e));
   // The latest answer to each question wins; earlier ones stay in the journal.
   const latest = new Map<string, AnswerEvent>();
   for (const a of [...answers].sort((x, y) => x.at - y.at)) latest.set(a.question, a);

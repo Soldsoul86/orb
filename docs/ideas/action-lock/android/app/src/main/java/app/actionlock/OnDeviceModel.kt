@@ -15,26 +15,40 @@ import kotlinx.coroutines.launch
  * a cloud AI app.
  */
 class OnDeviceModel(private val scope: CoroutineScope) {
-    private val model: GenerativeModel? = runCatching { Generation.getClient() }.getOrNull()
+    private val created = runCatching { Generation.getClient() }
+    private val model: GenerativeModel? = created.getOrNull()
 
     @Volatile
     var status: String = "checking"
         private set
 
+    /** Why it isn't available, in words, so "not supported" can be told apart from a failure. */
+    @Volatile
+    var reason: String = ""
+        private set
+
+    @Volatile
+    var modelName: String = ""
+        private set
+
     fun refresh(done: () -> Unit) {
         val m = model ?: run {
             status = "unavailable"
+            reason = "ML Kit could not start: ${created.exceptionOrNull()?.message ?: "unknown"}"
             return done()
         }
+        status = "checking"
         scope.launch {
-            status = runCatching {
-                when (m.checkStatus()) {
-                    FeatureStatus.AVAILABLE -> "available"
-                    FeatureStatus.DOWNLOADABLE -> "downloadable"
-                    FeatureStatus.DOWNLOADING -> "downloading"
-                    else -> "unavailable"
-                }
-            }.getOrDefault("unavailable")
+            val r = runCatching { m.checkStatus() }
+            status = when (r.getOrNull()) {
+                FeatureStatus.AVAILABLE -> "available"
+                FeatureStatus.DOWNLOADABLE -> "downloadable"
+                FeatureStatus.DOWNLOADING -> "downloading"
+                else -> "unavailable"
+            }
+            reason = r.exceptionOrNull()?.let { "Check failed: ${it.javaClass.simpleName}: ${it.message}" }
+                ?: if (status == "unavailable") "Android's AICore reports Gemini Nano is not available on this phone (not supported, or AICore needs an update in the Play Store)." else ""
+            if (status == "available") modelName = runCatching { m.getBaseModelName() }.getOrDefault("")
             done()
         }
     }

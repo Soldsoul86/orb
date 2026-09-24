@@ -66,6 +66,8 @@ export interface ImportResult {
   readonly scamCount: number;
   /** Payments whose alert named no payee (kept for totals). */
   readonly unnamedCount: number;
+  /** Your own name as banks write it ("Hariharan V" in a NEFT salary credit): transfers to it are to yourself. */
+  readonly selfNames: readonly string[];
   /** The largest payments each way, after merging duplicates: for checking the totals. */
   readonly biggest: { readonly out: readonly Txn[]; readonly in: readonly Txn[] };
   readonly phone?: PhoneCheck;
@@ -92,6 +94,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
   let phone: PhoneCheck | undefined;
   let mail: MailSummary | undefined;
   const contacts: Contact[] = [];
+  const selfNames = new Set<string>();
   const calls: Call[] = [];
   const usage: string[] = [];
 
@@ -142,6 +145,9 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     const messages: Sms[] = kind === 'adb_sms' ? parseAdbSms(input.text) : parseSmsBackupXml(input.text);
     let found = 0;
     for (const m of messages) {
+      // "NEFT Cr-IFSC-PAYER-YOUR NAME-ref": the beneficiary of a credit into your account is you.
+      const self = m.body.match(/\bNEFT Cr-[A-Z]{4}0[A-Z0-9]{6}-[^-\n]{2,60}-([A-Za-z][A-Za-z .]{2,40}?)-/)?.[1]?.trim();
+      if (self !== undefined) selfNames.add(self);
       const scam = looksLikeScam(m);
       if (scam !== null) {
         scamCount++;
@@ -194,6 +200,7 @@ export function runImport(inputs: readonly ImportInput[], now: number, tzOffsetM
     scams,
     scamCount,
     unnamedCount,
+    selfNames: [...selfNames],
     biggest: biggestEachWay(txns),
     ...(phone !== undefined ? { phone } : {}),
     ...(calls.length > 0 ? { calls: summariseCalls(calls, contacts) } : {}),

@@ -96,4 +96,14 @@ describe('Orb twin', () => {
     const q = buildTwin(r, [], now).questions.find((x) => x.id === 'relation:ASHA MENON')!;
     assert.equal(q.options[0]!.label, 'Me (my own account)');
   });
+
+  it('knows transfers to your own name are to yourself (name from your salary credits)', () => {
+    const self = sms(now - 2 * DAY, 'Sent Rs.30000.00\nFrom HDFC Bank A/C *6111\nTo Hariharan Viswanathan\nOn 21/09/26\nRef 504893449901\nNot You?');
+    const salary = sms(now - 5 * DAY, 'Update! INR 3,10,338.00 deposited in HDFC Bank A/c XX6111 on 01-SEP-26 for NEFT Cr-YESB0000001-ACME TECHNOLOGIES-Hariharan V-YESIG62440270199.Avl bal INR 3,10,848.10.');
+    const r2 = runImport([{ name: 'sms.txt', text: [SMS, salary, self].join('\n') }], now);
+    assert.ok(r2.selfNames.includes('Hariharan V'));
+    const t2 = buildTwin(r2, [], now);
+    assert.equal(t2.entities.find((e) => e.name === 'Hariharan Viswanathan')?.relation, 'you');
+    assert.ok(!t2.questions.some((q) => /Hariharan/.test(q.text)));
+  });
 });

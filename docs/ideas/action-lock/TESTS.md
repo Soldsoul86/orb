@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 165 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 166 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -105,7 +105,7 @@ contact names, no full phone numbers.
 | Entities | People, organisations and accounts resolved from bank alerts; a person linked to a matching contact; a timeline per entity |
 | Beliefs | Regular monthly credits become an income belief with a confidence below 1 and a reason ("5 credits in 5 months"); no belief is ever 0 or 1 |
 | Questions | Most valuable first (the salary question before the rest); who-is-this for people you move money with; what-was-it for a large one-off |
-| Answers | Answers in your own words; "me" for your own accounts; an answer is an event: the belief is then held from you at 0.99, its question goes, the entity gets a relation; a later answer replaces an earlier one without erasing it; unknown answers are ignored |
+| Answers | Transfers to your own name (read from your salary credits, "…-Hariharan V-…") are labelled "you" without asking; answers in your own words; "me" for your own accounts; an answer is an event: the belief is then held from you at 0.99, its question goes, the entity gets a relation; a later answer replaces an earlier one without erasing it; unknown answers are ignored |
 | Replay | Same observations and answers → the same twin |
 | Value | Money by relation for the last 30 days; a brief with income, the week's spending and questions waiting |
 

@@ -30,6 +30,11 @@ interface OrbNative {
   guardLog(): string;
   modelStatus(): string;
   modelDownload(): void;
+  modelReason(): string;
+  modelRecheck(): void;
+  aiApps(): string;
+  shareTo(app: string, text: string): void;
+  copyText(text: string): void;
   modelGenerate(id: string, prompt: string): void;
   shareText(text: string): void;
   clipboardText(): string;
@@ -74,6 +79,11 @@ function browserNative(): OrbNative {
     guardLog: () => '',
     modelStatus: () => 'unavailable',
     modelDownload: () => {},
+    modelReason: () => 'This is a browser preview: there is no phone model here.',
+    modelRecheck: () => {},
+    aiApps: () => JSON.stringify([{ id: 'com.anthropic.claude', name: 'Claude' }]),
+    shareTo: () => {},
+    copyText: () => {},
     modelGenerate: () => {},
     shareText: () => {},
     clipboardText: () => '',
@@ -241,6 +251,14 @@ function latestBaseline(): InferenceRecord | undefined {
   return [...state.records].reverse().find((r) => r.task === 'weekly_baseline');
 }
 
+function aiApps(): { id: string; name: string }[] {
+  try {
+    return JSON.parse(native.aiApps()) as { id: string; name: string }[];
+  } catch {
+    return [];
+  }
+}
+
 function insightsCard(): string {
   const latest = latestBaseline();
   const status = native.modelStatus();
@@ -259,7 +277,7 @@ function insightsCard(): string {
             : latest.proposals.map((p) => `<p>${p.kind === 'question' ? '? ' : '• '}${esc(p.text)}</p>`).join('')
       }
       ${latest ? `<p class="meta">By ${esc(by(latest))}, ${new Date(latest.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}. <button class="link" data-log="1">How Orb reasoned</button></p>` : ''}
-      <p class="meta">On-device model: ${status === 'available' ? 'ready' : status === 'downloadable' ? 'can be downloaded by Android' : status === 'downloading' ? 'downloading…' : status === 'checking' ? 'checking…' : 'not supported on this phone'}.</p>
+      <p class="meta">On-device model: ${status === 'available' ? 'ready' : status === 'downloadable' ? 'can be downloaded by Android' : status === 'downloading' ? 'downloading…' : status === 'checking' ? 'checking…' : 'not available'}.${status === 'unavailable' && native.modelReason() ? ` ${esc(native.modelReason())}` : ''} <button class="link" data-recheck="1">Check again</button></p>
       <div class="opts">
         <button class="opt" data-insight="1">${status === 'available' ? 'Refresh on this phone' : 'Refresh with rules'}</button>
         ${status === 'downloadable' ? '<button class="opt" data-download="1">Download on-device model</button>' : ''}
@@ -272,7 +290,7 @@ function insightsCard(): string {
               <pre class="unread">${esc(baselinePrompt(cloud.facts))}</pre>
               ${
                 cloud.approvedAt === undefined
-                  ? '<button class="primary" data-approve="1">Approve and choose AI app</button><button class="link" data-cancelcloud="1">Cancel</button>'
+                  ? `<p class="meta">Approve by choosing where it goes:</p><div class="opts">${aiApps().map((x) => `<button class="opt" data-approve="${esc(x.id)}">Send to ${esc(x.name)}</button>`).join('')}<button class="opt" data-approve="copy">Copy (paste anywhere)</button></div><button class="link" data-cancelcloud="1">Cancel</button>`
                   : '<p class="meta">Copy the AI\'s whole answer, come back, then:</p><button class="primary" data-paste="1">Paste the answer</button><button class="link" data-cancelcloud="1">Cancel</button>'
               }
             </div>`
@@ -612,13 +630,16 @@ function onClick(ev: Event): void {
   else if (d['msgguard']) native.setMessageGuard(d['msgguard'] === 'on');
   else if (d['insight']) return refreshInsights();
   else if (d['download']) native.modelDownload();
+  else if (d['recheck']) native.modelRecheck();
   else if (d['cloud']) {
     const f = facts();
     if (f !== null) state.cloud = { facts: f };
   } else if (d['approve'] && state.cloud) {
     // Your yes for this one task, recorded with the run; the AI app you pick does the sending.
     state.cloud = { ...state.cloud, approvedAt: Date.now() };
-    native.shareText(baselinePrompt(state.cloud.facts));
+    const prompt = baselinePrompt(state.cloud.facts);
+    if (d['approve'] === 'copy') native.copyText(prompt);
+    else native.shareTo(d['approve'], prompt);
   } else if (d['paste'] && state.cloud?.approvedAt !== undefined) {
     const reply = native.clipboardText();
     keep(inferenceRecord('weekly_baseline', CLOUD, state.cloud.facts, reply, Date.now(), state.cloud.approvedAt));

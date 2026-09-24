@@ -12,7 +12,7 @@
 
 import type { ImportResult } from '../import/run.ts';
 import { mergeDuplicates } from '../profile.ts';
-import type { Twin } from './twin.ts';
+import { isSelf, type Twin } from './twin.ts';
 
 const DAY = 86_400_000;
 
@@ -85,7 +85,8 @@ export function baselineFacts(r: ImportResult, twin: Twin, now: number, guard: G
   }
 
   // Who got the most this month, and who is new.
-  const month = txns.filter((t) => t.at >= now - 30 * DAY && t.unnamed !== true);
+  // Money moved to your own accounts is not spending on anyone.
+  const month = txns.filter((t) => t.at >= now - 30 * DAY && t.unnamed !== true && !isSelf(t.counterparty, r.selfNames ?? []));
   const byKey = new Map<string, { name: string; total: number; count: number }>();
   for (const t of month) {
     const e = byKey.get(t.key) ?? { name: t.counterparty, total: 0, count: 0 };
@@ -184,7 +185,7 @@ export function rulesBaseline(r: ImportResult, now: number): Proposal[] {
   }
   const firstSeen = new Map<string, number>();
   for (const t of txns) firstSeen.set(t.key, Math.min(firstSeen.get(t.key) ?? Infinity, t.at));
-  const fresh = txns.filter((t) => t.unnamed !== true && (firstSeen.get(t.key) ?? 0) >= now - 30 * DAY && t.at >= now - 30 * DAY);
+  const fresh = txns.filter((t) => t.unnamed !== true && !isSelf(t.counterparty, r.selfNames ?? []) && (firstSeen.get(t.key) ?? 0) >= now - 30 * DAY && t.at >= now - 30 * DAY);
   const freshTotal = new Map<string, { name: string; total: number }>();
   for (const t of fresh) freshTotal.set(t.key, { name: t.counterparty, total: (freshTotal.get(t.key)?.total ?? 0) + t.amount });
   const big = [...freshTotal.values()].filter((v) => v.total >= 5_000).sort((a, b) => b.total - a.total);

@@ -17,7 +17,7 @@ Needs Node 22.18 or newer (runs TypeScript directly).
 
 ```bash
 npm install
-npm test          # 165 tests (+ 14 Kotlin: cd android && ./gradlew testDebugUnitTest)
+npm test          # 166 tests (+ 14 Kotlin: cd android && ./gradlew testDebugUnitTest)
 npm run typecheck # strict TypeScript
 npm start         # demo on http://localhost:8787 — open it at phone width
 ```

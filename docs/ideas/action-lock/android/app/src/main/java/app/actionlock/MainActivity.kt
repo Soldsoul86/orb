@@ -192,6 +192,10 @@ class MainActivity : FragmentActivity() {
         if (::web.isInitialized) callJs("window.OrbApp?.onAccess")
     }
 
+    private fun copy(text: String) {
+        getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("Orb request", text))
+    }
+
     private fun granted(permission: String) = ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     /** Exposed to the Orb page as `AndroidOrb`: the sensors and Orb's journal. */
@@ -263,6 +267,47 @@ class MainActivity : FragmentActivity() {
 
         @android.webkit.JavascriptInterface
         fun modelStatus(): String = nano.status
+
+        @android.webkit.JavascriptInterface
+        fun modelReason(): String = nano.reason
+
+        @android.webkit.JavascriptInterface
+        fun modelRecheck() = runOnUiThread { nano.refresh { callJs("window.OrbApp?.onModelStatus") } }
+
+        /** AI apps installed on the phone that a request can be handed to (JSON: [{id, name}]). */
+        @android.webkit.JavascriptInterface
+        fun aiApps(): String {
+            val known = listOf(
+                "com.anthropic.claude" to "Claude",
+                "com.google.android.apps.bard" to "Gemini",
+                "com.openai.chatgpt" to "ChatGPT",
+                "ai.perplexity.app.android" to "Perplexity",
+            )
+            val arr = org.json.JSONArray()
+            for ((id, name) in known) {
+                val installed = runCatching { packageManager.getPackageInfo(id, 0) }.isSuccess
+                if (installed) arr.put(JSONObject().put("id", id).put("name", name))
+            }
+            return arr.toString()
+        }
+
+        /** Hands the request to one AI app; if it doesn't take shared text, copies it and opens the app. */
+        @android.webkit.JavascriptInterface
+        fun shareTo(app: String, text: String) = runOnUiThread {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).setPackage(app)
+            val ok = runCatching { startActivity(send) }.isSuccess
+            if (!ok) {
+                copy(text)
+                packageManager.getLaunchIntentForPackage(app)?.let { startActivity(it) }
+                Toast.makeText(this@MainActivity, "Copied: paste it into the app", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun copyText(text: String) = runOnUiThread {
+            copy(text)
+            Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
+        }
 
         @android.webkit.JavascriptInterface
         fun modelDownload() = runOnUiThread { nano.download { callJs("window.OrbApp?.onModelStatus") } }
