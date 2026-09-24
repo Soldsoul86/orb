@@ -76,6 +76,38 @@ class PayScreenTest {
         assertNull(PayScreen.parse(listOf(ScreenNode("Settings"), ScreenNode("Next", clickable = true))))
     }
 
+    // The UPI PIN screen, as logged on the Pixel from Google Pay and PhonePe (Sept 2026).
+    private fun pin(to: String, pay: String) = listOf(
+        ScreenNode("Logo"), ScreenNode("HDFC Bank"), ScreenNode("Close", clickable = true), ScreenNode(pay), ScreenNode(to),
+        ScreenNode("Enter your PIN"), ScreenNode("Never enter your UPI PIN to receive money"),
+    ) + (1..9).map { ScreenNode("$it", clickable = true) } + listOf(ScreenNode("0", clickable = true), ScreenNode("Delete", clickable = true), ScreenNode("Submit", clickable = true))
+
+    @Test
+    fun readsTheUpiPinScreenAndCoversTheKeypad() {
+        val g = PayScreen.parse(pin("To CHETHAN GOWDA P S", "Pay ₹3000.00"))!!
+        assertEquals(true, g.pin)
+        assertEquals("CHETHAN GOWDA P S", g.name)
+        assertEquals(3000.0, g.amount!!, 0.0)
+        assertEquals(12, g.cover.size) // ten digits, delete, submit
+        assertEquals(false, g.cover.contains(2)) // not the Close button
+        val p = PayScreen.parse(pin("To munirajamadavali@oksbi", "Pay ₹300.00"))!!
+        assertNull(p.name) // never "Close"
+        assertEquals("munirajamadavali@oksbi", p.vpa)
+        assertEquals(300.0, p.amount!!, 0.0)
+    }
+
+    @Test
+    fun readsTheNameInGooglePaysChatHeader() {
+        val chat = listOf(
+            ScreenNode("Back", clickable = true), ScreenNode("CHETHAN GOWDA P S PhonePe • 9535528118@axl"), ScreenNode("Show menu", clickable = true),
+            ScreenNode("Payment to CHETHAN ₹175 Paid • 29 Jun", clickable = true), ScreenNode("Pay", clickable = true),
+        )
+        val info = PayScreen.parse(chat)!!
+        assertEquals("CHETHAN GOWDA P S", info.name)
+        assertEquals("9535528118@axl", info.vpa)
+        assertNull(info.amount) // the ₹175 is an old payment, not this one
+    }
+
     @Test
     fun notAPayScreenWithoutAPayButton() {
         assertNull(PayScreen.parse(listOf(ScreenNode("Transfer Money to"), ScreenNode("Banking name: X Y"))))

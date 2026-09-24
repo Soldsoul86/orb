@@ -20,7 +20,7 @@ run on a device: the readers and permission flow need a first run on the Pixel.
 PhonePe or Google Pay shows a pay screen, it reads the payee ("Banking name")
 and the amount you typed, looks them up in the guard table Orb builds from your
 model (`src/orb/guard.ts` → `guard.json`), and when the payment is unusual
-covers the Pay button with a shield and a card with the reason and a
+covers the Pay button (or, on the UPI PIN screen that every UPI app ends with, the PIN keypad) with a shield and a card with the reason and a
 countdown; large payments to someone new also need your fingerprint. Usual
 payments see nothing. "Don't pay" goes back. Every pause is logged in
 `guard.jsonl`; pay screens it can't read go to `guard-unread.txt` (shown in the

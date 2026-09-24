@@ -41,6 +41,15 @@
         "usual": 350,
         "max": 1800,
         "passUpTo": 3600
+      },
+      {
+        "key": "chethangowdaps",
+        "name": "CHETHAN GOWDA P S",
+        "vpa": "9535528118@axl",
+        "count": 3,
+        "usual": 175,
+        "max": 400,
+        "passUpTo": 800
       }
     ]
   },
@@ -228,6 +237,30 @@
         "seconds": 10,
         "reasons": [
           "Orb couldn't read who this payment is to."
+        ]
+      }
+    },
+    {
+      "label": "PIN screen shows only a known UPI ID",
+      "name": "9535528118@axl",
+      "amount": 300,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "PIN screen shows an unknown UPI ID",
+      "name": "munirajamadavali@oksbi",
+      "amount": 300,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "You've never paid munirajamadavali@oksbi before."
         ]
       }
     }

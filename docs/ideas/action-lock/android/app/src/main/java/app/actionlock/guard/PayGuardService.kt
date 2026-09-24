@@ -41,6 +41,9 @@ class PayGuardService : AccessibilityService() {
     private var tableStamp = 0L
     private var pending = false
 
+    /** UPI ID → name, from screens that showed both (a PIN screen may show only the ID). */
+    private val vpaNames = HashMap<String, String>()
+
     /** Payments you already let through (payee|amount → when), so the pause shows once. */
     private val released = HashMap<String, Long>()
 
@@ -107,24 +110,29 @@ class PayGuardService : AccessibilityService() {
             return
         }
         val t = loadTable() ?: return
-        val key = "${info.name}|$amount"
+        // A PIN screen may show only the UPI ID: use the name seen with that ID on the screen before.
+        val vpa = info.vpa?.lowercase()?.takeIf { !it.startsWith("x") }
+        if (info.name != null && vpa != null) vpaNames[vpa] = info.name
+        val who = info.name ?: vpa?.let { vpaNames[it] } ?: vpa
+        val key = "$who|$amount"
         val now = System.currentTimeMillis()
         released.entries.removeAll { now - it.value > 3 * 60_000 }
         if (key in released) {
             hide()
             return
         }
-        if (info.name == null) remember("unread", pkg, info, nodes)
-        val decision = GuardRules.decide(t, info.name, amount, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+        if (who == null) remember("unread", pkg, info, nodes)
+        val decision = GuardRules.decide(t, who, amount, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
         if (decision.mode == "pass") {
             hide()
             return
         }
+        val cover = Rect(bounds[info.cover.first()]).also { r -> info.cover.forEach { r.union(bounds[it]) } }
         if (overlayKey == key) {
-            move(bounds[info.payButton])
+            move(cover)
             return
         }
-        show(pkg, key, info, decision, bounds[info.payButton])
+        show(pkg, key, info.copy(name = who), decision, cover)
     }
 
     private fun collect(n: AccessibilityNodeInfo, nodes: MutableList<ScreenNode>, bounds: MutableList<Rect>, depth: Int) {

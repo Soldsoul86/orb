@@ -14,6 +14,7 @@ export const TABLE: GuardTable = {
     { key: 'ravikumarm', name: 'RAVIKUMAR M', count: 30, usual: 160, max: 400, passUpTo: 800 },
     { key: 'ashamenon', name: 'ASHA MENON', count: 12, usual: 1_000, max: 5_000, passUpTo: 24_000, relation: 'family' },
     { key: 'swiggylimited', name: 'SWIGGY LIMITED', count: 200, usual: 350, max: 1_800, passUpTo: 3_600 },
+    { key: 'chethangowdaps', name: 'CHETHAN GOWDA P S', vpa: '9535528118@axl', count: 3, usual: 175, max: 400, passUpTo: 800 },
   ],
 };
 
@@ -33,6 +34,8 @@ export const SCREENS: readonly (GuardScreen & { readonly label: string })[] = [
   { label: 'known payee at 3 am, 3.3× your usual', name: 'RAVIKUMAR M', amount: 600, hour: 3 },
   { label: 'quiet hours wrap midnight: 23:00 is outside 01–06', name: 'NEW PERSON', amount: 500, hour: 23 },
   { label: 'no name read', amount: 700, hour: 13 },
+  { label: 'PIN screen shows only a known UPI ID', name: '9535528118@axl', amount: 300, hour: 13 },
+  { label: 'PIN screen shows an unknown UPI ID', name: 'munirajamadavali@oksbi', amount: 300, hour: 13 },
 ];
 
 export function vectors(): { table: GuardTable; cases: (GuardScreen & { label: string; expected: GuardDecision })[] } {

@@ -7,7 +7,16 @@ package app.actionlock.guard
  */
 data class ScreenNode(val text: String, val editable: Boolean = false, val clickable: Boolean = false)
 
-data class PayScreenInfo(val name: String?, val vpa: String?, val amount: Double?, val payButton: Int)
+data class PayScreenInfo(
+    val name: String?,
+    val vpa: String?,
+    val amount: Double?,
+    val payButton: Int,
+    /** Nodes to cover: the Pay button, or the whole UPI PIN keypad. */
+    val cover: List<Int> = listOf(payButton),
+    /** The UPI PIN screen (NPCI's, the same in every UPI app): the last step before money leaves. */
+    val pin: Boolean = false,
+)
 
 object PayScreen {
     val apps = mapOf(
@@ -19,7 +28,23 @@ object PayScreen {
     private val vpaRe = Regex("""[A-Za-z0-9.\-_]{2,}@[A-Za-z][A-Za-z0-9]{1,63}""")
     private val amountRe = Regex("""^₹?\s?(\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)$""")
     private val nameLike = Regex("""^[A-Za-z][A-Za-z .'&-]{2,60}$""")
-    private val notNames = Regex("""^(?:pay|paying|to|from|banking name|transfer money to|upi|add a note|add message|proceed|send|cancel|back|more|help|split|request|history|check balance|enter amount|amount)$""", RegexOption.IGNORE_CASE)
+    private val notNames = Regex("""^(?:pay|paying|to|from|banking name|transfer money to|upi|add a note|add message|proceed|send|cancel|back|close|logo|show menu|more|help|split|request|history|check balance|enter amount|amount)$""", RegexOption.IGNORE_CASE)
+    private val appWords = Regex("""\s+(?:PhonePe|Google Pay|GPay|Paytm|BHIM|CRED)\s*$""", RegexOption.IGNORE_CASE)
+
+    /** The UPI PIN screen: "Pay ₹3000.00", "To CHETHAN GOWDA P S" (or a UPI ID), "Enter your PIN", keys 0–9. */
+    private fun pinScreen(nodes: List<ScreenNode>, texts: List<String>): PayScreenInfo? {
+        if (texts.none { Regex("""^enter (?:your )?(?:upi )?pin""", RegexOption.IGNORE_CASE).containsMatchIn(it) }) return null
+        val digits = nodes.indices.filter { nodes[it].clickable && Regex("""^\d$""").matches(texts[it]) }
+        if (digits.size < 10) return null
+        val amount = texts.firstNotNullOfOrNull { Regex("""^pay\s*₹\s*([\d,]+(?:\.\d{1,2})?)$""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull() }
+            ?: texts.firstNotNullOfOrNull { if (it.startsWith("₹")) number(it) else null }
+        val to = texts.firstNotNullOfOrNull { Regex("""^to\s+(.+)$""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1)?.trim() }
+        val vpa = to?.let { vpaRe.find(it)?.value }
+        val name = to?.takeIf { vpa == null }
+        // Cover the keypad and everything after it (backspace, the ✓ that submits).
+        val cover = (digits.first() until nodes.size).filter { nodes[it].clickable }
+        return PayScreenInfo(name, vpa, amount, digits.last(), cover, pin = true)
+    }
 
     private fun number(s: String): Double? {
         val m = amountRe.find(s.trim()) ?: return null
@@ -35,6 +60,7 @@ object PayScreen {
 
     fun parse(nodes: List<ScreenNode>): PayScreenInfo? {
         val texts = nodes.map { it.text.trim() }
+        pinScreen(nodes, texts)?.let { return it }
         val paymentScreen = nodes.any { it.editable && number(it.text) != null } ||
             texts.any { Regex("""^(?:banking name|bank(?:ing)? name)""", RegexOption.IGNORE_CASE).containsMatchIn(it) }
         val payButton = nodes.indexOfLast { it.clickable && payLabel.matches(it.text.trim()) }
@@ -60,13 +86,17 @@ object PayScreen {
             Regex("""^(?:banking name|bank(?:ing)? name|registered name)\s*[:\-]?\s*(.+)$""", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)?.trim()
         }?.takeIf { it.isNotEmpty() }
             ?: texts.indexOfFirst { Regex("""^(?:banking name|bank(?:ing)? name)\s*:?$""", RegexOption.IGNORE_CASE).matches(it) }.takeIf { it >= 0 }?.let { texts.getOrNull(it + 1) }
+        // Google Pay's chat header: "CHETHAN GOWDA P S PhonePe • 9535528118@axl".
+        val dotted = texts.firstNotNullOfOrNull { t ->
+            if (t.contains('•') && vpaRe.containsMatchIn(t)) t.substringBefore('•').replace(appWords, "").trim().takeIf { nameLike.matches(it) && !notNames.matches(it) } else null
+        }
         val paying = texts.firstNotNullOfOrNull { Regex("""^(?:paying|pay to|sending to)\s+(.+)$""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1)?.trim() }
         val afterHeading = texts.indexOfFirst { Regex("""^(?:transfer money to|paying|to)$""", RegexOption.IGNORE_CASE).matches(it) }
             .takeIf { it >= 0 }
             ?.let { i -> texts.drop(i + 1).firstOrNull { nameLike.matches(it) && !notNames.matches(it) } }
         val beforeVpa = texts.indexOfFirst { vpaRe.containsMatchIn(it) }.takeIf { it > 0 }
             ?.let { i -> texts.take(i).lastOrNull { nameLike.matches(it) && !notNames.matches(it) } }
-        val name = (banking ?: paying ?: afterHeading ?: beforeVpa)?.replace(Regex("""\s+"""), " ")?.trim()
+        val name = (banking ?: paying ?: dotted ?: afterHeading ?: beforeVpa)?.replace(Regex("""\s+"""), " ")?.trim()
         return PayScreenInfo(name, vpa, amount, payButton)
     }
 }

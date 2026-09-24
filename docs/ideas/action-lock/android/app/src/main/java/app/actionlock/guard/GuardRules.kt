@@ -7,7 +7,7 @@ import org.json.JSONObject
  * payment seen on a pay screen. Pure. Kept identical to the TypeScript one by
  * GuardRulesTest, which runs the shared cases in test/guard-vectors.json.
  */
-data class GuardPayee(val key: String, val name: String, val usual: Double, val max: Double, val passUpTo: Double, val relation: String?)
+data class GuardPayee(val key: String, val name: String, val usual: Double, val max: Double, val passUpTo: Double, val relation: String?, val vpa: String? = null)
 
 data class GuardTable(val largeAmount: Double, val usual: Double, val quietFrom: Int?, val quietTo: Int?, val payees: List<GuardPayee>) {
     companion object {
@@ -24,6 +24,7 @@ data class GuardTable(val largeAmount: Double, val usual: Double, val quietFrom:
                     max = p.getDouble("max"),
                     passUpTo = p.getDouble("passUpTo"),
                     relation = if (p.has("relation")) p.getString("relation") else null,
+                    vpa = if (p.has("vpa")) p.getString("vpa") else null,
                 )
             }
             return GuardTable(o.getDouble("largeAmount"), o.getDouble("usual"), q?.getInt("from"), q?.getInt("to"), payees)
@@ -51,6 +52,7 @@ object GuardRules {
 
     fun find(table: GuardTable, name: String?): GuardPayee? {
         if (name == null) return null
+        if ('@' in name) return table.payees.firstOrNull { it.vpa == name.trim().lowercase() }
         val n = letters(name)
         if (n.length < 3) return null
         val exact = table.payees.firstOrNull { it.key == n }

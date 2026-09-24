@@ -17,6 +17,8 @@ export interface GuardPayee {
   /** Letters of the name, lower-case: how names on screen are matched. */
   readonly key: string;
   readonly name: string;
+  /** The UPI ID, when your history has it: PIN screens sometimes show only that. */
+  readonly vpa?: string;
   readonly count: number;
   readonly usual: number;
   readonly max: number;
@@ -66,7 +68,7 @@ export function buildGuardTable(profile: Profile, twin: Twin | null, now: number
       const rel = relation.get(p.key);
       // Up to twice the most you've ever paid them passes; more for people you confirmed.
       const passUpTo = rel !== undefined && TRUSTED.has(rel) ? Math.max(2 * p.max, largeAmount * 4) : Math.max(2 * p.max, p50);
-      return { key: letters(p.name), name: p.name, count: p.count, usual: p.median, max: p.max, passUpTo: Math.round(passUpTo), ...(rel !== undefined ? { relation: rel } : {}) };
+      return { key: letters(p.name), name: p.name, ...(p.key.includes('@') ? { vpa: p.key.toLowerCase() } : {}), count: p.count, usual: p.median, max: p.max, passUpTo: Math.round(passUpTo), ...(rel !== undefined ? { relation: rel } : {}) };
     });
   return {
     version: 1,
@@ -81,6 +83,7 @@ export function buildGuardTable(profile: Profile, twin: Twin | null, now: number
 /** A payee on screen matches when the letters are equal, or one long name begins the other. */
 export function findGuardPayee(table: GuardTable, name: string | undefined): GuardPayee | undefined {
   if (name === undefined) return undefined;
+  if (name.includes('@')) return table.payees.find((p) => p.vpa === name.trim().toLowerCase());
   const n = letters(name);
   if (n.length < 3) return undefined;
   const exact = table.payees.find((p) => p.key === n);
