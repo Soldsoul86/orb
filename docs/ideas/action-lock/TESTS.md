@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 153 tests, plus 6 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 153 tests, plus 7 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 

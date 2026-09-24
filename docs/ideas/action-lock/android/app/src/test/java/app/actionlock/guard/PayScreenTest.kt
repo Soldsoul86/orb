@@ -68,6 +68,15 @@ class PayScreenTest {
     }
 
     @Test
+    fun anArrowButtonCountsOnlyOnAPaymentScreen() {
+        val gpay = listOf(ScreenNode("Chetna"), ScreenNode("Banking name: CHETNA S"), ScreenNode("₹"), ScreenNode("250", editable = true), ScreenNode("Next", clickable = true))
+        val info = PayScreen.parse(gpay)!!
+        assertEquals("CHETNA S", info.name)
+        assertEquals(250.0, info.amount!!, 0.0)
+        assertNull(PayScreen.parse(listOf(ScreenNode("Settings"), ScreenNode("Next", clickable = true))))
+    }
+
+    @Test
     fun notAPayScreenWithoutAPayButton() {
         assertNull(PayScreen.parse(listOf(ScreenNode("Transfer Money to"), ScreenNode("Banking name: X Y"))))
     }

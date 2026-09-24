@@ -97,6 +97,7 @@ class PayGuardService : AccessibilityService() {
         val info = PayScreen.parse(nodes)
         if (info == null) {
             hide()
+            if (PayScreen.looksLikePayment(nodes)) remember("no pay button found", pkg, PayScreenInfo(null, null, null, -1), nodes)
             return
         }
         val amount = info.amount

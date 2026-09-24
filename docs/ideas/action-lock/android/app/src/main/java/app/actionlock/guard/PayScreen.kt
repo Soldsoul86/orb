@@ -26,10 +26,21 @@ object PayScreen {
         return m.groupValues[1].replace(",", "").toDoubleOrNull()?.takeIf { it > 0 }
     }
 
+    /** Buttons that go on to pay only on a screen that is clearly a payment (an amount field or a banking name). */
+    private val nextLabel = Regex("""^(?:next|continue|proceed|done|arrow|arrow forward|go|submit)$""", RegexOption.IGNORE_CASE)
+
+    /** Looks like a money screen, even if no Pay button was recognised: worth keeping for improving the reader. */
+    fun looksLikePayment(nodes: List<ScreenNode>): Boolean =
+        nodes.any { it.text.contains("₹") || Regex("""banking name""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
+
     fun parse(nodes: List<ScreenNode>): PayScreenInfo? {
-        val payButton = nodes.indexOfLast { it.clickable && payLabel.matches(it.text.trim()) }
-        if (payButton < 0) return null
         val texts = nodes.map { it.text.trim() }
+        val paymentScreen = nodes.any { it.editable && number(it.text) != null } ||
+            texts.any { Regex("""^(?:banking name|bank(?:ing)? name)""", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+        val payButton = nodes.indexOfLast { it.clickable && payLabel.matches(it.text.trim()) }
+            .takeIf { it >= 0 }
+            ?: nodes.indexOfLast { it.clickable && paymentScreen && nextLabel.matches(it.text.trim()) }
+        if (payButton < 0) return null
 
         // Amount: what you typed in the amount field. Only a screen with no amount field (a
         // confirm step) falls back to the "Pay ₹3,000" button or a "₹3,000" line; otherwise
