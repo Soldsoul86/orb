@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 153 tests, plus 11 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 154 tests, plus 13 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -119,6 +119,7 @@ script errors. The APK builds; its merged manifest has no internet permission.
 |---|---|
 | Decision | Known payee at a usual amount passes; new payee waits 10 s; large to someone new needs the fingerprint (30 s); far above someone's most → 30 s + fingerprint; quiet hours add 10 s; no name read says so |
 | Pressure signals | On a call: an unusual payment waits 20 s longer and needs the fingerprint if the payee is new; a usual payment to someone known still passes. From a request: 30 s and fingerprint, with "you never need your PIN to receive money" |
+| Learning from app history | Payments you sent, read from Google Pay's "Payment to CHETHAN ₹175 Paid" and PhonePe's "₹170 PAID" bubbles (not money received, not the amount being typed), make that person known: up to twice the most passes, more still waits; your bank history is never overridden. Same rule in Kotlin, checked on shared cases; a deliberate change (3× instead of 2×) was caught |
 | Leaving | "Don't pay" taps the PIN screen's own Close and confirms a cancel dialog; other apps' shopping screens are ignored (PIN screen only) |
 | Names | Case-insensitive, long names may begin one another, short fragments never match |
 | Table | Built from your history; people you confirmed as family may receive more without a pause; guesses never loosen it |

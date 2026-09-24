@@ -28,6 +28,7 @@ interface OrbNative {
   guardLog(): string;
   guardUnread(): string;
   clearGuardUnread(): void;
+  guardSeen(): string;
 }
 
 /** In a browser there is no phone: invented sample data, answers kept in this tab. */
@@ -60,6 +61,7 @@ function browserNative(): OrbNative {
     guardLog: () => '',
     guardUnread: () => '',
     clearGuardUnread: () => {},
+    guardSeen: () => '{}',
   };
 }
 
@@ -294,6 +296,13 @@ function guardCard(): string {
     });
   const done = events.filter((e) => e.outcome !== 'shown').slice(-6).reverse();
   const verb: Record<string, string> = { continued: 'you continued', confirmed: 'you confirmed with fingerprint', cancelled: "you didn't pay" };
+  let learned: Record<string, { amounts: number[]; app?: string }> = {};
+  try {
+    learned = JSON.parse(native.guardSeen()) as typeof learned;
+  } catch {
+    /* none yet */
+  }
+  const learnedNames = Object.entries(learned);
   const unread = native.guardUnread();
   const unreadCount = (unread.match(/^── /gm) ?? []).length;
   return `
@@ -302,6 +311,7 @@ function guardCard(): string {
       <p>${on ? '✓ <b>On</b> for PhonePe and Google Pay.' : '○ <b>Off.</b>'} When a payment is unusual for you (someone new, much more than usual, an odd hour), Orb covers the Pay button with the reason and a short pause. Usual payments see nothing.</p>
       ${on ? '' : `<p class="meta">Settings → Accessibility → Orb pay guard → On. If it's greyed out: Settings → Apps → Orb → ⋮ → Allow restricted settings, then try again.</p><button class="primary" data-guard="1">Open Accessibility settings</button>`}
       ${done.length > 0 ? `<div class="meta" style="margin-top:10px">Recent pauses:</div>${done.map((e) => `<div class="row line"><span>${rupees(e.amount)} to ${esc(e.name ?? 'someone')} <span class="meta">· ${esc(e.app)}</span></span><span class="meta">${verb[e.outcome] ?? e.outcome}</span></div>`).join('')}` : ''}
+      ${learnedNames.length > 0 ? `<p class="meta">Learned from your UPI apps' history: ${learnedNames.slice(0, 6).map(([n, e]) => `${esc(n)} (${e.amounts.length}× up to ${rupees(Math.max(...e.amounts))})`).join(', ')}${learnedNames.length > 6 ? ` and ${learnedNames.length - 6} more` : ''}. Usual payments to them now pass.</p>` : ''}
       ${unreadCount > 0 ? `<p class="meta">${unreadCount} pay screen${unreadCount === 1 ? '' : 's'} it couldn't fully read. <button class="link" data-unread="1">${state.showUnread ? 'Hide' : 'Show'}</button> · <button class="link" data-clearunread="1">Clear</button> (send these to improve the reader)</p>${state.showUnread ? `<pre class="unread">${esc(unread)}</pre>` : ''}` : ''}
     </div>`;
 }

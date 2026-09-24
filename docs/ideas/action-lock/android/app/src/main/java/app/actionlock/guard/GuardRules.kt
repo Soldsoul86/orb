@@ -34,6 +34,9 @@ data class GuardTable(val largeAmount: Double, val usual: Double, val quietFrom:
 
 data class GuardDecision(val mode: String, val seconds: Int, val reasons: List<String>)
 
+/** Payments to someone that a UPI app showed in its own history. */
+data class SeenPayee(val name: String, val amounts: List<Double>, val vpa: String? = null)
+
 object GuardRules {
     private val trusted = setOf("family", "you", "own account")
 
@@ -58,6 +61,19 @@ object GuardRules {
         val exact = table.payees.firstOrNull { it.key == n }
         if (exact != null || n.length < 8) return exact
         return table.payees.firstOrNull { it.key.length >= 8 && (it.key.startsWith(n) || n.startsWith(it.key)) }
+    }
+
+    /** Kotlin copy of withSeen in src/orb/guard.ts. */
+    fun withSeen(table: GuardTable, seen: List<SeenPayee>): GuardTable {
+        val extra = mutableListOf<GuardPayee>()
+        for (s in seen) {
+            if (s.amounts.isEmpty() || letters(s.name).length < 3) continue
+            if (find(table.copy(payees = table.payees + extra), s.name) != null) continue
+            val a = s.amounts.sorted()
+            val max = a.last()
+            extra += GuardPayee(letters(s.name), s.name, a[a.size / 2], max, Math.round(maxOf(2 * max, table.usual)).toDouble(), null, s.vpa?.lowercase())
+        }
+        return table.copy(payees = table.payees + extra)
     }
 
     fun decide(table: GuardTable, name: String?, amount: Double, hour: Int, onCall: Boolean = false, fromRequest: Boolean = false): GuardDecision {

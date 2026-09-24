@@ -337,5 +337,90 @@
         ]
       }
     }
+  ],
+  "seen": [
+    {
+      "name": "CHETHAN KUMAR R",
+      "amounts": [
+        175,
+        175,
+        240
+      ]
+    },
+    {
+      "name": "Tarun Sharma",
+      "amounts": [
+        99999
+      ]
+    },
+    {
+      "name": "AB",
+      "amounts": [
+        100
+      ]
+    }
+  ],
+  "seenCases": [
+    {
+      "label": "seen in app history, usual amount",
+      "name": "CHETHAN KUMAR R",
+      "amount": 175,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "seen in app history, up to twice the most",
+      "name": "CHETHAN KUMAR R",
+      "amount": 480,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "seen in app history, just over twice the most",
+      "name": "CHETHAN KUMAR R",
+      "amount": 600,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "₹600 is more than you've paid CHETHAN KUMAR R before (most: ₹240, usually ₹175)."
+        ]
+      }
+    },
+    {
+      "label": "seen in app history, far above",
+      "name": "CHETHAN KUMAR R",
+      "amount": 3000,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "₹3,000 is more than you've paid CHETHAN KUMAR R before (most: ₹240, usually ₹175)."
+        ]
+      }
+    },
+    {
+      "label": "SMS history wins over app history",
+      "name": "TARUN SHARMA",
+      "amount": 50000,
+      "hour": 13,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 30,
+        "reasons": [
+          "₹50,000 is more than you've paid TARUN SHARMA before (most: ₹12,050, usually ₹3,000)."
+        ]
+      }
+    }
   ]
 }

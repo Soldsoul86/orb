@@ -1,7 +1,7 @@
 // Cases the TypeScript and Kotlin pay guards must both get right.
 // `npm run guard-vectors` writes them, with the expected decisions, to
 // test/guard-vectors.json (read by GuardRulesTest.kt).
-import { decideGuard, type GuardDecision, type GuardScreen, type GuardTable } from '../src/orb/guard.ts';
+import { decideGuard, withSeen, type GuardDecision, type GuardScreen, type GuardTable, type SeenPayee } from '../src/orb/guard.ts';
 
 export const TABLE: GuardTable = {
   version: 1,
@@ -43,6 +43,32 @@ export const SCREENS: readonly (GuardScreen & { readonly label: string })[] = [
   { label: 'PIN screen shows an unknown UPI ID', name: 'munirajamadavali@oksbi', amount: 300, hour: 13 },
 ];
 
-export function vectors(): { table: GuardTable; cases: (GuardScreen & { label: string; expected: GuardDecision })[] } {
-  return { table: TABLE, cases: SCREENS.map((s) => ({ ...s, expected: decideGuard(TABLE, s) })) };
+/** Payees seen in the UPI apps' own history screens. */
+export const SEEN: readonly SeenPayee[] = [
+  { name: 'CHETHAN KUMAR R', amounts: [175, 175, 240] },
+  { name: 'Tarun Sharma', amounts: [99_999] }, // already known from SMS: history screens never override it
+  { name: 'AB', amounts: [100] }, // too short to match anyone
+];
+
+export const SEEN_SCREENS: readonly (GuardScreen & { readonly label: string })[] = [
+  { label: 'seen in app history, usual amount', name: 'CHETHAN KUMAR R', amount: 175, hour: 13 },
+  { label: 'seen in app history, up to twice the most', name: 'CHETHAN KUMAR R', amount: 480, hour: 13 },
+  { label: 'seen in app history, just over twice the most', name: 'CHETHAN KUMAR R', amount: 600, hour: 13 },
+  { label: 'seen in app history, far above', name: 'CHETHAN KUMAR R', amount: 3_000, hour: 13 },
+  { label: 'SMS history wins over app history', name: 'TARUN SHARMA', amount: 50_000, hour: 13 },
+];
+
+export function vectors(): {
+  table: GuardTable;
+  cases: (GuardScreen & { label: string; expected: GuardDecision })[];
+  seen: readonly SeenPayee[];
+  seenCases: (GuardScreen & { label: string; expected: GuardDecision })[];
+} {
+  const merged = withSeen(TABLE, SEEN);
+  return {
+    table: TABLE,
+    cases: SCREENS.map((s) => ({ ...s, expected: decideGuard(TABLE, s) })),
+    seen: SEEN,
+    seenCases: SEEN_SCREENS.map((s) => ({ ...s, expected: decideGuard(merged, s) })),
+  };
 }

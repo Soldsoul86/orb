@@ -253,6 +253,10 @@ class MainActivity : FragmentActivity() {
         @android.webkit.JavascriptInterface
         fun guardLog(): String = JournalFile(filesDir, "guard.jsonl").read()
 
+        /** People the guard learned from the UPI apps' own history screens. */
+        @android.webkit.JavascriptInterface
+        fun guardSeen(): String = java.io.File(filesDir, "guard-seen.json").let { if (it.exists()) it.readText() else "{}" }
+
         @android.webkit.JavascriptInterface
         fun clearGuardUnread() {
             java.io.File(filesDir, "guard-unread.txt").delete()

@@ -97,6 +97,22 @@ class PayScreenTest {
     }
 
     @Test
+    fun readsPaymentsYouSentFromTheAppsHistory() {
+        val gpay = listOf(
+            ScreenNode("Back", clickable = true), ScreenNode("CHETHAN GOWDA P S PhonePe • 9535528118@axl"),
+            ScreenNode("Payment to CHETHAN ₹175 Paid • 29 Jun", clickable = true), ScreenNode("Payment from CHETHAN ₹500 Received • 2 Jul", clickable = true),
+            ScreenNode("Pay", clickable = true),
+        )
+        assertEquals(listOf(175.0), PayScreen.history(gpay))
+        val phonePe = listOf(
+            ScreenNode("Iron Muniraja"), ScreenNode("₹170"), ScreenNode("PAID"), ScreenNode("8:59 AM"), ScreenNode("₹130"), ScreenNode("PAID"),
+            ScreenNode("₹2,000"), ScreenNode("RECEIVED"), ScreenNode("Send ₹180 again", clickable = true),
+            ScreenNode("Banking name: Mr M Muniraja"), ScreenNode("₹"), ScreenNode("3,000", editable = true), ScreenNode("PAY", clickable = true),
+        )
+        assertEquals(listOf(170.0, 130.0), PayScreen.history(phonePe))
+    }
+
+    @Test
     fun otherAppsOnlyThePinScreen() {
         val shop = listOf(ScreenNode("Deal of the day ₹499"), ScreenNode("Buy now", clickable = true), ScreenNode("Proceed to pay", clickable = true))
         assertNull(PayScreen.parse(shop, pinOnly = true))

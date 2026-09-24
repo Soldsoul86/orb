@@ -116,6 +116,8 @@ class PayGuardService : AccessibilityService() {
             if (yes >= 0) click(refs[yes])
         }
         val info = PayScreen.parse(nodes, pinOnly = pkg !in PayScreen.ownScreens)
+        // Learn from the app's own history on screen: who you've paid, and how much.
+        if (info != null && info.name != null && !info.pin) learn(pkg, info.name, info.vpa, PayScreen.history(nodes))
         if (info == null) {
             hide()
             if (PayScreen.looksLikePayment(nodes)) remember("no pay button found", pkg, PayScreenInfo(null, null, null, -1), nodes)
@@ -127,7 +129,7 @@ class PayGuardService : AccessibilityService() {
             remember("unread", pkg, info, nodes)
             return
         }
-        val t = loadTable() ?: return
+        val t = GuardRules.withSeen(loadTable() ?: return, seenPayees())
         // A PIN screen may show only the UPI ID: use the name seen with that ID on the screen before.
         val vpa = info.vpa?.lowercase()?.takeIf { !it.startsWith("x") }
         if (info.name != null && vpa != null) vpaNames[vpa] = info.name
@@ -166,6 +168,35 @@ class PayGuardService : AccessibilityService() {
             refs += n
         }
         for (i in 0 until n.childCount) n.getChild(i)?.let { collect(it, nodes, bounds, refs, depth + 1) }
+    }
+
+    // ── Learned from the apps' history screens (guard-seen.json, on the phone) ──
+
+    private var seen: JSONObject? = null
+
+    private fun seenFile() = File(filesDir, "guard-seen.json")
+
+    private fun seenJson(): JSONObject = seen ?: runCatching { JSONObject(seenFile().readText()) }.getOrDefault(JSONObject()).also { seen = it }
+
+    private fun seenPayees(): List<SeenPayee> {
+        val o = seenJson()
+        return o.keys().asSequence().map { name ->
+            val e = o.getJSONObject(name)
+            val a = e.getJSONArray("amounts")
+            SeenPayee(name, (0 until a.length()).map { a.getDouble(it) }, e.optString("vpa").takeIf { it.isNotEmpty() })
+        }.toList()
+    }
+
+    /** Keeps the longest list of payments seen for a name (each look at the chat shows the same bubbles again). */
+    private fun learn(pkg: String, name: String, vpa: String?, amounts: List<Double>) {
+        if (amounts.isEmpty()) return
+        val o = seenJson()
+        val before = o.optJSONObject(name)?.optJSONArray("amounts")?.length() ?: 0
+        if (amounts.size <= before) return
+        val e = JSONObject().put("amounts", org.json.JSONArray(amounts)).put("app", PayScreen.apps[pkg]).put("at", System.currentTimeMillis())
+        vpa?.takeIf { !it.lowercase().startsWith("x") }?.let { e.put("vpa", it) }
+        o.put(name, e)
+        runCatching { seenFile().writeText(o.toString()) }
     }
 
     /** Clicks a node, or the nearest clickable parent (labels are often inside the button). */

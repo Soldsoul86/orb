@@ -54,6 +54,28 @@ object PayScreen {
         return nodes.indexOfFirst { it.clickable && Regex("""^(?:yes|yes, cancel|cancel payment|cancel transaction|ok|confirm)$""", RegexOption.IGNORE_CASE).matches(it.text.trim()) }
     }
 
+    /**
+     * Payments you sent that this screen's history shows: Google Pay's
+     * "Payment to CHETHAN ₹175 Paid • 29 Jun", PhonePe's "₹180" bubble followed by
+     * "PAID". Money you received and the amount you are typing are not included.
+     */
+    fun history(nodes: List<ScreenNode>): List<Double> {
+        val t = nodes.map { it.text.trim() }
+        val out = mutableListOf<Double>()
+        for (i in t.indices) {
+            if (nodes[i].editable) continue
+            Regex("""^payment to .+?₹\s?([\d,]+(?:\.\d{1,2})?)\s+(?:paid|completed|sent)\b""", RegexOption.IGNORE_CASE).find(t[i])?.let {
+                it.groupValues[1].replace(",", "").toDoubleOrNull()?.let { a -> out += a }
+                continue
+            }
+            val m = Regex("""^₹\s?([\d,]+(?:\.\d{1,2})?)$""").find(t[i]) ?: continue
+            if (t.subList(i + 1, minOf(i + 3, t.size)).any { Regex("""^(?:paid|sent|completed)$""", RegexOption.IGNORE_CASE).matches(it) }) {
+                m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { out += it }
+            }
+        }
+        return out
+    }
+
     /** The screen's own close button (the PIN screen has one): how "Don't pay" leaves it. */
     fun closeButton(nodes: List<ScreenNode>): Int =
         nodes.indexOfFirst { it.clickable && Regex("""^(?:close|back|navigate up|cancel)$""", RegexOption.IGNORE_CASE).matches(it.text.trim()) }

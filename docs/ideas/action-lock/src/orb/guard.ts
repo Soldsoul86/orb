@@ -95,6 +95,40 @@ export function findGuardPayee(table: GuardTable, name: string | undefined): Gua
   return table.payees.find((p) => p.key.length >= 8 && (p.key.startsWith(n) || n.startsWith(p.key)));
 }
 
+/** Payments to someone that a UPI app showed in its own history ("Payment to CHETHAN ₹175 Paid"). */
+export interface SeenPayee {
+  readonly name: string;
+  readonly amounts: readonly number[];
+  readonly vpa?: string;
+}
+
+/**
+ * Adds people you've paid according to the UPI apps' own history screens, when
+ * your bank SMS don't have them (another account, UPI Lite, a different name
+ * in the alert). The same rule as for SMS payees: up to twice the most you've
+ * paid them passes.
+ */
+export function withSeen(table: GuardTable, seen: readonly SeenPayee[]): GuardTable {
+  const extra: GuardPayee[] = [];
+  for (const s of seen) {
+    if (s.amounts.length === 0 || letters(s.name).length < 3) continue;
+    const current = { ...table, payees: [...table.payees, ...extra] };
+    if (findGuardPayee(current, s.name) !== undefined) continue;
+    const a = [...s.amounts].sort((x, y) => x - y);
+    const max = a[a.length - 1]!;
+    extra.push({
+      key: letters(s.name),
+      name: s.name,
+      ...(s.vpa !== undefined ? { vpa: s.vpa.toLowerCase() } : {}),
+      count: a.length,
+      usual: a[Math.floor(a.length / 2)]!,
+      max,
+      passUpTo: Math.round(Math.max(2 * max, table.usual)),
+    });
+  }
+  return { ...table, payees: [...table.payees, ...extra] };
+}
+
 export function decideGuard(table: GuardTable, screen: GuardScreen): GuardDecision {
   const reasons: string[] = [];
   let seconds = 0;

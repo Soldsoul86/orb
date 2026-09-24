@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { runImport } from '../src/import/run.ts';
-import { buildGuardTable, decideGuard, findGuardPayee } from '../src/orb/guard.ts';
+import { buildGuardTable, decideGuard, findGuardPayee, withSeen } from '../src/orb/guard.ts';
 import { answer, buildTwin } from '../src/orb/twin.ts';
 import { TABLE, vectors } from './guard-cases.ts';
 
@@ -44,5 +44,13 @@ describe('pay guard', () => {
 
   it("says so when it couldn't read the payee", () => {
     assert.deepEqual(decideGuard(TABLE, { amount: 700, hour: 13 }).reasons, ["Orb couldn't read who this payment is to."]);
+  });
+
+  it('learns people you paid from the UPI apps\' own history, never overriding your bank history', () => {
+    const merged = withSeen(TABLE, [{ name: 'MEENA IYER', amounts: [175] }, { name: 'TARUN SHARMA', amounts: [1] }]);
+    assert.equal(decideGuard(TABLE, { name: 'MEENA IYER', amount: 175, hour: 13 }).mode, 'wait');
+    assert.equal(decideGuard(merged, { name: 'MEENA IYER', amount: 175, hour: 13 }).mode, 'pass');
+    assert.equal(decideGuard(merged, { name: 'MEENA IYER', amount: 3_000, hour: 13 }).mode, 'wait');
+    assert.equal(merged.payees.filter((p) => p.key === 'tarunsharma').length, 1);
   });
 });
