@@ -104,6 +104,12 @@ class PayScreenTest {
             ScreenNode("Pay", clickable = true),
         )
         assertEquals(listOf(175.0), PayScreen.history(gpay))
+        // As Google Pay really labels it: line breaks and a no-break space inside one node.
+        val multiline = gpay.map { if (it.text.startsWith("Payment to")) ScreenNode("Payment to CHETHAN\n₹\u00A0175\nPaid • 29 Jun", clickable = true) else it }
+        assertEquals(listOf(175.0), PayScreen.history(multiline))
+        assertEquals("CHETHAN GOWDA P S", PayScreen.parse(multiline.map { ScreenNode(it.text.replace(" PhonePe", "\nPhonePe"), it.editable, it.clickable) })!!.name)
+        val split = listOf(ScreenNode("Back", clickable = true), ScreenNode("CHETHAN GOWDA P S"), ScreenNode("PhonePe • 9535528118@axl"), ScreenNode("Pay", clickable = true))
+        assertEquals("CHETHAN GOWDA P S", PayScreen.parse(split)!!.name)
         val phonePe = listOf(
             ScreenNode("Iron Muniraja"), ScreenNode("₹170"), ScreenNode("PAID"), ScreenNode("8:59 AM"), ScreenNode("₹130"), ScreenNode("PAID"),
             ScreenNode("₹2,000"), ScreenNode("RECEIVED"), ScreenNode("Send ₹180 again", clickable = true),

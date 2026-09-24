@@ -117,7 +117,14 @@ class PayGuardService : AccessibilityService() {
         }
         val info = PayScreen.parse(nodes, pinOnly = pkg !in PayScreen.ownScreens)
         // Learn from the app's own history on screen: who you've paid, and how much.
-        if (info != null && info.name != null && !info.pin) learn(pkg, info.name, info.vpa, PayScreen.history(nodes))
+        if (info != null && info.name != null && !info.pin) {
+            val past = PayScreen.history(nodes)
+            learn(pkg, info.name, info.vpa, past)
+            // History visible but nothing read: keep the screen so the reader can learn its format.
+            if (past.isEmpty() && nodes.any { Regex("""\bpaid\b""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }) {
+                remember("history not read", pkg, info, nodes)
+            }
+        }
         if (info == null) {
             hide()
             if (PayScreen.looksLikePayment(nodes)) remember("no pay button found", pkg, PayScreenInfo(null, null, null, -1), nodes)
@@ -161,7 +168,8 @@ class PayGuardService : AccessibilityService() {
     private fun collect(n: AccessibilityNodeInfo, nodes: MutableList<ScreenNode>, bounds: MutableList<Rect>, refs: MutableList<AccessibilityNodeInfo>, depth: Int) {
         if (depth > 40 || nodes.size > 600) return
         if (!n.isVisibleToUser) return
-        val text = (n.text ?: n.contentDescription)?.toString()
+        // One line per node, ordinary spaces: apps use line breaks and no-break spaces inside labels.
+        val text = (n.text ?: n.contentDescription)?.toString()?.let { PayScreen.clean(it) }
         if (!text.isNullOrBlank()) {
             nodes += ScreenNode(text, n.isEditable, n.isClickable || n.parent?.isClickable == true)
             bounds += Rect().also { n.getBoundsInScreen(it) }

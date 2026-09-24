@@ -40,6 +40,9 @@ object PayScreen {
         "com.msf.kbank.mobile" to "Kotak",
     )
 
+    /** Screen text as one line with ordinary spaces (labels often hold line breaks and no-break spaces). */
+    fun clean(s: String): String = s.replace(Regex("""[\s\u00A0\u2007\u202F\u200B]+"""), " ").trim()
+
     /** Apps whose own pay screens are read; in the others only the NPCI PIN screen is. */
     val ownScreens = setOf("com.phonepe.app", "com.google.android.apps.nbu.paisa.user")
 
@@ -60,7 +63,7 @@ object PayScreen {
      * "PAID". Money you received and the amount you are typing are not included.
      */
     fun history(nodes: List<ScreenNode>): List<Double> {
-        val t = nodes.map { it.text.trim() }
+        val t = nodes.map { clean(it.text) }
         val out = mutableListOf<Double>()
         for (i in t.indices) {
             if (nodes[i].editable) continue
@@ -115,7 +118,7 @@ object PayScreen {
         nodes.any { Regex("""banking name|enter (?:your )?(?:upi )?pin|\bupi id\b""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
 
     fun parse(nodes: List<ScreenNode>, pinOnly: Boolean = false): PayScreenInfo? {
-        val texts = nodes.map { it.text.trim() }
+        val texts = nodes.map { clean(it.text) }
         pinScreen(nodes, texts)?.let { return it }
         if (pinOnly) return null
         val paymentScreen = nodes.any { it.editable && number(it.text) != null } ||
@@ -144,8 +147,13 @@ object PayScreen {
         }?.takeIf { it.isNotEmpty() }
             ?: texts.indexOfFirst { Regex("""^(?:banking name|bank(?:ing)? name)\s*:?$""", RegexOption.IGNORE_CASE).matches(it) }.takeIf { it >= 0 }?.let { texts.getOrNull(it + 1) }
         // Google Pay's chat header: "CHETHAN GOWDA P S PhonePe • 9535528118@axl".
-        val dotted = texts.firstNotNullOfOrNull { t ->
-            if (t.contains('•') && vpaRe.containsMatchIn(t)) t.substringBefore('•').replace(appWords, "").trim().takeIf { nameLike.matches(it) && !notNames.matches(it) } else null
+        // (or the name in its own node just above "PhonePe • …@axl").
+        val dotted = texts.indices.firstNotNullOfOrNull { i ->
+            val t = texts[i]
+            if (!(t.contains('•') && vpaRe.containsMatchIn(t))) return@firstNotNullOfOrNull null
+            val here = t.substringBefore('•').replace(appWords, "").trim()
+            val candidate = if (Regex("""^(?:PhonePe|Google Pay|GPay|Paytm|BHIM|CRED)?$""", RegexOption.IGNORE_CASE).matches(here)) texts.getOrNull(i - 1) ?: "" else here
+            candidate.takeIf { nameLike.matches(it) && !notNames.matches(it) }
         }
         val paying = texts.firstNotNullOfOrNull { Regex("""^(?:paying|pay to|sending to)\s+(.+)$""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1)?.trim() }
         val afterHeading = texts.indexOfFirst { Regex("""^(?:transfer money to|paying|to)$""", RegexOption.IGNORE_CASE).matches(it) }
