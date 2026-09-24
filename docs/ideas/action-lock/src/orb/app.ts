@@ -29,6 +29,8 @@ interface OrbNative {
   guardUnread(): string;
   clearGuardUnread(): void;
   guardSeen(): string;
+  messageGuardOn(): boolean;
+  setMessageGuard(on: boolean): void;
 }
 
 /** In a browser there is no phone: invented sample data, answers kept in this tab. */
@@ -62,6 +64,8 @@ function browserNative(): OrbNative {
     guardUnread: () => '',
     clearGuardUnread: () => {},
     guardSeen: () => '{}',
+    messageGuardOn: () => false,
+    setMessageGuard: () => {},
   };
 }
 
@@ -280,7 +284,12 @@ interface GuardEvent {
   amount: number;
   mode: string;
   outcome: string;
+  kind?: 'message';
+  found?: string[];
+  to?: string;
 }
+
+const FOUND: Record<string, string> = { code: 'one-time code', pin: 'PIN', card: 'card number', cvv: 'CVV', password: 'password', aadhaar: 'Aadhaar number', phrase: 'recovery phrase' };
 
 function guardCard(): string {
   const on = native.guardOn();
@@ -295,7 +304,10 @@ function guardCard(): string {
       }
     });
   const done = events.filter((e) => e.outcome !== 'shown').slice(-6).reverse();
-  const verb: Record<string, string> = { continued: 'you continued', confirmed: 'you confirmed with fingerprint', cancelled: "you didn't pay" };
+  const verb = (e: GuardEvent) =>
+    e.outcome === 'continued' ? (e.kind === 'message' ? 'you sent it' : 'you continued') : e.outcome === 'confirmed' ? 'you confirmed with fingerprint' : e.kind === 'message' ? "you didn't send it" : "you didn't pay";
+  const what = (e: GuardEvent) =>
+    e.kind === 'message' ? `${(e.found ?? []).map((f) => FOUND[f] ?? f).join(', ')} to ${esc(e.to ?? 'a chat')}` : `${rupees(e.amount)} to ${esc(e.name ?? 'someone')}`;
   let learned: Record<string, { amounts: number[]; app?: string }> = {};
   try {
     learned = JSON.parse(native.guardSeen()) as typeof learned;
@@ -310,16 +322,26 @@ function guardCard(): string {
     <div class="card">
       <p>${on ? '✓ <b>On</b> for PhonePe and Google Pay.' : '○ <b>Off.</b>'} When a payment is unusual for you (someone new, much more than usual, an odd hour), Orb covers the Pay button with the reason and a short pause. Usual payments see nothing.</p>
       ${on ? '' : `<p class="meta">Settings → Accessibility → Orb pay guard → On. If it's greyed out: Settings → Apps → Orb → ⋮ → Allow restricted settings, then try again.</p><button class="primary" data-guard="1">Open Accessibility settings</button>`}
-      ${done.length > 0 ? `<div class="meta" style="margin-top:10px">Recent pauses:</div>${done.map((e) => `<div class="row line"><span>${rupees(e.amount)} to ${esc(e.name ?? 'someone')} <span class="meta">· ${esc(e.app)}</span></span><span class="meta">${verb[e.outcome] ?? e.outcome}</span></div>`).join('')}` : ''}
+      ${done.length > 0 ? `<div class="meta" style="margin-top:10px">Recent pauses:</div>${done.map((e) => `<div class="row line"><span>${what(e)} <span class="meta">· ${esc(e.app)}</span></span><span class="meta">${verb(e)}</span></div>`).join('')}` : ''}
       ${learnedNames.length > 0 ? `<p class="meta">Learned from your UPI apps' history: ${learnedNames.slice(0, 6).map(([n, e]) => `${esc(n)} (${e.amounts.length}× up to ${rupees(Math.max(...e.amounts))})`).join(', ')}${learnedNames.length > 6 ? ` and ${learnedNames.length - 6} more` : ''}. Usual payments to them now pass.</p>` : ''}
       ${unreadCount > 0 ? `<p class="meta">${unreadCount} pay screen${unreadCount === 1 ? '' : 's'} it couldn't fully read. <button class="link" data-unread="1">${state.showUnread ? 'Hide' : 'Show'}</button> · <button class="link" data-clearunread="1">Clear</button> (send these to improve the reader)</p>${state.showUnread ? `<pre class="unread">${esc(unread)}</pre>` : ''}` : ''}
+    </div>`;
+}
+
+function messageCard(): string {
+  const on = native.messageGuardOn();
+  return `
+    <h2>Message guard · WhatsApp</h2>
+    <div class="card">
+      <p>${on ? '✓ <b>On.</b>' : '○ <b>Off.</b>'} Pauses <b>Send</b> when the message you're typing holds an OTP, PIN, card number, CVV, password, Aadhaar number or wallet recovery phrase; stricter with numbers not in your contacts and during calls. It reads only the message box and the chat's title, and <b>never stores what you type</b>. Needs the pay guard (Accessibility) on.</p>
+      <button class="${on ? 'secondary' : 'primary'}" data-msgguard="${on ? 'off' : 'on'}">${on ? 'Turn off' : 'Turn on'}</button>
     </div>`;
 }
 
 function phone(): string {
   const r = state.result!;
   const c = r.phone;
-  return `${guardCard()}
+  return `${guardCard()}${messageCard()}
     <h2>Phone check</h2>
     ${c === undefined ? '<div class="card meta">Not read yet.</div>' : c.findings.length === 0 ? '<div class="card">Nothing to fix.</div>' : c.findings.map((f) => `<div class="card brief ${f.level === 'serious' ? 'security' : ''}"><span class="ic">${f.level === 'serious' ? '⚠' : '·'}</span><span>${esc(f.text)}</span></div>`).join('')}
     ${r.calls ? `<h2>Calls</h2><div class="card"><div class="row"><span>Calls to you from contacts</span><b>${Math.round(r.calls.incomingFromContacts * 100)}%</b></div><div class="row"><span>Unknown numbers that keep calling</span><b>${r.calls.persistentUnknown.length}</b></div></div>` : ''}
@@ -399,6 +421,7 @@ function onClick(ev: Event): void {
   else if (d['access']) return native.requestAccess();
   else if (d['usage']) return native.requestUsageAccess();
   else if (d['guard']) return native.openGuardSettings();
+  else if (d['msgguard']) native.setMessageGuard(d['msgguard'] === 'on');
   else if (d['unread']) state.showUnread = !state.showUnread;
   else if (d['clearunread']) {
     native.clearGuardUnread();

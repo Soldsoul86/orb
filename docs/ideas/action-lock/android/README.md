@@ -26,6 +26,14 @@ payments see nothing. "Don't pay" goes back. Every pause is logged in
 `guard.jsonl`; pay screens it can't read go to `guard-unread.txt` (shown in the
 Phone tab) so the reader can be improved. Only those two apps' screens are read.
 
+**The message guard** (same service, its own switch in Orb's Phone tab, off by
+default): in WhatsApp it reads only the text box you are typing in, the Send
+button and the chat's title. When the draft holds an OTP, PIN, card number,
+CVV, password, Aadhaar number or recovery phrase (`src/orb/message.ts`, Kotlin
+copy `MessageRules.kt`), it covers Send with the reason; stricter for numbers not
+in your contacts and during calls. "Don't send" clears the draft. Nothing you
+type is stored; the log keeps only what kind of thing was found.
+
 ## Build and install
 
 ```bash

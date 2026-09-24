@@ -1,0 +1,238 @@
+{
+  "cases": [
+    {
+      "label": "ordinary message",
+      "draft": "5pm today at Sathya's or Dolphins koramangala",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": [],
+        "findings": []
+      }
+    },
+    {
+      "label": "a price is not a code",
+      "draft": "1500",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": [],
+        "findings": []
+      }
+    },
+    {
+      "label": "a year is not a code",
+      "draft": "See you in 2026",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": [],
+        "findings": []
+      }
+    },
+    {
+      "label": "bare 6-digit code",
+      "draft": "482913",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "This looks like a one-time code (OTP). Banks, couriers and support staff never need it; sharing it is how most accounts are taken over."
+        ],
+        "findings": [
+          "code"
+        ]
+      }
+    },
+    {
+      "label": "code with a word, to a stranger",
+      "draft": "the otp is 4829",
+      "ctx": {
+        "unknownSender": true,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This looks like a one-time code (OTP). Banks, couriers and support staff never need it; sharing it is how most accounts are taken over.",
+          "You're sending it to a number that isn't in your contacts."
+        ],
+        "findings": [
+          "code"
+        ]
+      }
+    },
+    {
+      "label": "code while on a call",
+      "draft": "Code 482913",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": true
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This looks like a one-time code (OTP). Banks, couriers and support staff never need it; sharing it is how most accounts are taken over.",
+          "You're on a call. Scammers ask for codes while they keep you talking."
+        ],
+        "findings": [
+          "code"
+        ]
+      }
+    },
+    {
+      "label": "UPI PIN",
+      "draft": "my upi pin is 2468",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This looks like a PIN. No one ever needs it, not even your bank."
+        ],
+        "findings": [
+          "pin"
+        ]
+      }
+    },
+    {
+      "label": "card number (valid checksum)",
+      "draft": "card 4111 1111 1111 1111",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This contains a card number."
+        ],
+        "findings": [
+          "card"
+        ]
+      }
+    },
+    {
+      "label": "long number that is not a card",
+      "draft": "order id 1234567890123456",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": [],
+        "findings": []
+      }
+    },
+    {
+      "label": "CVV",
+      "draft": "cvv 123",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This contains a card's CVV. With the number, it is enough to spend on your card."
+        ],
+        "findings": [
+          "cvv"
+        ]
+      }
+    },
+    {
+      "label": "password with a value",
+      "draft": "wifi password: Tiger@2026",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "This contains a password."
+        ],
+        "findings": [
+          "password"
+        ]
+      }
+    },
+    {
+      "label": "the word password alone",
+      "draft": "I forgot my password again",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": [],
+        "findings": []
+      }
+    },
+    {
+      "label": "Aadhaar, printed format",
+      "draft": "2345 6789 0123",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "This contains an Aadhaar number."
+        ],
+        "findings": [
+          "aadhaar"
+        ]
+      }
+    },
+    {
+      "label": "recovery phrase",
+      "draft": "abandon ability able about above absent absorb abstract absurd abuse access accident",
+      "ctx": {
+        "unknownSender": false,
+        "onCall": false
+      },
+      "expected": {
+        "mode": "confirm",
+        "seconds": 20,
+        "reasons": [
+          "This looks like a wallet recovery phrase. Anyone who has it can take everything in the wallet."
+        ],
+        "findings": [
+          "phrase"
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 154 tests, plus 13 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 157 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -132,6 +132,17 @@ On the Pixel (24 Sept 2026): PhonePe's Pay button covered and released
 ("Continue"); Google Pay's UPI PIN keypad covered by the sheet; "Don't pay" on the
 PIN screen returns to Google Pay. Not yet tried on a device: the fingerprint step,
 the other UPI apps, the call and request signals. Learning from history, on the Pixel: after opening Chethan's Google Pay chat ("Payment to CHETHAN ₹175 Paid"), ₹175 to him passed with no pause and ₹2,000 was paused as "more than you've paid … (most: ₹175)".
+
+## Message guard (WhatsApp) — `test/message.test.ts`, `MessageRulesTest.kt`
+
+| Area | What is proven |
+|---|---|
+| Found | A bare 6-digit code, or 4–8 digits with "OTP"/"code"; a PIN with its digits; card numbers only with a valid checksum; CVV; a password with a value; Aadhaar as exactly 4-4-4 (a card printed in fours is not one); a 12+ word recovery phrase |
+| Left alone | Ordinary messages, a price ("1500"), a year, an order ID, "I forgot my password again" |
+| Decision | Codes and passwords wait 10 s; PIN, card, CVV and phrases need the fingerprint; a number not in your contacts or a call makes it stricter; nothing found → no pause even with a stranger |
+| Parity | The Kotlin copy decides identically on every shared draft (`test/message-vectors.json`); a deliberate change to its timing was caught |
+
+Not yet tried on a device: reading WhatsApp's text box, the pause over Send, "Don't send" clearing the draft.
 
 ## Checked that the tests can fail
 

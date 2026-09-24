@@ -253,6 +253,16 @@ class MainActivity : FragmentActivity() {
         @android.webkit.JavascriptInterface
         fun guardLog(): String = JournalFile(filesDir, "guard.jsonl").read()
 
+        /** The WhatsApp message guard's own switch (off unless you turn it on). */
+        @android.webkit.JavascriptInterface
+        fun messageGuardOn(): Boolean = java.io.File(filesDir, "message-guard-on").exists()
+
+        @android.webkit.JavascriptInterface
+        fun setMessageGuard(on: Boolean) {
+            val f = java.io.File(filesDir, "message-guard-on")
+            if (on) f.writeText("on") else f.delete()
+        }
+
         /** People the guard learned from the UPI apps' own history screens. */
         @android.webkit.JavascriptInterface
         fun guardSeen(): String = java.io.File(filesDir, "guard-seen.json").let { if (it.exists()) it.readText() else "{}" }

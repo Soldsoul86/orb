@@ -13,8 +13,8 @@ android {
         applicationId = "app.orb"
         minSdk = 29
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.5.3"
+        versionCode = 13
+        versionName = "0.6.0"
     }
 
     buildFeatures { buildConfig = true }
@@ -26,7 +26,10 @@ android {
 }
 
 // GuardRulesTest reads the shared cases written by `npm run guard-vectors`.
-tasks.withType<Test>().configureEach { inputs.file("../../test/guard-vectors.json") }
+tasks.withType<Test>().configureEach {
+    inputs.file("../../test/guard-vectors.json")
+    inputs.file("../../test/message-vectors.json")
+}
 
 kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }

@@ -28,7 +28,7 @@ class GuardConfirmActivity : FragmentActivity() {
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
                 .setTitle(intent.getStringExtra("title") ?: "Confirm this payment")
-                .setSubtitle("Orb paused it: large, and to someone new.")
+                .setSubtitle(intent.getStringExtra("subtitle") ?: "Orb paused it.")
                 .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
                 .build(),
         )

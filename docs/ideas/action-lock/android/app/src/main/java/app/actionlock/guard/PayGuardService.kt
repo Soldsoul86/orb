@@ -72,6 +72,16 @@ class PayGuardService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName) return
+        if (pkg in WHATSAPP) {
+            if (!messageGuardOn()) return
+            if (pendingMessage) return
+            pendingMessage = true
+            main.postDelayed({
+                pendingMessage = false
+                checkMessage(pkg)
+            }, 250)
+            return
+        }
         if (pkg !in PayScreen.apps) {
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) hide()
             return
@@ -293,15 +303,15 @@ class PayGuardService : AccessibilityService() {
             if (left > 0) {
                 b.isEnabled = false
                 b.alpha = 0.55f
-                b.text = if (d.mode == "confirm") "Fingerprint · ${left}s" else "Pay anyway · ${left}s"
+                b.text = if (d.mode == "confirm") "Fingerprint · ${left}s" else "${copy.go} · ${left}s"
                 shield?.text = "🔒 ${left}s"
                 left--
                 main.postDelayed(this, 1000)
             } else {
                 b.isEnabled = true
                 b.alpha = 1f
-                b.text = if (d.mode == "confirm") "Confirm with fingerprint" else "Pay anyway"
-                shield?.text = "🔒 Tap Pay anyway"
+                b.text = if (d.mode == "confirm") "Confirm with fingerprint" else copy.go
+                shield?.text = "🔒 Tap ${copy.go}"
             }
         }
     }
@@ -332,7 +342,24 @@ class PayGuardService : AccessibilityService() {
         isClickable = true
     }
 
+    /** The words on the pause: a payment's or a message's. */
+    private data class Copy(val headline: String, val big: String, val sub: String, val stop: String, val go: String, val confirmTitle: String, val confirmSubtitle: String)
+
+    private var copy = Copy("", "", "", "", "", "", "")
+    private var onStop: () -> Unit = {}
+
     private fun show(pkg: String, key: String, info: PayScreenInfo, d: GuardDecision, cover: Rect) {
+        val who = info.name ?: "this payee"
+        copy = Copy(
+            "Orb paused this payment",
+            GuardRules.rupees(info.amount ?: 0.0),
+            "to $who",
+            "Don't pay",
+            "Pay anyway",
+            "Pay ${GuardRules.rupees(info.amount ?: 0.0)} to $who?",
+            "Orb paused it: large, and to someone new.",
+        )
+        onStop = { leave(pkg) }
         val ev = JSONObject().put("app", PayScreen.apps[pkg]).put("name", info.name ?: JSONObject.NULL).put("amount", info.amount).put("mode", d.mode).put("seconds", d.seconds)
         hide()
         event = ev
@@ -358,20 +385,20 @@ class PayGuardService : AccessibilityService() {
                 }
             }, LinearLayout.LayoutParams(dp(12), dp(12)).apply { rightMargin = dp(8) })
             addView(TextView(this@PayGuardService).apply {
-                text = "Orb paused this payment"
+                text = copy.headline
                 setTextColor(c.muted)
                 textSize = 13f
             })
         }
         val amount = TextView(this).apply {
-            text = GuardRules.rupees(info.amount ?: 0.0)
+            text = copy.big
             setTextColor(c.fg)
             textSize = if (sheetMode) 34f else 22f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setPadding(0, dp(6), 0, 0)
         }
         val to = TextView(this).apply {
-            text = "to ${info.name ?: "this payee"}"
+            text = copy.sub
             setTextColor(c.fg)
             textSize = 16f
             maxLines = 1
@@ -403,8 +430,8 @@ class PayGuardService : AccessibilityService() {
         track.addView(fill, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, dp(4)))
         bar = fill
 
-        val stop = pill("Don't pay", c.accent, c.onAccent)
-        val pay = pill("Pay anyway", android.graphics.Color.TRANSPARENT, c.fg, c.muted)
+        val stop = pill(copy.stop, c.accent, c.onAccent)
+        val pay = pill(copy.go, android.graphics.Color.TRANSPARENT, c.fg, c.muted)
         go = pay
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -435,7 +462,7 @@ class PayGuardService : AccessibilityService() {
         stop.setOnClickListener {
             event?.let { record("cancelled", it) }
             hide()
-            leave(guardedPkg)
+            onStop()
         }
         pay.setOnClickListener {
             val key = overlayKey ?: return@setOnClickListener
@@ -446,7 +473,8 @@ class PayGuardService : AccessibilityService() {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .putExtra("key", key)
                         .putExtra("event", ev.toString())
-                        .putExtra("title", "Pay ${GuardRules.rupees(ev.optDouble("amount"))} to ${ev.optString("name").takeIf { it.isNotEmpty() && it != "null" } ?: "this payee"}?"),
+                        .putExtra("title", copy.confirmTitle)
+                        .putExtra("subtitle", copy.confirmSubtitle),
                 )
             } else {
                 release(key, ev.toString(), "continued")
@@ -521,7 +549,92 @@ class PayGuardService : AccessibilityService() {
         }
     }
 
+    // ── Message guard (WhatsApp) ──────────────────────────────────────────
+    // Reads only the text box you are typing in, the Send button and the chat's
+    // title (to tell a saved contact from a bare number). Nothing you type is
+    // stored: the log keeps only what kind of thing was found.
+
+    private var pendingMessage = false
+    private var messageFlagStamp = -1L
+    private var messageFlag = false
+
+    private fun messageGuardOn(): Boolean {
+        val f = File(filesDir, "message-guard-on")
+        val stamp = if (f.exists()) f.lastModified() else 0L
+        if (stamp != messageFlagStamp) {
+            messageFlagStamp = stamp
+            messageFlag = f.exists()
+        }
+        return messageFlag
+    }
+
+    private fun byId(n: AccessibilityNodeInfo, suffix: String, depth: Int = 0): AccessibilityNodeInfo? {
+        if (depth > 40) return null
+        if (n.viewIdResourceName?.endsWith(suffix) == true) return n
+        for (i in 0 until n.childCount) n.getChild(i)?.let { c -> byId(c, suffix, depth + 1)?.let { return it } }
+        return null
+    }
+
+    private fun checkMessage(pkg: String) {
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != pkg) return
+        val entry = byId(root, ":id/entry")
+        val send = byId(root, ":id/send")
+        if (entry == null || send == null || entry.isShowingHintText) {
+            if (overlayKey?.startsWith("msg|") == true) hide()
+            return
+        }
+        val draft = entry.text?.toString() ?: ""
+        val title = byId(root, ":id/conversation_contact_name")?.text?.toString()?.let { PayScreen.clean(it) } ?: ""
+        val unknown = Regex("""^\+?[\d\s()-]{8,}$""").matches(title)
+        val audio = getSystemService(android.media.AudioManager::class.java)
+        val onCall = audio?.mode == android.media.AudioManager.MODE_IN_CALL || audio?.mode == android.media.AudioManager.MODE_IN_COMMUNICATION
+        val r = MessageRules.check(draft, unknown, onCall)
+        // The key holds a hash of the draft, in memory only, so a changed draft is judged again.
+        val key = "msg|$title|${draft.hashCode()}"
+        released.entries.removeAll { System.currentTimeMillis() - it.value > 3 * 60_000 }
+        if (r.decision.mode == "pass" || key in released) {
+            if (overlayKey?.startsWith("msg|") == true) hide()
+            return
+        }
+        val rect = Rect().also { send.getBoundsInScreen(it) }
+        if (overlayKey == key) {
+            move(rect)
+            return
+        }
+        val kinds = r.findings.map { MessageRules.label.getValue(it) }
+        copy = Copy(
+            "Orb paused this message",
+            kinds.joinToString(" · "),
+            if (unknown) "to a number not in your contacts" else "to ${title.ifEmpty { "this chat" }}",
+            "Don't send",
+            "Send anyway",
+            "Send this ${kinds.first().lowercase()}?",
+            "Orb paused it: it may be something you shouldn't share.",
+        )
+        onStop = {
+            // Clear the draft so the code or password isn't sent by accident.
+            entry.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, android.os.Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+            })
+        }
+        val ev = JSONObject().put("app", "WhatsApp").put("kind", "message").put("found", org.json.JSONArray(r.findings))
+            .put("to", if (unknown) "a number not in your contacts" else "a saved contact").put("mode", r.decision.mode).put("seconds", r.decision.seconds)
+        hide()
+        event = ev
+        decision = r.decision
+        overlayKey = key
+        sheetMode = false
+        guardedPkg = pkg
+        record("shown", ev)
+        create(PayScreenInfo(null, null, null, 0), r.decision, rect)
+        left = r.decision.seconds
+        main.post(tick)
+    }
+
     companion object {
+        val WHATSAPP = setOf("com.whatsapp", "com.whatsapp.w4b")
+
         @Volatile
         var instance: PayGuardService? = null
     }
