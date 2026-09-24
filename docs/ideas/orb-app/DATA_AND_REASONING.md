@@ -1,7 +1,10 @@
 # Your data, who can read it, and how Orb reasons over it
 
-Status: audit 2026-09-24; the reasoning (LLM) layer is a **proposal awaiting
-approval**. The live version of the audit is Orb's Phone tab → "Who can see what",
+Status: audit 2026-09-24. Reasoning layer **approved and built** (2026-09-24):
+on-device model where the phone supports it; cloud **per task with your yes**,
+sent by an AI app you pick (share sheet) so Orb itself keeps no internet access;
+weekly baseline; reasoning log. Code: `src/orb/reason.ts`,
+`android/…/OnDeviceModel.kt`. The live version of the audit is Orb's Phone tab → "Who can see what",
 built from the permissions actually granted on the phone (`src/orb/datamap.ts`).
 
 ## 1. What data is on the phone
@@ -34,7 +37,7 @@ internet permission. On the Mac, raw copies are no longer kept.
 4. 24 likely scam messages: don't open their links. Report them on sancharsaathi.gov.in (Chakshu).
 5. Open "Who can see what" and check location "all the time", microphone and photos for apps that don't need them.
 
-## 3. The reasoning layer (proposal)
+## 3. The reasoning layer
 
 Rules and statistics do the everyday work: deterministic, on the phone,
 tested (the pay guard, the message guard, the twin). A language model runs only
@@ -54,7 +57,7 @@ rule, loosens a guard or acts on its own.
 ### Where it runs
 
 - **On the phone first**: an on-device model (Gemini Nano through Android's AICore where the Pixel supports it, or a small open model). Nothing leaves the phone.
-- **A cloud model only per task, with your yes**, given masked, derived facts ("₹25,000 monthly to a person, 6 months"), never raw messages, numbers or names.
+- **A cloud model only per task, with your yes**, given masked, derived facts ("₹25,000 monthly to person A"), never raw messages, numbers or names. Orb shows exactly what will be sent; you approve; the AI app you choose sends it (Orb has no internet permission); you paste the answer back and Orb maps labels to names on the phone.
 - Chosen by a model router, never a hardcoded provider (Orb constitution: model independent). Swapping models changes no data or history.
 
 ### What stays true

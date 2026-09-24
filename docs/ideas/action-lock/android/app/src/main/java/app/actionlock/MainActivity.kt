@@ -14,6 +14,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
@@ -41,6 +42,8 @@ class MainActivity : FragmentActivity() {
     private lateinit var answers: JournalFile
     private lateinit var readers: PhoneReaders
     private lateinit var guardTable: PrivateFile
+    private lateinit var reasoning: JournalFile
+    private lateinit var nano: OnDeviceModel
 
     private val access = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         callJs("OrbApp.onAccess")
@@ -68,6 +71,9 @@ class MainActivity : FragmentActivity() {
         answers = JournalFile(filesDir, "answers.jsonl")
         readers = PhoneReaders(this)
         guardTable = PrivateFile(filesDir, "guard.json", "")
+        reasoning = JournalFile(filesDir, "reasoning.jsonl")
+        nano = OnDeviceModel(lifecycleScope)
+        nano.refresh { callJs("window.OrbApp?.onModelStatus") }
         incomingLink = upiLinkOf(intent)
 
         val assets = WebViewAssetLoader.Builder()
@@ -252,6 +258,39 @@ class MainActivity : FragmentActivity() {
         /** What the guard did (one JSON event per line) and pay screens it couldn't read. */
         @android.webkit.JavascriptInterface
         fun guardLog(): String = JournalFile(filesDir, "guard.jsonl").read()
+
+        // ── Reasoning: the on-device model, the cloud hand-off, the reasoning log ──
+
+        @android.webkit.JavascriptInterface
+        fun modelStatus(): String = nano.status
+
+        @android.webkit.JavascriptInterface
+        fun modelDownload() = runOnUiThread { nano.download { callJs("window.OrbApp?.onModelStatus") } }
+
+        /** Runs the on-device model; the reply comes back through OrbApp.onModelReply(id, reply, error). */
+        @android.webkit.JavascriptInterface
+        fun modelGenerate(id: String, prompt: String) = runOnUiThread {
+            nano.generate(prompt) { reply, error -> callJs("OrbApp.onModelReply", id, reply, error) }
+        }
+
+        /** Cloud, per task with your yes: you pick the AI app that sends it. Orb itself stays offline. */
+        @android.webkit.JavascriptInterface
+        fun shareText(text: String) = runOnUiThread {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            startActivity(Intent.createChooser(send, "Ask an AI app"))
+        }
+
+        @android.webkit.JavascriptInterface
+        fun clipboardText(): String {
+            val cm = getSystemService(android.content.ClipboardManager::class.java)
+            return cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this@MainActivity)?.toString() ?: ""
+        }
+
+        @android.webkit.JavascriptInterface
+        fun loadReasoning(): String = reasoning.read()
+
+        @android.webkit.JavascriptInterface
+        fun appendReasoning(json: String) = reasoning.append(json)
 
         /** The WhatsApp message guard's own switch (off unless you turn it on). */
         @android.webkit.JavascriptInterface

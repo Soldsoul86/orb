@@ -7,6 +7,7 @@ import { answer, buildTwin, type AnswerEvent, type Entity, type Question, type T
 import { demoSources } from './demo.ts';
 import { buildGuardTable } from './guard.ts';
 import { dataMap } from './datamap.ts';
+import { baselineFacts, baselinePrompt, inferenceRecord, routeModel, rulesBaseline, type GuardSummary, type InferenceRecord, type MaskedFacts, type ModelInfo } from './reason.ts';
 
 interface Access {
   sms: boolean;
@@ -27,6 +28,13 @@ interface OrbNative {
   guardOn(): boolean;
   openGuardSettings(): void;
   guardLog(): string;
+  modelStatus(): string;
+  modelDownload(): void;
+  modelGenerate(id: string, prompt: string): void;
+  shareText(text: string): void;
+  clipboardText(): string;
+  loadReasoning(): string;
+  appendReasoning(json: string): void;
   guardUnread(): string;
   clearGuardUnread(): void;
   guardSeen(): string;
@@ -35,6 +43,8 @@ interface OrbNative {
 }
 
 /** In a browser there is no phone: invented sample data, answers kept in this tab. */
+let reasoningLog = '';
+
 function browserNative(): OrbNative {
   const sources = demoSources(Date.now());
   let answers = '';
@@ -62,6 +72,15 @@ function browserNative(): OrbNative {
     guardOn: () => false,
     openGuardSettings: () => {},
     guardLog: () => '',
+    modelStatus: () => 'unavailable',
+    modelDownload: () => {},
+    modelGenerate: () => {},
+    shareText: () => {},
+    clipboardText: () => '',
+    loadReasoning: () => reasoningLog,
+    appendReasoning: (json) => {
+      reasoningLog += json + '\n';
+    },
     guardUnread: () => '',
     clearGuardUnread: () => {},
     guardSeen: () => '{}',
@@ -83,9 +102,13 @@ const state: {
   search: string;
   skipped: Set<string>;
   status: string;
+  records: InferenceRecord[];
+  thinking: string | null;
+  cloud: { facts: MaskedFacts; approvedAt?: number } | null;
+  showLog: boolean;
   writing: string | null;
   showUnread: boolean;
-} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '', writing: null, showUnread: false };
+} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '', writing: null, showUnread: false, records: [], thinking: null, cloud: null, showLog: false };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -140,7 +163,143 @@ function rebuild(): void {
   state.twin = buildTwin(state.result, state.answers, Date.now());
   // The pay guard reads this table; it changes with every answer (e.g. someone confirmed as family).
   native.saveGuard(JSON.stringify(buildGuardTable(state.result.profile, state.twin, Date.now())));
+  state.records = loadRecords();
+  // The weekly baseline: once a week, on the phone's own model if it has one, else by rules.
+  const last = latestBaseline();
+  if (state.thinking === null && (last === undefined || Date.now() - last.at > 7 * 86_400_000)) refreshInsights();
 }
+
+// ── Reasoning: Orb's weekly notes, the models behind them, and their log ──
+
+const NANO: ModelInfo = { kind: 'on_device', provider: 'Google AICore', name: 'Gemini Nano' };
+const CLOUD: ModelInfo = { kind: 'cloud', provider: 'the AI app you shared to', name: 'cloud model' };
+
+function loadRecords(): InferenceRecord[] {
+  return native
+    .loadReasoning()
+    .split('\n')
+    .flatMap((l) => {
+      try {
+        const e = JSON.parse(l) as InferenceRecord;
+        return e.kind === 'inference' ? [e] : [];
+      } catch {
+        return [];
+      }
+    });
+}
+
+function guardWeek(now: number): GuardSummary {
+  const events = native
+    .guardLog()
+    .split('\n')
+    .flatMap((l) => {
+      try {
+        return l.trim() === '' ? [] : [JSON.parse(l) as { at: number; outcome: string; kind?: string }];
+      } catch {
+        return [];
+      }
+    })
+    .filter((e) => e.at >= now - 7 * 86_400_000);
+  return {
+    paused: events.filter((e) => e.outcome === 'shown' && e.kind !== 'message').length,
+    notPaid: events.filter((e) => e.outcome === 'cancelled' && e.kind !== 'message').length,
+    messagesPaused: events.filter((e) => e.outcome === 'shown' && e.kind === 'message').length,
+  };
+}
+
+function facts(): MaskedFacts | null {
+  if (state.result === null || state.twin === null) return null;
+  return baselineFacts(state.result, state.twin, Date.now(), guardWeek(Date.now()));
+}
+
+function keep(rec: InferenceRecord): void {
+  native.appendReasoning(JSON.stringify(rec));
+  state.records = loadRecords();
+}
+
+/** Runs the weekly baseline on the phone's model, or on rules if there is none. */
+function refreshInsights(): void {
+  const f = facts();
+  if (f === null) return;
+  const model = routeModel(native.modelStatus() === 'available' ? NANO : null, false, CLOUD);
+  if (model.kind === 'rules') {
+    const now = Date.now();
+    keep({ kind: 'inference', id: `i${now}`, at: now, task: 'weekly_baseline', template: 'rules', model, prompt: '', reply: '', proposals: rulesBaseline(state.result!, now) });
+    render();
+    return;
+  }
+  const id = `m${Date.now()}`;
+  state.thinking = id;
+  pendingFacts.set(id, f);
+  render();
+  native.modelGenerate(id, baselinePrompt(f));
+}
+
+const pendingFacts = new Map<string, MaskedFacts>();
+
+function latestBaseline(): InferenceRecord | undefined {
+  return [...state.records].reverse().find((r) => r.task === 'weekly_baseline');
+}
+
+function insightsCard(): string {
+  const latest = latestBaseline();
+  const status = native.modelStatus();
+  const by = (r: InferenceRecord) =>
+    r.model.kind === 'on_device' ? `${r.model.name} on this phone` : r.model.kind === 'cloud' ? `a cloud AI you approved (${new Date(r.approvedAt ?? r.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })})` : "Orb's rules (no model)";
+  const cloud = state.cloud;
+  return `
+    <h2>This week, by Orb</h2>
+    <div class="card">
+      ${state.thinking ? '<p class="meta">Thinking on this phone…</p>' : ''}
+      ${
+        latest === undefined
+          ? '<p class="meta">No notes yet.</p>'
+          : latest.proposals.length === 0
+            ? '<p class="meta">Nothing unusual this week.</p>'
+            : latest.proposals.map((p) => `<p>${p.kind === 'question' ? '? ' : '• '}${esc(p.text)}</p>`).join('')
+      }
+      ${latest ? `<p class="meta">By ${esc(by(latest))}, ${new Date(latest.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}. <button class="link" data-log="1">How Orb reasoned</button></p>` : ''}
+      <p class="meta">On-device model: ${status === 'available' ? 'ready' : status === 'downloadable' ? 'can be downloaded by Android' : status === 'downloading' ? 'downloading…' : status === 'checking' ? 'checking…' : 'not supported on this phone'}.</p>
+      <div class="opts">
+        <button class="opt" data-insight="1">${status === 'available' ? 'Refresh on this phone' : 'Refresh with rules'}</button>
+        ${status === 'downloadable' ? '<button class="opt" data-download="1">Download on-device model</button>' : ''}
+        <button class="opt" data-cloud="1">Ask a cloud AI…</button>
+      </div>
+      ${
+        cloud
+          ? `<div class="cloud">
+              <p><b>Exactly this will be sent</b>, by the AI app you pick. People are replaced by labels; only this phone knows who they are.</p>
+              <pre class="unread">${esc(baselinePrompt(cloud.facts))}</pre>
+              ${
+                cloud.approvedAt === undefined
+                  ? '<button class="primary" data-approve="1">Approve and choose AI app</button><button class="link" data-cancelcloud="1">Cancel</button>'
+                  : '<p class="meta">Copy the AI\'s whole answer, come back, then:</p><button class="primary" data-paste="1">Paste the answer</button><button class="link" data-cancelcloud="1">Cancel</button>'
+              }
+            </div>`
+          : ''
+      }
+    </div>`;
+}
+
+function logView(): string {
+  const recs = [...state.records].reverse();
+  return `
+    <button class="link" data-closelog="1">← Today</button>
+    <h2>How Orb reasoned</h2>
+    <p class="meta">Every time a model was asked: which one, exactly what it was given (masked), what it said, and what Orb took from it. Kept on this phone as history.</p>
+    ${recs
+      .map(
+        (r) => `<details class="card">
+          <summary><span class="row"><span>${esc(r.task.replace('_', ' '))} · ${esc(r.model.kind === 'rules' ? 'rules' : `${r.model.name} (${r.model.kind === 'on_device' ? 'on this phone' : 'cloud, approved'})`)}</span><span class="meta">${new Date(r.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span></span></summary>
+          ${r.approvedAt ? `<p class="meta">You approved sending at ${new Date(r.approvedAt).toLocaleString('en-IN')}.</p>` : ''}
+          ${r.prompt ? `<p class="meta">Given:</p><pre class="unread">${esc(r.prompt)}</pre>` : '<p class="meta">No model: fixed rules over your data.</p>'}
+          ${r.reply ? `<p class="meta">Replied:</p><pre class="unread">${esc(r.reply)}</pre>` : ''}
+          <p class="meta">Orb took: ${r.proposals.length === 0 ? 'nothing (no valid notes)' : r.proposals.map((p) => esc(p.text)).join(' · ')}</p>
+        </details>`,
+      )
+      .join('') || '<p class="meta">Nothing yet.</p>'}`;
+}
+
 
 function give(question: string, value: string): void {
   const e = answer(question, value, Date.now(), state.answers.length);
@@ -170,6 +329,7 @@ function nextQuestion(t: Twin): Question | undefined {
 }
 
 function today(t: Twin): string {
+  if (state.showLog) return logView();
   const q = nextQuestion(t);
   const icon: Record<string, string> = { money: '₹', due: '⏰', security: '⚠', question: '?' };
   return `
@@ -177,6 +337,7 @@ function today(t: Twin): string {
     ${t.brief.length === 0 ? '<div class="card meta">Nothing needs you today.</div>' : ''}
     ${t.brief.map((b) => `<div class="card brief ${b.kind}"><span class="ic">${icon[b.kind]}</span><span>${esc(b.text)}</span></div>`).join('')}
     ${q ? `<h2>One question</h2>${questionCard(q)}` : ''}
+    ${insightsCard()}
     ${sensitiveNote()}`;
 }
 
@@ -449,6 +610,22 @@ function onClick(ev: Event): void {
   else if (d['usage']) return native.requestUsageAccess();
   else if (d['guard']) return native.openGuardSettings();
   else if (d['msgguard']) native.setMessageGuard(d['msgguard'] === 'on');
+  else if (d['insight']) return refreshInsights();
+  else if (d['download']) native.modelDownload();
+  else if (d['cloud']) {
+    const f = facts();
+    if (f !== null) state.cloud = { facts: f };
+  } else if (d['approve'] && state.cloud) {
+    // Your yes for this one task, recorded with the run; the AI app you pick does the sending.
+    state.cloud = { ...state.cloud, approvedAt: Date.now() };
+    native.shareText(baselinePrompt(state.cloud.facts));
+  } else if (d['paste'] && state.cloud?.approvedAt !== undefined) {
+    const reply = native.clipboardText();
+    keep(inferenceRecord('weekly_baseline', CLOUD, state.cloud.facts, reply, Date.now(), state.cloud.approvedAt));
+    state.cloud = null;
+  } else if (d['cancelcloud']) state.cloud = null;
+  else if (d['log']) state.showLog = true;
+  else if (d['closelog']) state.showLog = false;
   else if (d['unread']) state.showUnread = !state.showUnread;
   else if (d['clearunread']) {
     native.clearGuardUnread();
@@ -473,6 +650,20 @@ export const OrbApp = {
     const a = access();
     if (a.sms) void sync();
     else render();
+  },
+  /** The on-device model's reply to a task (from the Android bridge). */
+  onModelReply(id: string, reply: string | null, error: string | null): void {
+    const f = pendingFacts.get(id);
+    pendingFacts.delete(id);
+    if (state.thinking === id) state.thinking = null;
+    if (f !== undefined) {
+      const rec = inferenceRecord('weekly_baseline', NANO, f, reply ?? `(no reply: ${error ?? 'unknown error'})`, Date.now());
+      keep(rec);
+    }
+    render();
+  },
+  onModelStatus(): void {
+    if (state.twin !== null) render();
   },
   /** Called by the app after a permission prompt or on return from Settings. */
   onAccess(): void {

@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 160 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 165 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -147,6 +147,18 @@ Not yet tried on a device: reading WhatsApp's text box, the pause over Send, "Do
 ## Data map — `test/datamap.test.ts`
 
 For each kind of personal data (SMS, notifications, screen control, install and draw-over rights, contacts, calls, location all the time / while in use, microphone, camera, photos, files, calendar, health, nearby devices, phone number), the apps you installed that were granted it, with those not from the Play Store marked; the apps reaching the most money-related data ranked first; where to take access away; what Orb itself reads it for.
+
+## Reasoning layer — `test/reason.test.ts`
+
+| Area | What is proven |
+|---|---|
+| Masking | Facts name organisations but label people and accounts ("person A"); the prompt contains no person's name; the label map stays on the phone |
+| Replies | A model's reply is used only if it is JSON of the expected shape; notes mentioning a label that was never given are dropped; labels are mapped back to names on the phone |
+| Routing | On the phone's model if there is one; a cloud model only with a yes for that task; otherwise rules |
+| History | Each run is an inference record with the masked prompt, the reply and, for the cloud, when you approved |
+| No model | The weekly baseline still works from fixed rules |
+
+Browser preview: the weekly notes card, the approve-and-share request showing exactly what would be sent, and the reasoning log. Not yet on a device: Gemini Nano through AICore (whether the Pixel supports it), sharing to an AI app and pasting back.
 
 ## Checked that the tests can fail
 

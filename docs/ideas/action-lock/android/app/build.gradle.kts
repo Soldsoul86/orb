@@ -13,8 +13,8 @@ android {
         applicationId = "app.orb"
         minSdk = 29
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.6.1"
+        versionCode = 15
+        versionName = "0.7.0"
     }
 
     buildFeatures { buildConfig = true }
@@ -41,6 +41,8 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    // On-device model (Gemini Nano via AICore). Its telemetry asks for internet; the manifest removes that.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
 
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub in local unit tests.
