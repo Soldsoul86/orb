@@ -87,6 +87,8 @@ export interface AppInfo {
   readonly installedAt?: number;
   /** Watched permissions it holds, in words. */
   readonly can: readonly string[];
+  /** Every permission it has been granted (for the data map). */
+  readonly granted: readonly string[];
 }
 
 export interface PhoneFinding {
@@ -96,6 +98,8 @@ export interface PhoneFinding {
 
 export interface PhoneCheck {
   readonly apps: number;
+  /** Every app you installed, with what it was granted. */
+  readonly all: readonly AppInfo[];
   readonly notFromPlay: readonly AppInfo[];
   /** Websites installed as apps from Chrome; not counted as "not from the Play Store". */
   readonly webApps: number;
@@ -149,21 +153,24 @@ export function checkPhone(text: string): PhoneCheck {
     const m = line.match(/^package:([\w.]+)\s+installer=(\S+)/) ?? line.match(/^package:([\w.]+)/);
     if (!m) continue;
     const installer = m[2] === undefined || m[2] === 'null' ? null : m[2];
-    apps.set(m[1]!, { id: m[1]!, name: nameOf(m[1]!), installer, fromPlay: installer !== null && PLAY.has(installer), can: [] });
+    apps.set(m[1]!, { id: m[1]!, name: nameOf(m[1]!), installer, fromPlay: installer !== null && PLAY.has(installer), can: [], granted: [] });
   }
   for (const [key, lines] of s) {
     const id = key.match(/^app (\S+)$/)?.[1];
     const app = id === undefined ? undefined : apps.get(id);
     if (app === undefined) continue;
     const can = new Set<string>();
+    const granted = new Set<string>();
     let installedAt: number | undefined;
     for (const l of lines) {
+      const any = l.match(/([\w.]+\.permission\.[\w.]+): granted=true/)?.[1];
+      if (any !== undefined) granted.add(any);
       const perm = l.match(/(android\.permission\.[A-Z_]+): granted=true/)?.[1];
       if (perm !== undefined && WATCHED[perm] !== undefined) can.add(WATCHED[perm]);
       const t = l.match(/firstInstallTime=(.+)/)?.[1];
       if (t !== undefined) installedAt ??= parseInstallTime(t);
     }
-    apps.set(app.id, { ...app, can: [...can], ...(installedAt !== undefined ? { installedAt } : {}) });
+    apps.set(app.id, { ...app, can: [...can], granted: [...granted], ...(installedAt !== undefined ? { installedAt } : {}) });
   }
 
   const third = (ids: readonly string[]) => ids.filter((p) => apps.has(p));
@@ -219,6 +226,7 @@ export function checkPhone(text: string): PhoneCheck {
 
   return {
     apps: apps.size,
+    all: [...apps.values()],
     notFromPlay,
     webApps,
     accessibility,

@@ -57,6 +57,13 @@
   .write input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
   .write .primary { width: auto; margin: 0; padding: 10px 16px; }
   pre.unread { white-space: pre-wrap; font-size: 12px; max-height: 320px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 8px; }
+  details.data summary { list-style: none; cursor: pointer; }
+  details.data summary::-webkit-details-marker { display: none; }
+  .data .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: var(--muted); }
+  .data.money .dot { background: var(--warn); }
+  .data.high .dot { background: var(--accent); }
+  .chip { display: inline-block; padding: 3px 10px; margin: 2px 0; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; }
+  .chip.warn { border-color: var(--warn); color: var(--warn); }
   input[type=search] { width: 100%; font: inherit; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); margin-bottom: 10px; }
   .ent { cursor: pointer; }
   .ent .meta { display: block; margin-top: 2px; }

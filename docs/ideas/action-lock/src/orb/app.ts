@@ -6,6 +6,7 @@ import { runImport, type ImportInput, type ImportResult } from '../import/run.ts
 import { answer, buildTwin, type AnswerEvent, type Entity, type Question, type Twin } from './twin.ts';
 import { demoSources } from './demo.ts';
 import { buildGuardTable } from './guard.ts';
+import { dataMap } from './datamap.ts';
 
 interface Access {
   sms: boolean;
@@ -338,10 +339,36 @@ function messageCard(): string {
     </div>`;
 }
 
+function dataCard(): string {
+  const c = state.result?.phone;
+  if (c === undefined) return '';
+  const m = dataMap(c);
+  const dot: Record<string, string> = { money: 'money', high: 'high', medium: 'medium' };
+  const withApps = m.rows.filter((r) => r.apps.length > 0);
+  const none = m.rows.filter((r) => r.apps.length === 0);
+  return `
+    <h2>Who can see what</h2>
+    <p class="meta">Every kind of personal data on this phone, and which of the ${c.apps} apps you installed can read it (system apps aren't listed). Take access away where an app doesn't need it.</p>
+    ${m.widest.length > 0 ? `<div class="card"><div class="meta">Apps that reach the most:</div>${m.widest.map((w) => `<div class="row line"><span>${esc(w.app)}</span><span class="meta">${w.kinds} kind${w.kinds === 1 ? '' : 's'}${w.money > 0 ? ` · ${w.money} money-related` : ''}</span></div>`).join('')}</div>` : ''}
+    ${withApps
+      .map(
+        (r) => `<details class="card data ${dot[r.kind.sensitivity]}">
+          <summary><span class="row"><span><span class="dot"></span>${esc(r.kind.label)}</span><b>${r.apps.length}</b></span></summary>
+          <p class="meta">${esc(r.kind.why)}</p>
+          <p>${r.apps.map((a) => `<span class="chip${r.sideloaded.includes(a) ? ' warn' : ''}">${esc(a)}</span>`).join(' ')}</p>
+          ${r.sideloaded.length > 0 ? '<p class="meta">Red: not from the Play Store.</p>' : ''}
+          ${r.kind.orb ? `<p class="meta">Orb reads it for: ${esc(r.kind.orb)} (on this phone only).</p>` : ''}
+          <p class="meta">Review: ${esc(r.kind.settings)}</p>
+        </details>`,
+      )
+      .join('')}
+    ${none.length > 0 ? `<p class="meta">No app you installed can read: ${none.map((r) => esc(r.kind.label.toLowerCase())).join(', ')}.</p>` : ''}`;
+}
+
 function phone(): string {
   const r = state.result!;
   const c = r.phone;
-  return `${guardCard()}${messageCard()}
+  return `${dataCard()}${guardCard()}${messageCard()}
     <h2>Phone check</h2>
     ${c === undefined ? '<div class="card meta">Not read yet.</div>' : c.findings.length === 0 ? '<div class="card">Nothing to fix.</div>' : c.findings.map((f) => `<div class="card brief ${f.level === 'serious' ? 'security' : ''}"><span class="ic">${f.level === 'serious' ? '⚠' : '·'}</span><span>${esc(f.text)}</span></div>`).join('')}
     ${r.calls ? `<h2>Calls</h2><div class="card"><div class="row"><span>Calls to you from contacts</span><b>${Math.round(r.calls.incomingFromContacts * 100)}%</b></div><div class="row"><span>Unknown numbers that keep calling</span><b>${r.calls.persistentUnknown.length}</b></div></div>` : ''}

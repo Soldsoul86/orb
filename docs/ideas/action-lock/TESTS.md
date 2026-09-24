@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 157 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
+Run with `npm test` (Node's built-in `node:test`, no framework). 160 tests, plus 14 Kotlin unit tests in `android/` (`./gradlew testDebugUnitTest`).
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -143,6 +143,10 @@ the other UPI apps, the call and request signals. Learning from history, on the 
 | Parity | The Kotlin copy decides identically on every shared draft (`test/message-vectors.json`); a deliberate change to its timing was caught |
 
 Not yet tried on a device: reading WhatsApp's text box, the pause over Send, "Don't send" clearing the draft.
+
+## Data map — `test/datamap.test.ts`
+
+For each kind of personal data (SMS, notifications, screen control, install and draw-over rights, contacts, calls, location all the time / while in use, microphone, camera, photos, files, calendar, health, nearby devices, phone number), the apps you installed that were granted it, with those not from the Play Store marked; the apps reaching the most money-related data ranked first; where to take access away; what Orb itself reads it for.
 
 ## Checked that the tests can fail
 
