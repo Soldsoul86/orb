@@ -131,7 +131,7 @@ script errors. The APK builds; its merged manifest has no internet permission.
 On the Pixel (24 Sept 2026): PhonePe's Pay button covered and released
 ("Continue"); Google Pay's UPI PIN keypad covered by the sheet; "Don't pay" on the
 PIN screen returns to Google Pay. Not yet tried on a device: the fingerprint step,
-the other UPI apps, the call and request signals.
+the other UPI apps, the call and request signals. Learning from history, on the Pixel: after opening Chethan's Google Pay chat ("Payment to CHETHAN ₹175 Paid"), ₹175 to him passed with no pause and ₹2,000 was paused as "more than you've paid … (most: ₹175)".
 
 ## Checked that the tests can fail
 

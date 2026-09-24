@@ -133,7 +133,8 @@ class PayGuardService : AccessibilityService() {
         val amount = info.amount
         if (amount == null) {
             hide()
-            remember("unread", pkg, info, nodes)
+            // A chat with no amount typed yet is normal; only a pay screen without a payee is worth keeping.
+            if (info.name == null && info.vpa == null) remember("unread", pkg, info, nodes)
             return
         }
         val t = GuardRules.withSeen(loadTable() ?: return, seenPayees())
