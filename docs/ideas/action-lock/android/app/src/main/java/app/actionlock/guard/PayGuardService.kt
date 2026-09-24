@@ -41,6 +41,14 @@ class PayGuardService : AccessibilityService() {
     private var tableStamp = 0L
     private var pending = false
 
+    private var lastRefs: List<AccessibilityNodeInfo> = emptyList()
+    private var lastNodes: List<ScreenNode> = emptyList()
+    private var cancelUntil = 0L
+    private var guardedPkg = ""
+
+    /** When each app last showed a money request someone sent. */
+    private val requestSeen = HashMap<String, Long>()
+
     /** UPI ID → name, from screens that showed both (a PIN screen may show only the ID). */
     private val vpaNames = HashMap<String, String>()
 
@@ -96,8 +104,18 @@ class PayGuardService : AccessibilityService() {
         if (root.packageName?.toString() != pkg) return
         val nodes = ArrayList<ScreenNode>()
         val bounds = ArrayList<Rect>()
-        collect(root, nodes, bounds, 0)
-        val info = PayScreen.parse(nodes)
+        val refs = ArrayList<AccessibilityNodeInfo>()
+        collect(root, nodes, bounds, refs, 0)
+        lastRefs = refs
+        lastNodes = nodes
+        val now0 = System.currentTimeMillis()
+        if (PayScreen.isRequest(nodes)) requestSeen[pkg] = now0
+        // Just after "Don't pay": confirm the app's "cancel this payment?" dialog if it shows one.
+        if (now0 < cancelUntil) {
+            val yes = PayScreen.cancelConfirm(nodes)
+            if (yes >= 0) click(refs[yes])
+        }
+        val info = PayScreen.parse(nodes, pinOnly = pkg !in PayScreen.ownScreens)
         if (info == null) {
             hide()
             if (PayScreen.looksLikePayment(nodes)) remember("no pay button found", pkg, PayScreenInfo(null, null, null, -1), nodes)
@@ -122,7 +140,10 @@ class PayGuardService : AccessibilityService() {
             return
         }
         if (who == null) remember("unread", pkg, info, nodes)
-        val decision = GuardRules.decide(t, who, amount, Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+        val audio = getSystemService(android.media.AudioManager::class.java)
+        val onCall = audio?.mode == android.media.AudioManager.MODE_IN_CALL || audio?.mode == android.media.AudioManager.MODE_IN_COMMUNICATION
+        val fromRequest = (requestSeen[pkg] ?: 0L) > now - 3 * 60_000
+        val decision = GuardRules.decide(t, who, amount, Calendar.getInstance().get(Calendar.HOUR_OF_DAY), onCall, fromRequest)
         if (decision.mode == "pass") {
             hide()
             return
@@ -135,15 +156,41 @@ class PayGuardService : AccessibilityService() {
         show(pkg, key, info.copy(name = who), decision, cover)
     }
 
-    private fun collect(n: AccessibilityNodeInfo, nodes: MutableList<ScreenNode>, bounds: MutableList<Rect>, depth: Int) {
+    private fun collect(n: AccessibilityNodeInfo, nodes: MutableList<ScreenNode>, bounds: MutableList<Rect>, refs: MutableList<AccessibilityNodeInfo>, depth: Int) {
         if (depth > 40 || nodes.size > 600) return
         if (!n.isVisibleToUser) return
         val text = (n.text ?: n.contentDescription)?.toString()
         if (!text.isNullOrBlank()) {
             nodes += ScreenNode(text, n.isEditable, n.isClickable || n.parent?.isClickable == true)
             bounds += Rect().also { n.getBoundsInScreen(it) }
+            refs += n
         }
-        for (i in 0 until n.childCount) n.getChild(i)?.let { collect(it, nodes, bounds, depth + 1) }
+        for (i in 0 until n.childCount) n.getChild(i)?.let { collect(it, nodes, bounds, refs, depth + 1) }
+    }
+
+    /** Clicks a node, or the nearest clickable parent (labels are often inside the button). */
+    private fun click(n: AccessibilityNodeInfo): Boolean {
+        var cur: AccessibilityNodeInfo? = n
+        repeat(4) {
+            val c = cur ?: return false
+            if (c.isClickable) return c.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            cur = c.parent
+        }
+        return false
+    }
+
+    /**
+     * "Don't pay": leave the payment. On the PIN screen the back gesture is often
+     * ignored, so the screen's own Close is tapped and a "cancel payment?"
+     * dialog confirmed; if the PIN screen is somehow still there, the pause
+     * comes back rather than leaving the keypad open.
+     */
+    private fun leave(pkg: String) {
+        cancelUntil = System.currentTimeMillis() + 4_000
+        val close = PayScreen.closeButton(lastNodes)
+        if (!(close >= 0 && click(lastRefs[close]))) performGlobalAction(GLOBAL_ACTION_BACK)
+        main.postDelayed({ check(pkg) }, 900)
+        main.postDelayed({ check(pkg) }, 2_000)
     }
 
     // ── Overlay ──────────────────────────────────────────────────────────
@@ -252,6 +299,7 @@ class PayGuardService : AccessibilityService() {
         decision = d
         overlayKey = key
         sheetMode = info.pin
+        guardedPkg = pkg
         record("shown", ev)
         create(info, d, cover)
         left = d.seconds
@@ -347,7 +395,7 @@ class PayGuardService : AccessibilityService() {
         stop.setOnClickListener {
             event?.let { record("cancelled", it) }
             hide()
-            performGlobalAction(GLOBAL_ACTION_BACK)
+            leave(guardedPkg)
         }
         pay.setOnClickListener {
             val key = overlayKey ?: return@setOnClickListener

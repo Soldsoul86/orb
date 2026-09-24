@@ -17,7 +17,7 @@ class GuardRulesTest {
             val c = cases.getJSONObject(i)
             val expected = c.getJSONObject("expected")
             val name = if (c.has("name")) c.getString("name") else null
-            val d = GuardRules.decide(table, name, c.getDouble("amount"), c.getInt("hour"))
+            val d = GuardRules.decide(table, name, c.getDouble("amount"), c.getInt("hour"), c.optBoolean("onCall"), c.optBoolean("fromRequest"))
             val label = c.getString("label")
             assertEquals(label, expected.getString("mode"), d.mode)
             assertEquals(label, expected.getInt("seconds"), d.seconds)

@@ -60,7 +60,7 @@ object GuardRules {
         return table.payees.firstOrNull { it.key.length >= 8 && (it.key.startsWith(n) || n.startsWith(it.key)) }
     }
 
-    fun decide(table: GuardTable, name: String?, amount: Double, hour: Int): GuardDecision {
+    fun decide(table: GuardTable, name: String?, amount: Double, hour: Int, onCall: Boolean = false, fromRequest: Boolean = false): GuardDecision {
         val reasons = mutableListOf<String>()
         var seconds = 0
         var confirm = false
@@ -79,6 +79,19 @@ object GuardRules {
             seconds = if (large) 30 else 10
             confirm = large && !(p.relation != null && p.relation in trusted)
             reasons += "${rupees(amount)} is more than you've paid ${p.name} before (most: ${rupees(p.max)}, usually ${rupees(p.usual)})."
+        }
+
+        // Pressure signals only make an unusual payment stricter; a usual payment still passes.
+        val unusual = seconds > 0
+        if (fromRequest) {
+            reasons += "This payment started from a request someone sent you. You never need your PIN to receive money."
+            seconds = maxOf(seconds, 30)
+            confirm = true
+        }
+        if (onCall && (unusual || fromRequest)) {
+            reasons += "You're on a call. Scammers keep people on the phone while they pay; hang up first if you can."
+            seconds += 20
+            confirm = confirm || p == null
         }
 
         val from = table.quietFrom

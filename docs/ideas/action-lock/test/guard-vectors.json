@@ -241,6 +241,79 @@
       }
     },
     {
+      "label": "new payee while on a call",
+      "name": "NEW PERSON",
+      "amount": 500,
+      "hour": 13,
+      "onCall": true,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 30,
+        "reasons": [
+          "You've never paid NEW PERSON before.",
+          "You're on a call. Scammers keep people on the phone while they pay; hang up first if you can."
+        ]
+      }
+    },
+    {
+      "label": "known payee, usual amount, on a call: still passes",
+      "name": "TARUN SHARMA",
+      "amount": 3000,
+      "hour": 13,
+      "onCall": true,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "known payee, above usual, on a call",
+      "name": "RAVIKUMAR M",
+      "amount": 1500,
+      "hour": 13,
+      "onCall": true,
+      "expected": {
+        "mode": "wait",
+        "seconds": 30,
+        "reasons": [
+          "₹1,500 is more than you've paid RAVIKUMAR M before (most: ₹400, usually ₹160).",
+          "You're on a call. Scammers keep people on the phone while they pay; hang up first if you can."
+        ]
+      }
+    },
+    {
+      "label": "payment from a request",
+      "name": "SWIGGY LIMITED",
+      "amount": 400,
+      "hour": 13,
+      "fromRequest": true,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 30,
+        "reasons": [
+          "This payment started from a request someone sent you. You never need your PIN to receive money."
+        ]
+      }
+    },
+    {
+      "label": "request from someone new while on a call",
+      "name": "NEW PERSON",
+      "amount": 1900,
+      "hour": 13,
+      "fromRequest": true,
+      "onCall": true,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 50,
+        "reasons": [
+          "You've never paid NEW PERSON before.",
+          "This payment started from a request someone sent you. You never need your PIN to receive money.",
+          "You're on a call. Scammers keep people on the phone while they pay; hang up first if you can."
+        ]
+      }
+    },
+    {
       "label": "PIN screen shows only a known UPI ID",
       "name": "9535528118@axl",
       "amount": 300,

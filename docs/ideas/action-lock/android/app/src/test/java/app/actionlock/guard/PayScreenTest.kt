@@ -97,6 +97,24 @@ class PayScreenTest {
     }
 
     @Test
+    fun otherAppsOnlyThePinScreen() {
+        val shop = listOf(ScreenNode("Deal of the day ₹499"), ScreenNode("Buy now", clickable = true), ScreenNode("Proceed to pay", clickable = true))
+        assertNull(PayScreen.parse(shop, pinOnly = true))
+        assertEquals(true, PayScreen.parse(pin("To CHETHAN GOWDA P S", "Pay ₹3000.00"), pinOnly = true)!!.pin)
+        assertEquals(false, PayScreen.looksLikePayment(shop))
+    }
+
+    @Test
+    fun findsTheCloseButtonAndACancelDialog() {
+        assertEquals(2, PayScreen.closeButton(pin("To X Y", "Pay ₹1.00")))
+        val dialog = listOf(ScreenNode("Are you sure you want to cancel this payment?"), ScreenNode("No", clickable = true), ScreenNode("Yes", clickable = true))
+        assertEquals(2, PayScreen.cancelConfirm(dialog))
+        assertEquals(-1, PayScreen.cancelConfirm(listOf(ScreenNode("Yes", clickable = true))))
+        assertEquals(true, PayScreen.isRequest(listOf(ScreenNode("ANIL K has requested ₹1,999"))))
+        assertEquals(false, PayScreen.isRequest(listOf(ScreenNode("Request", clickable = true))))
+    }
+
+    @Test
     fun readsTheNameInGooglePaysChatHeader() {
         val chat = listOf(
             ScreenNode("Back", clickable = true), ScreenNode("CHETHAN GOWDA P S PhonePe • 9535528118@axl"), ScreenNode("Show menu", clickable = true),

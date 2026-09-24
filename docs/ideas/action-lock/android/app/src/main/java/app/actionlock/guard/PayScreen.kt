@@ -19,10 +19,44 @@ data class PayScreenInfo(
 )
 
 object PayScreen {
+    /**
+     * UPI apps whose screens are read. Every UPI app asks for the PIN on NPCI's
+     * common-library screen, so the PIN-screen guard works in all of them; the
+     * apps' own pay screens are read best-effort.
+     */
     val apps = mapOf(
         "com.phonepe.app" to "PhonePe",
         "com.google.android.apps.nbu.paisa.user" to "Google Pay",
+        "net.one97.paytm" to "Paytm",
+        "in.org.npci.upiapp" to "BHIM",
+        "com.dreamplug.androidapp" to "CRED",
+        "in.amazon.mShop.android.shopping" to "Amazon Pay",
+        "com.mobikwik_new" to "MobiKwik",
+        "com.naviapp" to "Navi",
+        "com.snapwork.hdfc" to "HDFC Bank",
+        "com.csam.icici.bank.imobile" to "ICICI iMobile",
+        "com.sbi.lotusintouch" to "SBI YONO",
+        "com.axis.mobile" to "Axis Mobile",
+        "com.msf.kbank.mobile" to "Kotak",
     )
+
+    /** Apps whose own pay screens are read; in the others only the NPCI PIN screen is. */
+    val ownScreens = setOf("com.phonepe.app", "com.google.android.apps.nbu.paisa.user")
+
+    /** A money request someone sent you ("requested ₹500", "Approve payment"): the start of most collect scams. */
+    private val requestRe = Regex("""(?:has requested|requested ₹|request(?:ed)? (?:money|payment)|collect request|payment request|approve (?:payment|request)|pending request)""", RegexOption.IGNORE_CASE)
+
+    fun isRequest(nodes: List<ScreenNode>): Boolean = nodes.any { requestRe.containsMatchIn(it.text) }
+
+    /** On a "cancel this payment?" dialog: the button that confirms cancelling. */
+    fun cancelConfirm(nodes: List<ScreenNode>): Int {
+        if (nodes.none { Regex("""cancel|abort|discard|go back""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) && !it.clickable }) return -1
+        return nodes.indexOfFirst { it.clickable && Regex("""^(?:yes|yes, cancel|cancel payment|cancel transaction|ok|confirm)$""", RegexOption.IGNORE_CASE).matches(it.text.trim()) }
+    }
+
+    /** The screen's own close button (the PIN screen has one): how "Don't pay" leaves it. */
+    fun closeButton(nodes: List<ScreenNode>): Int =
+        nodes.indexOfFirst { it.clickable && Regex("""^(?:close|back|navigate up|cancel)$""", RegexOption.IGNORE_CASE).matches(it.text.trim()) }
 
     private val payLabel = Regex("""^(?:pay|pay now|proceed to pay|proceed|send|pay\s*₹\s*[\d,]+(?:\.\d{1,2})?)$""", RegexOption.IGNORE_CASE)
     private val vpaRe = Regex("""[A-Za-z0-9.\-_]{2,}@[A-Za-z][A-Za-z0-9]{1,63}""")
@@ -56,11 +90,12 @@ object PayScreen {
 
     /** Looks like a money screen, even if no Pay button was recognised: worth keeping for improving the reader. */
     fun looksLikePayment(nodes: List<ScreenNode>): Boolean =
-        nodes.any { it.text.contains("₹") || Regex("""banking name""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
+        nodes.any { Regex("""banking name|enter (?:your )?(?:upi )?pin|\bupi id\b""", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
 
-    fun parse(nodes: List<ScreenNode>): PayScreenInfo? {
+    fun parse(nodes: List<ScreenNode>, pinOnly: Boolean = false): PayScreenInfo? {
         val texts = nodes.map { it.text.trim() }
         pinScreen(nodes, texts)?.let { return it }
+        if (pinOnly) return null
         val paymentScreen = nodes.any { it.editable && number(it.text) != null } ||
             texts.any { Regex("""^(?:banking name|bank(?:ing)? name)""", RegexOption.IGNORE_CASE).containsMatchIn(it) }
         val payButton = nodes.indexOfLast { it.clickable && payLabel.matches(it.text.trim()) }

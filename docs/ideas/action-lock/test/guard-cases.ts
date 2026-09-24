@@ -34,6 +34,11 @@ export const SCREENS: readonly (GuardScreen & { readonly label: string })[] = [
   { label: 'known payee at 3 am, 3.3× your usual', name: 'RAVIKUMAR M', amount: 600, hour: 3 },
   { label: 'quiet hours wrap midnight: 23:00 is outside 01–06', name: 'NEW PERSON', amount: 500, hour: 23 },
   { label: 'no name read', amount: 700, hour: 13 },
+  { label: 'new payee while on a call', name: 'NEW PERSON', amount: 500, hour: 13, onCall: true },
+  { label: 'known payee, usual amount, on a call: still passes', name: 'TARUN SHARMA', amount: 3_000, hour: 13, onCall: true },
+  { label: 'known payee, above usual, on a call', name: 'RAVIKUMAR M', amount: 1_500, hour: 13, onCall: true },
+  { label: 'payment from a request', name: 'SWIGGY LIMITED', amount: 400, hour: 13, fromRequest: true },
+  { label: 'request from someone new while on a call', name: 'NEW PERSON', amount: 1_900, hour: 13, fromRequest: true, onCall: true },
   { label: 'PIN screen shows only a known UPI ID', name: '9535528118@axl', amount: 300, hour: 13 },
   { label: 'PIN screen shows an unknown UPI ID', name: 'munirajamadavali@oksbi', amount: 300, hour: 13 },
 ];

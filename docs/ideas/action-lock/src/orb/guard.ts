@@ -44,6 +44,10 @@ export interface GuardScreen {
   readonly name?: string;
   readonly amount: number;
   readonly hour: number;
+  /** A phone or WhatsApp call is going on: scammers keep people on the line while they pay. */
+  readonly onCall?: boolean;
+  /** The payment started from a request someone sent (collect / "approve"), not from you. */
+  readonly fromRequest?: boolean;
 }
 
 export interface GuardDecision {
@@ -110,6 +114,19 @@ export function decideGuard(table: GuardTable, screen: GuardScreen): GuardDecisi
     seconds = large ? 30 : 10;
     confirm = large && !(p.relation !== undefined && TRUSTED.has(p.relation));
     reasons.push(`${rupees(screen.amount)} is more than you've paid ${p.name} before (most: ${rupees(p.max)}, usually ${rupees(p.usual)}).`);
+  }
+
+  // Pressure signals only make an unusual payment stricter; a usual payment still passes.
+  const unusual = seconds > 0;
+  if (screen.fromRequest === true) {
+    reasons.push('This payment started from a request someone sent you. You never need your PIN to receive money.');
+    seconds = Math.max(seconds, 30);
+    confirm = true;
+  }
+  if (screen.onCall === true && (unusual || screen.fromRequest === true)) {
+    reasons.push("You're on a call. Scammers keep people on the phone while they pay; hang up first if you can.");
+    seconds += 20;
+    confirm = confirm || p === undefined;
   }
 
   const q = table.quiet;
