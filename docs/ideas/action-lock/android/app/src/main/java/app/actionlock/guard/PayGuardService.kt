@@ -211,7 +211,7 @@ class PayGuardService : AccessibilityService() {
     private fun create(pay: Rect) {
         val dark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val fg = if (dark) 0xFFF1EEE8.toInt() else 0xFF1C1B19.toInt()
-        val bg = if (dark) 0xF71D1C1A.toInt() else 0xFAFFFFFF.toInt()
+        val bg = if (dark) 0xFF1D1C1A.toInt() else 0xFFFFFFFF.toInt()
         val accent = if (dark) 0xFF8AA6F6.toInt() else 0xFF2F5BD3.toInt()
 
         title = TextView(this).apply {
