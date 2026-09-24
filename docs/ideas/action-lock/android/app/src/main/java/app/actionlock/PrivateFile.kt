@@ -7,7 +7,7 @@ import java.io.File
  * Writes go to a temporary file first and are then renamed over the old one,
  * so a crash mid-write never leaves a half-written file.
  */
-class PrivateFile(dir: File, name: String, private val empty: String) {
+class PrivateFile(dir: File, private val name: String, private val empty: String) {
     private val file = File(dir, name)
     private val tmp = File(dir, "$name.tmp")
 
