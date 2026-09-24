@@ -127,8 +127,10 @@ script errors. The APK builds; its merged manifest has no internet permission.
 | Google Pay chat | Name from the header "CHETHAN GOWDA P S PhonePe • …@axl"; the ₹175 of an old payment is not taken as the amount |
 | Reading the pay screen | PhonePe (text from a real screen): payee from "Banking name", the typed amount, not the ₹12,050 from the chat history above; an empty amount field gives no amount; Google Pay entry and confirm screens; no Pay button → not a pay screen |
 
-Not tested on a device yet: the Accessibility service, the overlay's position over
-the Pay button, and the fingerprint step.
+On the Pixel (24 Sept 2026): PhonePe's Pay button covered and released
+("Continue"); Google Pay's UPI PIN keypad covered by the sheet; "Don't pay" on the
+PIN screen returns to Google Pay. Not yet tried on a device: the fingerprint step,
+the other UPI apps, the call and request signals.
 
 ## Checked that the tests can fail
 
