@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orb</title>
+<style>
+  :root {
+    --bg: #f3f2ef; --card: #ffffff; --text: #1c1b19; --muted: #67635c; --line: #e2dfd8;
+    --accent: #2f5bd3; --accent-soft: #e3e9fa; --warn: #c8322b; --warn-soft: #fbe9e7; --ok: #1f7a4a; --track: #e7e4dd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a59f94; --line: #2e2c29;
+      --accent: #8aa6f6; --accent-soft: #232a3d; --warn: #e5574c; --warn-soft: #3a1f1c; --ok: #5ec48d; --track: #2b2926;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121212; --card: #1d1c1a; --text: #f1eee8; --muted: #a59f94; --line: #2e2c29;
+    --accent: #8aa6f6; --accent-soft: #232a3d; --warn: #e5574c; --warn-soft: #3a1f1c; --ok: #5ec48d; --track: #2b2926;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body { margin: 0; color: var(--text); font: 16px/1.45 system-ui, -apple-system, Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px 96px; }
+  header { display: flex; align-items: center; gap: 10px; padding: 6px 0 4px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; flex: 1; }
+  .orb { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--accent-soft), var(--accent)); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: .9 } 50% { transform: scale(1.12); opacity: 1 } }
+  @media (prefers-reduced-motion: reduce) { .orb { animation: none; } }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; }
+  .card { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .line { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .line:last-child { border-bottom: 0; }
+  .meta { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .note { margin: 4px 0 0; }
+  .payee { font-weight: 600; overflow-wrap: anywhere; }
+  .big { font-size: 20px; }
+  .in { color: var(--ok); }
+  .brief { display: flex; gap: 12px; align-items: flex-start; }
+  .brief .ic { width: 22px; flex: none; text-align: center; font-weight: 700; color: var(--accent); }
+  .brief.security { border-color: var(--warn); background: var(--warn-soft); }
+  .brief.security .ic { color: var(--warn); }
+  .q .qtext { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  button { font: inherit; cursor: pointer; }
+  .opt { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px; padding: 8px 14px; }
+  .opt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .link { border: 0; background: none; color: var(--accent); padding: 8px 0; }
+  .primary, .secondary { display: block; width: 100%; margin-top: 12px; border-radius: 12px; padding: 12px; border: 1px solid var(--accent); }
+  .primary { background: var(--accent); color: #fff; }
+  .secondary { background: transparent; color: var(--accent); }
+  input[type=search] { width: 100%; font: inherit; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); margin-bottom: 10px; }
+  .ent { cursor: pointer; }
+  .ent .meta { display: block; margin-top: 2px; }
+  .stats { display: flex; justify-content: space-between; margin-top: 12px; text-align: center; }
+  .belief .conf { height: 4px; background: var(--track); border-radius: 2px; margin: 8px 0 6px; overflow: hidden; }
+  .belief .conf span { display: block; height: 100%; background: var(--accent); }
+  .bar { margin-bottom: 10px; }
+  .bar .track { display: block; height: 6px; background: var(--track); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .bar .track span { display: block; height: 100%; background: var(--accent); }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 2px; padding: 8px 8px max(8px, env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); }
+  nav button, nav a { flex: 1; max-width: 84px; border: 0; background: none; color: var(--muted); font-size: 13px; padding: 8px 2px; border-radius: 10px; text-decoration: none; text-align: center; }
+  nav .on { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  nav i { font-style: normal; background: var(--accent); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 11px; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>OrbApp.start();</script>
+</body>
+</html>

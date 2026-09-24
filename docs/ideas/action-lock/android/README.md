@@ -1,13 +1,35 @@
-# Action Lock for Android (Pixel)
+# Orb for Android (Pixel)
 
-A delayed press for UPI payments. Every payment waits for the buffer you set,
+**Orb** (home screen, `index.html`): reads what the phone already keeps (SMS,
+contacts, call log, installed apps and their permissions, screen time), builds
+Orb's model of you (people and organisations, beliefs with a confidence and a
+reason) and asks you one question at a time. Your answers are an append-only
+journal (`answers.jsonl`) in app-private storage; the model is rebuilt from the
+phone's data plus every answer. The app has **no internet permission** (removed
+even where a library asks for it), so nothing it reads can leave the phone. See
+`../../orb-app/PLAN.md`.
+
+**The lock** (`lock.html`, the Lock tab): a delayed press for UPI payments. Every payment waits for the buffer you set,
 then opens your UPI app (Google Pay, PhonePe, Paytm, BHIM) with the payee and
 amount filled in. You enter your UPI PIN there as usual.
 
-Status: **source complete, not yet compiled.** The build environment used to
-write it could not reach `dl.google.com` (Android SDK and Google Maven), so the
-Kotlin code has not been through the compiler yet. The web part it runs has
-been tested (see `../TESTS.md`).
+Status: **builds** (`app-debug.apk`, debug-signed, package `app.orb`). Not yet
+run on a device: the readers and permission flow need a first run on the Pixel.
+
+## Build and install
+
+```bash
+cd ..                      # docs/ideas/action-lock
+npm run build:android      # bundles the Orb and lock pages into the app's assets
+cd android && echo "sdk.dir=/path/to/android-sdk" > local.properties
+./gradlew assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+On first open Orb asks for Messages, Contacts and Call log, and (in Settings)
+Usage access. SMS and call-log access are restricted for Play Store apps; this
+is installed directly, so Android allows them (it may ask you to confirm
+"restricted settings": Settings → Apps → Orb → ⋮ → Allow restricted settings).
 
 ## How it works
 

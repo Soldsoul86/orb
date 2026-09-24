@@ -1,10 +1,16 @@
-// Builds the Pixel app's page into the Android assets folder: public/app.html
-// with the lock core (src/android.ts) bundled inside.
+// Builds the Pixel app's pages into the Android assets folder:
+//   index.html — Orb (public/orb.html + src/orb/app.ts)
+//   lock.html  — the lock (public/app.html + src/android.ts)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { inlineBundle, root } from './inline.mjs';
 
-const out = await inlineBundle('public/app.html', 'src/android.ts');
 const dir = new URL('android/app/src/main/assets/', root);
 mkdirSync(dir, { recursive: true });
-writeFileSync(new URL('index.html', dir), out);
-console.log(`android/app/src/main/assets/index.html ${(out.length / 1024).toFixed(1)} KB`);
+for (const [page, entry, out] of [
+  ['public/orb.html', 'src/orb/app.ts', 'index.html'],
+  ['public/app.html', 'src/android.ts', 'lock.html'],
+]) {
+  const html = await inlineBundle(page, entry);
+  writeFileSync(new URL(out, dir), html);
+  console.log(`android/app/src/main/assets/${out} ${(html.length / 1024).toFixed(1)} KB`);
+}

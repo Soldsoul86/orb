@@ -27,3 +27,20 @@ class PrivateFile(dir: File, private val name: String, private val empty: String
         }
     }
 }
+
+/**
+ * An append-only journal in app-private storage: one JSON event per line.
+ * Lines are only ever added, never rewritten, so history can't be edited.
+ */
+class JournalFile(dir: File, name: String) {
+    private val file = File(dir, name)
+
+    @Synchronized
+    fun read(): String = if (file.exists()) file.readText() else ""
+
+    @Synchronized
+    fun append(line: String) {
+        require(!line.contains('\n')) { "One event per line" }
+        file.appendText(line + "\n")
+    }
+}

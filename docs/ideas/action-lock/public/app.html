@@ -29,6 +29,7 @@
   body { margin: 0; color: var(--text); font: 16px/1.45 system-ui, -apple-system, Roboto, sans-serif; }
   main { max-width: 480px; margin: 0 auto; padding-block: max(16px, env(safe-area-inset-top)) 48px; padding-inline: 16px; }
   header { display: flex; align-items: center; gap: 10px; padding: 6px 0 4px; }
+  header .back { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 15px; }
   header svg { width: 26px; height: 26px; color: var(--accent); }
   h1 { font-size: 21px; margin: 0; letter-spacing: -0.01em; }
   .sub { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
@@ -81,6 +82,7 @@
       <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
     </svg>
     <h1>Action Lock</h1>
+    <a class="back" href="index.html">← Orb</a>
   </header>
   <p class="sub">Every UPI payment waits for the buffer you set before your UPI app opens.</p>
   <p class="preview" id="previewNote" hidden><strong>Preview.</strong> No real payment is made here: "Opening your UPI app" is simulated. In the Pixel app it opens Google Pay or PhonePe.</p>

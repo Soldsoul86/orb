@@ -1,6 +1,6 @@
 # Action Lock — Tests
 
-Run with `npm test` (Node's built-in `node:test`, no framework). 141 tests.
+Run with `npm test` (Node's built-in `node:test`, no framework). 147 tests.
 
 ## Unit — `test/core.test.ts` (pure core)
 
@@ -97,6 +97,21 @@ calls read short of their rows (layout only, values replaced by their length),
 screen-time lines when the format isn't recognised, mails that looked like
 receipts or bookings but weren't read. Proven safe to paste: no passwords, no
 contact names, no full phone numbers.
+
+## Orb — `test/twin.test.ts`
+
+| Area | What is proven |
+|---|---|
+| Entities | People, organisations and accounts resolved from bank alerts; a person linked to a matching contact; a timeline per entity |
+| Beliefs | Regular monthly credits become an income belief with a confidence below 1 and a reason ("5 credits in 5 months"); no belief is ever 0 or 1 |
+| Questions | Most valuable first (the salary question before the rest); who-is-this for people you move money with; what-was-it for a large one-off |
+| Answers | An answer is an event: the belief is then held from you at 0.99, its question goes, the entity gets a relation; a later answer replaces an earlier one without erasing it; unknown answers are ignored |
+| Replay | Same observations and answers → the same twin |
+| Value | Money by relation for the last 30 days; a brief with income, the week's spending and questions waiting |
+
+The Orb page was run in a 412 px browser with invented data (`npm run
+build:orb-preview`): every tab, answering a question, a person's page. No
+script errors. The APK builds; its merged manifest has no internet permission.
 
 ## Checked that the tests can fail
 

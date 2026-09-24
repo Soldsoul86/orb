@@ -1,6 +1,10 @@
 # Orb app — plan (approved: option A)
 
-Status: approved 2026-09-23, build starts next session. Prototype under
+Status: approved 2026-09-23. **First build done 2026-09-24**: the Android app
+(`action-lock/android`, package `app.orb`) reads the phone itself and shows the
+Orb screens (Today, Ask, People, Money, Phone, Lock); core in
+`action-lock/src/orb/twin.ts` (tests: `test/twin.test.ts`). Not yet run on the
+Pixel. Prototype under
 `docs/ideas/`, like `action-lock/`; not part of the Orb runtime (Phase 3 gates
 implementation in `packages/`). Replaceable; the architecture is not changed.
 
