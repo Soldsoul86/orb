@@ -27,6 +27,7 @@ interface OrbNative {
   openGuardSettings(): void;
   guardLog(): string;
   guardUnread(): string;
+  clearGuardUnread(): void;
 }
 
 /** In a browser there is no phone: invented sample data, answers kept in this tab. */
@@ -58,6 +59,7 @@ function browserNative(): OrbNative {
     openGuardSettings: () => {},
     guardLog: () => '',
     guardUnread: () => '',
+    clearGuardUnread: () => {},
   };
 }
 
@@ -300,7 +302,7 @@ function guardCard(): string {
       <p>${on ? '✓ <b>On</b> for PhonePe and Google Pay.' : '○ <b>Off.</b>'} When a payment is unusual for you (someone new, much more than usual, an odd hour), Orb covers the Pay button with the reason and a short pause. Usual payments see nothing.</p>
       ${on ? '' : `<p class="meta">Settings → Accessibility → Orb pay guard → On. If it's greyed out: Settings → Apps → Orb → ⋮ → Allow restricted settings, then try again.</p><button class="primary" data-guard="1">Open Accessibility settings</button>`}
       ${done.length > 0 ? `<div class="meta" style="margin-top:10px">Recent pauses:</div>${done.map((e) => `<div class="row line"><span>${rupees(e.amount)} to ${esc(e.name ?? 'someone')} <span class="meta">· ${esc(e.app)}</span></span><span class="meta">${verb[e.outcome] ?? e.outcome}</span></div>`).join('')}` : ''}
-      ${unreadCount > 0 ? `<p class="meta">${unreadCount} pay screen${unreadCount === 1 ? '' : 's'} it couldn't fully read. <button class="link" data-unread="1">${state.showUnread ? 'Hide' : 'Show'}</button> (send these to improve the reader)</p>${state.showUnread ? `<pre class="unread">${esc(unread)}</pre>` : ''}` : ''}
+      ${unreadCount > 0 ? `<p class="meta">${unreadCount} pay screen${unreadCount === 1 ? '' : 's'} it couldn't fully read. <button class="link" data-unread="1">${state.showUnread ? 'Hide' : 'Show'}</button> · <button class="link" data-clearunread="1">Clear</button> (send these to improve the reader)</p>${state.showUnread ? `<pre class="unread">${esc(unread)}</pre>` : ''}` : ''}
     </div>`;
 }
 
@@ -388,6 +390,10 @@ function onClick(ev: Event): void {
   else if (d['usage']) return native.requestUsageAccess();
   else if (d['guard']) return native.openGuardSettings();
   else if (d['unread']) state.showUnread = !state.showUnread;
+  else if (d['clearunread']) {
+    native.clearGuardUnread();
+    state.showUnread = false;
+  }
   else if (d['sync']) return void sync();
   else return;
   render();

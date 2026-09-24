@@ -146,14 +146,18 @@ class PayGuardService : AccessibilityService() {
         for (i in 0 until n.childCount) n.getChild(i)?.let { collect(it, nodes, bounds, depth + 1) }
     }
 
-    // ── Overlay: a shield exactly over Pay, and a card above it with the reason ──
+    // ── Overlay ──────────────────────────────────────────────────────────
+    // On the UPI PIN screen: one sheet over the keypad (amount, payee, reasons,
+    // countdown, Don't pay / Pay anyway). On an app's own pay screen: a card
+    // above the Pay button and a small locked chip over it, so the amount field
+    // and keyboard keep working.
 
     private var shield: TextView? = null
-    private var title: TextView? = null
-    private var why: TextView? = null
-    private var go: Button? = null
+    private var go: TextView? = null
+    private var bar: View? = null
     private var event: JSONObject? = null
     private var decision: GuardDecision? = null
+    private var sheetMode = false
     private var left = 0
     private var lastRemembered = ""
 
@@ -175,13 +179,24 @@ class PayGuardService : AccessibilityService() {
     private fun shieldParams(pay: Rect) = windowParams(pay.width() + dp(8), pay.height() + dp(8), (pay.left - dp(4)).coerceAtLeast(0), (pay.top - dp(4)).coerceAtLeast(0))
 
     private fun cardParams(pay: Rect): WindowManager.LayoutParams {
-        val h = dp(170)
+        val h = dp(196)
         return windowParams(WindowManager.LayoutParams.MATCH_PARENT, h, 0, (pay.top - h - dp(8)).coerceAtLeast(0))
     }
 
-    private fun move(pay: Rect) {
-        shield?.let { windows.updateViewLayout(it, shieldParams(pay)) }
-        overlay?.let { windows.updateViewLayout(it, cardParams(pay)) }
+    /** Over the PIN keypad, full width, at least tall enough for the sheet's content. */
+    private fun sheetParams(keys: Rect): WindowManager.LayoutParams {
+        val screen = resources.displayMetrics.heightPixels
+        val top = (keys.top - dp(12)).coerceAtLeast(0).coerceAtMost(screen - dp(340))
+        return windowParams(WindowManager.LayoutParams.MATCH_PARENT, (keys.bottom + dp(12)).coerceAtMost(screen) - top, 0, top)
+    }
+
+    private fun move(r: Rect) {
+        if (sheetMode) {
+            overlay?.let { windows.updateViewLayout(it, sheetParams(r)) }
+        } else {
+            shield?.let { windows.updateViewLayout(it, shieldParams(r)) }
+            overlay?.let { windows.updateViewLayout(it, cardParams(r)) }
+        }
     }
 
     private val tick = object : Runnable {
@@ -190,120 +205,204 @@ class PayGuardService : AccessibilityService() {
             val d = decision ?: return
             if (left > 0) {
                 b.isEnabled = false
-                b.text = "Continue in ${left}s"
-                shield?.text = "Wait ${left}s"
+                b.alpha = 0.55f
+                b.text = if (d.mode == "confirm") "Fingerprint · ${left}s" else "Pay anyway · ${left}s"
+                shield?.text = "🔒 ${left}s"
                 left--
                 main.postDelayed(this, 1000)
             } else {
                 b.isEnabled = true
-                b.text = if (d.mode == "confirm") "Fingerprint" else "Continue"
-                shield?.text = if (d.mode == "confirm") "Fingerprint first" else "Tap Continue"
+                b.alpha = 1f
+                b.text = if (d.mode == "confirm") "Confirm with fingerprint" else "Pay anyway"
+                shield?.text = "🔒 Tap Pay anyway"
             }
         }
     }
 
-    private fun show(pkg: String, key: String, info: PayScreenInfo, d: GuardDecision, pay: Rect) {
+    private class Palette(val fg: Int, val muted: Int, val bg: Int, val accent: Int, val onAccent: Int, val track: Int, val warn: Int)
+
+    private fun palette(): Palette {
+        val dark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        return if (dark) {
+            Palette(0xFFF1EEE8.toInt(), 0xFFA59F94.toInt(), 0xFF1D1C1A.toInt(), 0xFF8AA6F6.toInt(), 0xFF101828.toInt(), 0xFF2E2C29.toInt(), 0xFFE5574C.toInt())
+        } else {
+            Palette(0xFF1C1B19.toInt(), 0xFF67635C.toInt(), 0xFFFFFFFF.toInt(), 0xFF2F5BD3.toInt(), 0xFFFFFFFF.toInt(), 0xFFE7E4DD.toInt(), 0xFFC8322B.toInt())
+        }
+    }
+
+    private fun pill(text: String, fill: Int, fg: Int, stroke: Int? = null) = TextView(this).apply {
+        this.text = text
+        gravity = Gravity.CENTER
+        setTextColor(fg)
+        textSize = 15f
+        setTypeface(typeface, android.graphics.Typeface.BOLD)
+        setPadding(dp(12), dp(12), dp(12), dp(12))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(26).toFloat()
+            setColor(fill)
+            if (stroke != null) setStroke(dp(1), stroke)
+        }
+        isClickable = true
+    }
+
+    private fun show(pkg: String, key: String, info: PayScreenInfo, d: GuardDecision, cover: Rect) {
         val ev = JSONObject().put("app", PayScreen.apps[pkg]).put("name", info.name ?: JSONObject.NULL).put("amount", info.amount).put("mode", d.mode).put("seconds", d.seconds)
+        hide()
         event = ev
         decision = d
         overlayKey = key
+        sheetMode = info.pin
         record("shown", ev)
-        if (overlay == null) create(pay) else move(pay)
-        // A new payee or amount starts the pause again.
-        title?.text = "Orb · pause before paying ${GuardRules.rupees(info.amount!!)}"
-        why?.text = d.reasons.joinToString("\n")
+        create(info, d, cover)
         left = d.seconds
-        main.removeCallbacks(tick)
         main.post(tick)
     }
 
-    private fun create(pay: Rect) {
-        val dark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val fg = if (dark) 0xFFF1EEE8.toInt() else 0xFF1C1B19.toInt()
-        val bg = if (dark) 0xFF1D1C1A.toInt() else 0xFFFFFFFF.toInt()
-        val accent = if (dark) 0xFF8AA6F6.toInt() else 0xFF2F5BD3.toInt()
-
-        title = TextView(this).apply {
-            setTextColor(fg)
-            textSize = 16f
+    private fun create(info: PayScreenInfo, d: GuardDecision, cover: Rect) {
+        val c = palette()
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(View(this@PayGuardService).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(c.accent)
+                }
+            }, LinearLayout.LayoutParams(dp(12), dp(12)).apply { rightMargin = dp(8) })
+            addView(TextView(this@PayGuardService).apply {
+                text = "Orb paused this payment"
+                setTextColor(c.muted)
+                textSize = 13f
+            })
+        }
+        val amount = TextView(this).apply {
+            text = GuardRules.rupees(info.amount ?: 0.0)
+            setTextColor(c.fg)
+            textSize = if (sheetMode) 34f else 22f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(6), 0, 0)
         }
-        why = TextView(this).apply {
-            setTextColor(fg)
+        val to = TextView(this).apply {
+            text = "to ${info.name ?: "this payee"}"
+            setTextColor(c.fg)
+            textSize = 16f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        val why = TextView(this).apply {
+            text = d.reasons.joinToString("\n") { "• $it" }
+            setTextColor(c.fg)
             textSize = 14f
-            setPadding(0, dp(4), 0, dp(6))
-            maxLines = 3
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(10), 0, dp(12))
+            maxLines = if (sheetMode) 6 else 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        val cancel = Button(this).apply { text = "Don't pay" }
-        go = Button(this).apply { setTextColor(accent) }
+        // Countdown bar: shrinks to nothing as the pause ends.
+        val track = android.widget.FrameLayout(this).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(2).toFloat()
+                setColor(c.track)
+            }
+        }
+        val fill = View(this).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(2).toFloat()
+                setColor(c.accent)
+            }
+            pivotX = 0f
+        }
+        track.addView(fill, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, dp(4)))
+        bar = fill
+
+        val stop = pill("Don't pay", c.accent, c.onAccent)
+        val pay = pill("Pay anyway", android.graphics.Color.TRANSPARENT, c.fg, c.muted)
+        go = pay
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(cancel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(go, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            setPadding(0, dp(12), 0, 0)
+            addView(stop, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(10) })
+            addView(pay, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
-        val card = LinearLayout(this).apply {
+        val sheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(12), dp(18), dp(8))
+            setPadding(dp(20), dp(16), dp(20), dp(16))
             background = GradientDrawable().apply {
-                cornerRadius = dp(20).toFloat()
-                setColor(bg)
-                setStroke(dp(1), accent)
+                cornerRadius = dp(24).toFloat()
+                setColor(c.bg)
+                setStroke(dp(1), c.track)
             }
-            addView(title)
+            addView(header)
+            addView(amount)
+            addView(to)
             addView(why)
+            addView(track, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(4)))
+            if (sheetMode) addView(View(this@PayGuardService), LinearLayout.LayoutParams(0, 0, 1f))
             addView(buttons)
+            // Touches on the sheet never reach the keypad or Pay underneath.
             isClickable = true
         }
-        // Over the Pay button: taps land here, not on Pay, until you continue.
-        val s = TextView(this).apply {
-            gravity = Gravity.CENTER
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 14f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            background = GradientDrawable().apply {
-                cornerRadius = dp(28).toFloat()
-                setColor(accent)
-            }
-            isClickable = true
-        }
+        if (sheetMode) sheet.gravity = Gravity.TOP
 
-        cancel.setOnClickListener {
+        stop.setOnClickListener {
             event?.let { record("cancelled", it) }
             hide()
             performGlobalAction(GLOBAL_ACTION_BACK)
         }
-        go?.setOnClickListener {
+        pay.setOnClickListener {
             val key = overlayKey ?: return@setOnClickListener
             val ev = event ?: return@setOnClickListener
             if (decision?.mode == "confirm") {
-                val amount = ev.optDouble("amount")
                 startActivity(
                     Intent(this, GuardConfirmActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .putExtra("key", key)
                         .putExtra("event", ev.toString())
-                        .putExtra("title", "Pay ${GuardRules.rupees(amount)} to ${ev.optString("name").takeIf { it.isNotEmpty() && it != "null" } ?: "this payee"}?"),
+                        .putExtra("title", "Pay ${GuardRules.rupees(ev.optDouble("amount"))} to ${ev.optString("name").takeIf { it.isNotEmpty() && it != "null" } ?: "this payee"}?"),
                 )
             } else {
                 release(key, ev.toString(), "continued")
             }
         }
-        windows.addView(card, cardParams(pay))
-        windows.addView(s, shieldParams(pay))
-        overlay = card
-        shield = s
+
+        if (sheetMode) {
+            windows.addView(sheet, sheetParams(cover))
+        } else {
+            windows.addView(sheet, cardParams(cover))
+            val chip = TextView(this).apply {
+                gravity = Gravity.CENTER
+                setTextColor(c.onAccent)
+                textSize = 14f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(28).toFloat()
+                    setColor(c.accent)
+                }
+                isClickable = true
+            }
+            windows.addView(chip, shieldParams(cover))
+            shield = chip
+        }
+        overlay = sheet
+
+        // Slide in, a short buzz, and the countdown bar running down.
+        sheet.alpha = 0f
+        sheet.translationY = dp(24).toFloat()
+        sheet.animate().alpha(1f).translationY(0f).setDuration(180).start()
+        sheet.performHapticFeedback(if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.CONFIRM else android.view.HapticFeedbackConstants.LONG_PRESS)
+        if (d.seconds > 0) fill.animate().scaleX(0f).setDuration(d.seconds * 1000L).setInterpolator(android.view.animation.LinearInterpolator()).start()
     }
 
     private fun hide() {
         main.removeCallbacks(tick)
+        bar?.animate()?.cancel()
         overlay?.let { runCatching { windows.removeView(it) } }
         shield?.let { runCatching { windows.removeView(it) } }
         overlay = null
         shield = null
         overlayKey = null
-        title = null
-        why = null
         go = null
+        bar = null
     }
 
     /** You chose to go ahead: the pause is lifted for this payee and amount. */

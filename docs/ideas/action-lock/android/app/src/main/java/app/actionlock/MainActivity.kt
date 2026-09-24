@@ -254,6 +254,11 @@ class MainActivity : FragmentActivity() {
         fun guardLog(): String = JournalFile(filesDir, "guard.jsonl").read()
 
         @android.webkit.JavascriptInterface
+        fun clearGuardUnread() {
+            java.io.File(filesDir, "guard-unread.txt").delete()
+        }
+
+        @android.webkit.JavascriptInterface
         fun guardUnread(): String = java.io.File(filesDir, "guard-unread.txt").let { if (it.exists()) it.readText().takeLast(20_000) else "" }
 
         /** The profile the lock judges payments against, rebuilt from the phone's own data. */
