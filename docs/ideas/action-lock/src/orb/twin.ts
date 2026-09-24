@@ -16,7 +16,7 @@
 import { mergeDuplicates } from '../profile.ts';
 import type { ImportResult } from '../import/run.ts';
 import { UNNAMED_KEY, type Txn } from '../import/types.ts';
-import type { Subscription } from '../subscriptions.ts';
+import { displayMerchant, type Subscription } from '../subscriptions.ts';
 
 const DAY = 86_400_000;
 
@@ -207,6 +207,7 @@ function incomeRule(e: Entity, txns: readonly Txn[]): Candidate | null {
 }
 
 const RELATIONS: readonly Option[] = [
+  { value: 'me', label: 'Me (my own account)' },
   { value: 'family', label: 'Family' },
   { value: 'friend', label: 'Friend' },
   { value: 'landlord', label: 'Landlord / rent' },
@@ -229,7 +230,7 @@ function relationRule(e: Entity, regular?: Subscription): Candidate | null {
     belief: { id: `relation:${e.id}`, about: e.id, text: `${e.name} is someone close to you`, confidence: Math.min(0.8, 0.4 + e.count / 100), because, source: 'observed' },
     question: { text: `Who is ${e.name} to you?`, because, options: RELATIONS, score: 200 + total / 1_000 },
     meaning: Object.fromEntries(RELATIONS.map((o) => [o.value, `${e.name}: ${o.label.toLowerCase()}`])),
-    relation: Object.fromEntries(RELATIONS.map((o) => [o.value, o.value])),
+    relation: Object.fromEntries(RELATIONS.map((o) => [o.value, o.value === 'me' ? 'you' : o.value])),
   };
 }
 
@@ -267,7 +268,7 @@ function candidates(r: ImportResult, entities: readonly Entity[], txns: readonly
   const person = new Set(entities.filter((e) => e.kind === 'person').map((e) => e.id));
 
   for (const a of p.autopays.filter((x) => x.status === 'active')) {
-    const name = a.likelyMerchant ?? a.merchant;
+    const name = a.likelyMerchant ?? displayMerchant(a.merchant);
     const because = `autopay${a.amount !== undefined ? ` up to ${rupees(a.amount)}` : ''}${a.frequency ? `, ${a.frequency}` : ''}; last message ${shortDate(a.lastEventAt)}`;
     out.push({
       belief: { id: `autopay:${a.merchant}`, about: 'you', text: `You still want the autopay to ${name}`, confidence: 0.6, because, source: 'observed' },
@@ -377,9 +378,13 @@ export function buildTwin(r: ImportResult, answers: readonly AnswerEvent[], now:
   for (const c of candidates(r, base, txns)) {
     const qid = c.belief.id;
     const a = latest.get(qid);
-    if (a !== undefined && c.meaning[a.value] !== undefined) {
-      beliefs.push({ ...c.belief, text: c.meaning[a.value]!, confidence: 0.99, because: `you said so on ${shortDate(a.at)} (${c.belief.because})`, source: 'you' });
-      const rel = c.relation?.[a.value];
+    // Your own words ("note:my cousin's rent share") when no option fits.
+    const note = a?.value.startsWith('note:') ? a.value.slice(5).trim() : undefined;
+    if (a !== undefined && (c.meaning[a.value] !== undefined || (note !== undefined && note !== ''))) {
+      const subject = c.belief.about === 'you' ? '' : `${base.find((e) => e.id === c.belief.about)?.name ?? c.belief.about}: `;
+      const text = note !== undefined ? `${subject}${note}` : c.meaning[a.value]!;
+      beliefs.push({ ...c.belief, text, confidence: 0.99, because: `you said so on ${shortDate(a.at)} (${c.belief.because})`, source: 'you' });
+      const rel = note !== undefined ? (c.relation !== undefined ? note.toLowerCase() : undefined) : c.relation?.[a.value];
       if (rel !== undefined && c.belief.about !== 'you') relations.set(c.belief.about, rel);
       if (c.question !== undefined) answeredQuestions.push({ id: qid, about: c.belief.about, ...c.question, answer: a.value });
     } else {
@@ -418,12 +423,22 @@ function briefOf(r: ImportResult, entities: readonly Entity[], beliefs: readonly
   // Income: when the next one is due, or whether it arrived.
   for (const b of beliefs.filter((x) => x.id.startsWith('income:') && !/not your income/.test(x.text))) {
     const e = entities.find((x) => x.id === b.about);
-    const last = e?.timeline.find((m) => m.direction === 'credit');
+    const credits = e?.timeline.filter((m) => m.direction === 'credit') ?? [];
+    const last = credits[0];
     if (e === undefined || last === undefined) continue;
-    const next = last.at + 30.44 * DAY;
+    const usual = median(credits.map((m) => m.amount));
+    // The main (usual-sized) payment decides what to expect next; smaller extras are mentioned as such.
+    const main = credits.find((m) => Math.abs(m.amount - usual) <= usual * 0.25) ?? last;
+    const next = main.at + 30.44 * DAY;
+    const extra = last !== main ? ` Latest: ${rupees(last.amount)} on ${shortDate(last.at)}.` : '';
     out.push({
       kind: 'money',
-      text: now - last.at < 20 * DAY ? `${e.name}: ${rupees(last.amount)} arrived on ${shortDate(last.at)}.` : `${e.name}: next payment expected around ${shortDate(next)}.`,
+      text:
+        now - main.at < 20 * DAY
+          ? `${e.name}: ${rupees(main.amount)} arrived on ${shortDate(main.at)}.${extra}`
+          : next < now - 3 * DAY
+            ? `${e.name}: the usual ~${rupees(usual)} was expected around ${shortDate(next)} and hasn't arrived.${extra}`
+            : `${e.name}: next ~${rupees(usual)} expected around ${shortDate(next)}.${extra}`,
     });
   }
 
@@ -448,7 +463,7 @@ function briefOf(r: ImportResult, entities: readonly Entity[], beliefs: readonly
     out.push({ kind: 'due', text: `${s.name}: about ${rupees(s.usualAmount)} due around ${shortDate(s.nextDueAt)}.` });
   }
   for (const a of p.autopays.filter((x) => x.status === 'active' && soon(x.nextDebitAt))) {
-    out.push({ kind: 'due', text: `Autopay to ${a.likelyMerchant ?? a.merchant}${a.amount !== undefined ? ` (up to ${rupees(a.amount)})` : ''} on ${shortDate(a.nextDebitAt!)}.` });
+    out.push({ kind: 'due', text: `Autopay to ${a.likelyMerchant ?? displayMerchant(a.merchant)}${a.amount !== undefined ? ` (up to ${rupees(a.amount)})` : ''} on ${shortDate(a.nextDebitAt!)}.` });
   }
 
   // Security: only what needs doing.

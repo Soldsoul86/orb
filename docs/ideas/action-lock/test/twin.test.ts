@@ -81,8 +81,19 @@ describe('Orb twin', () => {
     const t = buildTwin(r, [answer('income:ACME TECHNOLOGIES', 'salary', now, 0)], now);
     assert.ok(t.spendByRelation.some((s) => s.relation === 'not labelled yet' && s.amount > 2_000));
     const brief = t.brief.map((b) => b.text).join('\n');
-    assert.match(brief, /ACME TECHNOLOGIES: (?:₹3,10,338 arrived on 1 Sept?\.|next payment expected around)/);
+    assert.match(brief, /ACME TECHNOLOGIES: the usual ~₹3,10,338 was expected around 31 Aug and hasn't arrived\./);
     assert.match(brief, /Spent ₹[\d,]+ in the last 7 days \(7 payments\)/);
     assert.match(brief, /questions? waiting/);
+  });
+
+  it('answers in your own words, and "me" for your own accounts', () => {
+    const t = buildTwin(r, [answer('relation:ASHA MENON', 'note:my cousin, shares the rent', now, 0), answer('oneoff:ACCOUNT XX2041', 'own_account', now, 1)], now);
+    const asha = t.beliefs.find((b) => b.id === 'relation:ASHA MENON')!;
+    assert.equal(asha.text, 'ASHA MENON: my cousin, shares the rent');
+    assert.equal(t.entities.find((e) => e.name === 'ASHA MENON')?.relation, 'my cousin, shares the rent');
+    assert.equal(t.answeredQuestions.find((q) => q.id === 'relation:ASHA MENON')?.answer, 'note:my cousin, shares the rent');
+    assert.equal(t.entities.find((e) => e.name === 'Account XX2041')?.relation, 'own account');
+    const q = buildTwin(r, [], now).questions.find((x) => x.id === 'relation:ASHA MENON')!;
+    assert.equal(q.options[0]!.label, 'Me (my own account)');
   });
 });

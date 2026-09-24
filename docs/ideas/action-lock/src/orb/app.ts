@@ -63,7 +63,8 @@ const state: {
   search: string;
   skipped: Set<string>;
   status: string;
-} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '' };
+  writing: string | null;
+} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '', writing: null };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -128,12 +129,15 @@ function give(question: string, value: string): void {
 // ── Views ──────────────────────────────────────────────────────────────────
 
 function questionCard(q: Question, current?: string): string {
+  const own = current?.startsWith('note:') ? current.slice(5) : undefined;
+  const writing = state.writing === q.id;
   return `<div class="card q">
     <p class="qtext">${esc(q.text)}</p>
     <p class="meta">Because ${esc(q.because)}.</p>
     <div class="opts">${q.options
       .map((o) => `<button class="opt${o.value === current ? ' on' : ''}" data-q="${esc(q.id)}" data-v="${esc(o.value)}">${esc(o.label)}</button>`)
-      .join('')}</div>
+      .join('')}<button class="opt${own !== undefined ? ' on' : ''}" data-write="${esc(q.id)}">${own !== undefined ? `“${esc(own)}”` : 'In my words…'}</button></div>
+    ${writing ? `<div class="write"><input id="note" type="text" maxlength="120" placeholder="e.g. my cousin, pays half the rent" value="${esc(own ?? '')}"><button class="primary" data-note="${esc(q.id)}">Save</button></div>` : ''}
     ${current === undefined ? `<button class="link" data-skip="${esc(q.id)}">Not now</button>` : ''}
   </div>`;
 }
@@ -297,6 +301,8 @@ function render(): void {
     ${isPhone ? '' : '<p class="meta note">Preview with invented data. On the phone, Orb reads your own.</p>'}
     ${body}
     ${t ? `<nav>${tabs.map(([k, l]) => `<button data-tab="${k}" class="${state.tab === k ? 'on' : ''}">${l}</button>`).join('')}<a href="lock.html">Lock</a></nav>` : ''}`;
+  const note = document.getElementById('note') as HTMLInputElement | null;
+  if (note !== null) note.focus();
   const search = document.getElementById('search') as HTMLInputElement | null;
   if (search !== null && state.search !== '') {
     search.focus();
@@ -311,8 +317,21 @@ function onClick(ev: Event): void {
   if (d['tab']) {
     state.tab = d['tab'] as Tab;
     state.person = null;
-  } else if (d['q'] && d['v']) return give(d['q'], d['v']);
-  else if (d['skip']) state.skipped.add(d['skip']);
+  } else if (d['q'] && d['v']) {
+    state.writing = null;
+    return give(d['q'], d['v']);
+  } else if (d['write']) state.writing = state.writing === d['write'] ? null : d['write'];
+  else if (d['note']) {
+    const text = (document.getElementById('note') as HTMLInputElement | null)?.value.trim() ?? '';
+    state.writing = null;
+    if (text !== '') return give(d['note'], `note:${text}`);
+  }
+  else if (d['write']) state.writing = state.writing === d['write'] ? null : d['write'];
+  else if (d['note']) {
+    const text = (document.getElementById('note') as HTMLInputElement | null)?.value.trim() ?? '';
+    state.writing = null;
+    if (text !== '') return give(d['note'], `note:${text}`);
+  } else if (d['skip']) state.skipped.add(d['skip']);
   else if (d['unskip']) state.skipped.clear();
   else if (d['person']) state.person = d['person'];
   else if (d['back']) state.person = null;
@@ -321,7 +340,7 @@ function onClick(ev: Event): void {
   else if (d['sync']) return void sync();
   else return;
   render();
-  window.scrollTo(0, 0);
+  if (!d['write']) window.scrollTo(0, 0);
 }
 
 export const OrbApp = {
