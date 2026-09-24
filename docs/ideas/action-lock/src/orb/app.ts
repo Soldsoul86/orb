@@ -5,6 +5,7 @@
 import { runImport, type ImportInput, type ImportResult } from '../import/run.ts';
 import { answer, buildTwin, type AnswerEvent, type Entity, type Question, type Twin } from './twin.ts';
 import { demoSources } from './demo.ts';
+import { buildGuardTable } from './guard.ts';
 
 interface Access {
   sms: boolean;
@@ -21,6 +22,11 @@ interface OrbNative {
   loadAnswers(): string;
   appendAnswer(json: string): void;
   saveProfile(json: string): void;
+  saveGuard(json: string): void;
+  guardOn(): boolean;
+  openGuardSettings(): void;
+  guardLog(): string;
+  guardUnread(): string;
 }
 
 /** In a browser there is no phone: invented sample data, answers kept in this tab. */
@@ -47,6 +53,11 @@ function browserNative(): OrbNative {
       }
     },
     saveProfile: () => {},
+    saveGuard: () => {},
+    guardOn: () => false,
+    openGuardSettings: () => {},
+    guardLog: () => '',
+    guardUnread: () => '',
   };
 }
 
@@ -64,7 +75,8 @@ const state: {
   skipped: Set<string>;
   status: string;
   writing: string | null;
-} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '', writing: null };
+  showUnread: boolean;
+} = { tab: 'today', result: null, answers: [], twin: null, person: null, search: '', skipped: new Set(), status: '', writing: null, showUnread: false };
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -117,6 +129,8 @@ function rebuild(): void {
   if (state.result === null) return;
   state.answers = loadAnswers();
   state.twin = buildTwin(state.result, state.answers, Date.now());
+  // The pay guard reads this table; it changes with every answer (e.g. someone confirmed as family).
+  native.saveGuard(JSON.stringify(buildGuardTable(state.result.profile, state.twin, Date.now())));
 }
 
 function give(question: string, value: string): void {
@@ -255,10 +269,45 @@ function money(t: Twin): string {
     <div class="card">${autopays.map((a) => `<div class="row line"><span>${esc(a.likelyMerchant ?? a.merchant)}</span><span>${a.amount !== undefined ? `up to ${rupees(a.amount)}` : ''}</span></div>`).join('') || '<span class="meta">None found.</span>'}</div>`;
 }
 
+interface GuardEvent {
+  at: number;
+  app: string;
+  name: string | null;
+  amount: number;
+  mode: string;
+  outcome: string;
+}
+
+function guardCard(): string {
+  const on = native.guardOn();
+  const events = native
+    .guardLog()
+    .split('\n')
+    .flatMap((l) => {
+      try {
+        return l.trim() === '' ? [] : [JSON.parse(l) as GuardEvent];
+      } catch {
+        return [];
+      }
+    });
+  const done = events.filter((e) => e.outcome !== 'shown').slice(-6).reverse();
+  const verb: Record<string, string> = { continued: 'you continued', confirmed: 'you confirmed with fingerprint', cancelled: "you didn't pay" };
+  const unread = native.guardUnread();
+  const unreadCount = (unread.match(/^── /gm) ?? []).length;
+  return `
+    <h2>Pay guard</h2>
+    <div class="card">
+      <p>${on ? '✓ <b>On</b> for PhonePe and Google Pay.' : '○ <b>Off.</b>'} When a payment is unusual for you (someone new, much more than usual, an odd hour), Orb covers the Pay button with the reason and a short pause. Usual payments see nothing.</p>
+      ${on ? '' : `<p class="meta">Settings → Accessibility → Orb pay guard → On. If it's greyed out: Settings → Apps → Orb → ⋮ → Allow restricted settings, then try again.</p><button class="primary" data-guard="1">Open Accessibility settings</button>`}
+      ${done.length > 0 ? `<div class="meta" style="margin-top:10px">Recent pauses:</div>${done.map((e) => `<div class="row line"><span>${rupees(e.amount)} to ${esc(e.name ?? 'someone')} <span class="meta">· ${esc(e.app)}</span></span><span class="meta">${verb[e.outcome] ?? e.outcome}</span></div>`).join('')}` : ''}
+      ${unreadCount > 0 ? `<p class="meta">${unreadCount} pay screen${unreadCount === 1 ? '' : 's'} it couldn't fully read. <button class="link" data-unread="1">${state.showUnread ? 'Hide' : 'Show'}</button> (send these to improve the reader)</p>${state.showUnread ? `<pre class="unread">${esc(unread)}</pre>` : ''}` : ''}
+    </div>`;
+}
+
 function phone(): string {
   const r = state.result!;
   const c = r.phone;
-  return `
+  return `${guardCard()}
     <h2>Phone check</h2>
     ${c === undefined ? '<div class="card meta">Not read yet.</div>' : c.findings.length === 0 ? '<div class="card">Nothing to fix.</div>' : c.findings.map((f) => `<div class="card brief ${f.level === 'serious' ? 'security' : ''}"><span class="ic">${f.level === 'serious' ? '⚠' : '·'}</span><span>${esc(f.text)}</span></div>`).join('')}
     ${r.calls ? `<h2>Calls</h2><div class="card"><div class="row"><span>Calls to you from contacts</span><b>${Math.round(r.calls.incomingFromContacts * 100)}%</b></div><div class="row"><span>Unknown numbers that keep calling</span><b>${r.calls.persistentUnknown.length}</b></div></div>` : ''}
@@ -337,6 +386,8 @@ function onClick(ev: Event): void {
   else if (d['back']) state.person = null;
   else if (d['access']) return native.requestAccess();
   else if (d['usage']) return native.requestUsageAccess();
+  else if (d['guard']) return native.openGuardSettings();
+  else if (d['unread']) state.showUnread = !state.showUnread;
   else if (d['sync']) return void sync();
   else return;
   render();
@@ -359,6 +410,8 @@ export const OrbApp = {
   },
   /** Called by the app after a permission prompt or on return from Settings. */
   onAccess(): void {
+    // Back from Settings: the guard may have been switched on.
+    if (state.twin !== null && state.tab === 'phone') render();
     if (state.twin === null && state.status === '') {
       if (access().sms) void sync();
       else render();

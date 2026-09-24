@@ -55,5 +55,22 @@
                 <data android:scheme="upi" android:host="pay" />
             </intent-filter>
         </activity>
+        <!-- The pay guard (Accessibility): pauses unusual payments on PhonePe and Google Pay. -->
+        <service
+            android:name=".guard.PayGuardService"
+            android:exported="false"
+            android:label="@string/guard_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/pay_guard" />
+        </service>
+
+        <activity
+            android:name=".guard.GuardConfirmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Orb.Translucent" />
     </application>
 </manifest>

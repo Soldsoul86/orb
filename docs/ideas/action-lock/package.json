@@ -20,7 +20,8 @@
     "mail": "node scripts/mail.ts",
     "schedule": "node scripts/schedule.ts",
     "pair": "node scripts/pair.ts",
-    "build:orb-preview": "node scripts/build-orb-preview.mjs"
+    "build:orb-preview": "node scripts/build-orb-preview.mjs",
+    "guard-vectors": "node scripts/guard-vectors.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,0 +1,235 @@
+{
+  "table": {
+    "version": 1,
+    "builtAt": 0,
+    "largeAmount": 6000,
+    "usual": 180,
+    "quiet": {
+      "from": 1,
+      "to": 6
+    },
+    "payees": [
+      {
+        "key": "tarunsharma",
+        "name": "TARUN SHARMA",
+        "count": 4,
+        "usual": 3000,
+        "max": 12050,
+        "passUpTo": 24100
+      },
+      {
+        "key": "ravikumarm",
+        "name": "RAVIKUMAR M",
+        "count": 30,
+        "usual": 160,
+        "max": 400,
+        "passUpTo": 800
+      },
+      {
+        "key": "ashamenon",
+        "name": "ASHA MENON",
+        "count": 12,
+        "usual": 1000,
+        "max": 5000,
+        "passUpTo": 24000,
+        "relation": "family"
+      },
+      {
+        "key": "swiggylimited",
+        "name": "SWIGGY LIMITED",
+        "count": 200,
+        "usual": 350,
+        "max": 1800,
+        "passUpTo": 3600
+      }
+    ]
+  },
+  "cases": [
+    {
+      "label": "known payee, usual amount",
+      "name": "TARUN SHARMA",
+      "amount": 3000,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "known payee, name in other case",
+      "name": "Tarun Sharma",
+      "amount": 3000,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "known payee, far above their most",
+      "name": "TARUN SHARMA",
+      "amount": 50000,
+      "hour": 13,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 30,
+        "reasons": [
+          "₹50,000 is more than you've paid TARUN SHARMA before (most: ₹12,050, usually ₹3,000)."
+        ]
+      }
+    },
+    {
+      "label": "known payee, above most but small",
+      "name": "RAVIKUMAR M",
+      "amount": 1500,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "₹1,500 is more than you've paid RAVIKUMAR M before (most: ₹400, usually ₹160)."
+        ]
+      }
+    },
+    {
+      "label": "new payee, small",
+      "name": "NEW PERSON",
+      "amount": 500,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "You've never paid NEW PERSON before."
+        ]
+      }
+    },
+    {
+      "label": "new payee, large",
+      "name": "NEW PERSON",
+      "amount": 25000,
+      "hour": 13,
+      "expected": {
+        "mode": "confirm",
+        "seconds": 30,
+        "reasons": [
+          "You've never paid NEW PERSON before.",
+          "₹25,000 is a large amount; your usual payment is ₹180."
+        ]
+      }
+    },
+    {
+      "label": "confirmed family, large",
+      "name": "ASHA MENON",
+      "amount": 30000,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 30,
+        "reasons": [
+          "₹30,000 is more than you've paid ASHA MENON before (most: ₹5,000, usually ₹1,000)."
+        ]
+      }
+    },
+    {
+      "label": "long name that begins the known one",
+      "name": "SWIGGY LIMITED BANGALORE",
+      "amount": 400,
+      "hour": 13,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "short fragment is not a match",
+      "name": "SWIG",
+      "amount": 400,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "You've never paid SWIG before."
+        ]
+      }
+    },
+    {
+      "label": "known payee at 3 am, usual amount",
+      "name": "RAVIKUMAR M",
+      "amount": 160,
+      "hour": 3,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "new payee at 3 am",
+      "name": "NEW PERSON",
+      "amount": 500,
+      "hour": 3,
+      "expected": {
+        "mode": "wait",
+        "seconds": 20,
+        "reasons": [
+          "You've never paid NEW PERSON before.",
+          "It's 03:00: you rarely pay between 01:00 and 06:00."
+        ]
+      }
+    },
+    {
+      "label": "known payee at 3 am, 2.5× your usual",
+      "name": "RAVIKUMAR M",
+      "amount": 450,
+      "hour": 3,
+      "expected": {
+        "mode": "pass",
+        "seconds": 0,
+        "reasons": []
+      }
+    },
+    {
+      "label": "known payee at 3 am, 3.3× your usual",
+      "name": "RAVIKUMAR M",
+      "amount": 600,
+      "hour": 3,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "It's 03:00: you rarely pay between 01:00 and 06:00."
+        ]
+      }
+    },
+    {
+      "label": "quiet hours wrap midnight: 23:00 is outside 01–06",
+      "name": "NEW PERSON",
+      "amount": 500,
+      "hour": 23,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "You've never paid NEW PERSON before."
+        ]
+      }
+    },
+    {
+      "label": "no name read",
+      "amount": 700,
+      "hour": 13,
+      "expected": {
+        "mode": "wait",
+        "seconds": 10,
+        "reasons": [
+          "Orb couldn't read who this payment is to."
+        ]
+      }
+    }
+  ]
+}

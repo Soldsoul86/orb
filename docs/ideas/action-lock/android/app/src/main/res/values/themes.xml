@@ -4,4 +4,5 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@color/background</item>
     </style>
+    <style name="Theme.Orb.Translucent" parent="@android:style/Theme.Translucent.NoTitleBar" />
 </resources>

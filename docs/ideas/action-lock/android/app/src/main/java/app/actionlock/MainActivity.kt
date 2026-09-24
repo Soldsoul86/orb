@@ -40,6 +40,7 @@ class MainActivity : FragmentActivity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var answers: JournalFile
     private lateinit var readers: PhoneReaders
+    private lateinit var guardTable: PrivateFile
 
     private val access = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         callJs("OrbApp.onAccess")
@@ -66,6 +67,7 @@ class MainActivity : FragmentActivity() {
         profile = PrivateFile(filesDir, "profile.json", "")
         answers = JournalFile(filesDir, "answers.jsonl")
         readers = PhoneReaders(this)
+        guardTable = PrivateFile(filesDir, "guard.json", "")
         incomingLink = upiLinkOf(intent)
 
         val assets = WebViewAssetLoader.Builder()
@@ -233,6 +235,26 @@ class MainActivity : FragmentActivity() {
 
         @android.webkit.JavascriptInterface
         fun appendAnswer(json: String) = answers.append(json)
+
+        /** The pay guard's table (src/orb/guard.ts), rebuilt whenever the model changes. */
+        @android.webkit.JavascriptInterface
+        fun saveGuard(json: String) = guardTable.write(json)
+
+        @android.webkit.JavascriptInterface
+        fun guardOn(): Boolean {
+            val on = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+            return on.split(':').any { it.startsWith("$packageName/") }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun openGuardSettings() = runOnUiThread { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+
+        /** What the guard did (one JSON event per line) and pay screens it couldn't read. */
+        @android.webkit.JavascriptInterface
+        fun guardLog(): String = JournalFile(filesDir, "guard.jsonl").read()
+
+        @android.webkit.JavascriptInterface
+        fun guardUnread(): String = java.io.File(filesDir, "guard-unread.txt").let { if (it.exists()) it.readText().takeLast(20_000) else "" }
 
         /** The profile the lock judges payments against, rebuilt from the phone's own data. */
         @android.webkit.JavascriptInterface

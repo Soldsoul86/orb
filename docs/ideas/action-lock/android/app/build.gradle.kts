@@ -13,8 +13,8 @@ android {
         applicationId = "app.orb"
         minSdk = 29
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
     }
 
     buildFeatures { buildConfig = true }
@@ -24,6 +24,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+// GuardRulesTest reads the shared cases written by `npm run guard-vectors`.
+tasks.withType<Test>().configureEach { inputs.file("../../test/guard-vectors.json") }
 
 kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
@@ -35,4 +38,8 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // Android's org.json is a stub in local unit tests.
+    testImplementation("org.json:json:20240303")
 }
