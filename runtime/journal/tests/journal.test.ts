@@ -22,6 +22,7 @@ import {
   isEventId,
   JournalIntegrityError,
   type OrbEvent,
+  type StoredEvent,
   type EventDraft,
 } from "../src/index.js";
 
@@ -251,18 +252,19 @@ describe("ordering and replay", () => {
       ...state,
       (event.payload as { text: string }).text,
     ]);
-    assert.deepEqual(texts, ["p1", "m1", "m2"]);
+    assert.deepEqual(texts.state, ["p1", "m1", "m2"]);
+    assert.equal(texts.complete, true);
   });
 
   test("a projection can be discarded and rebuilt identically", async () => {
     const journal = await Journal.open({ lane: "mac", device: "mac-01" });
     await journal.append([note("a"), note("b"), note("c")]);
 
-    const count = (events: readonly OrbEvent[]) => events.length;
+    const count = (events: readonly StoredEvent[]) => events.length;
     const first = await replay(journal, 0, (n) => n + 1);
     const second = await replay(journal, 0, (n) => n + 1);
-    assert.equal(first, second);
-    assert.equal(first, count(await journal.readAll()));
+    assert.equal(first.state, second.state);
+    assert.equal(first.state, count(await journal.readAll()));
   });
 });
 

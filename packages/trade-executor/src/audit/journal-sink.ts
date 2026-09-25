@@ -123,12 +123,20 @@ export async function replayLifecycle(
   journal: Journal,
   tradeId?: string,
 ): Promise<readonly LifecycleEvent[]> {
-  const { orderEvents } = await import("@orb/journal");
+  const { orderEvents, hasPayload } = await import("@orb/journal");
   const events = orderEvents(await journal.readAll());
 
   const out: LifecycleEvent[] = [];
   for (const event of events) {
     if (event.schema.id !== LIFECYCLE_SCHEMA.id) continue;
+    if (!hasPayload(event)) {
+      // This device dropped the payload (`docs/PARTIAL_REPLICATION.md`). An
+      // audit that silently omits a lifecycle record is worse than no audit, so
+      // refuse rather than return a plausible-looking gap.
+      throw new Error(
+        `lifecycle event ${event.id} is not held on this device; fetch it from a peer before auditing`,
+      );
+    }
     const payload = event.payload as LifecycleEvent;
     if (tradeId === undefined || payload.tradeId === tradeId) out.push(payload);
   }

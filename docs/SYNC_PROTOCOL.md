@@ -44,6 +44,13 @@ Pixel lane ──replicate──▶  Mac    (read-only copy of Pixel's lane)
 Each device ends up holding the **union of all lanes**. Identical input → identical
 union → identical derived order on every device.
 
+> **Refinement — partial replication.** A device holds every event's *envelope*
+> and may hold only a subset of *payloads* (`PARTIAL_REPLICATION.md`, accepted).
+> The union is unchanged and so is the derived order, which needs only
+> envelopes; devices differ in retained detail, never in what they know
+> happened. A payload is dropped only with journaled custody receipts proving it
+> survives on at least two other holders, one of them a device the user owns.
+
 ---
 
 ## 4. Replication Mechanics
@@ -118,8 +125,11 @@ events.
 
 ## 9. Invariants
 
-1. Devices are equal peers; none is authoritative.
+1. Devices are equal peers; none is authoritative — including over what another
+   device retains.
 2. Sync replicates immutable, single-writer lanes; it never rewrites history.
+   Every device receives every envelope; payload retention is a local policy
+   (`PARTIAL_REPLICATION.md`).
 3. The journal has no merge conflicts; merge is union of lanes.
 4. Replication preserves causality; HLC is advanced on receive.
 5. Global order is derived `(hlc, lane)` on read, identically everywhere, never

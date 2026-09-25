@@ -43,3 +43,15 @@ const count = await replay(journal, 0, (n) => n + 1);
 - [`DESIGN.md`](DESIGN.md) — why it is built this way.
 - [`API.md`](API.md) — the public surface.
 - [`TESTS.md`](TESTS.md) — what is covered and what is not.
+
+## Partial replication
+
+Every device holds every event's **envelope**; payloads may be dropped locally
+once custody receipts prove the payload survives on at least two other devices,
+one of them the user's own. The chain verifies and `(hlc, lane)` order derives
+from envelopes alone, so a device that has pruned still agrees with every peer
+about what happened and in what order — and, because it holds every envelope, it
+knows exactly what it is missing rather than answering as though nothing were.
+
+`fold` and `replay` therefore return a `BoundedFold`: the state plus whether it
+was complete and which events were skipped. See `docs/PARTIAL_REPLICATION.md`.

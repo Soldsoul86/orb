@@ -50,3 +50,30 @@ id that would escape the journal directory is refused.
   correctness choice; if it becomes a bottleneck the sink batches.
 - **Clock adversaries** — HLC tolerates skew, not a peer deliberately
   reporting a far-future timestamp. That is a trust boundary question.
+
+## Partial replication — `tests/partial-replication.test.ts`
+
+**An envelope stands alone.** A lane verifies with every payload dropped;
+tampering is still detected with no payloads present; a payload that does not
+match the hash its envelope commits to is rejected; order derives identically
+with and without payloads.
+
+**Custody receipts.** A receipt watermarks the contiguous prefix actually held,
+and a gap ends the claim rather than skipping over it. The furthest receipt per
+holder wins; other lanes are ignored.
+
+**The prune guard.** Each refusal path is tested on its own rather than through
+a happy path that happens to cover them, because this is the one rule whose
+failure is silent and permanent: too few holders; relays only; a device the
+policy does not permit; a device earlier in the prune order still holding;
+counting one's own receipt; a receipt that stops short of the event; the
+originator's extra-holder requirement; a policy attempting to lower the floor
+below two.
+
+**The journal enforces it.** A refused prune removes nothing. A permitted one
+drops the payload, keeps the envelope, and leaves the chain verifying. The
+horizon names exactly what is missing. A replay over a partial replica reports
+`complete: false` and the skipped ids instead of silently folding a subset.
+
+**Durability.** A compacted lane survives a reopen with the payload still gone,
+and a later append extends the compacted chain rather than forking it.

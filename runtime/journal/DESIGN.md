@@ -83,3 +83,41 @@ before they touch the filesystem.
 | Full replay for every projection | O(history) | Correctness and simplicity first. A cached projection is a later optimisation, not an architectural change. |
 | JSON rather than a binary encoding | Size | Inspectable by hand, and forward-compatible through `schema.version`. |
 | SHA-256 per event | CPU | Negligible next to the fsync it accompanies. |
+
+## The envelope commits to the payload by hash
+
+`contracts/Event.md` already splits an event into a frozen **envelope** and an
+opaque **payload**. The integrity hash commits to the payload *by its hash*
+rather than inline, which is the same by-reference commitment
+`contracts/Attachment.md` uses for raw bytes. Two things follow, and both are
+the reason for the change:
+
+- the chain verifies on a device that holds no payloads at all, so a device may
+  drop content without losing tamper-evidence over its own history;
+- a payload fetched back later is checked against history before it is trusted,
+  so it can come from a peer, a relay, or anywhere else without that source
+  needing to be trusted.
+
+**This changed the canonical preimage.** A lane written before this change
+hashes its payload inline and will not verify against the current code. There is
+no migration path in this package and none is offered: the journal carries no
+long-lived history yet, and doing this after it does would have required
+`Event v2` alongside v1 under Art. X §38. It is recorded here because a hash
+format that changes silently is exactly the kind of thing that is impossible to
+diagnose two years later.
+
+## Pruning is guarded, not advertised
+
+`retention.ts` is pure, total, and refuses by default. It is the only rule in
+the partial-replication design whose failure is silent and permanent — a payload
+dropped when it should not have been is simply gone — so every path that is not
+provably safe returns a refusal carrying its reason, and `Journal.detach`
+refuses the whole batch if any single event fails. A partial prune would leave
+the caller unable to say which payloads still exist, which is the state the
+design exists to prevent.
+
+The concurrent-prune race is handled by `policy.pruneOrder` rather than by
+coordination: a device may prune only once every device ahead of it has stopped
+holding the payload, so at most one device in the set is eligible at a time. It
+is deterministic, needs no agreement between devices, and also expresses intent
+— the phone goes first, the home server last or not at all.

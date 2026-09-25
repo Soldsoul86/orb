@@ -103,12 +103,23 @@ through projection functions.
   ever necessary, by **archival of cold journal segments** to encrypted
   cold storage — never by mutation or silent deletion of history. Any archival
   policy must preserve the ability to replay.
+- A **peer device is a legitimate archive target** alongside cold storage
+  (`PARTIAL_REPLICATION.md`, accepted). A device may drop an event's payload
+  while keeping its envelope, once journaled custody receipts prove the payload
+  survives on at least two other holders, one of them a device the user owns.
+  The envelope stays, so the chain still verifies, the order still derives, and
+  the device knows precisely what it no longer holds. In a file-backed store
+  this is a compaction rewrite (`RUNTIME_LOOP.md` §13): temp file, fsync,
+  rename, so a crash leaves the old lane or the new one and never a half-written
+  one.
 
 ---
 
 ## 8. Invariants
 
-1. The journal store is append-only; it offers no update/delete of events.
+1. The journal store is append-only; it offers no update/delete of events. It
+   may drop a payload under §7's rule — an event's identity, content and
+   replayability are untouched, which is the test `contracts/Event.md` §2 sets.
 2. A device writes only its own lane; foreign lanes are read-only replicas.
 3. Per-lane hash chaining makes corruption/tampering detectable.
 4. Projections are disposable and always rebuildable by replay.

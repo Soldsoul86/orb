@@ -2,12 +2,18 @@
  * Tamper-evidence for the journal.
  *
  * Constitution Art. I §5: lanes are hash-chained so that any corruption or
- * rewriting is detectable. The hash covers every field of the event except the
- * hash itself, and commits to the predecessor's hash.
+ * rewriting is detectable.
+ *
+ * The envelope hash covers every envelope field except the hash itself,
+ * commits to the predecessor's hash, and commits to the payload **by its
+ * hash** rather than inline. That is what makes the chain verifiable on a
+ * device holding no payloads (`docs/PARTIAL_REPLICATION.md` §3), and it is the
+ * same by-reference commitment `contracts/Attachment.md` already uses for raw
+ * bytes.
  */
 import { createHash } from "node:crypto";
-import type { OrbEvent } from "./types.js";
-import { JournalIntegrityError } from "./types.js";
+import type { EventEnvelope, OrbEvent, StoredEvent } from "./types.js";
+import { hasPayload, JournalIntegrityError } from "./types.js";
 
 /**
  * Deterministic JSON encoding: object keys sorted, no incidental whitespace.
@@ -39,45 +45,92 @@ export function canonicalJson(value: unknown): string {
   }
 }
 
-/** The bytes an event commits to. Excludes `integrity.hash`, includes `integrity.previous`. */
-export function eventPreimage(event: Omit<OrbEvent, "integrity"> & { previous: string | null }): string {
+/** The commitment an envelope carries in place of the payload itself. */
+export function hashPayload(payload: unknown): string {
+  return createHash("sha256").update(canonicalJson(payload), "utf8").digest("hex");
+}
+
+/** Envelope fields plus the two commitments, as the hash sees them. */
+export type EnvelopePreimageInput = Omit<EventEnvelope, "integrity"> & {
+  readonly previous: string | null;
+  readonly payloadHash: string;
+};
+
+/** The bytes an event commits to. Excludes `integrity.hash`; includes the payload's hash. */
+export function eventPreimage(input: EnvelopePreimageInput): string {
   return canonicalJson({
-    id: event.id,
-    lane: event.lane,
-    device: event.device,
-    hlc: event.hlc,
-    wallClock: event.wallClock,
-    type: event.type,
-    causes: event.causes,
-    schema: event.schema,
-    payload: event.payload,
-    previous: event.previous,
+    id: input.id,
+    lane: input.lane,
+    device: input.device,
+    hlc: input.hlc,
+    wallClock: input.wallClock,
+    type: input.type,
+    causes: input.causes,
+    schema: input.schema,
+    payloadHash: input.payloadHash,
+    previous: input.previous,
   });
 }
 
-export function hashEvent(event: Omit<OrbEvent, "integrity"> & { previous: string | null }): string {
-  return createHash("sha256").update(eventPreimage(event), "utf8").digest("hex");
+export function hashEvent(input: EnvelopePreimageInput): string {
+  return createHash("sha256").update(eventPreimage(input), "utf8").digest("hex");
 }
 
-/** Recomputes an event's hash and checks it against the recorded one. */
-export function verifyEvent(event: OrbEvent): boolean {
-  return hashEvent({ ...event, previous: event.integrity.previous }) === event.integrity.hash;
+/**
+ * Recomputes an envelope's hash and checks it against the recorded one.
+ *
+ * Needs no payload — that is the property the whole partial-replication design
+ * rests on.
+ */
+export function verifyEnvelope(envelope: EventEnvelope): boolean {
+  return (
+    hashEvent({
+      ...envelope,
+      previous: envelope.integrity.previous,
+      payloadHash: envelope.integrity.payloadHash,
+    }) === envelope.integrity.hash
+  );
+}
+
+/**
+ * Checks a payload against the commitment its envelope carries.
+ *
+ * This is the gate a payload must pass when it is fetched back after being
+ * dropped, whoever supplied it.
+ */
+export function verifyPayload(event: OrbEvent): boolean {
+  return hashPayload(event.payload) === event.integrity.payloadHash;
+}
+
+/** Verifies the envelope always, and the payload when this device holds it. */
+export function verifyEvent(event: StoredEvent): boolean {
+  if (!verifyEnvelope(event)) return false;
+  return hasPayload(event) ? verifyPayload(event) : true;
 }
 
 /**
  * Verifies a full lane: every hash is self-consistent and every event commits
  * to its predecessor, with strictly increasing HLC.
  *
+ * Accepts envelopes, so a device that has dropped payloads still verifies its
+ * whole history. Events that do carry payloads have those checked too.
+ *
  * @throws {JournalIntegrityError} naming the first event that fails.
  */
-export function verifyLane(events: readonly OrbEvent[]): void {
+export function verifyLane(events: readonly StoredEvent[]): void {
   let previousHash: string | null = null;
   let previousPhysical = -1;
   let previousCounter = -1;
 
   for (const [index, event] of events.entries()) {
-    if (!verifyEvent(event)) {
+    if (!verifyEnvelope(event)) {
       throw new JournalIntegrityError("event hash does not match its contents", {
+        eventId: event.id,
+        index,
+      });
+    }
+    if (hasPayload(event) && !verifyPayload(event)) {
+      throw new JournalIntegrityError("payload does not match the hash its envelope commits to", {
         eventId: event.id,
         index,
       });

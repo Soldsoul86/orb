@@ -6,12 +6,14 @@
  * replicates foreign lanes. Everything else in Orb is a projection of this.
  */
 import { HybridLogicalClock, type Hlc, type PhysicalClock } from "./hlc.js";
-import { hashEvent, verifyLane } from "./integrity.js";
+import { hashEvent, hashPayload, verifyLane } from "./integrity.js";
 import { newEventId } from "./ids.js";
 import type { JournalStore } from "./store.js";
 import { MemoryJournalStore } from "./store.js";
-import type { EventDraft, LaneId, OrbEvent } from "./types.js";
-import { JournalIntegrityError } from "./types.js";
+import type { EventDraft, LaneId, OrbEvent, StoredEvent } from "./types.js";
+import { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
+import { latestCustody } from "./custody.js";
+import { evaluatePrune, type RetentionPolicy } from "./retention.js";
 
 export interface JournalOptions {
   /** This device's lane. The journal appends here and nowhere else. */
@@ -24,6 +26,28 @@ export interface JournalOptions {
 
 /** Notified after events become durable. Listeners must not throw. */
 export type JournalListener = (events: readonly OrbEvent[]) => void;
+
+/** What one lane is missing on this device. */
+export interface LaneHorizon {
+  readonly lane: LaneId;
+  readonly events: number;
+  readonly withPayload: number;
+  readonly detached: number;
+  /** Ids of events whose payloads this device does not hold. */
+  readonly missing: readonly string[];
+}
+
+/**
+ * The bound on what this device can answer.
+ *
+ * `complete` is the only honest basis for an unqualified answer; anything else
+ * must be reported alongside the result.
+ */
+export interface Horizon {
+  readonly complete: boolean;
+  readonly missing: number;
+  readonly lanes: readonly LaneHorizon[];
+}
 
 export class Journal {
   readonly lane: LaneId;
@@ -126,8 +150,9 @@ export class Journal {
         schema: draft.schema,
         payload: draft.payload,
       };
-      const hash = hashEvent({ ...skeleton, previous });
-      events.push({ ...skeleton, integrity: { previous, hash } });
+      const payloadHash = hashPayload(draft.payload);
+      const hash = hashEvent({ ...skeleton, previous, payloadHash });
+      events.push({ ...skeleton, integrity: { previous, hash, payloadHash } });
       previous = hash;
     }
 
@@ -142,7 +167,7 @@ export class Journal {
    * Adopts events from a foreign lane (Art. IV §18: merge is set union of
    * immutable lanes). Rejects anything claiming to be this device's lane.
    */
-  async replicate(lane: LaneId, events: readonly OrbEvent[]): Promise<void> {
+  async replicate(lane: LaneId, events: readonly StoredEvent[]): Promise<void> {
     if (lane === this.lane) {
       throw new JournalIntegrityError("a device never accepts writes to its own lane", { lane });
     }
@@ -156,26 +181,103 @@ export class Journal {
     if (fresh.length === 0) return;
 
     verifyLane([...existing, ...fresh]);
-    await this.#store.append(lane, fresh);
+    await this.#store.append(lane, fresh.filter(hasPayload));
 
     const last = fresh.at(-1);
     if (last) this.#clock.merge(last.hlc);
-    for (const listener of this.#listeners) listener(fresh);
+    for (const listener of this.#listeners) listener(fresh.filter(hasPayload));
   }
 
   /** Every event in every lane, unordered. Use `replay` for ordered folding. */
-  async readAll(): Promise<readonly OrbEvent[]> {
-    const out: OrbEvent[] = [];
+  async readAll(): Promise<readonly StoredEvent[]> {
+    const out: StoredEvent[] = [];
     for (const lane of await this.#store.lanes()) out.push(...(await this.#store.read(lane)));
     return out;
   }
 
-  async readLane(lane: LaneId): Promise<readonly OrbEvent[]> {
+  async readLane(lane: LaneId): Promise<readonly StoredEvent[]> {
     return this.#store.read(lane);
   }
 
   async lanes(): Promise<readonly LaneId[]> {
     return this.#store.lanes();
+  }
+
+  /**
+   * What this device cannot answer from its own store.
+   *
+   * A device holds every envelope, so it knows exactly which payloads it is
+   * missing rather than guessing. That is what lets a projection say "I cannot
+   * answer that" instead of quietly returning a wrong answer
+   * (`docs/PARTIAL_REPLICATION.md` §5).
+   */
+  async horizon(): Promise<Horizon> {
+    const lanes: LaneHorizon[] = [];
+    let missing = 0;
+
+    for (const lane of await this.#store.lanes()) {
+      const events = await this.#store.read(lane);
+      const absent = events.filter((event) => !hasPayload(event)).map((event) => event.id);
+      missing += absent.length;
+      lanes.push({
+        lane,
+        events: events.length,
+        withPayload: events.length - absent.length,
+        detached: absent.length,
+        missing: absent,
+      });
+    }
+
+    return { complete: missing === 0, missing, lanes };
+  }
+
+  /**
+   * Drops the payloads named, keeping their envelopes.
+   *
+   * Every event is checked against `evaluatePrune` first and the whole call is
+   * refused if any one of them fails, because a partial prune would leave the
+   * caller unsure which payloads still exist. Art. I is untouched: the events
+   * remain in history, chained and ordered, and only this device's copy of the
+   * content goes away (`docs/PARTIAL_REPLICATION.md` §10).
+   *
+   * @throws {RetentionError} naming the first event that may not be dropped.
+   */
+  async detach(
+    lane: LaneId,
+    eventIds: readonly string[],
+    policy: RetentionPolicy,
+  ): Promise<number> {
+    if (!this.#opened) throw new Error("journal is not open");
+    if (eventIds.length === 0) return 0;
+
+    const laneEvents = await this.#store.read(lane);
+    const custody = latestCustody(await this.readAll(), lane);
+    const byId = new Map(laneEvents.map((event) => [event.id, event]));
+
+    for (const id of eventIds) {
+      const event = byId.get(id);
+      if (!event) {
+        throw new RetentionError("event is not in this lane", { lane, eventId: id });
+      }
+      if (!hasPayload(event)) continue;
+
+      const decision = evaluatePrune({
+        event,
+        lane: laneEvents,
+        selfDevice: this.device,
+        custody,
+        policy,
+      });
+      if (!decision.permitted) {
+        throw new RetentionError(`refusing to drop payload: ${decision.reason}`, {
+          lane,
+          eventId: id,
+          holders: decision.holders,
+        });
+      }
+    }
+
+    return this.#store.detach(lane, eventIds);
   }
 
   /** Verifies every lane's hash chain. Throws on the first corruption found. */

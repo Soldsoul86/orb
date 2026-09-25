@@ -8,12 +8,19 @@
  * A torn trailing line — the signature of a crash mid-write — is discarded on
  * read rather than repaired, because Art. I §2 forbids mutating history and a
  * partial line was never a complete event.
+ *
+ * `detach` is the one operation that rewrites a lane file. It is compaction in
+ * the sense of `RUNTIME_LOOP.md` §13 — it drops payload bytes and keeps every
+ * envelope, so the chain still verifies afterwards and nothing about any event's
+ * identity, content or replayability changes (`contracts/Event.md` §2). The
+ * rewrite goes to a temporary file and is renamed into place, so a crash leaves
+ * either the old lane or the new one and never a half-written lane.
  */
-import { open, mkdir, readFile, readdir } from "node:fs/promises";
+import { open, mkdir, readFile, readdir, rename, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { JournalStore } from "./store.js";
-import type { LaneId, OrbEvent } from "./types.js";
+import type { LaneId, OrbEvent, StoredEvent } from "./types.js";
 
 const LANE_FILE_SUFFIX = ".lane.jsonl";
 
@@ -67,7 +74,7 @@ export class FileJournalStore implements JournalStore {
     await next;
   }
 
-  async read(lane: LaneId): Promise<readonly OrbEvent[]> {
+  async read(lane: LaneId): Promise<readonly StoredEvent[]> {
     let text: string;
     try {
       text = await readFile(laneFile(this.#directory, lane), "utf8");
@@ -76,11 +83,11 @@ export class FileJournalStore implements JournalStore {
       throw error;
     }
 
-    const events: OrbEvent[] = [];
+    const events: StoredEvent[] = [];
     for (const line of text.split("\n")) {
       if (line === "") continue;
       try {
-        events.push(JSON.parse(line) as OrbEvent);
+        events.push(JSON.parse(line) as StoredEvent);
       } catch {
         // A torn final line is a crash artefact, not history. Anything earlier
         // being unparsable is corruption, and must surface.
@@ -88,6 +95,65 @@ export class FileJournalStore implements JournalStore {
       }
     }
     return events;
+  }
+
+  async detach(lane: LaneId, eventIds: readonly string[]): Promise<number> {
+    if (this.#closed) throw new Error("journal store is closed");
+    if (eventIds.length === 0) return 0;
+
+    const previous = this.#writeQueues.get(lane) ?? Promise.resolve();
+    const next = previous.then(() => this.#detachNow(lane, eventIds));
+    this.#writeQueues.set(
+      lane,
+      next.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return next;
+  }
+
+  async #detachNow(lane: LaneId, eventIds: readonly string[]): Promise<number> {
+    const events = await this.read(lane);
+    const wanted = new Set(eventIds);
+    let dropped = 0;
+
+    const rewritten = events.map((event) => {
+      if (!wanted.has(event.id) || event.payload === undefined) return event;
+      const { payload: _payload, ...envelope } = event as OrbEvent;
+      dropped += 1;
+      return envelope;
+    });
+    if (dropped === 0) return 0;
+
+    const target = laneFile(this.#directory, lane);
+    const temporary = `${target}.compacting`;
+    const body = rewritten.map((event) => JSON.stringify(event)).join("\n") + "\n";
+
+    const handle = await open(temporary, "w", 0o600);
+    try {
+      await handle.write(body);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+
+    // Drop the append handle before swapping the file underneath it, or later
+    // appends would land in the unlinked inode and silently vanish.
+    const appendHandle = this.#handles.get(lane);
+    if (appendHandle) {
+      this.#handles.delete(lane);
+      await appendHandle.close();
+    }
+
+    try {
+      await rename(temporary, target);
+    } catch (error) {
+      await unlink(temporary).catch(() => undefined);
+      throw error;
+    }
+
+    return dropped;
   }
 
   async lanes(): Promise<readonly LaneId[]> {

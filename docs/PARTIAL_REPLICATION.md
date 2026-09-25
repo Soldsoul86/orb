@@ -1,8 +1,8 @@
 # Partial Replication — availability is not existence
 
-> Status: **PROPOSAL. Architectural. Not accepted, not implemented.**
-> Per `CLAUDE.md`: design explained, risks identified, implementation proposed —
-> **awaiting approval before any code.**
+> Status: **ACCEPTED 2026-09-25. Tier 1 implemented in `runtime/journal`.**
+> The reading of Art. I §2 in §10 was put to the operator and approved
+> explicitly; no constitutional amendment was required.
 > Elaborates `SYNC_PROTOCOL.md` §3 and `STORAGE.md` §7. Closes the open question
 > in `AIRWALL.md` §8. Read `MOBILE_SENSING.md` §9 for why the phone is the
 > device this exists for.
@@ -255,7 +255,7 @@ peerage.
 
 ---
 
-## 10. The reading review must accept or reject
+## 10. The reading, ruled on
 
 The sharpest tension is **Art. I §2: "Events are never edited, reordered, or
 deleted."**
@@ -270,18 +270,57 @@ The reading this proposal rests on:
 > *relocated*, not deleted. The Event's identity, content, and replayability are
 > all untouched — which is exactly the test `Event.md` §2 states.
 
-If review rejects that reading, the proposal fails and the fallbacks are Tier 0
-(today's behaviour) or lane-granular replication — a device holds whole lanes or
-none, which preserves per-lane chains perfectly and loses §3's "knows what it
-does not know" property entirely.
+**Ruled: accepted, 2026-09-25**, explicitly rather than by assumption, because
+every invariant in §9 depends on it and because a law quietly reinterpreted once
+would be quietly reinterpreted again. Art. I §2 is unamended; this is its
+application to the store, which `STORAGE.md` had already distinguished from the
+journal.
 
-**This should be ruled on explicitly rather than assumed**, because every
-invariant in §9 depends on it and because a law that gets quietly reinterpreted
-once will be quietly reinterpreted again.
+Had it been rejected, the fallbacks were Tier 0 (today's behaviour) or
+lane-granular replication — a device holds whole lanes or none, which preserves
+per-lane chains perfectly and loses §3's "knows what it does not know" property
+entirely.
 
 ---
 
-## 11. Sources
+## 11. What is built
+
+Tier 1, in `runtime/journal` (27 tests in `tests/partial-replication.test.ts`):
+
+| §9 invariant | Where it lives |
+| --- | --- |
+| 2 — envelope completeness | `types.ts` `EventEnvelope` / `StoredEvent`; the store returns envelopes for dropped payloads |
+| 3 — known absence | `hasPayload`, `Journal.horizon()` |
+| 4 — proof before pruning | `retention.ts` `evaluatePrune`, enforced by `Journal.detach` |
+| 5 — declared horizon | `replay.ts` `BoundedFold` — `fold` and `replay` return `complete` and `skipped` |
+| custody evidence | `custody.ts` — receipts are ordinary events on the holder's own lane |
+
+The enabling change: the integrity hash now commits to the payload **by hash**
+rather than inline, so a chain verifies with no payloads present and a fetched
+payload is checked against history before it is trusted. **This changed the
+canonical preimage**, so any lane written before it will not verify — see
+`runtime/journal/DESIGN.md`. Done now because the journal carries no long-lived
+history yet; after it does, the same change would have required `Event v2`
+alongside v1 under Art. X §38.
+
+**Not built, and deliberately so:**
+
+- **Invariant 1 (emission completeness)** and **6 (journaled policy)** — both
+  need a sync implementation, and there is none in this repository yet. Until
+  sync exists, nothing prunes in production and the guard is the only thing that
+  matters.
+- **Invariant 7 (no retention authority)** holds by construction: `detach` takes
+  the calling device's own policy and no device can invoke another's.
+- **Tiers 2 and 3** (source-class policy; per-class payload keys so an exposed
+  device carries ciphertext it cannot read). Tier 3 remains the strongest answer
+  to §1 and the largest piece of new design; it should not be attempted before
+  Tier 1 runs against real sync.
+- **Fetch-on-demand.** A dropped payload can be verified when it comes back
+  (`verifyPayload`), but nothing fetches it yet. That is a sync concern too.
+
+---
+
+## 12. Sources
 
 `SYNC_PROTOCOL.md` §3, §9; `STORAGE.md` §3, §7, §8; `EVENT_MODEL.md`;
 `contracts/Event.md` §2, §4 (inv. 5–8), §5; `contracts/Attachment.md` §3,

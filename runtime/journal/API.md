@@ -17,15 +17,15 @@ Appends to the local lane as one atomic, durable batch. Concurrent callers are
 serialised. Assigns `id`, `hlc`, `wallClock` and `integrity`.
 
 ```ts
-replicate(lane: LaneId, events: readonly OrbEvent[]): Promise<void>
+replicate(lane: LaneId, events: readonly StoredEvent[]): Promise<void>
 ```
 Adopts events from a foreign lane. Idempotent — already-known events are
 skipped. Throws `JournalIntegrityError` for the local lane, for events that do
 not belong to the named lane, and for a batch that breaks the chain.
 
 ```ts
-readAll(): Promise<readonly OrbEvent[]>
-readLane(lane: LaneId): Promise<readonly OrbEvent[]>
+readAll(): Promise<readonly StoredEvent[]>
+readLane(lane: LaneId): Promise<readonly StoredEvent[]>
 lanes(): Promise<readonly LaneId[]>
 verify(): Promise<void>
 subscribe(listener: JournalListener): () => void
@@ -33,11 +33,47 @@ close(): Promise<void>
 get clock(): Hlc
 ```
 
+## Partial replication
+
+See `docs/PARTIAL_REPLICATION.md`. An event is an **envelope** plus a
+**payload**. Every device holds every envelope; a device may hold only some
+payloads. `hasPayload(event)` narrows `StoredEvent` to `OrbEvent`.
+
+```ts
+detach(lane: LaneId, eventIds: readonly string[], policy: RetentionPolicy): Promise<number>
+```
+Drops payloads, keeping envelopes. Every id is checked against `evaluatePrune`
+first and the whole call is refused if any fails, so a caller is never left
+unsure which payloads still exist. Throws `RetentionError`.
+
+```ts
+horizon(): Promise<Horizon>
+```
+What this device cannot answer: per lane, how many payloads are absent and which
+ids. `complete` is the only basis for an unqualified answer.
+
+```ts
+evaluatePrune(request: PruneRequest): PruneDecision
+```
+Pure. Refuses unless: the device is in `policy.pruneOrder`; no device ahead of
+it in that order still holds the payload; at least 2 other devices have covering
+custody receipts; at least one of them is in `policy.ownedDevices`; and, when the
+device produced the event, one holder more than that.
+
+```ts
+custodyReceiptFor(lane, events): CustodyReceipt | null
+custodyReceiptDraft(receipt): EventDraft<CustodyReceipt>
+latestCustody(events, lane): readonly HeldCustody[]
+```
+Receipts are ordinary events on the holder's own lane, so the holder is
+`event.device` and is never a field. A receipt watermarks the contiguous prefix
+actually held — a gap ends the claim.
+
 ## Ordering and replay
 
 ```ts
-compareEventOrder(a: OrbEvent, b: OrbEvent): number   // (hlc, lane)
-orderEvents(events: readonly OrbEvent[]): readonly OrbEvent[]
+compareEventOrder(a: EventEnvelope, b: EventEnvelope): number   // (hlc, lane)
+orderEvents<E extends EventEnvelope>(events: readonly E[]): readonly E[]
 fold<S>(events: readonly OrbEvent[], initial: S, project: Projection<S>): S
 replay<S>(journal: Journal, initial: S, project: Projection<S>): Promise<S>
 ```
