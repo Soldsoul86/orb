@@ -104,9 +104,19 @@ anywhere else, the test is not discriminating and needs a stronger adversary.
 
 ---
 
-## 3. C2 — The record cannot be rewritten without detection
+## 3. C2 — The sequence cannot be rewritten without detection
 
-**Claim.** Any alteration or deletion of history is detected.
+**Claim.** Any change to the **sequence** of history — an envelope altered,
+inserted, removed or reordered — is detected. Destruction or withholding of
+**content** by the party holding it is **not** detected, except where that party
+has already asserted custody of it, which turns silence into a contradiction.
+
+**Corrected 2026-09-25**, raised by the operator. The claim previously read
+*"any alteration or deletion of history is detected."* That was too strong, and
+building `ERASURE.md` is what exposed it. See §3d for the correction in full;
+the short version is that *"I will not show you"* and *"I cannot show you"* are
+indistinguishable over a wire, in this system and in every other, so a claim
+that content cannot go missing undetected was never available to make.
 
 *Constitutional basis:* Art. I.
 *Status:* **partly earned, 2026-09-25.** See `DEVICE_LOOP.md` §5d — the hash
@@ -114,8 +124,8 @@ chain caught a defect its own author had introduced, on the operator's phone,
 within three minutes, without being asked to look. That is the single strongest
 piece of evidence this project has, precisely because nobody staged it.
 
-It is partly earned and not fully earned because "the record" has three
-different failure modes and only one of them has been demonstrated.
+It is partly earned and not fully earned because "the record" has four different
+failure modes and only one of them has been demonstrated.
 
 **C2a — Alteration in place.** An envelope is edited. **Not detected by the
 shipped probe**, and the earlier draft of this document was wrong to say it was.
@@ -167,6 +177,39 @@ cannot express "independent key" at all. Logged as architectural debt (AD-6); C2
 not runnable until it can. `WITNESSES.md` works out what a witness should be —
 another person's phone holding a few hundred bytes it cannot read — and is
 blocked on the same entry.
+
+**C2d — Content destroyed or withheld without saying so.** The originator drops
+a payload and does not write the erasure declaration. **Not detected, and not
+detectable in general.**
+
+An absent payload and a payload its holder declines to send are the same
+observation from anywhere else. No hash chain, no witness and no protocol
+distinguishes them, because the distinction is about a fact inside one device
+that the device alone can report.
+
+Two things narrow it, and neither closes it:
+
+1. **Every honest absence is journaled.** `unfetched` has a policy record
+   (inv. 6), `pruned` has custody receipts, `erased` has a declaration. So an
+   absence with *no* journaled explanation is itself visible as unexplained —
+   the "knows what it does not know" property, applied to content rather than to
+   time.
+2. **Custody turns silence into a contradiction.** A device that asserted
+   custody of a payload and later cannot produce it has either pruned it, which
+   needs receipts elsewhere, or erased it, which needs a declaration. If history
+   holds neither, the device is caught in a claim it cannot support.
+
+What escapes both is content **only the originator ever held**. Nobody else ever
+claimed custody, so nothing outside that device records that the payload was
+ever available. It can be destroyed in silence, and only `payloadHash` remains —
+proof that something of that hash existed, and nothing about whether it was
+destroyed or is merely being withheld.
+
+**This means `ERASURE.md`'s rule — *history may never shrink silently* — is a
+policy the honest implementation follows, not an invariant the structure
+enforces.** That distinction is recorded there, in `ERASURE.md` §0a, because a
+policy stated as an invariant is exactly the overreach this document exists to
+prevent, and this one was mine.
 
 **The owner is not the adversary here — ruled 2026-09-25.** `ERASURE.md` §2
 carries the operator's ruling: deletion is a right, exercised openly, declared

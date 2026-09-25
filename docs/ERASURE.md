@@ -21,11 +21,71 @@ Both halves matter. Immutable history denies the owner a right over their own
 life. Silent deletion deceives whoever reads the record. This is the third path:
 erasure is legitimate, and erasure is declared.
 
+**Read §0a before relying on that sentence.** It is a rule an honest
+implementation follows, not an invariant the format enforces, and the difference
+is load-bearing.
+
 **The consequence worth noticing first.** If you can delete openly, the only
 reason to delete secretly is to deceive someone. Silent truncation therefore
 becomes, by definition, an attack — never an exercise of a right. Orb stops
 having to work against its owner, which is the fork `CLAIMS.md` could not
 resolve and this ruling closes.
+
+---
+
+## 0a. Policy, not invariant — and the difference matters
+
+*Recorded 2026-09-25, after the operator asked what the claim actually rests on.*
+
+§0's rule reads like an invariant. It is not one. **Nothing in the structure
+forces a declaration to be written.** An originator can drop a payload and stay
+silent, and no hash chain, witness or protocol detects it — because *"I will not
+show you"* and *"I cannot show you"* are the same observation from anywhere
+else, in this system and in every other.
+
+So the rule is what an **honest implementation does**, not what the format
+guarantees. Stating it as a guarantee was an overreach, and it was mine.
+
+### What is enforced, and what is merely followed
+
+| | Enforced by structure | Followed by policy |
+| --- | --- | --- |
+| The sequence — nothing altered, inserted, removed, reordered | **Yes**, hash chain | |
+| The count — E1 removes no events | **Yes** | |
+| The commitment — `payloadHash` survives erasure | **Yes** | |
+| An absence carries a reason locally | **Yes**, the type system now requires it | |
+| Every absence is explained in history | | **Policy** (inv. 6, receipts, declarations) |
+| An erasure is declared at all | | **Policy** |
+
+An erased payload therefore leaves a record that proves *something of this hash
+existed at this position in this order*. It proves nothing about what that
+something said — and it cannot prove that the silence around it was honest.
+
+### The two things that narrow it
+
+**Unexplained absence is visible.** Each honest reason has a journaled
+counterpart: `unfetched` a policy record, `pruned` custody receipts, `erased` a
+declaration. An absence with none of them is *detectably unexplained*, which is
+the "knows what it does not know" property applied to content instead of to
+time.
+
+**Custody turns silence into a contradiction.** A device that asserted custody
+and later cannot produce the payload has either pruned it — which needs receipts
+— or erased it — which needs a declaration. With neither in history it is caught
+holding a claim it cannot support.
+
+What escapes both is content **only the originator ever held**: nothing outside
+that device ever recorded that the payload was available, so its destruction
+leaves no contradiction to find. `CLAIMS.md` C2d carries this as a named,
+undetectable case rather than a gap to be closed later.
+
+### Why this is written down rather than fixed
+
+It cannot be fixed. It can only be stated, so that no claim in this project
+rests on it quietly. A reader deciding whether to trust an Orb journal is
+entitled to know that *declared* erasure is a discipline its owner keeps, not a
+property its format enforces — and that the value of the record comes from the
+sequence being provable, not from the content being complete.
 
 ---
 
