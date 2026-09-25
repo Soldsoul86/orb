@@ -50,6 +50,14 @@ export interface Integrity {
  * instead of guessing.
  */
 export interface EventEnvelope {
+  /**
+   * Envelope format version. **Absent means 1** — see `envelopeVersion`.
+   *
+   * Inside the hash preimage, so it cannot be flipped to make a verifier apply
+   * the wrong rule; in the envelope rather than the payload, so a device
+   * holding no keys can still tell which rule to use.
+   */
+  readonly v?: 2;
   readonly id: string;
   readonly lane: LaneId;
   readonly device: string;

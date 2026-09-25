@@ -33,7 +33,8 @@ export {
   verifyEvent,
   verifyLane,
 } from "./integrity.js";
-export type { EnvelopePreimageInput } from "./integrity.js";
+export { envelopeVersion, ENVELOPE_VERSION } from "./integrity.js";
+export type { EnvelopePreimageInput, EnvelopeVersion } from "./integrity.js";
 
 export {
   CUSTODY_RECEIPT_TYPE,

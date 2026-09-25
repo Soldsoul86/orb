@@ -56,17 +56,81 @@ export type EnvelopePreimageInput = Omit<EventEnvelope, "integrity"> & {
   readonly payloadHash: string;
 };
 
-/** The bytes an event commits to. Excludes `integrity.hash`; includes the payload's hash. */
+/**
+ * The envelope format an event was written under.
+ *
+ * **1** — `type` is fine-grained, `causes` and `schema` are in the envelope, the
+ * payload is unwrapped. Everything written before 2026-09-25.
+ *
+ * **2** — `type` is coarse, `causes` and `schema` moved into the payload, the
+ * payload is nonce-wrapped (`docs/ERASURE.md` §2b, §2a).
+ */
+export type EnvelopeVersion = 1 | 2;
+
+/** The current version. Everything new is written this way. */
+export const ENVELOPE_VERSION: EnvelopeVersion = 2;
+
+/**
+ * Which rule an event was written under.
+ *
+ * **Absent means 1**, and that is not a default — it is the definition. Every
+ * event written before the field existed is v1 by construction, and there are
+ * 1475 of them on the operator's phone that Art. I forbids editing and the
+ * E2/E3 ruling forbids removing (`DEVICE_LOOP.md` §0). A reader that guessed
+ * here would report every one of them as corrupt.
+ */
+export function envelopeVersion(envelope: { readonly v?: number }): EnvelopeVersion {
+  return envelope.v === 2 ? 2 : 1;
+}
+
+/**
+ * The bytes an event commits to. Excludes `integrity.hash`; includes the
+ * payload's hash.
+ *
+ * **`v` is inside the preimage, deliberately.** A version outside it could be
+ * flipped to make a verifier apply the wrong rule — a downgrade attack. Inside,
+ * changing it changes the hash, which breaks linkage with the next event, so
+ * the chain protects the field that selects how the chain is checked.
+ *
+ * **`v` is in the envelope and never the payload**, for the same reason the
+ * type is: a witness holds envelopes and no keys (`WITNESSES.md` W2), and a
+ * version locked inside an encrypted, erasable payload would make history
+ * unverifiable the moment somebody exercised their right to erase.
+ *
+ * v1 omits `v` entirely rather than writing `v: 1`. Writing it would change
+ * every existing hash, which is the one thing this whole mechanism exists to
+ * avoid.
+ */
 export function eventPreimage(input: EnvelopePreimageInput): string {
+  const version = envelopeVersion(input);
+
+  if (version === 1) {
+    return canonicalJson({
+      id: input.id,
+      lane: input.lane,
+      device: input.device,
+      hlc: input.hlc,
+      wallClock: input.wallClock,
+      type: input.type,
+      causes: input.causes,
+      schema: input.schema,
+      payloadHash: input.payloadHash,
+      previous: input.previous,
+    });
+  }
+
+  // v2: `causes` and `schema` are gone from the envelope, so they are gone from
+  // here. They live in the payload and are committed to through `payloadHash`,
+  // which means erasing a payload erases an event's stated lineage with it —
+  // which is the operator's ruling, not a side effect.
   return canonicalJson({
+    v: 2,
     id: input.id,
     lane: input.lane,
     device: input.device,
     hlc: input.hlc,
     wallClock: input.wallClock,
     type: input.type,
-    causes: input.causes,
-    schema: input.schema,
     payloadHash: input.payloadHash,
     previous: input.previous,
   });
