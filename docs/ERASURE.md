@@ -537,6 +537,50 @@ correctly on the owner's behalf, and each is checkable.
 A system that resolves any of these quietly is not doing erasure. It is doing
 something else and calling it erasure.
 
+### Built, 2026-09-25 — `runtime/journal/src/erasure-plan.ts`
+
+`planErasure` computes the eight points as findings; `decisionsRequired` names
+which the owner must answer. A pure function over events — it has no journal, so
+a caller cannot journal the preview by accident (§2b).
+
+**The property that carries the most weight is not the blast radius.** It is
+that every finding says whether it was *computed* or is *unavailable*, and an
+unavailable one never degrades into a reassuring one. *"No disclosures found"*
+where no disclosure record type exists is not caution; it is a false statement
+the owner would act on. Three gaps are reported unconditionally:
+
+| | Why it cannot be computed |
+| --- | --- |
+| **D4** | No disclosure record type exists. Nothing was found because nothing *can* be found — not because nothing left. Art. VIII §32 requires disclosures to be history; until they are, what already left is beyond recall **and beyond report** |
+| **D5** | Holders are listed from custody receipts, but no erasure-confirmation protocol exists, so every holder is unconfirmed |
+| **D6** | Needs a collection policy layer that does not exist (§5c) |
+
+**What is computed.** D2 separates from D1 by a fixpoint: a conclusion loses its
+whole basis when every cause it names is either a target or is itself losing its
+whole basis. Everything else in the fallout **survives rebuilding** — §5a, an
+over-determined pattern survives its own evidence — and each one is a decision,
+not a deletion. D7's residue is read off the event rather than hard-coded, so it
+shrinks by itself when `type`, `schema` and `causes` move into the payload (§2b)
+instead of needing this document edited. D8 is `false` by the ruling: E1 changes
+no hash, height or count, so an attestation taken before still reconciles after.
+
+### The finding a failing test produced
+
+D3 was first raised only when the traversal reported itself unclosed. That is
+**not sufficient, and the test that was written to confirm it exposed why.**
+
+A forward walk reports `closed` when it runs out of dependents it holds — and it
+can close **perfectly over a fragment**, because a cause that is named but not
+held is never stepped through: the walk goes the other way. So a partial replica
+would have presented a confident, short blast radius with no warning, which is
+the exact failure `lineage.ts` was built to prevent, arriving by the one route
+its own flag does not cover.
+
+The evidence of fragmentary history is a **dangling cause anywhere in the
+index**, and D3 is now raised on that as well. The test asserts both halves: the
+walk genuinely closed, *and* the plan still refuses to call the radius
+trustworthy.
+
 ---
 
 ## 5. Three things that cannot be bought
@@ -743,4 +787,6 @@ After it, and after AD-6:
    natural first test of `CLAIMS.md` C1's consent gate — the six routes an agent
    might use to avoid asking are all testable against an operation that never
    leaves the device.
-4. **The two-phase preview** (§1, §4) — the part the owner actually touches.
+4. ~~**The two-phase preview** (§1, §4).~~ **Computation done 2026-09-25** —
+   `erasure-plan.ts`, 12 cases. What remains is the surface the owner touches,
+   and the act itself, which is gated on §10.3.

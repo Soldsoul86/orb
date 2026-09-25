@@ -54,6 +54,14 @@ export {
 } from "./erasure.js";
 export type { ErasureRecord } from "./erasure.js";
 
+export { planErasure, decisionsRequired } from "./erasure-plan.js";
+export type {
+  ErasurePlan,
+  DecisionPoint,
+  Unavailable,
+  EnvelopeResidue,
+} from "./erasure-plan.js";
+
 export { indexLineage, descendantsOf, ancestorsOf } from "./lineage.js";
 export type { LineageIndex, Traversal } from "./lineage.js";
 
