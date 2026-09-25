@@ -86,7 +86,7 @@ public final class MainActivity extends Activity {
         root.addView(stop);
 
         Button export = new Button(this);
-        export.setText("Export journal to Downloads");
+        export.setText("Export and share journal");
         export.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) { export(); }
         });
@@ -143,9 +143,12 @@ public final class MainActivity extends Activity {
 
         try {
             List<String> lines = journal.readLines();
+            // `.txt` rather than `.jsonl`: upload and share targets routinely
+            // filter on extension, and a file nobody can attach is a file that
+            // never leaves the phone. The contents are unchanged.
             String name = "orb-pass1-"
                 + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date())
-                + ".jsonl";
+                + ".txt";
 
             Map<String, Object> record = Json.obj();
             record.put("destination", "Downloads/" + name);
@@ -160,7 +163,7 @@ public final class MainActivity extends Activity {
 
             ContentValues values = new ContentValues();
             values.put(MediaStore.Downloads.DISPLAY_NAME, name);
-            values.put(MediaStore.Downloads.MIME_TYPE, "application/x-ndjson");
+            values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
             values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
 
             ContentResolver resolver = getContentResolver();
@@ -176,8 +179,17 @@ public final class MainActivity extends Activity {
                 }
             }
 
-            status.setText("exported " + lines.size() + " events\nDownloads/" + name
-                + "\n\nOpen Files > Downloads to share it.");
+            status.setText("exported " + lines.size() + " events\nDownloads/" + name);
+
+            // Hand it straight to the share sheet. Navigating to Downloads and
+            // finding the file is a step that can fail, and an instrument whose
+            // evidence cannot get off the device produced nothing.
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_STREAM, target);
+            send.putExtra(Intent.EXTRA_SUBJECT, name);
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(send, "Send journal"));
         } catch (IOException error) {
             status.setText("export failed: " + error);
         }

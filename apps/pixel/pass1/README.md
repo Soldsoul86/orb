@@ -77,8 +77,13 @@ chain state; the journal is the actual output.
 adb pull /sdcard/Android/data/dev.orb.pass1/files/pixel.lane.jsonl
 ```
 
-**Without one:** tap **Export journal to Downloads**, then open Files →
-Downloads and share `orb-pass1-<timestamp>.jsonl` however you like.
+**Without one:** tap **Export and share journal**. It writes
+`orb-pass1-<timestamp>.txt` to Downloads and opens the share sheet on it
+immediately.
+
+Written as `.txt` rather than `.jsonl` because upload and share targets filter
+on extension, and a file nobody can attach is a file that never leaves the
+phone. The contents are unchanged — one JSON object per line.
 
 The second path exists because it is the only one on a phone with developer
 mode off: since Android 11 the Files app cannot browse into another app's
