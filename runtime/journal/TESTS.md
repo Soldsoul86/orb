@@ -90,7 +90,9 @@ nothing and grow neither lane.
 
 **Emission vs retention.** A device holding no payloads still serves every
 envelope, including onward to a third device — inv. 1. A policy selects which
-payloads are held and the rest stay envelopes. A payload skipped under a narrow
+payloads are held and the rest stay envelopes — by wall clock, because from v2 a
+policy sees only coarse types. A policy naming a real event type holds nothing,
+and that is pinned rather than worked around. A payload skipped under a narrow
 policy is picked up under a wider one. A peer offering a payload that does not
 match history is rejected, so no peer has to be trusted.
 
@@ -101,3 +103,37 @@ nothing claims nothing.
 **The guard, live.** A phone may drop a payload once enough peers have fetched
 it, and not before. A peer that took envelopes only does not count as a holder.
 A dropped payload comes back from a peer that kept it.
+
+## The envelope migration — `tests/coarse-envelope.test.ts`
+
+Every other file here checks a property v2 was careful **not** to break. This
+one checks what it bought, because a property no test asserts is one the next
+refactor removes for free. `docs/ERASURE.md` §2a, §2b.
+
+**The envelope discloses nothing.** A stored envelope carries `orb.content`, a
+schema describing an encrypted payload, and no stated lineage — and names
+nothing about the subject. It still verifies with the payload stripped, which is
+the whole reason hiding it is affordable. Bookkeeping keeps its real name,
+because a witness holds no keys and can never decrypt to learn that an event was
+a custody receipt.
+
+**A payload cannot be confirmed by guessing it.** Knowing the exact plaintext a
+caller wrote does not reproduce `payloadHash`; the nonce is inside what the hash
+covers, or it would buy nothing. The same event written twice is two unlinkable
+events — the deduplication that costs.
+
+**A reader gets back what the writer wrote.** Presentation restores the real
+type, schema, causes and payload, and the result still verifies in the hand.
+`append` and `readLane` return the identical object, because writing and reading
+must not disagree about what an event is.
+
+**Erasure reaches the kind and the lineage.** After an erasure nothing survives
+saying what was erased — not even to its owner. A provenance walk across such an
+event reports itself **open**, never closed: an erased event states no causes,
+and reporting that as *built on nothing* would be a false claim of completeness
+in the direction that hides the erasure.
+
+**Negative controls, run 2026-09-25.** Each claim was checked by breaking it.
+Keeping the fine type in the envelope fails 4 tests; keeping `causes` in the
+envelope fails 3; a constant nonce fails 2; indexing unreadable lineage as `[]`
+fails exactly the provenance test. None passed with the property removed.

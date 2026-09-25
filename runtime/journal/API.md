@@ -123,15 +123,17 @@ class FileJournalStore implements JournalStore {
 
 ```ts
 interface OrbEvent<Payload = unknown> {
+  readonly v?: 2;                   // envelope format; absent means 1
   readonly id: string;              // ULID-class, never reused
   readonly lane: LaneId;
   readonly device: string;
   readonly hlc: Hlc;
   readonly wallClock: number;       // human-facing only; never used for ordering
   readonly type: string;
-  readonly causes: readonly string[];
+  readonly causes?: readonly string[];
   readonly schema: SchemaRef;
   readonly payload: Payload;        // opaque to the journal
+  readonly nonce?: string;          // presentation state; see below
   readonly integrity: Integrity;
 }
 
@@ -142,6 +144,37 @@ interface EventDraft<Payload = unknown> {
   readonly causes?: readonly string[];
 }
 ```
+
+### Two forms of the same event (v2)
+
+`docs/ERASURE.md` §2a, §2b. An event has a **stored** form and a **presented**
+form, and the difference is the envelope migration.
+
+| | stored / on the wire | presented by `append` and `readLane` |
+|---|---|---|
+| `type` | `orb.content`, or a bookkeeping type | the real type |
+| `schema` | `orb.content` v1 | the real schema |
+| `causes` | absent | as written |
+| `payload` | `{ causes, data, nonce, schema, type }` | `data`, as written |
+| `nonce` | — | the wrapper's nonce |
+
+A witness or a peer sees only the stored form: that an event happened, of a
+coarse kind, at a time. The real type, schema and stated lineage are payload
+data, so **erasing a payload erases them**, and what remains says *cannot say*
+rather than *nothing* — `causes` is `undefined`, never `[]`.
+
+`nonce` is carried on presented events so `storedPayload(event)` can rebuild the
+wrapper and `verifyEvent` stays true of an event a caller just read. It is not
+in any hash preimage and is not part of identity.
+
+Two consequences worth stating plainly:
+
+- **`payloadHash` is no longer a content address.** The nonce closes a
+  confirmation oracle — `payloadHash` sits in a plaintext envelope, so without
+  it an adversary hashes guesses until one matches. The cost is that two
+  devices recording the same observation produce unlinkable events, so payloads
+  cannot be deduplicated by hash.
+- **Payloads cannot be selected by kind.** See `holdTypes` below.
 
 ## Errors
 
@@ -179,11 +212,19 @@ still fetches payloads for it. That is the recovery path for a payload it
 pruned, and it is safe because the envelope is its own.
 
 ```ts
-holdEverything() | holdNothing() | holdSince(ms) | holdTypes([...])
+holdEverything() | holdNothing() | holdSince(ms) | holdContent() | holdTypes([...])
 ```
 `PayloadPolicy` decides which payloads this device holds. It is the device's own
 decision; no other device consults it (inv. 7). `describe` is journaled when the
 policy changes (inv. 6), so a horizon can be explained later.
+
+A policy sees **envelopes only** — it is deciding whether to fetch the payload,
+and a witness has no key in any case. From v2 an envelope carries no real type,
+so `holdTypes(["note"])` holds nothing: selective retention by kind of content
+is gone, not unimplemented. Any envelope field fine enough to restore it is a
+field that survives erasure and is readable by whoever holds the envelope, which
+is the leak §2b closed. What remains available is lane, device, wall clock and
+content-versus-bookkeeping — `holdSince` and `holdContent`.
 
 ```ts
 advertise(): Promise<readonly LaneWatermark[]>

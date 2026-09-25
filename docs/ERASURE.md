@@ -2,8 +2,17 @@
 
 **Status: four rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading and the
 permanent prohibition on E2/E3 (§2), the coarse envelope type, and the coarse
-vocabulary (both §2b). The rest is a PROPOSAL.** Nothing here is implemented;
-§9 carries what is still open.
+vocabulary (both §2b). The rest is a PROPOSAL.** §9 carries what is still open.
+
+**§2a and §2b are now IMPLEMENTED** in `runtime/journal` as envelope v2: the
+coarse type and schema, stated lineage moved into the payload, per-event nonces,
+and per-event keys. `tests/coarse-envelope.test.ts` pins what the migration
+bought, and each of its claims has a recorded negative control. Two costs the
+ruling predicted arrived exactly as written — `holdTypes` holding nothing (see
+*What this breaks*, below) and an erased event becoming uninterpretable even to
+its owner. One was **not** predicted and is recorded in §2a: `payloadHash` is no
+longer a content address, so payloads cannot be deduplicated by hash across
+devices.
 
 ---
 
@@ -518,6 +527,14 @@ devices that already share keys, which is machinery that does not exist.
 Recorded as a cost of the ruling rather than argued against it. `holdEverything`,
 `holdNothing` and `holdSince` are unaffected, and those are the policies a
 witness and a durability peer actually use.
+
+**Implemented 2026-09-25, and it landed harder than written.** The loss is not
+only across a trust boundary: a device selecting payloads is reading envelopes
+*before* it has the payload, so it sees coarse types locally too.
+`holdTypes(["note"])` now holds nothing at all. `holdContent()` was added as the
+honest replacement — every content payload, no bookkeeping, which is the finest
+split a v2 envelope still supports. A test pins the loss so it cannot be
+rediscovered as a bug.
 
 **This changes a kernel contract.** `Event.md` and `EVENT_MODEL.md` define the
 envelope, and the type field's meaning changes for every Event in the system.

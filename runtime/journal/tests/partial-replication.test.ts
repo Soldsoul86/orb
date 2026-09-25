@@ -23,6 +23,7 @@ import {
   evaluatePrune,
   hasPayload,
   hashPayload,
+  storedPayload,
   latestCustody,
   orderEvents,
   replay,
@@ -110,7 +111,13 @@ describe("an envelope stands alone", () => {
   test("the envelope commits to the payload by hash, not by value", async () => {
     const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
     const event = await journal.appendOne(note("a"));
-    assert.equal(event.integrity.payloadHash, hashPayload({ text: "a" }));
+
+    // The commitment is to the plaintext the store holds, which under v2 is the
+    // wrapper: the caller's payload plus its type, schema, causes and nonce
+    // (`payload.ts`). `storedPayload` rebuilds it from an event in any form,
+    // which is what keeps a freshly-read event verifiable in the hand.
+    assert.equal(event.integrity.payloadHash, hashPayload(storedPayload(event)));
+    assert.notEqual(event.integrity.payloadHash, hashPayload({ text: "a" }));
   });
 
   test("order derives identically with and without payloads", async () => {

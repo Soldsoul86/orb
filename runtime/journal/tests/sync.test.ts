@@ -18,9 +18,11 @@ import {
   SYNC_POLICY_TYPE,
   exchange,
   hasPayload,
+  holdContent,
   holdEverything,
   holdNothing,
   holdTypes,
+  isBookkeepingType,
   latestCustody,
   pullFrom,
   type PayloadRecord,
@@ -39,9 +41,16 @@ const alert = (text: string) => ({ type: "alert", schema: ALERT_SCHEMA, payload:
  * A lane also carries the sync rounds and custody receipts the device recorded
  * about itself, which are real history and must not be filtered out anywhere
  * but here, where the subject is what replicated rather than what was noted.
+ *
+ * Counts what is *not* bookkeeping rather than what is a "note" or an "alert".
+ * A replica holds envelopes whose payloads it never fetched, and an envelope has
+ * never heard of a note (`docs/ERASURE.md` §2b): it says `orb.content`. The same
+ * event read where its payload *is* held comes back with its real type restored.
+ * So the two forms agree on exactly one thing — whether this is bookkeeping —
+ * and that is what a count across replicas has to be built on.
  */
 function contentIn(events: readonly { type: string }[]): number {
-  return events.filter((event) => event.type === "note" || event.type === "alert").length;
+  return events.filter((event) => !isBookkeepingType(event.type)).length;
 }
 
 async function pixelAndMac() {
@@ -153,20 +162,31 @@ describe("envelopes are emitted in full, payloads by local policy", () => {
   });
 
   test("a policy selects which payloads are held, and the rest stay envelopes", async () => {
-    const { pixel, mac } = await pixelAndMac();
-    await pixel.append([note("p1"), alert("a1"), note("p2")]);
+    // A stepped clock, because three appends in one millisecond would make the
+    // cutoff below meaningless and the test vacuous.
+    let tick = 1_000;
+    const pixel = await Journal.open({ lane: "pixel", device: "pixel-01", now: () => (tick += 10) });
+    const mac = await Journal.open({ lane: "mac", device: "mac-01" });
 
-    await pullFrom(mac, new LocalSyncPeer(pixel), holdTypes(["alert"]));
+    await pixel.append([note("p1"), alert("a1")]);
+    const [last] = await pixel.append([note("p2")]);
+    assert.ok(last);
+
+    // Selection happens on the envelope, because that is all a fetching device
+    // has — the payload is what it is deciding whether to ask for. So the policy
+    // discriminates on wall clock, which the envelope still carries.
+    await pullFrom(mac, new LocalSyncPeer(pixel), {
+      describe: "hold:after-cutoff",
+      wants: (envelope) => envelope.wallClock >= last.wallClock,
+    });
 
     const replica = await mac.readLane("pixel");
     assert.equal(contentIn(replica), 3);
     assert.deepEqual(
-      replica.map((event) => [event.type, hasPayload(event)]),
-      [
-        ["note", false],
-        ["alert", true],
-        ["note", false],
-      ],
+      replica
+        .filter((event) => !isBookkeepingType(event.type))
+        .map((event) => hasPayload(event)),
+      [false, false, true],
     );
 
     const horizon = await mac.horizon();
@@ -174,16 +194,32 @@ describe("envelopes are emitted in full, payloads by local policy", () => {
     assert.equal(horizon.missing, 2);
   });
 
+  test("a policy cannot select content by kind, and holds nothing if it tries", async () => {
+    const { pixel, mac } = await pixelAndMac();
+    await pixel.append([note("p1"), alert("a1")]);
+
+    // Pins the cost of the coarse-type ruling so it cannot be rediscovered as a
+    // bug. Every content envelope says `orb.content`, so a policy naming a real
+    // event type matches nothing — and the alternative, a finer envelope label,
+    // is exactly the leak §2b closed. `holdContent` is the honest replacement.
+    await pullFrom(mac, new LocalSyncPeer(pixel), holdTypes(["alert"]));
+    assert.equal((await mac.horizon()).missing, 2, "no content payload was fetched");
+
+    const wider = await Journal.open({ lane: "wider", device: "wider-01" });
+    await pullFrom(wider, new LocalSyncPeer(pixel), holdContent());
+    assert.equal((await wider.horizon()).missing, 0, "content is all or nothing");
+  });
+
   test("a payload missed under one policy is picked up under a wider one", async () => {
     const { pixel, mac } = await pixelAndMac();
     await pixel.append([note("p1"), alert("a1")]);
 
-    await pullFrom(mac, new LocalSyncPeer(pixel), holdTypes(["alert"]));
-    assert.equal((await mac.horizon()).missing, 1);
+    await pullFrom(mac, new LocalSyncPeer(pixel), holdNothing());
+    assert.equal((await mac.horizon()).missing, 2);
 
     const second = await pullFrom(mac, new LocalSyncPeer(pixel), holdEverything());
     assert.equal(second.envelopes, 0, "no new envelopes");
-    assert.equal(second.payloads, 1, "the payload it had skipped");
+    assert.equal(second.payloads, 2, "the payloads it had skipped");
     assert.equal((await mac.horizon()).complete, true);
   });
 
@@ -229,8 +265,11 @@ describe("a round reports itself and journals only what lasts", () => {
     const record = own.find((event) => event.type === SYNC_POLICY_TYPE)
       ?.payload as SyncPolicyRecord;
     assert.equal(record.policy, "hold:types:alert");
-    // "Why does this device not hold p1?" is answerable from the journal alone.
-    assert.equal((await mac.horizon()).missing, 1);
+    // "Why does this device not hold p1?" is answerable from the journal alone —
+    // and under v2 the honest answer is that this policy names types no envelope
+    // carries, so it held nothing at all. The horizon is explainable either way,
+    // which is the property under test.
+    assert.equal((await mac.horizon()).missing, 2);
   });
 
   test("an unchanged policy is recorded once, a changed one is recorded again", async () => {

@@ -12,6 +12,7 @@
  */
 import type { EventDraft, LaneId, OrbEvent, SchemaRef, StoredEvent } from "./types.js";
 import { hasPayload } from "./types.js";
+import { unwrapPayload } from "./payload.js";
 
 export const CUSTODY_RECEIPT_TYPE = "orb.custody.receipt";
 export const CUSTODY_RECEIPT_SCHEMA: SchemaRef = { id: "orb.custody.receipt", version: 1 };
@@ -91,7 +92,10 @@ export function latestCustody(
 
   for (const event of events) {
     if (!isCustodyReceipt(event)) continue;
-    const receipt = event.payload;
+    // v2 payloads are wrapped (`payload.ts`); v1 ones are not. Unwrapping is
+    // explicit at every reader, here included, so that a reader which forgets
+    // gets an obviously wrong object rather than a silently wrong answer.
+    const receipt = unwrapPayload(event.payload) as CustodyReceipt;
     if (receipt.lane !== lane) continue;
     const seen = byHolder.get(event.device);
     if (!seen || receipt.count >= seen.count) byHolder.set(event.device, receipt);

@@ -6,9 +6,11 @@
  * replicates foreign lanes. Everything else in Orb is a projection of this.
  */
 import { HybridLogicalClock, type Hlc, type PhysicalClock } from "./hlc.js";
-import { hashEvent, hashPayload, verifyLane } from "./integrity.js";
+import { hashEvent, hashPayload, verifyLane, ENVELOPE_VERSION } from "./integrity.js";
 import type { LaneWatermark } from "./sync.js";
 import { newEventId } from "./ids.js";
+import { wrapPayload, isWrapped } from "./payload.js";
+import { coarseType, coarseSchema } from "./vocabulary.js";
 import type { JournalStore, PayloadRecord } from "./store.js";
 import { MemoryJournalStore } from "./store.js";
 import type { EventDraft, EventEnvelope, LaneId, OrbEvent, StoredEvent } from "./types.js";
@@ -54,6 +56,47 @@ export interface Horizon {
   readonly complete: boolean;
   readonly missing: number;
   readonly lanes: readonly LaneHorizon[];
+}
+
+/**
+ * A stored event turned back into the event its writer wrote.
+ *
+ * History holds a coarse envelope over a wrapped payload: type `orb.content`, a
+ * schema describing *an encrypted payload*, no stated lineage, and a payload
+ * carrying the real type, schema, causes and a nonce (`docs/ERASURE.md` §2b,
+ * §2a). That is what a witness sees and what compulsion reaches. It is not what
+ * a projection should have to parse.
+ *
+ * So presentation restores all four — fine type, fine schema, causes, and the
+ * caller's own payload — and **carries the nonce alongside** so the wrapper can
+ * be rebuilt. Without the nonce the restored event would be unverifiable in the
+ * hand, and the failure mode is the dangerous one: a caller verifies what it
+ * just read and is told its history is corrupt when nothing is wrong. That bug
+ * already happened once today, in `verifyLane` against sealed payloads (§5g).
+ *
+ * The alternative considered and rejected was to present nothing and export
+ * `unwrapPayload` for callers to use. It verifies trivially, but it pushes the
+ * migration's cost onto every projection ever written, permanently, and
+ * `replay` was the proof: every projection in the system broke at once. A cost
+ * paid here, in one function, is the cheaper and the more reversible one.
+ *
+ * **An event whose payload is gone is presented untouched** — coarse type, no
+ * causes. Not a degradation to work around: erasing a payload erases what the
+ * event was built on, and a reader that recovered it from elsewhere would have
+ * defeated the erasure. `causes` being `undefined` rather than `[]` is what
+ * tells `lineage.ts` the difference between *built on nothing* and *cannot say*.
+ */
+function presented(event: StoredEvent): StoredEvent {
+  if (!hasPayload(event) || !isWrapped(event.payload)) return event;
+  const wrapper = event.payload;
+  return {
+    ...event,
+    type: wrapper.type,
+    schema: wrapper.schema,
+    causes: wrapper.causes,
+    payload: wrapper.data,
+    nonce: wrapper.nonce,
+  };
 }
 
 export class Journal {
@@ -140,30 +183,72 @@ export class Journal {
   }
 
   async #appendNow(drafts: readonly EventDraft[]): Promise<readonly OrbEvent[]> {
+    // Two shapes, kept deliberately apart. `stored` is what history holds: a
+    // coarse envelope over a wrapped payload. `events` is what the caller gets
+    // back: the event it wrote. Collapsing them into one would mean either the
+    // caller seeing the wrapper or the store holding the fine type, and both
+    // were the point of the migration.
+    const stored: OrbEvent[] = [];
     const events: OrbEvent[] = [];
     let previous = this.#head;
 
     for (const draft of drafts) {
       const hlc = this.#clock.tick();
       const wallClock = this.#now();
-      const skeleton = {
-        id: newEventId(wallClock),
+      const causes = draft.causes ?? [];
+      const id = newEventId(wallClock);
+
+      // The real type, schema and causes go inside the payload, together with a
+      // nonce; the envelope keeps a coarse type and a schema describing *an
+      // encrypted payload* (`docs/ERASURE.md` §2b, §2a).
+      //
+      // Wrapping happens here and not in a store decorator, because
+      // `payloadHash` must commit to the nonced form. A nonce the hash does not
+      // cover defeats nothing: the oracle it closes works on the hash.
+      const wrapped = wrapPayload({
+        data: draft.payload,
+        causes,
+        schema: draft.schema,
+        type: draft.type,
+      });
+      const payloadHash = hashPayload(wrapped);
+
+      // No `causes` here, and that is the whole of the lineage ruling: an
+      // envelope states no derivation, so erasing a payload erases what the
+      // event was built on. A witness holding envelopes learns that events
+      // happened, never how they were reasoned from one another.
+      const envelope = {
+        v: ENVELOPE_VERSION,
+        id,
         lane: this.lane,
         device: this.device,
         hlc,
         wallClock,
-        type: draft.type,
-        causes: draft.causes ?? [],
-        schema: draft.schema,
-        payload: draft.payload,
+        type: coarseType(draft.type),
+        schema: coarseSchema(draft.type, draft.schema),
       };
-      const payloadHash = hashPayload(draft.payload);
-      const hash = hashEvent({ ...skeleton, previous, payloadHash });
-      events.push({ ...skeleton, integrity: { previous, hash, payloadHash } });
+      const hash = hashEvent({ ...envelope, previous, payloadHash });
+      const integrity = { previous, hash, payloadHash };
+
+      stored.push({ ...envelope, payload: wrapped as unknown, integrity });
+
+      // What the caller gets back is the event it wrote, presented exactly as a
+      // later read would present it — same fine type, same payload, same nonce.
+      // Writing and reading must not disagree about what an event is.
+      events.push({
+        ...envelope,
+        type: draft.type,
+        schema: draft.schema,
+        causes,
+        payload: draft.payload,
+        nonce: wrapped.nonce,
+        integrity,
+      });
+
       previous = hash;
     }
 
-    await this.#store.append(this.lane, events);
+    await this.#store.append(this.lane, stored);
     this.#head = previous;
 
     for (const listener of this.#listeners) listener(events);
@@ -216,11 +301,11 @@ export class Journal {
   async readAll(): Promise<readonly StoredEvent[]> {
     const out: StoredEvent[] = [];
     for (const lane of await this.#store.lanes()) out.push(...(await this.#store.read(lane)));
-    return out;
+    return out.map(presented);
   }
 
   async readLane(lane: LaneId): Promise<readonly StoredEvent[]> {
-    return this.#store.read(lane);
+    return (await this.#store.read(lane)).map(presented);
   }
 
   async lanes(): Promise<readonly LaneId[]> {

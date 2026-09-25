@@ -25,8 +25,10 @@ import type { EventEnvelope, LaneId } from "./types.js";
 import { hasPayload, isErased } from "./types.js";
 import type { PayloadRecord } from "./store.js";
 import type { Journal } from "./journal.js";
+import { isBookkeepingType } from "./vocabulary.js";
+import { SYNC_POLICY_TYPE, SYNC_POLICY_SCHEMA } from "./sync-types.js";
+import { unwrapPayload } from "./payload.js";
 import {
-  CUSTODY_RECEIPT_TYPE,
   custodyReceiptDraft,
   custodyReceiptFor,
   latestCustody,
@@ -95,7 +97,26 @@ export function holdSince(windowMs: number, now: () => number = Date.now): Paylo
   };
 }
 
-/** Hold payloads of the named event types only. */
+/**
+ * Hold payloads of the named envelope types only.
+ *
+ * **Envelope types, which from v2 are not event types.** The coarse-type ruling
+ * (`docs/ERASURE.md` §2b) put every content event's real type inside its
+ * payload, so an envelope says either a bookkeeping type or `orb.content` and
+ * nothing finer. A device choosing what to fetch reads envelopes — it has no
+ * payload yet, and a witness has no key ever — so **selective retention by kind
+ * of content is gone**, not merely unimplemented.
+ *
+ * `holdTypes(["note"])` therefore holds nothing. That is not a bug to route
+ * around, and routing around it is what would be the bug: any envelope field
+ * fine enough to make this work is a field that survives erasure and is
+ * readable by whoever holds the envelope, which is the leak §2b closed.
+ *
+ * What a policy can still discriminate on is everything the envelope still
+ * carries: lane, device, wall clock, and content-versus-bookkeeping. That is
+ * `holdSince`, and it is enough for the retention cases that motivated this —
+ * "keep the last month", "keep my own lane", "keep nothing".
+ */
 export function holdTypes(types: readonly string[]): PayloadPolicy {
   const wanted = new Set(types);
   return {
@@ -104,8 +125,22 @@ export function holdTypes(types: readonly string[]): PayloadPolicy {
   };
 }
 
-export const SYNC_POLICY_TYPE = "orb.sync.policy";
-export const SYNC_POLICY_SCHEMA = { id: "orb.sync.policy", version: 1 } as const;
+/**
+ * Hold every content payload and no bookkeeping.
+ *
+ * The finest split a v2 envelope still supports, and the honest replacement for
+ * the type-selective policies that v2 ended. Bookkeeping payloads are small and
+ * a peer can always re-derive its own, so a device short of space sheds them
+ * first.
+ */
+export function holdContent(): PayloadPolicy {
+  return {
+    describe: "hold:content",
+    wants: (envelope) => !isBookkeepingType(envelope.type),
+  };
+}
+
+export { SYNC_POLICY_TYPE, SYNC_POLICY_SCHEMA } from "./sync-types.js";
 
 /**
  * The payload policy a device put into force.
@@ -127,7 +162,7 @@ export interface SyncPolicyRecord {
  * the last round's records and record that it had done so, forever.
  */
 function isBookkeeping(event: { readonly type: string }): boolean {
-  return event.type === CUSTODY_RECEIPT_TYPE || event.type === SYNC_POLICY_TYPE;
+  return isBookkeepingType(event.type);
 }
 
 /** What one exchange did. Returned to the caller; not itself history. */
@@ -253,7 +288,7 @@ async function policyDraft(journal: Journal, policy: PayloadPolicy) {
   for (let index = own.length - 1; index >= 0; index -= 1) {
     const event = own[index];
     if (!event || event.type !== SYNC_POLICY_TYPE) continue;
-    const recorded = event.payload as SyncPolicyRecord | undefined;
+    const recorded = unwrapPayload(event.payload) as SyncPolicyRecord | undefined;
     return recorded?.policy === policy.describe ? [] : [policyEvent(policy)];
   }
 

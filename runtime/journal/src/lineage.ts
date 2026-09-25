@@ -44,6 +44,17 @@ export interface LineageIndex {
   idForHash(hash: string): string | undefined;
   /** Whether this id is in scope at all. */
   holds(id: string): boolean;
+  /**
+   * Whether this event says what it was built on.
+   *
+   * False when the event is held but its stated lineage is not readable here —
+   * a v2 envelope whose payload was never fetched, pruned, or erased
+   * (`docs/ERASURE.md` §2b). That is *cannot say*, and `causesOf` returning
+   * `[]` for it would report *built on nothing*, which is a different and
+   * false claim. `ancestorsOf` reads this so a walk through such an event is
+   * reported open instead of closed.
+   */
+  statesCauses(id: string): boolean;
   /** How many events the index was built over. */
   readonly scope: number;
   /**
@@ -76,6 +87,8 @@ export interface Traversal {
 class Index implements LineageIndex {
   readonly #dependents = new Map<string, string[]>();
   readonly #causes = new Map<string, readonly string[]>();
+  /** Every indexed id, including those whose lineage is unreadable here. */
+  readonly #held = new Set<string>();
   readonly #byHash = new Map<string, string>();
   readonly #order: string[] = [];
   readonly #unresolved = new Set<string>();
@@ -83,7 +96,11 @@ class Index implements LineageIndex {
   constructor(events: Iterable<StoredEvent>) {
     for (const event of events) {
       this.#order.push(event.id);
-      this.#causes.set(event.id, event.causes);
+      this.#held.add(event.id);
+      // Kept apart from `#held` deliberately. An event with no readable payload
+      // states no lineage, and recording `[]` for it would make the index claim
+      // the event was built on nothing.
+      if (event.causes !== undefined) this.#causes.set(event.id, event.causes);
       this.#byHash.set(event.integrity.hash, event.id);
     }
 
@@ -98,7 +115,7 @@ class Index implements LineageIndex {
     // A second pass, because a cause may legitimately be cited before the
     // event carrying it appears in the iteration order — lanes interleave.
     for (const cause of this.#dependents.keys()) {
-      if (!this.#causes.has(cause)) this.#unresolved.add(cause);
+      if (!this.#held.has(cause)) this.#unresolved.add(cause);
     }
   }
 
@@ -115,6 +132,10 @@ class Index implements LineageIndex {
   }
 
   holds(id: string): boolean {
+    return this.#held.has(id);
+  }
+
+  statesCauses(id: string): boolean {
     return this.#causes.has(id);
   }
 
@@ -159,13 +180,18 @@ export function descendantsOf(
  * not an entry's own account of where it came from.
  */
 export function ancestorsOf(index: LineageIndex, roots: Iterable<string>): Traversal {
-  return walk(index, roots, (id) => index.causesOf(id));
+  // Opaque where the lineage is not readable: an erased or unfetched payload
+  // took the event's stated causes with it, so the walk stops there and says so
+  // rather than reporting a provenance it never read.
+  return walk(index, roots, (id) => index.causesOf(id), (id) => !index.statesCauses(id));
 }
 
 function walk(
   index: LineageIndex,
   roots: Iterable<string>,
   step: (id: string) => readonly string[],
+  /** Held, but cannot be stepped through. Its edges are unknown, not absent. */
+  opaque: (id: string) => boolean = () => false,
 ): Traversal {
   const seed = [...roots];
   const seen = new Set<string>(seed);
@@ -180,6 +206,8 @@ function walk(
   while (queue.length > 0) {
     const id = queue.shift();
     if (id === undefined) break;
+
+    if (opaque(id)) unresolved.add(id);
 
     for (const next of step(id)) {
       if (!index.holds(next)) {

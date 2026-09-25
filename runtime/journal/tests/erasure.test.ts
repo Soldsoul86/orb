@@ -240,18 +240,20 @@ describe("what was erased is never brought back", () => {
     const [pruned, destroyed] = await journal.append([note("keep"), note("gone")]);
     assert.ok(pruned && destroyed);
     assert.ok(hasPayload(pruned) && hasPayload(destroyed));
-    const prunedPayload = pruned.payload;
-    const destroyedPayload = destroyed.payload;
+
+    // What a peer would be holding, taken the way a peer gets it. Under v2 a
+    // payload on the wire is the wrapper, nonce included — the caller's own
+    // object no longer hashes to what the envelope commits to, which is the
+    // confirmation oracle being closed rather than an inconvenience.
+    const held = await journal.payloads("pixel", [pruned.id, destroyed.id]);
+    assert.equal(held.length, 2);
 
     await store.detach("pixel", [pruned.id], "pruned");
     await store.detach("pixel", [destroyed.id], "erased");
 
     // Both payloads verify against their envelopes: the refusal is about the
     // reason for absence, never about the bytes failing a check.
-    const restored = await journal.attach("pixel", [
-      { eventId: pruned.id, payload: prunedPayload },
-      { eventId: destroyed.id, payload: destroyedPayload },
-    ] satisfies PayloadRecord[]);
+    const restored = await journal.attach("pixel", held satisfies readonly PayloadRecord[]);
 
     assert.equal(restored, 1, "exactly the pruned one comes back");
 

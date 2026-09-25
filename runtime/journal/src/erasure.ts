@@ -21,6 +21,7 @@
  * ruled unbuildable.
  */
 import type { EventDraft, LaneId, StoredEvent } from "./types.js";
+import { unwrapPayload } from "./payload.js";
 
 export const ERASURE_TYPE = "orb.erasure";
 export const ERASURE_SCHEMA = { id: "orb.erasure", version: 1 } as const;
@@ -70,7 +71,7 @@ export function erasedHashes(events: Iterable<StoredEvent>): ReadonlySet<string>
     // A declaration whose payload this device does not hold still counts as a
     // declaration, but cannot say which envelope it referred to. Skipping it is
     // the only honest option: acting on a guess would erase the wrong thing.
-    const record = event.payload as ErasureRecord | undefined;
+    const record = unwrapPayload(event.payload) as ErasureRecord | undefined;
     if (record?.hash) erased.add(record.hash);
   }
 

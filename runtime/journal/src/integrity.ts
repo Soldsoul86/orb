@@ -13,7 +13,9 @@
  */
 import { createHash } from "node:crypto";
 import type { EventEnvelope, OrbEvent, StoredEvent } from "./types.js";
+import { coarseType } from "./vocabulary.js";
 import { hasPayload, JournalIntegrityError } from "./types.js";
+import { storedPayload } from "./payload.js";
 
 /**
  * Deterministic JSON encoding: object keys sorted, no incidental whitespace.
@@ -67,8 +69,14 @@ export type EnvelopePreimageInput = Omit<EventEnvelope, "integrity"> & {
  */
 export type EnvelopeVersion = 1 | 2;
 
-/** The current version. Everything new is written this way. */
-export const ENVELOPE_VERSION: EnvelopeVersion = 2;
+/**
+ * The current version. Everything new is written this way.
+ *
+ * Typed as the literal rather than the union: an envelope only ever *stores* a
+ * version it was written under, and v1 stores none at all, so `EventEnvelope.v`
+ * is `2` and not `1 | 2`. A future version widens both together.
+ */
+export const ENVELOPE_VERSION = 2 as const;
 
 /**
  * Which rule an event was written under.
@@ -112,7 +120,7 @@ export function eventPreimage(input: EnvelopePreimageInput): string {
       hlc: input.hlc,
       wallClock: input.wallClock,
       type: input.type,
-      causes: input.causes,
+      causes: input.causes ?? [],
       schema: input.schema,
       payloadHash: input.payloadHash,
       previous: input.previous,
@@ -122,7 +130,14 @@ export function eventPreimage(input: EnvelopePreimageInput): string {
   // v2: `causes` and `schema` are gone from the envelope, so they are gone from
   // here. They live in the payload and are committed to through `payloadHash`,
   // which means erasing a payload erases an event's stated lineage with it —
-  // which is the operator's ruling, not a side effect.
+  // the operator's ruling, not a side effect.
+  //
+  // The type is **coarsened here rather than trusted**. What v2 commits to is
+  // the coarse type; the fine one is payload data. Coarsening is idempotent, so
+  // this holds whether the caller passes an event as stored (already coarse) or
+  // as presented to a reader (fine type restored from the payload) — and
+  // without it, an event handed back from `append` would fail verification
+  // against the hash that `append` itself computed.
   return canonicalJson({
     v: 2,
     id: input.id,
@@ -130,7 +145,7 @@ export function eventPreimage(input: EnvelopePreimageInput): string {
     device: input.device,
     hlc: input.hlc,
     wallClock: input.wallClock,
-    type: input.type,
+    type: coarseType(input.type),
     payloadHash: input.payloadHash,
     previous: input.previous,
   });
@@ -167,7 +182,7 @@ export function verifyEnvelope(envelope: EventEnvelope): boolean {
  * {@link verifiablePayload}.
  */
 export function verifyPayload(event: OrbEvent): boolean {
-  return hashPayload(event.payload) === event.integrity.payloadHash;
+  return hashPayload(storedPayload(event)) === event.integrity.payloadHash;
 }
 
 /**
@@ -189,7 +204,7 @@ export function verifyPayload(event: OrbEvent): boolean {
  * undetectable, and not made worse here.
  */
 export function verifiablePayload(event: OrbEvent): boolean {
-  const payload = event.payload;
+  const payload = storedPayload(event);
   return !(
     typeof payload === "object" &&
     payload !== null &&

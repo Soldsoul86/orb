@@ -65,8 +65,22 @@ export interface EventEnvelope {
   /** Best-effort physical timestamp. Human-facing only; never used for ordering. */
   readonly wallClock: number;
   readonly type: string;
-  /** Event ids this event was derived from or reacted to. */
-  readonly causes: readonly string[];
+  /**
+   * Event ids this event was derived from or reacted to.
+   *
+   * **Optional from v2, and the absence is meaningful.** Stated lineage moved
+   * into the payload (`docs/ERASURE.md` §2b), so an envelope whose payload this
+   * device does not hold cannot say what the event was built on. That is
+   * `undefined` — *cannot say* — and it is not the same fact as `[]`, which is
+   * *built on nothing*. A reader that collapsed them would report a complete
+   * provenance walk over a history it had only partly read.
+   *
+   * v1 envelopes always carry it. v2 events carry it once presented with their
+   * payload (`presented` in `journal.ts`); on the wire, an envelope alone never
+   * does — which is the point, because a witness holding envelopes must not be
+   * able to reconstruct the shape of the owner's reasoning.
+   */
+  readonly causes?: readonly string[];
   readonly schema: SchemaRef;
   readonly integrity: Integrity;
 }
@@ -74,6 +88,23 @@ export interface EventEnvelope {
 /** The immutable atomic unit of history, payload present. */
 export interface OrbEvent<Payload = unknown> extends EventEnvelope {
   readonly payload: Payload;
+  /**
+   * The v2 payload wrapper's nonce, carried on events presented to readers.
+   *
+   * Presentation unwraps the payload and restores the fine type, schema and
+   * causes, so that a projection sees exactly the event that was written. That
+   * would make the event **unverifiable in the hand** — the stored plaintext is
+   * the wrapper, and the wrapper cannot be rebuilt without its nonce. Carrying
+   * the nonce here is what keeps `verifyEvent` true of a freshly-read event.
+   *
+   * Absent on v1 events, which have no wrapper, and on events read straight
+   * from a store, whose payload is still wrapped. Both cases are handled by
+   * {@link storedPayload}.
+   *
+   * Presentation state, not identity: it is not in any hash preimage, and
+   * re-deriving it is impossible by construction.
+   */
+  readonly nonce?: string;
 }
 
 /**

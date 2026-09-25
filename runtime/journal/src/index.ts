@@ -68,6 +68,17 @@ export type {
   EnvelopeResidue,
 } from "./erasure-plan.js";
 
+export { wrapPayload, unwrapPayload, isWrapped, storedPayload, newNonce } from "./payload.js";
+export type { WrappedPayload } from "./payload.js";
+
+export {
+  CONTENT_TYPE,
+  CONTENT_SCHEMA,
+  isBookkeepingType,
+  coarseType,
+  coarseSchema,
+} from "./vocabulary.js";
+
 export { indexLineage, descendantsOf, ancestorsOf } from "./lineage.js";
 export type { LineageIndex, Traversal } from "./lineage.js";
 
@@ -84,6 +95,7 @@ export {
   holdNothing,
   holdSince,
   holdTypes,
+  holdContent,
 } from "./sync.js";
 export type {
   SyncPeer,

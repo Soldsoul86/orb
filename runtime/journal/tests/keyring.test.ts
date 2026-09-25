@@ -21,6 +21,7 @@ import {
   isSealed,
   sealedStore,
   verifiablePayload,
+  verifyEvent,
   verifyLane,
   type EventDraft,
 } from "../src/index.js";
@@ -83,16 +84,38 @@ describe("the store holds ciphertext, the journal sees plaintext", () => {
   });
 
   test("hashes are over plaintext, so sealing changes no integrity", async () => {
-    const plain = await Journal.open({ lane: "pixel", device: "pixel-01" });
-    const { store } = sealed();
+    const { inner, store } = sealed();
     const enciphered = await Journal.open({ lane: "pixel", device: "pixel-01", store });
+    const written = await enciphered.appendOne(note("same"));
 
-    const a = await plain.appendOne(note("same"));
-    const b = await enciphered.appendOne(note("same"));
+    // The store below holds ciphertext; the hash was taken over the plaintext
+    // and still checks out when the payload is read back through the keyring.
+    const [sealedRaw] = await inner.read("pixel");
+    assert.ok(sealedRaw && hasPayload(sealedRaw) && isSealed(sealedRaw.payload));
 
-    // Two devices sealing the same payload under different keys still agree on
-    // its hash — which is why the cross-implementation vectors are untouched.
-    assert.equal(a.integrity.payloadHash, b.integrity.payloadHash);
+    const [read] = await enciphered.readLane("pixel");
+    assert.ok(read && hasPayload(read));
+    assert.equal(read.integrity.payloadHash, written.integrity.payloadHash);
+    assert.equal(verifyEvent(read), true, "sealing is invisible to verification");
+  });
+
+  test("two devices writing the same thing do not produce the same hash", async () => {
+    const a = await Journal.open({ lane: "a", device: "a-01" });
+    const b = await Journal.open({ lane: "b", device: "b-01" });
+
+    const one = await a.appendOne(note("same"));
+    const two = await b.appendOne(note("same"));
+
+    // The v1 property this replaces was that identical payloads hash alike,
+    // which made `payloadHash` a content address. The per-event nonce
+    // (`payload.ts`) ends that deliberately: a guessable payload with a
+    // convergent hash is a confirmation oracle — hash the guess, compare, and
+    // read the event with no key at all.
+    //
+    // The cost is named here so it is not rediscovered as a bug: two devices
+    // recording the same observation produce unlinkable events, so payloads
+    // can never be deduplicated by hash across devices.
+    assert.notEqual(one.integrity.payloadHash, two.integrity.payloadHash);
   });
 });
 
@@ -134,12 +157,16 @@ describe("destroying the key is what erasure is", () => {
     const journal = await Journal.open({ lane: "pixel", device: "pixel-01", store });
     const target = await journal.appendOne(note("kept"));
 
+    // Taken before the drop, the way a peer holds it: the v2 wrapper, not the
+    // caller's own object, which no longer hashes to the envelope's commitment.
+    const held = await journal.payloads("pixel", [target.id]);
+
     await store.detach("pixel", [target.id], "pruned");
 
     // The negative control. A keyring that destroyed keys on every detach would
     // pass every test above while making pruning silently irreversible.
     assert.equal(await keyring.holds(target.id), true);
-    assert.equal(await journal.attach("pixel", [{ eventId: target.id, payload: { text: "kept" } }]), 1);
+    assert.equal(await journal.attach("pixel", held), 1);
 
     const [back] = await journal.readLane("pixel");
     assert.ok(back && hasPayload(back));
@@ -166,14 +193,15 @@ describe("destroying the key is what erasure is", () => {
     const { keyring, store } = sealed();
     const journal = await Journal.open({ lane: "pixel", device: "pixel-01", store });
     const target = await journal.appendOne(note("gone"));
+    const held = await journal.payloads("pixel", [target.id]);
 
     await store.detach("pixel", [target.id], "erased");
 
     // A peer helpfully returning the payload must not mint a fresh key for it.
-    // That would undo an erasure without anyone deciding to.
-    const restored = await journal.attach("pixel", [
-      { eventId: target.id, payload: { text: "gone" } },
-    ]);
+    // That would undo an erasure without anyone deciding to. The payload is the
+    // real one, taken before the erasure, so the refusal is about the reason for
+    // absence and not about bytes that failed a check.
+    const restored = await journal.attach("pixel", held);
     assert.equal(restored, 0);
     assert.equal(await keyring.holds(target.id), false);
 
