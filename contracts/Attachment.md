@@ -39,7 +39,9 @@ Attachment, always.
 ## 2. Lifecycle
 
 1. **Ingestion.** A Sensor (or import) produces raw content; the content is hashed
-   and stored, yielding an Attachment identified by that hash.
+   and stored, yielding an Attachment identified by that hash. It is *stored
+   under a blinded address* derived from that identity, never under the identity
+   itself (inv. 7).
 2. **Reference.** An Observation or Evidence references the Attachment by its
    content hash. The reference enters history as an Event; the bytes do not.
 3. **Resolution.** When a layer needs the raw content, it resolves the hash
@@ -82,7 +84,16 @@ currently holds them* may change. No transition alters the bytes or the identity
    carries a reason**: never fetched, dropped for space, or destroyed by the
    owner. The three are not interchangeable — a peer that confuses the last with
    the first helpfully restores content its owner erased.
-7. **Erasable with its last reader.** An Attachment is encrypted under its own
+7. **Addressed by a blinded identity.** Identity is the content hash (inv. 2);
+   the **storage address is not**. A store addressed by identity is a list of
+   identities, so anyone reading it can test any file they already hold against
+   it — encrypting the bytes hides the content, never *which* content. The
+   address is therefore derived, `HMAC(addressSecret, identity)`: unguessable
+   without the secret, recomputable from the identity so nothing extra is
+   persisted, and rotatable, because nothing depends on it but local store
+   layout. Rotation voids every address an adversary has collected. This secret
+   is derived-by-design and is **not** an erasure key — inv. 8 destroys those.
+8. **Erasable with its last reader.** An Attachment is encrypted under its own
    key, and that key is destroyed when no *readable* event references it any
    more. An erased event does not keep an Attachment alive: its payload is gone,
    so the reference is gone, and it can never resolve the content again. An
@@ -100,6 +111,14 @@ Upholds Constitution Articles I (History) and VIII (Ownership and Trust).
   of the v1 contract. Introducing a new hashing scheme is an *addition*: new
   Attachments may use a new scheme tag; existing Attachments keep their original
   identity and remain valid forever. The two coexist; old references never break.
+- The **address-blinding scheme** (inv. 7) is deliberately **not** frozen, and
+  this is the one asymmetry in this section. Identity is frozen because history
+  references it and history is immutable; an address is referenced by nothing but
+  the local store, so changing the scheme or rotating the secret re-addresses
+  that store and breaks nothing. Rotation is a feature, not a migration: it voids
+  every address an adversary has already collected. An implementation that froze
+  the address scheme alongside the identity scheme would have thrown that away
+  for symmetry's sake.
 - The **at-rest encryption** obligation is frozen; strengthening the cipher is an
   implementation change behind `Encryption`, not a contract change.
 - No change ever rewrites an existing Attachment's identity or content.
@@ -168,22 +187,25 @@ wrong thing to amend afterwards.
 
 1. ~~**Erasure is not mentioned by any invariant above.**~~ **Ruled 2026-09-25
    by the operator: a per-Attachment key that dies with the last reference.**
-   Now inv. 7, and set out with its mechanism in `ERASURE.md` §2c. Note that §1's
+   Now inv. 8, and set out with its mechanism in `ERASURE.md` §2c. Note that §1's
    *"persists for the life of the journal"* is a **retention default, not a
    guarantee against the owner** — it describes what happens when nobody erases
-   anything, and inv. 7 governs when somebody does.
+   anything, and inv. 8 governs when somebody does.
 
-2. **Inv. 2's deduplication is a confirmation oracle.** *Identical content yields
-   one identity* is what lets a holder of any file test whether this device has
-   it, with no key and no bytes — the same capability the payload nonce closed
-   (`ERASURE.md` §2a). Weaker here, because the bytes are high-entropy and
-   cannot be guessed; not absent, because the interesting query names a file the
-   asker already holds. The payload fix does not transfer: a nonce would destroy
-   inv. 2, and here deduplication is load-bearing (`PARTIAL_REPLICATION.md`
-   §228).
+2. ~~**Inv. 2's deduplication is a confirmation oracle.**~~ **Ruled 2026-09-25:
+   keep the identity, blind the address.** Now inv. 7, with the reasoning in
+   `ERASURE.md` §2a. Inv. 2 and inv. 5 are deliberately untouched: the defect
+   was never that identity is the content hash, but that the *address* was the
+   same value, making the store a list of identities. Note that "the bytes are
+   high-entropy so this is weak" was considered and rejected — the adversary
+   does not guess, they hold the file and test it, which is how known-file
+   detection works at scale. Two residuals stay open and are **not** closed by
+   inv. 7: a durability peer holding encrypted blobs without keys still sees
+   content hashes cross the wire (§2 step 3), and blob sizes remain visible in
+   any store.
 
 Closed alongside the first: inv. 6 previously let an Attachment be *"momentarily
 unavailable"* with no reason recorded. Events had the same gap and it was closed
 with `AbsenceReason` (`ERASURE.md` §7). Inv. 6 now carries the same three
-reasons, and inv. 7 needs the distinction to work at all — *unknown* must block
+reasons, and inv. 8 needs the distinction to work at all — *unknown* must block
 a key destruction that *absent* would allow.

@@ -8,10 +8,15 @@ vocabulary (both §2b). The rest is a PROPOSAL.** §9 carries what is still open
 destroys a payload key and an Attachment is not payload, so a photograph
 outlived the erasure of the entry that carried it: the ruling delivered for
 `{"beat": 47}` and not for the content it was made for. Ruled: *a per-photo key
-that dies with the last reference.* Now `Attachment.md` inv. 7, with **D9** in
-the preview reporting `unavailable` until Attachments exist. **Question 5 stays
-open** — inv. 2's deduplication is still a confirmation oracle, and the payload
-fix does not transfer.
+that dies with the last reference.* Now `Attachment.md` inv. 8, with **D9** in
+the preview reporting `unavailable` until Attachments exist.
+
+**A sixth, same day — question 5 (§2a).** Ruled: *keep the identity, blind the
+address.* Inv. 2's deduplication was the confirmation oracle in a permanent
+kernel contract. The defect was never that identity is the content hash — it is
+that the **address** was the same value, so the store was a list of the
+identities it holds. Now `Attachment.md` inv. 7. Two residuals stay open and are
+named rather than glossed: the wire, and blob sizes.
 
 **§2a and §2b are now IMPLEMENTED** in `runtime/journal` as envelope v2: the
 coarse type and schema, stated lineage moved into the payload, per-event nonces,
@@ -426,50 +431,108 @@ payloads, locally, on a device holding the keys. It can never be answered by
 comparing hashes — not by a witness, not by a peer, not by the sync layer. That
 is a design constraint to build around, not a defect to fix.
 
-#### The same oracle is wide open in Attachments — open question 5
+#### The same oracle in Attachments — question 5, ruled 2026-09-25
 
 Writing the above surfaced it. The identity runs both ways: *deduplication by
 hash is the confirmation oracle*. `contracts/Attachment.md` inv. 2 states
 **"Identical content yields one identity; deduplication is inherent"** — which
 is the oracle, named as a feature, in a **permanent kernel contract**.
 
-The attack is the same one §2a just closed, in the place the closure did not
-reach. It is weaker, because Attachment bytes are photographs, audio and log
-blobs rather than `{"beat": 1}` — guessing them at random is hopeless. It is not
-absent, because the interesting query is not random: *does this device hold this
-particular file?* A known document, a known image, a known recording is
-confirmable by hash by anyone holding the reference, with no key and no bytes.
+**Corrected, same day: this was first called weak because the bytes are
+high-entropy.** That is the wrong frame, and it is worth saying why, because the
+wrong frame is the one that makes this look ignorable. *The adversary does not
+guess.* They hold the file and test it. Matching a known file against a hash
+list is not a theoretical attack — it is a deployed industry: known-file
+detection, copyright matching and CSAM scanning all work exactly this way, and a
+content-addressed store is the ideal substrate for it.
 
-**Corrected 2026-09-25, same day.** This first said the reference is on every
-device that replicated the envelope. It is not. A reference *"enters history as
-an Event"* (`Attachment.md` §1) — so it is payload, which §2b sealed and
-encrypted. A witness holding envelopes never sees an Attachment hash. The
+There is a sharper version of the same point. Ask which files actually
+deduplicate:
+
+| | deduplication benefit | oracle exposure |
+| --- | --- | --- |
+| A photograph only you hold | none — there is one copy | none — nobody has it to test |
+| A file that circulates | real — many copies | high — anyone holding it can test |
+
+**The files that deduplicate are exactly the files that are testable.** The
+identity again, now at the level of content rather than cryptography:
+deduplication does not merely coexist with the oracle, it pays off precisely
+where the oracle bites.
+
+**Corrected also: the exposure is narrower than first written.** This first said
+the reference is on every device that replicated the envelope. It is not. A
+reference *"enters history as an Event"* (`Attachment.md` §1) — so it is payload,
+which §2b sealed. A witness holding envelopes never sees an Attachment hash. The
 exposure needs someone who can read the **Attachment store itself**: the device,
-a backup, or a peer that syncs attachments. Narrower than stated, and still
-real, because a content-addressed store is a list of content hashes by
-construction — encrypting the bytes does not hide the addresses.
+a backup, or a peer that syncs attachments. Still real, because a
+content-addressed store is a list of content hashes by construction, and
+encrypting the bytes does not hide the addresses.
 
-Three reasons this is worth raising now rather than when Attachments are built:
+##### The payload answer does not transfer — in the opposite direction
 
-- **Nothing implements it yet.** `Attachment` appears in `runtime/journal` only
-  as precedent in comments. There is no store, no resolver, no hash scheme.
-- **It is a *contract*, not a storage choice** — `Attachment.md` says so
-  explicitly, and argues content-addressing is architectural precisely so it
-  cannot be revised as an implementation detail. That is the right call for a
-  kernel contract and exactly why the question has to be settled before the
-  first implementation, not after.
-- **The fix that worked for payloads does not transfer.** A per-Attachment nonce
-  would destroy inv. 2's deduplication outright, and unlike payloads the
-  deduplication is *load-bearing* here: Attachments are the heavy bytes, and
-  `PARTIAL_REPLICATION.md` §228 leans on it to keep high-rate signal affordable.
-  Convergent encryption is the natural shape for this layer — it is what backup
-  systems use, on exactly this content — but it re-opens the leak for whoever
-  holds references without keys, which is every witness.
+The first draft of this section said keyed hashing was foreclosed here. That was
+§2a's reasoning about *payloads*, applied where it does not hold.
 
-**Not ruled. Added to §9 as question 5.** The answer plausibly differs from the
-payload answer, and should: the content is different, the entropy is different,
-and what deduplication buys is different. Recorded so that the first Attachment
-implementation inherits a decision rather than a default.
+A payload's hash must be checkable by a party with **no key** — that is how a
+witness verifies a chain, and it is why the table above rules out *HMAC with a
+device secret*: it kills cross-device verification.
+
+No such party exists for Attachments. Resolution *"resolves the hash through
+Storage **and decrypts it**"* (§1 step 3); §8's cross-device example has the Mac
+fetch, *verify, and decrypt locally*. Both hold the key. `WITNESSES.md` never
+mentions Attachments at all, because a witness cannot decrypt one and so never
+resolves one. **Nobody keyless ever verifies an Attachment hash**, so the
+constraint that forced random nonces on payloads is simply absent, and the
+answer is free to differ.
+
+##### The defect is not inv. 2 — it is that identity and address are the same thing
+
+*Identical content yields one identity* is correct and necessary: identity must
+be the content hash or neither deduplication nor verification works.
+
+The oracle comes from the **store being addressed by that identity**, so the list
+of addresses is the list of identities. The bytes are not what leaks. *Which*
+bytes is what leaks, and the addresses say it. Git has exactly this property in
+`.git/objects`; Git makes no privacy claim, and Orb does.
+
+##### Ruled: keep the identity, blind the address
+
+| | identity | address | inv. 2 / inv. 5 | deduplication |
+| --- | --- | --- | --- | --- |
+| A. nonce per Attachment — the payload fix | random | random | **broken** | **lost** |
+| B. keyed identity, `HMAC(secret, content)` | secret-dependent | = identity | **changed** | within the trust domain |
+| **C. keep identity, blind the address** | `SHA-256(content)` | `HMAC(secret, identity)` | **untouched** | **intact** |
+
+**C, ruled by the operator 2026-09-25.** It costs almost nothing:
+
+- Identity stays the plain content hash, so inv. 2 and inv. 5 are untouched,
+  deduplication works, verification works, history is unchanged, and the
+  cross-implementation vectors never see it.
+- The address is **derived**, so there is no table to persist — nothing new to
+  keep durable and nothing that breaks replay from events.
+- The secret is **freely rotatable**, because nothing depends on it but local
+  store layout. Rotating re-addresses the store and voids every fingerprint an
+  adversary already collected. B cannot do that: rotating there re-identifies
+  everything.
+- Deriving is permitted here, and §2a's *keys are stored, never derived* is not
+  violated — that rule governs **erasure** keys, and a derived key is worthless
+  because it is re-derivable. This secret never needs destroying. The content
+  key, which `Attachment.md` inv. 8 destroys, does that job.
+
+##### What survives C, named rather than glossed
+
+C removes the cheap, scalable, at-rest oracle. It does not remove the oracle.
+
+- **The wire.** §8's fetch names the content hash. A key-holding peer could read
+  the content anyway, so that is no loss — but a **durability peer holding
+  encrypted blobs without keys** would see hashes cross the wire. Real, and
+  unsolved. Independent of C, which is why C did not wait for it.
+- **Size and count.** The store still reveals blob sizes. Exact-size matching
+  against a known file is a weak oracle that survives every option here,
+  including A.
+- **Retroactive compromise.** Leaking the address secret reveals *which* files
+  are held, historically — not their contents, which need the content keys. A
+  rotation closes it going forward.
 
 ### What makes this checkable by anyone but the owner
 
@@ -1149,7 +1212,7 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    its real names; everything else gets one label.** See §2b.
 6. ~~**Erasure does not reach Attachments — what should it do?**~~ **Ruled
    2026-09-25: a per-photo key that dies with the last reference.** Now
-   `Attachment.md` inv. 7; mechanism and the D9 caveat in §2c. Raised
+   `Attachment.md` inv. 8; mechanism and the D9 caveat in §2c. Raised
    2026-09-25. Erasure destroys the payload key; an Attachment is a separate
    blob under separate encryption, so a photograph outlives the erasure of the
    entry that carried it — by contract, *"for the life of the journal"*.
@@ -1160,17 +1223,22 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    erase what nothing else of yours points at). Needed before the first
    Attachment implementation — a kernel contract is the wrong thing to amend
    later. See §2c.
-5. **Does `Attachment`'s content-addressing keep the confirmation oracle the
-   payload nonce just closed?** Raised 2026-09-25, from writing up the
-   deduplication cost in §2a. Deduplication by hash and the oracle are the same
-   capability, and `Attachment.md` inv. 2 makes deduplication a permanent kernel
-   contract — so anyone holding a reference can confirm *this device holds this
-   exact file* with no key. Weaker than the payload case (the bytes are
-   high-entropy) but not absent (the interesting query names a known file). The
-   payload fix does not transfer: a nonce would destroy inv. 2, and unlike
-   payloads the deduplication is load-bearing. **Needs an answer before the
-   first Attachment implementation, not after** — nothing implements it today,
-   and a kernel contract is the wrong thing to revise later. See §2a.
+5. ~~**Does `Attachment`'s content-addressing keep the confirmation oracle the
+   payload nonce just closed?**~~ **Ruled 2026-09-25: keep the identity, blind
+   the address.** Now `Attachment.md` inv. 7. The defect was never that identity
+   is the content hash — it is that the *address* was the same value, making the
+   store a list of the identities it holds. Deriving the address as
+   `HMAC(addressSecret, identity)` leaves inv. 2 and inv. 5 untouched, persists
+   nothing extra, and is rotatable, which voids every address already collected.
+   Two framings were considered and rejected on the way: that the oracle is weak
+   because the bytes are high-entropy (the adversary does not guess — they hold
+   the file and test it, which is how known-file detection works at scale), and
+   that the payload fix cannot transfer (it is the payload *constraint* that
+   does not transfer — no keyless party ever verifies an Attachment hash, so
+   keying was available here all along). **Two residuals remain open:** a
+   durability peer holding encrypted blobs without keys still sees content
+   hashes on the wire, and blob sizes are visible in any store. Both are
+   independent of the ruling. See §2a.
 
 ---
 
@@ -1182,9 +1250,10 @@ After it, and after AD-6:
 
 1. ~~**A reason on absence** (§7).~~ **Done 2026-09-25**, with the erasure
    declaration alongside it. 453 tests pass, lint clean.
-1a. ~~**Payload key granularity** (§2a).~~ **Done 2026-09-25**, 10 cases. What
-   remains is the confirmation oracle above, and putting the keyring itself
-   behind hardware (device predictions P8 and P11).
+1a. ~~**Payload key granularity** (§2a).~~ **Done 2026-09-25**, 10 cases. The
+   confirmation oracle is closed for payloads by the nonce, and ruled for
+   Attachments by inv. 7. What remains is putting the keyring itself behind
+   hardware (device predictions P8 and P11).
 1b. **The coarse vocabulary, then the envelope change** (§2b). The vocabulary
    is ruled; the envelope edit that follows touches `Event.md`, `EVENT_MODEL.md`,
    the TypeScript envelope and the phone's encoder together. **Four things move
