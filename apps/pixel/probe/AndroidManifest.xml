@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb device probe — DEVICE_LOOP.md prediction P0.
+
+  Declares nothing and requests nothing: no permissions, no services, no
+  receivers, no network. The whole point is to test the install gate, so
+  anything else it did would be a second variable.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="dev.orb.probe"
+    android:versionCode="1"
+    android:versionName="0.1-p0">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <application
+        android:label="Orb probe"
+        android:theme="@android:style/Theme.DeviceDefault">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
