@@ -1,0 +1,103 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Canonical JSON, byte-identical to `runtime/journal/src/integrity.ts`.
+ *
+ * This is the one file in the probe that must match the TypeScript runtime
+ * exactly. Two devices derive the same hash for the same event only if they
+ * encode it the same way, so a difference here would not be a bug that shows up
+ * as a wrong answer — it would show up as two devices that can never agree that
+ * they hold the same history.
+ *
+ * Rules, copied rather than reinvented: object keys sorted, no incidental
+ * whitespace, and string escaping matching `JSON.stringify` — quote, backslash
+ * and control characters escaped, everything else emitted raw.
+ */
+final class Json {
+    private Json() {}
+
+    /** An ordered map, so callers cannot accidentally depend on insertion order. */
+    static Map<String, Object> obj() {
+        return new TreeMap<>();
+    }
+
+    static String canonical(Object value) {
+        StringBuilder out = new StringBuilder();
+        write(out, value);
+        return out.toString();
+    }
+
+    private static void write(StringBuilder out, Object value) {
+        if (value == null) {
+            out.append("null");
+        } else if (value instanceof String) {
+            writeString(out, (String) value);
+        } else if (value instanceof Boolean) {
+            out.append(value.toString());
+        } else if (value instanceof Long || value instanceof Integer) {
+            out.append(value.toString());
+        } else if (value instanceof Map) {
+            writeObject(out, (Map<?, ?>) value);
+        } else if (value instanceof List) {
+            writeArray(out, (List<?>) value);
+        } else {
+            throw new IllegalArgumentException("unsupported value in event: " + value.getClass());
+        }
+    }
+
+    private static void writeObject(StringBuilder out, Map<?, ?> map) {
+        // Sorted, always. A TreeMap arrives sorted; anything else is sorted here
+        // rather than trusted, because the hash depends on it.
+        List<String> keys = new ArrayList<>();
+        for (Object key : map.keySet()) keys.add((String) key);
+        java.util.Collections.sort(keys);
+
+        out.append('{');
+        boolean first = true;
+        for (String key : keys) {
+            Object entry = map.get(key);
+            if (entry == null && !map.containsKey(key)) continue;
+            if (!first) out.append(',');
+            first = false;
+            writeString(out, key);
+            out.append(':');
+            write(out, entry);
+        }
+        out.append('}');
+    }
+
+    private static void writeArray(StringBuilder out, List<?> list) {
+        out.append('[');
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) out.append(',');
+            write(out, list.get(i));
+        }
+        out.append(']');
+    }
+
+    /** Matches `JSON.stringify` for a string: non-ASCII stays raw, controls escape. */
+    private static void writeString(StringBuilder out, String value) {
+        out.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"': out.append("\\\""); break;
+                case '\\': out.append("\\\\"); break;
+                case '\n': out.append("\\n"); break;
+                case '\r': out.append("\\r"); break;
+                case '\t': out.append("\\t"); break;
+                case '\b': out.append("\\b"); break;
+                case '\f': out.append("\\f"); break;
+                default:
+                    if (c < 0x20) out.append(String.format("\\u%04x", (int) c));
+                    else out.append(c);
+            }
+        }
+        out.append('"');
+    }
+}

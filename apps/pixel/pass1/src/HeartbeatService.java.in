@@ -1,0 +1,193 @@
+package @PKG@;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.ServiceInfo;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.os.SystemClock;
+import java.util.Map;
+
+/**
+ * A foreground service that does nothing but say it is alive, once a minute.
+ *
+ * Two of these run at once with different foreground-service types, which is
+ * what lets one run answer both P1 and P3: if `dataSync` stops at roughly six
+ * cumulative hours and `specialUse` keeps going, the cap is type-specific and
+ * `MOBILE_SENSING.md` §2 G4 is right. If both stop, or neither does, that is a
+ * different and more interesting answer.
+ *
+ * Neither requests a runtime permission, so nothing about the result depends on
+ * a grant the user might later revoke.
+ */
+abstract class HeartbeatService extends Service {
+    private static final String CHANNEL = "probe";
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private BroadcastReceiver runtimeReceiver;
+    private long startedAt;
+    private long beats;
+
+    abstract String serviceType();
+
+    abstract int foregroundType();
+
+    abstract int notificationId();
+
+    private final Runnable beat = new Runnable() {
+        @Override
+        public void run() {
+            Journal journal = Probe.get().journal();
+            if (journal != null) {
+                Map<String, Object> payload = Json.obj();
+                payload.put("service", serviceType());
+                payload.put("beat", ++beats);
+                payload.put("serviceUptimeMs", SystemClock.elapsedRealtime() - startedAt);
+                payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+                journal.append("probe.heartbeat", payload);
+            }
+            handler.postDelayed(this, Probe.HEARTBEAT_MS);
+        }
+    };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        startedAt = SystemClock.elapsedRealtime();
+        createChannel();
+        registerRuntimeReceivers();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Notification notification = new Notification.Builder(this, CHANNEL)
+            .setContentTitle("Orb probe — " + serviceType())
+            .setContentText("recording")
+            .setSmallIcon(android.R.drawable.presence_online)
+            .setOngoing(true)
+            .build();
+
+        startForeground(notificationId(), notification, foregroundType());
+
+        Journal journal = Probe.get().journal();
+        if (journal != null) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("service", serviceType());
+            payload.put("startId", (long) startId);
+            payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+            journal.append("probe.service.start", payload);
+        }
+
+        handler.removeCallbacks(beat);
+        handler.post(beat);
+        // START_STICKY so the system may restart us: whether it actually does,
+        // and after how long, is part of what P1 and P4 are measuring.
+        return START_STICKY;
+    }
+
+    /**
+     * The direct evidence for the foreground-service time limit.
+     *
+     * Android calls this when a capped type reaches its budget, giving a few
+     * seconds to stop. Recording it is the difference between knowing the cap
+     * exists and inferring it from a silence.
+     */
+    @Override
+    public void onTimeout(int startId, int fgsType) {
+        Journal journal = Probe.get().journal();
+        if (journal != null) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("service", serviceType());
+            payload.put("startId", (long) startId);
+            payload.put("fgsType", (long) fgsType);
+            payload.put("serviceUptimeMs", SystemClock.elapsedRealtime() - startedAt);
+            payload.put("beats", beats);
+            journal.append("probe.service.timeout", payload);
+        }
+        stopSelf();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Journal journal = Probe.get().journal();
+        if (journal != null) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("service", serviceType());
+            journal.append("probe.service.taskRemoved", payload);
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
+    public void onDestroy() {
+        handler.removeCallbacks(beat);
+        if (runtimeReceiver != null) {
+            try {
+                unregisterReceiver(runtimeReceiver);
+            } catch (IllegalArgumentException ignored) {
+                // Already gone; the process may be going down around us.
+            }
+            runtimeReceiver = null;
+        }
+
+        Journal journal = Probe.get().journal();
+        if (journal != null) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("service", serviceType());
+            payload.put("serviceUptimeMs", SystemClock.elapsedRealtime() - startedAt);
+            payload.put("beats", beats);
+            payload.put("cause", "onDestroy");
+            journal.append("probe.service.stop", payload);
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    /**
+     * Screen and power events must be registered at runtime — the system will
+     * not deliver them to a manifest receiver. They therefore die with this
+     * service, which is itself the measurement: P6 asks which signals survive
+     * without a service, and these are the ones that do not.
+     */
+    private void registerRuntimeReceivers() {
+        runtimeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Journal journal = Probe.get().journal();
+                if (journal == null || intent.getAction() == null) return;
+                Map<String, Object> payload = Json.obj();
+                payload.put("action", intent.getAction());
+                payload.put("registration", "runtime");
+                payload.put("service", serviceType());
+                journal.append("probe.signal", payload);
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(Intent.ACTION_POWER_CONNECTED);
+        filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+        registerReceiver(runtimeReceiver, filter, Context.RECEIVER_EXPORTED);
+    }
+
+    private void createChannel() {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager.getNotificationChannel(CHANNEL) == null) {
+            manager.createNotificationChannel(
+                new NotificationChannel(CHANNEL, "Orb probe", NotificationManager.IMPORTANCE_LOW));
+        }
+    }
+}

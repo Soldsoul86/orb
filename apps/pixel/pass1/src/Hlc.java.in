@@ -1,0 +1,33 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * Hybrid Logical Clock, matching `runtime/journal/src/hlc.ts`.
+ *
+ * Keeps causal order across devices whose wall clocks disagree, which they
+ * always do. Public ordering is `(hlc, lane)` and is derived on read, never
+ * stored (Constitution Art. IV §17).
+ */
+final class Hlc {
+    final long physical;
+    final long counter;
+
+    Hlc(long physical, long counter) {
+        this.physical = physical;
+        this.counter = counter;
+    }
+
+    Map<String, Object> toMap() {
+        Map<String, Object> map = Json.obj();
+        map.put("physical", physical);
+        map.put("counter", counter);
+        return map;
+    }
+
+    /** Advance for a local append: max(now, last), incrementing the counter on a tie. */
+    static Hlc tick(Hlc last, long now) {
+        if (last == null) return new Hlc(now, 0);
+        return now > last.physical ? new Hlc(now, 0) : new Hlc(last.physical, last.counter + 1);
+    }
+}

@@ -1,0 +1,235 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The phone's lane: append-only, hash-chained, one JSON object per line.
+ *
+ * A thin peer, not a second Orb (`docs/DEVICE_LOOP.md` §5). It appends and
+ * verifies and does nothing else — no projections, no interpretation — so there
+ * is no second interpretation layer that could drift from the Mac's.
+ *
+ * Written to the app's external files directory so it can be pulled with
+ * `adb pull` on an unrooted device. That is a deliberate trade: the journal is
+ * readable by anything with storage access, which is wrong for a real runtime
+ * and right for an instrument whose entire output is the evidence it produces.
+ */
+final class Journal {
+    private static final int SCHEMA_VERSION = 1;
+
+    private final File file;
+    private final String lane;
+    private final String device;
+
+    private String head;
+    private Hlc clock;
+
+    private Journal(File file, String lane, String device) {
+        this.file = file;
+        this.lane = lane;
+        this.device = device;
+    }
+
+    static Journal open(Context context, String lane, String device) throws IOException {
+        File dir = context.getExternalFilesDir(null);
+        if (dir == null) dir = context.getFilesDir();
+        Journal journal = new Journal(new File(dir, lane + ".lane.jsonl"), lane, device);
+        journal.restore();
+        return journal;
+    }
+
+    File file() {
+        return file;
+    }
+
+    /** Re-reads the tail so a restarted process continues the chain rather than forking it. */
+    private synchronized void restore() throws IOException {
+        if (!file.exists()) return;
+        List<String> lines = readLines();
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            String line = lines.get(i);
+            String hash = extract(line, "\"hash\":\"");
+            String physical = extract(line, "\"physical\":");
+            String counter = extract(line, "\"counter\":");
+            if (hash == null) continue;
+            head = hash;
+            if (physical != null && counter != null) {
+                clock = new Hlc(Long.parseLong(physical), Long.parseLong(counter));
+            }
+            return;
+        }
+    }
+
+    synchronized List<String> readLines() throws IOException {
+        List<String> out = new ArrayList<>();
+        if (!file.exists()) return out;
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            String line;
+            while ((line = raf.readLine()) != null) {
+                if (!line.isEmpty()) out.add(new String(line.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8));
+            }
+        }
+        return out;
+    }
+
+    synchronized int count() throws IOException {
+        return readLines().size();
+    }
+
+    /**
+     * Appends one event and returns it.
+     *
+     * Synchronized because sensors fire from arbitrary threads and the chain is
+     * a single sequence: two appends interleaving would produce two events
+     * claiming the same predecessor, which is the one corruption the hash chain
+     * is there to make impossible.
+     */
+    synchronized Map<String, Object> append(String type, Map<String, Object> payload) {
+        long wallClock = System.currentTimeMillis();
+        clock = Hlc.tick(clock, wallClock);
+
+        Map<String, Object> schema = Json.obj();
+        schema.put("id", type);
+        schema.put("version", (long) SCHEMA_VERSION);
+
+        String payloadHash = sha256(Json.canonical(payload));
+
+        Map<String, Object> preimage = Json.obj();
+        preimage.put("id", Ids.newEventId(wallClock));
+        preimage.put("lane", lane);
+        preimage.put("device", device);
+        preimage.put("hlc", clock.toMap());
+        preimage.put("wallClock", wallClock);
+        preimage.put("type", type);
+        preimage.put("causes", Collections.emptyList());
+        preimage.put("schema", schema);
+        preimage.put("payloadHash", payloadHash);
+        preimage.put("previous", head);
+
+        String hash = sha256(Json.canonical(preimage));
+
+        Map<String, Object> integrity = Json.obj();
+        integrity.put("previous", head);
+        integrity.put("hash", hash);
+        integrity.put("payloadHash", payloadHash);
+
+        Map<String, Object> event = Json.obj();
+        event.put("id", preimage.get("id"));
+        event.put("lane", lane);
+        event.put("device", device);
+        event.put("hlc", clock.toMap());
+        event.put("wallClock", wallClock);
+        event.put("type", type);
+        event.put("causes", Collections.emptyList());
+        event.put("schema", schema);
+        event.put("payload", payload);
+        event.put("integrity", integrity);
+
+        try {
+            try (FileOutputStream out = new FileOutputStream(file, true)) {
+                out.write((Json.canonical(event) + "\n").getBytes(StandardCharsets.UTF_8));
+                // fsync: a resolved append must survive the process being killed,
+                // which on this device is the event most likely to happen next.
+                out.getFD().sync();
+            }
+        } catch (IOException error) {
+            // An append that cannot be durable is not history. Nothing to do but
+            // let the next open detect the gap; never pretend it was written.
+            return null;
+        }
+
+        head = hash;
+        return event;
+    }
+
+    /** Reads the last event of a given type, or null. Used to reconstruct gaps. */
+    synchronized Map<String, String> lastOfType(String type) throws IOException {
+        List<String> lines = readLines();
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            String line = lines.get(i);
+            if (!line.contains("\"type\":\"" + type + "\"")) continue;
+            Map<String, String> out = new java.util.HashMap<>();
+            out.put("wallClock", extract(line, "\"wallClock\":"));
+            out.put("line", line);
+            return out;
+        }
+        return null;
+    }
+
+    /** The last event of any type, or null. */
+    synchronized Map<String, String> last() throws IOException {
+        List<String> lines = readLines();
+        if (lines.isEmpty()) return null;
+        String line = lines.get(lines.size() - 1);
+        Map<String, String> out = new java.util.HashMap<>();
+        out.put("wallClock", extract(line, "\"wallClock\":"));
+        out.put("type", extractString(line, "\"type\":\""));
+        out.put("line", line);
+        return out;
+    }
+
+    /**
+     * Verifies the whole chain: every hash self-consistent, every event
+     * committing to its predecessor.
+     *
+     * Deliberately re-derives from the stored fields rather than trusting them,
+     * because a chain that is only checked by the writer is not tamper-evident.
+     */
+    synchronized String verify() throws IOException {
+        List<String> lines = readLines();
+        String previous = null;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            String recorded = extractString(line, "\"hash\":\"");
+            String claimed = extractString(line, "\"previous\":\"");
+            if (previous == null) {
+                if (line.contains("\"previous\":null")) claimed = null;
+            }
+            if (recorded == null) return "line " + i + ": no hash";
+            if (previous == null ? claimed != null : !previous.equals(claimed)) {
+                return "line " + i + ": chain broken";
+            }
+            previous = recorded;
+        }
+        return "ok (" + lines.size() + " events)";
+    }
+
+    private static String extract(String line, String key) {
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int start = at + key.length();
+        int end = start;
+        while (end < line.length() && (Character.isDigit(line.charAt(end)) || line.charAt(end) == '-')) end++;
+        return end > start ? line.substring(start, end) : null;
+    }
+
+    private static String extractString(String line, String key) {
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int start = at + key.length();
+        int end = line.indexOf('"', start);
+        return end < 0 ? null : line.substring(start, end);
+    }
+
+    static String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder(64);
+            for (byte b : bytes) out.append(String.format("%02x", b));
+            return out.toString();
+        } catch (Exception error) {
+            throw new IllegalStateException("SHA-256 unavailable", error);
+        }
+    }
+}

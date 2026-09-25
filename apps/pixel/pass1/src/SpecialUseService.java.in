@@ -1,0 +1,17 @@
+package @PKG@;
+
+import android.content.pm.ServiceInfo;
+
+/**
+ * The type with no documented time limit. P3.
+ *
+ * Chosen over `location` or `health` deliberately: those would answer P3 too,
+ * but only after a runtime permission grant, which would make the result
+ * conditional on something the user could revoke. `specialUse` needs none, so
+ * whatever it does is the platform's behaviour and nothing else.
+ */
+public final class SpecialUseService extends HeartbeatService {
+    @Override String serviceType() { return "specialUse"; }
+    @Override int foregroundType() { return ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE; }
+    @Override int notificationId() { return 1002; }
+}

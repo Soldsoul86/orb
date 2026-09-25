@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb pass-1 probe — DEVICE_LOOP.md §5.
+
+  An instrument, not a product. It requests the least that lets it measure:
+  two foreground-service types neither of which needs a runtime grant, boot
+  receipt, and notification posting for the service notification Android
+  requires. Nothing it measures depends on a permission the user could revoke
+  mid-run, which is what keeps the findings about the platform rather than
+  about the grant.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@PKG@"
+    android:versionCode="1"
+    android:versionName="0.1-pass1">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".Probe"
+        android:label="@LABEL@"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- P1: the capped type. -->
+        <service
+            android:name=".DataSyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- P3: the type with no documented limit. -->
+        <service
+            android:name=".SpecialUseService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Measures foreground-service survival for a local, personal runtime. Not distributed." />
+        </service>
+
+        <!-- P6 and P2: what arrives with no service running, and after a reboot. -->
+        <receiver
+            android:name=".SignalReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

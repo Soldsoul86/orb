@@ -1,0 +1,139 @@
+package @PKG@;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Enough interface to start the probe and see that it is recording.
+ *
+ * Deliberately not a product surface (`docs/DEVICE_LOOP.md` §5). The real
+ * output of pass 1 is the journal file, pulled over the cable; this screen
+ * exists so a human can confirm the thing is alive without one.
+ */
+public final class MainActivity extends Activity {
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private TextView status;
+
+    private final Runnable refresh = new Runnable() {
+        @Override
+        public void run() {
+            render();
+            handler.postDelayed(this, 2_000L);
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(48, 96, 48, 48);
+
+        Button start = new Button(this);
+        start.setText("Start recording");
+        start.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startServices(); }
+        });
+        root.addView(start);
+
+        Button stop = new Button(this);
+        stop.setText("Stop recording");
+        stop.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { stopServices(); }
+        });
+        root.addView(stop);
+
+        status = new TextView(this);
+        status.setTextSize(13);
+        status.setTextIsSelectable(true);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(status);
+        root.addView(scroll);
+
+        setContentView(root);
+
+        // The foreground-service notification needs this on API 33+. It is the
+        // only runtime permission the probe asks for, and nothing it measures
+        // depends on the answer.
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 1);
+        }
+    }
+
+    private void startServices() {
+        startForegroundService(new Intent(this, DataSyncService.class));
+        startForegroundService(new Intent(this, SpecialUseService.class));
+    }
+
+    private void stopServices() {
+        stopService(new Intent(this, DataSyncService.class));
+        stopService(new Intent(this, SpecialUseService.class));
+    }
+
+    private void render() {
+        Journal journal = Probe.get() == null ? null : Probe.get().journal();
+        if (journal == null) {
+            status.setText("journal unavailable");
+            return;
+        }
+        try {
+            List<String> lines = journal.readLines();
+            StringBuilder out = new StringBuilder();
+            out.append("events: ").append(lines.size()).append('\n');
+            out.append("chain:  ").append(journal.verify()).append('\n');
+            out.append("file:   ").append(journal.file().getAbsolutePath()).append("\n\n");
+            out.append("last 12:\n");
+            for (int i = Math.max(0, lines.size() - 12); i < lines.size(); i++) {
+                String line = lines.get(i);
+                out.append("  ").append(summarise(line)).append('\n');
+            }
+            status.setText(out.toString());
+        } catch (IOException error) {
+            status.setText("read failed: " + error);
+        }
+    }
+
+    private static String summarise(String line) {
+        int typeAt = line.indexOf("\"type\":\"");
+        String type = typeAt < 0 ? "?" : line.substring(typeAt + 8, line.indexOf('"', typeAt + 8));
+        int clockAt = line.indexOf("\"wallClock\":");
+        String at = "?";
+        if (clockAt >= 0) {
+            int start = clockAt + 12;
+            int end = start;
+            while (end < line.length() && Character.isDigit(line.charAt(end))) end++;
+            at = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                .format(new java.util.Date(Long.parseLong(line.substring(start, end))));
+        }
+        return at + "  " + type;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        handler.post(refresh);
+    }
+
+    @Override
+    protected void onPause() {
+        handler.removeCallbacks(refresh);
+        super.onPause();
+    }
+}

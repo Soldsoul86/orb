@@ -1,0 +1,22 @@
+{
+  "note": "Cross-implementation vectors. The Kotlin/Java phone journal and the TypeScript runtime must derive identical hashes for the same event, or two devices can never agree that they hold the same history (DEVICE_LOOP.md §7 R2). Chosen to exercise the encoding's edge cases: sorted keys, a nested object, an empty array, an escaped quote and backslash, a control character, and a non-ASCII codepoint that JSON.stringify leaves raw.",
+  "payload": {
+    "service": "dataSync",
+    "beat": 7,
+    "note": "quote \" backslash \\ newline \n unicode é"
+  },
+  "payloadCanonical": "{\"beat\":7,\"note\":\"quote \\\" backslash \\\\ newline \\n unicode é\",\"service\":\"dataSync\"}",
+  "payloadHash": "a5ca9c155c3f1b6c5bfbe82849ce74d0b508162d8316212d446266bdbe2e24d1",
+  "preimageInput": {
+    "id": "01M3B90CADNB1PH0FQS6ZHQV5S",
+    "lane": "pixel",
+    "device": "Pixel 10a/stallion",
+    "hlc": { "physical": 1790300066000, "counter": 3 },
+    "wallClock": 1790300066000,
+    "type": "probe.heartbeat",
+    "causes": [],
+    "schema": { "id": "probe.heartbeat", "version": 1 },
+    "previous": null
+  },
+  "hash": "dce6c5bbf93be24367d7839fe897b99874f99899a286d5299745d3ba64549803"
+}

@@ -1,0 +1,131 @@
+package @PKG@;
+
+import android.app.Application;
+import android.content.ComponentCallbacks2;
+import android.content.res.Configuration;
+import android.os.Build;
+import android.os.SystemClock;
+import java.io.IOException;
+import java.util.Map;
+
+/**
+ * Process-wide state, and the reconstruction of gaps the process could not
+ * record while it was dead.
+ *
+ * This is the part that answers P4, the honesty prediction. A process cannot
+ * always record its own death — Android may remove it without warning. What it
+ * can do is record its own *liveness* on a cadence, and on the next start
+ * notice that the cadence broke. A gap inferred that way is not as good as one
+ * observed, and is recorded as such: `confidence 0.6` against `1.0` for a stop
+ * the service saw coming (`contracts/Observation.md`).
+ *
+ * If that inference works, a partial history is distinguishable from a quiet
+ * one and the declared horizon in `PARTIAL_REPLICATION.md` is enforceable here.
+ * If it does not, the design needs rethinking rather than adjusting.
+ */
+public final class Probe extends Application implements ComponentCallbacks2 {
+    static final long HEARTBEAT_MS = 60_000L;
+    /** Two missed beats before a silence counts as a gap, so a late beat is not a death. */
+    static final long GAP_THRESHOLD_MS = HEARTBEAT_MS * 2 + 15_000L;
+
+    private static Probe instance;
+    private Journal journal;
+
+    public static Probe get() {
+        return instance;
+    }
+
+    Journal journal() {
+        return journal;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+
+        try {
+            journal = Journal.open(this, "pixel", Build.MODEL + "/" + Build.DEVICE);
+        } catch (IOException error) {
+            return;
+        }
+
+        reconstructGap();
+        recordStartup();
+    }
+
+    /**
+     * Looks for a silence the last run failed to explain.
+     *
+     * A clean stop leaves a `probe.service.stop`; a timeout leaves a
+     * `probe.service.timeout`. If the last thing in the journal is neither, and
+     * it is older than two heartbeats, the process went away without saying so.
+     */
+    private void reconstructGap() {
+        try {
+            Map<String, String> last = journal.last();
+            if (last == null) return;
+
+            String type = last.get("type");
+            String at = last.get("wallClock");
+            if (type == null || at == null) return;
+
+            boolean explained =
+                type.equals("probe.service.stop")
+                || type.equals("probe.service.timeout")
+                || type.equals("probe.gap.inferred");
+            if (explained) return;
+
+            long lastAt = Long.parseLong(at);
+            long silence = System.currentTimeMillis() - lastAt;
+            if (silence < GAP_THRESHOLD_MS) return;
+
+            Map<String, Object> payload = Json.obj();
+            payload.put("fromWallClock", lastAt);
+            payload.put("toWallClock", System.currentTimeMillis());
+            payload.put("durationMs", silence);
+            payload.put("lastEventType", type);
+            payload.put("detectedBy", "heartbeat-discontinuity-on-restart");
+            // Inferred, not observed. The gap certainly happened; its cause and
+            // exact boundaries did not come from anything that saw them.
+            payload.put("confidence", "0.6");
+            journal.append("probe.gap.inferred", payload);
+        } catch (IOException | NumberFormatException error) {
+            // Nothing to do. A failure here must not stop the probe recording.
+        }
+    }
+
+    private void recordStartup() {
+        Map<String, Object> payload = Json.obj();
+        payload.put("androidRelease", Build.VERSION.RELEASE);
+        payload.put("sdkInt", (long) Build.VERSION.SDK_INT);
+        payload.put("securityPatch", Build.VERSION.SECURITY_PATCH);
+        payload.put("fingerprintBuild", Build.DISPLAY);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        // Elapsed realtime counts from boot, so a small value here alongside a
+        // large wall-clock gap says the device rebooted rather than that we were
+        // killed while it stayed up. That distinction is P2.
+        journal.append("probe.process.start", payload);
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (journal == null) return;
+        Map<String, Object> payload = Json.obj();
+        payload.put("level", (long) level);
+        journal.append("probe.memory.trim", payload);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (journal == null) return;
+        journal.append("probe.memory.low", Json.obj());
+    }
+}

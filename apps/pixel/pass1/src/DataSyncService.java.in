@@ -1,0 +1,10 @@
+package @PKG@;
+
+import android.content.pm.ServiceInfo;
+
+/** The capped type, per `MOBILE_SENSING.md` §2 G4: six hours per 24. P1. */
+public final class DataSyncService extends HeartbeatService {
+    @Override String serviceType() { return "dataSync"; }
+    @Override int foregroundType() { return ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC; }
+    @Override int notificationId() { return 1001; }
+}
