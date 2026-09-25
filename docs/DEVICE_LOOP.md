@@ -7,6 +7,88 @@
 
 ---
 
+## 0. Pass 1, summarised — 2026-09-25
+
+*One day, one Pixel 10a on Android 16 (`CP1A.260405.005`), 1475 events. The
+detail and its provenance are in §5a–§5k; this is what a reader arriving cold
+needs, including the author in three months.*
+
+### The predictions
+
+| | Prediction | Result |
+| --- | --- | --- |
+| **P0** | A self-signed APK installs today | **Held.** No developer-verification block on this build (§5a) |
+| **P0a** | `adb install` bypasses the Play Protect novel-app scan | **Held.** Development builds stay private; only sideloading discloses (§5b) |
+| **P1** | `dataSync` is stopped at ~6 cumulative hours | **Refuted.** Ran **6h31m untouched**, battery set to *Optimised* — the default, no exemption (§5h) |
+| **P2** | Nothing resumes after reboot until the app is opened | **Refuted.** `specialUse` reached the foreground **133 s after boot** and recorded 15 clean beats with nobody present (§5k) |
+| **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** 391 minutes = 332 beats + 59 declared skips. **Zero unexplained** (§5h) |
+| **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
+| **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
+| **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
+
+### What it establishes
+
+**A record that knows the limits of its own reliability.** Not that the runtime
+survives — that it can be honest when it does not. Doze froze the heartbeat 47
+times, once for 9.6 minutes, and every lost minute is declared. Across a clean
+six hours, a crash loop and two reboots, **every gap has an entry beside it.**
+
+**An always-on path exists on this device.** `specialUse` ran 6h31m alongside
+`dataSync` and starts itself after a reboot. Neither run needed a human, so
+`RUNTIME_LOOP.md` does not need one either — on this device, this build, today.
+
+**It costs nothing to run and something to store.** 0% battery over 6h31m; 598
+bytes per event, which is 1.6 MB a day and 0.59 GB a year at the current
+cadence. The heartbeat is most of that volume and almost none of the
+information.
+
+**The integrity claim was verified off-device.** 1475/1475 envelope hashes and
+1475/1475 payload hashes re-derived from stored fields by a machine that did not
+write the file — the check the phone cannot make, since `verify()` there is
+linkage-only.
+
+### What it corrected in this project's own documents
+
+- `MOBILE_SENSING.md` §2 G4 — the six-hour quota did not fire. Downgraded from
+  constraint to condition, then confirmed to be under default settings.
+- **G4a added** — `dataSync` is refused by name at `BOOT_COMPLETED`;
+  `specialUse` is not.
+- **G5 added** — *Manage app if unused* archives an app and strips its
+  permissions after months idle. An always-on recorder is precisely an app
+  nobody opens. **The first gate a day of measurement cannot reach.**
+- `CLAIMS.md` C2 — narrowed from *"any deletion is detected"* to the sequence
+  only, with C2d naming the undetectable case.
+
+### What it found in the instrument, by being the instrument
+
+Three defects, each caught by the thing built to catch defects:
+
+1. **The hash chain caught its own author** (§5d). A numeric extractor on a hex
+   string forked the chain at every restart. The fork is still at line 4,
+   permanently, and every restart since links clean.
+2. **An unhandled exception ate its own evidence** (§5i). `dataSync`'s refusal
+   killed `specialUse`, which had started correctly — so the first reboot could
+   not answer P2. Fixed, re-run, answered (§5k).
+3. **The self-test was correct and useless** (§5j). Asking *"is the chain
+   perfect?"* meant reporting FAILED forever for a break that can never be
+   repaired. It now asks whether anything is new — and the fix itself shipped
+   with §5d's bug, a counted offset, caught by a test on first run.
+
+### What is still open
+
+- **P6 and P0b** — untested, and both need a run without a foreground service.
+- **G5 (hibernation)** — months to trigger; the device loop has no way to reach
+  it.
+- **`specialUse` alone, for a long time.** §5k shows 14 minutes after a boot.
+  Nothing yet shows six hours that way.
+- **`specialUse`'s real cost** — the type needs a manifest justification the
+  Play Store reviews and a sideload does not. A path open to an operator may be
+  closed to anything distributed.
+- **One device, one build, one day.** Everything above is a demonstration that
+  something *can* happen on `CP1A.260405.005`, never a measurement of how often.
+
+---
+
 ## 1. Why the phone, and not the easy device
 
 The obvious shortcut is to prove the runtime on a Mac, where there are no
@@ -1124,8 +1206,11 @@ remembering when comparing them.
 1. ~~P0 answered, either way, before Kotlin is written.~~ **Done 2026-09-25:
    held.** P0a and P0b raised in its place and carried into pass 1.
 2. P1, P2, P3, P4, P6 each answered `held` or `refuted`, with evidence from the
-   device.
+   device. **Partly done 2026-09-25 (§0): P1 refuted, P2 refuted, P4 held. P3
+   overtaken rather than tested; P6 still untested because a foreground service
+   ran throughout.**
 3. `MOBILE_SENSING.md` corrected wherever the device disagreed with it.
+   **Partly done 2026-09-25: G4 corrected, G4a and G5 added (§0).**
 4. A week of real carrying replayed, with every gap explained by a recorded
    deferral — or P4 refuted, which is the more valuable outcome, because it would
    be found now rather than after a year of trusted history turned out to have
