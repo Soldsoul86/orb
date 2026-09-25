@@ -293,6 +293,28 @@ findings meaningful again.
 
 ---
 
+## 5c. Finding — targeting API 36 draws under the system bars
+
+Incidental, cheap, and exactly the kind of thing the loop exists to catch before
+it matters. The first pass-1 build put its controls behind the status and action
+bars, where they could not be tapped. The probe installed, ran, recorded and
+exported correctly — and could not be started.
+
+Apps targeting SDK 35 or higher draw edge to edge whether they ask to or not, so
+a fixed top padding is wrong by however much the system bars happen to occupy on
+that device. Fixed by asking the window for its insets rather than guessing a
+number that would be wrong on the next phone, and by dropping an action bar that
+carried no function.
+
+Worth recording for two reasons beyond the fix. It cost an install cycle, and on
+a phone without developer mode an install cycle means another upload to Google
+(§5b) — so a layout bug now has a disclosure cost, which is not a sentence
+anyone expects to write. And it is the first finding that came from *using* the
+instrument rather than from reading about the platform, which is the whole
+argument for §1.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |
