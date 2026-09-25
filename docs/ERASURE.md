@@ -265,11 +265,15 @@ keyring)` gives every store the rule at once, including ones written later, and
 `SECURITY.md` §3's *"the store holds ciphertext"* becomes true without any store
 implementing cryptography.
 
-**Only the payload is sealed, and `payloadHash` commits to the plaintext.** Three
+**Only the payload is sealed, and `payloadHash` commits to the plaintext.** Two
 things depend on that: verification behaves identically before and after
-sealing; a payload recovered from any source is still checkable against its
-envelope; and two devices sealing the same payload under different keys still
-agree on its hash, so the cross-implementation vectors are untouched.
+sealing, and a payload recovered from any source is still checkable against its
+envelope.
+
+> **Superseded in part, 2026-09-25.** This section originally claimed a third
+> consequence — *two devices sealing the same payload under different keys still
+> agree on its hash*. The nonce ends that, deliberately. See **The cost that was
+> not predicted** below. Sealing still does not affect the hash; the nonce does.
 
 **The keyring is the ground truth for erasure.** A read whose key has gone
 returns the envelope marked `erased`, whatever the stored marker says — so a
@@ -302,7 +306,7 @@ It opens no new hole: substituting a sealed blob for a real payload destroys
 content without declaring it, which is `CLAIMS.md` C2d, already named as
 undetectable and not made worse here.
 
-### Still open — the confirmation oracle
+### The confirmation oracle — shipped 2026-09-25
 
 `payloadHash` commits to the plaintext, which is what makes everything above
 work. It also means **a hash over guessable plaintext is a confirmation
@@ -343,6 +347,112 @@ and would be forgotten the first time someone added an event type.
 what the hash preimage covers, exactly as `type`, `schema` and `causes` moving
 into the payload do. Four changes to the same preimage is one break in the
 cross-implementation vectors if they travel together, and four if they do not.
+
+#### Built, and the predicted shape was wrong twice
+
+Shipped as `payload.ts`. The reasoning above holds; two of its mechanics did not.
+
+- **Not `{n, v}` — `{causes, data, nonce, schema, type}`.** Once §2b moved the
+  real type, schema and causes into the payload, the nonce had a wrapper to live
+  in already. One wrapper, not two.
+- **Not a store decorator.** The section above reasoned "the same decorator shape
+  as sealing, for the same reason". That is wrong, and the difference is the
+  whole point: sealing may happen *below* the hash because `payloadHash` commits
+  to plaintext, but a nonce the hash does not cover defeats nothing — **the
+  oracle it closes works on the hash.** Wrapping therefore happens in `Journal`,
+  before `hashPayload`. Sealing is a storage concern; nonces are not.
+
+The second correction is the load-bearing one: a nonce applied where sealing is
+applied would have looked right, tested green against every sealing test, and
+closed nothing at all.
+
+#### The cost that was not predicted
+
+`payloadHash` is no longer a content address. Identical payloads now produce
+different hashes, so **payloads cannot be deduplicated by hash**, on one device
+or across devices.
+
+**This is not a tradeoff that went badly. It is an identity.** Deduplication by
+hash requires *same content produces the same hash, checkable by whoever holds
+the hash*. The confirmation oracle is *guess the content, hash it, compare*.
+They are the same capability described from two sides. Any scheme that restores
+deduplication restores the oracle to exactly whoever can deduplicate. There is
+no version of this where both are had.
+
+What it costs in practice is close to nothing, and the reasons are worth
+recording so this is not re-litigated:
+
+- **Nothing was deduplicating.** `payloadHash` appears nowhere in `store.ts`,
+  `file-store.ts` or `sync.ts`. It is a commitment, checked on `attach`. A
+  possible future optimisation was foreclosed; no working behaviour was removed.
+- **The heavy bytes keep it.** `contracts/Attachment.md` inv. 2 makes
+  Attachments content-addressed with deduplication as a stated property, and
+  `MOBILE_SENSING.md` §258 requires raw audio, images and log blobs to be
+  Attachments, never inlined. An Attachment's hash is over its own bytes; the
+  payload carries a reference. The same photograph twice is still stored once.
+  What loses deduplication is the small JSON record of meaning.
+- **Cross-device deduplication was never available.** Each device writes its own
+  lane, so two devices observing the same thing produce two events with
+  different ids, HLCs and devices. They were never going to collapse.
+- **Corroboration does not use it.** `EVIDENCE_GRAPH.md` §5's `corroborates`
+  edges are semantic — do the times and places agree — and §3 states edges are
+  derived from event payloads and `causes`. Hash equality was never the
+  mechanism, so no evidence property was lost.
+
+**The known escape, and why it is foreclosed here.** Convergent encryption
+(borg, restic, Tahoe-LAFS) derives the nonce as `HMAC(secret, payload)` rather
+than randomly: key-holders deduplicate, outsiders cannot run the oracle. It
+would work, and it is the right answer in a backup system. It is the wrong
+answer here, for the reason §2b exists: `payloadHash` sits in the **plaintext
+envelope**, which is exactly what a witness holds. Convergent nonces would let a
+witness see two identical hashes and learn *these two events have identical
+content* without knowing what it is — repetition and rhythm, legible to someone
+holding no keys. That is the volume-and-rhythm leak, sold back to buy a
+deduplication this design does not need. The door is not bolted; opening it
+costs more than it returns.
+
+**The constraint this leaves on every future feature.** A question of the form
+*"have I recorded this exact thing before?"* can only be answered over decrypted
+payloads, locally, on a device holding the keys. It can never be answered by
+comparing hashes — not by a witness, not by a peer, not by the sync layer. That
+is a design constraint to build around, not a defect to fix.
+
+#### The same oracle is wide open in Attachments — open question 5
+
+Writing the above surfaced it. The identity runs both ways: *deduplication by
+hash is the confirmation oracle*. `contracts/Attachment.md` inv. 2 states
+**"Identical content yields one identity; deduplication is inherent"** — which
+is the oracle, named as a feature, in a **permanent kernel contract**.
+
+The attack is the same one §2a just closed, in the place the closure did not
+reach. It is weaker, because Attachment bytes are photographs, audio and log
+blobs rather than `{"beat": 1}` — guessing them at random is hopeless. It is not
+absent, because the interesting query is not random: *does this device hold this
+particular file?* A known document, a known image, a known recording is
+confirmable by hash by anyone holding the reference, with no key and no bytes.
+And §6 means the reference is on every device that replicated the envelope.
+
+Three reasons this is worth raising now rather than when Attachments are built:
+
+- **Nothing implements it yet.** `Attachment` appears in `runtime/journal` only
+  as precedent in comments. There is no store, no resolver, no hash scheme.
+- **It is a *contract*, not a storage choice** — `Attachment.md` says so
+  explicitly, and argues content-addressing is architectural precisely so it
+  cannot be revised as an implementation detail. That is the right call for a
+  kernel contract and exactly why the question has to be settled before the
+  first implementation, not after.
+- **The fix that worked for payloads does not transfer.** A per-Attachment nonce
+  would destroy inv. 2's deduplication outright, and unlike payloads the
+  deduplication is *load-bearing* here: Attachments are the heavy bytes, and
+  `PARTIAL_REPLICATION.md` §228 leans on it to keep high-rate signal affordable.
+  Convergent encryption is the natural shape for this layer — it is what backup
+  systems use, on exactly this content — but it re-opens the leak for whoever
+  holds references without keys, which is every witness.
+
+**Not ruled. Added to §9 as question 5.** The answer plausibly differs from the
+payload answer, and should: the content is different, the entropy is different,
+and what deduplication buys is different. Recorded so that the first Attachment
+implementation inherits a decision rather than a default.
 
 ### What makes this checkable by anyone but the owner
 
@@ -870,6 +980,17 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    coarse type in the envelope, real type inside the payload.** See §2b.
 4. ~~**What is the coarse vocabulary?**~~ **Ruled 2026-09-25: bookkeeping keeps
    its real names; everything else gets one label.** See §2b.
+5. **Does `Attachment`'s content-addressing keep the confirmation oracle the
+   payload nonce just closed?** Raised 2026-09-25, from writing up the
+   deduplication cost in §2a. Deduplication by hash and the oracle are the same
+   capability, and `Attachment.md` inv. 2 makes deduplication a permanent kernel
+   contract — so anyone holding a reference can confirm *this device holds this
+   exact file* with no key. Weaker than the payload case (the bytes are
+   high-entropy) but not absent (the interesting query names a known file). The
+   payload fix does not transfer: a nonce would destroy inv. 2, and unlike
+   payloads the deduplication is load-bearing. **Needs an answer before the
+   first Attachment implementation, not after** — nothing implements it today,
+   and a kernel contract is the wrong thing to revise later. See §2a.
 
 ---
 
