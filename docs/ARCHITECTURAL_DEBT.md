@@ -312,6 +312,13 @@ unproven.
 **Raised by the operator**, reviewing C2's wording: a witness only counts if it
 does not hold the same signing key.
 
+**The use case that makes it urgent** is also the operator's: *can my mother's
+phone be the second device?* It can, and it is a better witness than any machine
+the user owns — different key, different person, different place. But Orb cannot
+currently tell that arrangement apart from one person holding two phones, and
+for tamper-evidence those are opposite things. See `WITNESSES.md`, which is
+blocked on this entry.
+
 **What adopting it would touch.** A key identity as a *value* attributed to a
 custody receipt — following the `Observation.md` source-identity precedent that
 AD-5 also leans on, rather than a new kernel contract with a dependency edge.

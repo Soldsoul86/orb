@@ -163,8 +163,10 @@ The distinction matters differently for the two properties K≥2 is asked to
 carry. For **durability**, two devices sharing a key are still two copies, so
 counting devices is defensible. For **tamper-detection**, they are one witness,
 so counting devices is wrong. Orb cannot currently tell these apart because it
-cannot express "independent key" at all. Logged as architectural debt; C2c is
-not runnable until it can.
+cannot express "independent key" at all. Logged as architectural debt (AD-6); C2c is
+not runnable until it can. `WITNESSES.md` works out what a witness should be —
+another person's phone holding a few hundred bytes it cannot read — and is
+blocked on the same entry.
 
 **Negative control (R2).** The same three mutations against a product whose log
 lives on the vendor's server. C2c is that product's default configuration: the
