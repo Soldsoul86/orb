@@ -433,6 +433,67 @@ something downstream still holds what was destroyed, and nothing knows to clear
 it. This is a hard constraint on `Belief.md`, `Fact.md`, `InferenceRecord.md` and
 `EVIDENCE_GRAPH.md`, and all of them are still Draft. Now is the cheap moment.
 
+### Built, 2026-09-25 — `runtime/journal/src/lineage.ts`
+
+The forward read of `causes`. Nothing new is stored: an event that cites its
+inputs *is* the lineage, and a second structure holding the same facts would be
+a second source of truth for them (Art. IX §33).
+
+**Ephemeral by construction.** The index is a value — computed, used, dropped.
+The operator ruled that *the journal entries are the only trace that exists*, so
+an index on disk would be a second trail outliving the entries it describes, and
+would survive the erasure that removed them. It holds ids, hashes and edges;
+never content.
+
+**`closed`, not `complete`.** A traversal reports whether it ran out of edges
+*within the events indexed*. It never claims no other device holds a derivation
+this one has not seen — not knowable from here, which is what `Horizon` exists
+for. A root the index does not hold comes back `closed: false` with the root
+named, because the dangerous answer is an empty list that looks like *"nothing
+was built on it"*: an erasure planned on that tears down nothing while believing
+it tore down everything.
+
+**Provenance survives the ruling.** `ancestorsOf` reads what an event openly
+says about itself. What the ruling forbids is a trail stored *beside* the
+journal, not an entry's own account of where it came from — Reading 1, ruled
+2026-09-25.
+
+**Cycle safety is not hypothetical hygiene.** `Journal.append` only ever cites
+earlier events, so a cycle means a malformed or hostile journal — and a
+traversal that looped on one would hang the erasure preview at the moment the
+owner is waiting on it. Verified by removing the visited-set guard: the suite
+then runs until killed at twenty seconds, and passes in milliseconds with it.
+
+**What it cannot find**, unchanged: a derivation that did not record its inputs.
+See below.
+
+---
+
+### Lineage is policy too — and the coarse type removed the check
+
+`causes` is populated by whoever appends. Nothing forces it to be complete or
+honest, so a derivation that recorded no inputs is invisible to any traversal,
+sits on erased content forever, and no amount of walking will reach it. Third
+instance of the same shape as §0a and `CLAIMS.md` C2d, and it is recorded here
+rather than found later.
+
+It narrows but does not close: `Belief.md` requires a model-backed Belief to
+carry provenance sufficient to explain it, so the **model** path is
+contract-enforced. Hand-written code appending a derived event is checked by
+nothing.
+
+**The obvious enforcement point is gone, and §2b is why.** The natural check —
+*the journal refuses an append of a derived event with empty `causes`* — is no
+longer available: the envelope says only that this is content, and the real type
+is inside the encrypted payload, so the journal cannot tell an observation,
+which legitimately cites nothing, from a conclusion, which must cite something.
+
+The check therefore has to live above the journal, in whatever appends, or in
+payload schema validation. **A real cost of the coarse-type ruling that was not
+visible when it was made.** It does not overturn it — the privacy gain is larger
+— but it is recorded as a consequence rather than discovered by someone later
+wondering why nothing validates this.
+
 ---
 
 ## 4. Where the system must stop and ask

@@ -54,6 +54,9 @@ export {
 } from "./erasure.js";
 export type { ErasureRecord } from "./erasure.js";
 
+export { indexLineage, descendantsOf, ancestorsOf } from "./lineage.js";
+export type { LineageIndex, Traversal } from "./lineage.js";
+
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";
 
