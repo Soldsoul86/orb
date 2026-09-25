@@ -22,6 +22,7 @@ final class SelfTestTest {
     static void run() throws IOException {
         passesOnAHealthyDevice();
         failsWhenTheChainIsBroken();
+        aKnownBreakIsNotAFailureForever();
         leavesNothingBehind();
         neverTouchesTheRealLane();
     }
@@ -44,8 +45,8 @@ final class SelfTestTest {
             checks.get("encoder.payloadDigest"), Boolean.TRUE);
         Harness.equal("the event digest agrees",
             checks.get("encoder.eventDigest"), Boolean.TRUE);
-        Harness.equal("the chain links end to end",
-            checks.get("chain.linksEndToEnd"), Boolean.TRUE);
+        Harness.equal("no new chain breaks",
+            checks.get("chain.noNewBreaks"), Boolean.TRUE);
         Harness.equal("an append survives a reopen",
             checks.get("storage.appendSurvivesReopen"), Boolean.TRUE);
         Harness.check("the runtime is named, so a divergence is diagnosable",
@@ -57,11 +58,17 @@ final class SelfTestTest {
      * healthy exactly as well as printing "ok" would.
      */
     private static void failsWhenTheChainIsBroken() throws IOException {
-        Harness.suite("the self-test fails when the chain is broken");
+        Harness.suite("the self-test fails when a NEW break appears");
         File dir = temp("broken");
         Context context = new Context(dir);
         Journal journal = Journal.open(context, "pixel", "test-device");
         for (int i = 0; i < 4; i++) journal.append("probe.heartbeat", Json.obj());
+
+        // The baseline must exist first. Breaking a journal that was already
+        // broken when first seen is not a regression, and reporting it as one
+        // is what made the shipped self-test say FAILED forever
+        // (`DEVICE_LOOP.md` §5j).
+        journal.append("probe.selftest", SelfTest.run(context, journal));
 
         List<String> lines = Files.readAllLines(lane(dir).toPath(), StandardCharsets.UTF_8);
         lines.remove(1);
@@ -69,13 +76,48 @@ final class SelfTestTest {
 
         Map<String, Object> result = SelfTest.run(context, journal);
         Map<?, ?> checks = (Map<?, ?>) result.get("checks");
-        Harness.equal("the broken chain is reported",
-            checks.get("chain.linksEndToEnd"), Boolean.FALSE);
+        Harness.equal("the new break is reported",
+            checks.get("chain.noNewBreaks"), Boolean.FALSE);
         Harness.equal("overall not ok", result.get("ok"), Boolean.FALSE);
         Harness.check("the failure is named, not just counted",
-            ((List<?>) result.get("failed")).contains("chain.linksEndToEnd"));
+            ((List<?>) result.get("failed")).contains("chain.noNewBreaks"));
         Harness.equal("the encoder still passes, so the failure is localised",
             checks.get("encoder.canonical"), Boolean.TRUE);
+    }
+
+    /**
+     * The finding from the device, as a test: a break already present when the
+     * self-test first looked must not be reported forever.
+     */
+    private static void aKnownBreakIsNotAFailureForever() throws IOException {
+        Harness.suite("a break present at baseline is not re-reported");
+        File dir = temp("known");
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, "pixel", "test-device");
+        for (int i = 0; i < 4; i++) journal.append("probe.heartbeat", Json.obj());
+
+        // Damage first, so the break exists before anything has ever looked.
+        List<String> lines = Files.readAllLines(lane(dir).toPath(), StandardCharsets.UTF_8);
+        lines.remove(1);
+        Files.write(lane(dir).toPath(), (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> first = SelfTest.run(context, journal);
+        Harness.equal("the first run is a baseline and passes", first.get("ok"), Boolean.TRUE);
+        Harness.equal("and says so", first.get("chainBaseline"), Boolean.TRUE);
+        Harness.check("while still recording where the break is",
+            !String.valueOf(first.get("chainBreaks")).isEmpty());
+        journal.append("probe.selftest", first);
+
+        Map<String, Object> second = SelfTest.run(context, journal);
+        Harness.equal("the second run does not re-report it", second.get("ok"), Boolean.TRUE);
+        Harness.check("and is no longer a baseline", second.get("chainBaseline") == null);
+
+        List<String> more = Files.readAllLines(lane(dir).toPath(), StandardCharsets.UTF_8);
+        more.remove(more.size() - 2);
+        Files.write(lane(dir).toPath(), (String.join("\n", more) + "\n").getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> third = SelfTest.run(context, journal);
+        Harness.equal("a further break is still caught", third.get("ok"), Boolean.FALSE);
     }
 
     private static void leavesNothingBehind() throws IOException {

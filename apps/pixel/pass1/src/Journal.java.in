@@ -218,7 +218,17 @@ final class Journal {
      * the desktop analyser is the better home for it anyway, since a chain
      * checked only by the device that wrote it is the weaker check.
      */
-    synchronized String verify() throws IOException {
+    /**
+     * The line numbers where linkage fails, in order.
+     *
+     * Separate from {@link #verify} because a break's *position* is the durable
+     * fact and the rendered sentence is not: positions are stable forever in an
+     * append-only file, so they can be compared across runs to tell an old break
+     * from a new one (`SelfTest`). A line that carries no hash at all is
+     * reported as `-1 - index` so it is distinguishable from a linkage break at
+     * the same place.
+     */
+    synchronized List<Integer> chainBreaks() throws IOException {
         List<String> lines = readLines();
         List<Integer> breaks = new ArrayList<>();
         String previous = null;
@@ -226,7 +236,10 @@ final class Journal {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             String recorded = extractString(line, "\"hash\":\"");
-            if (recorded == null) return "line " + i + ": no hash";
+            if (recorded == null) {
+                breaks.add(-1 - i);
+                continue;
+            }
 
             String claimed = line.contains("\"previous\":null")
                 ? null
@@ -239,6 +252,16 @@ final class Journal {
                 breaks.add(i);
             }
             previous = recorded;
+        }
+        return breaks;
+    }
+
+    synchronized String verify() throws IOException {
+        List<String> lines = readLines();
+        List<Integer> breaks = chainBreaks();
+
+        for (Integer at : breaks) {
+            if (at < 0) return "line " + (-1 - at) + ": no hash";
         }
 
         if (breaks.isEmpty()) return "ok (" + lines.size() + " events)";

@@ -797,6 +797,73 @@ and a reboot.
 
 ---
 
+## 5j. The self-test was correct, and useless
+
+**2026-09-25.** The pass-2 build shipped with `SelfTest` and the operator's
+screen immediately read:
+
+```
+events: 1445
+chain:  1 break in 1445 events, at line 4
+self:   FAILED "chain.linksEndToEnd"
+```
+
+Everything there is true. Line 4 is the §5d fork (§5h), the phone's Java
+verifier and the off-device Python one agree on it exactly, and **it can never be
+repaired** — Art. I forbids editing history and the E2/E3 ruling forbids removing
+it.
+
+So the check would have read `FAILED` for the rest of this journal's life.
+
+**A check that always fails is worse than no check.** It teaches its reader to
+dismiss it, and the day something genuinely breaks it looks identical to months
+of noise they have learned to ignore.
+
+This is the same family as the three distinctions that decided designs earlier
+today — `closed` not *complete*, *unavailable* not *none*, *cannot check* not
+*failed the check* — with a fourth member: **failed for a reason already known
+and permanently true.**
+
+### The fix
+
+The question is now *"has anything broken since I last looked?"*
+
+`Journal.chainBreaks()` returns break **positions**, which are durable — an
+append-only file never moves a line, so a break at 4 is at 4 forever, while the
+rendered sentence carries an event count that changes on every append.
+`SelfTest` compares them against the previous `probe.selftest` event.
+
+**The baseline lives in history, not in a file beside it.** State belongs where
+every other durable fact in this system lives (Art. I §3), and a separate
+baseline file would be precisely the second trail the operator's ruling forbids.
+
+A first run has nothing to compare against, records `chainBaseline: true`, lists
+the breaks it found, and passes. That is honest, and it is also the one moment an
+already-damaged journal goes unremarked — stated rather than hidden.
+
+**It is not tamper detection and must not be read as such.** Whoever can append
+to the journal can record a new break as known. `SelfTest` is a regression and
+liveness check; the tamper claim rests on off-device re-derivation and on
+witnesses (`CLAIMS.md` C2a, C2c).
+
+### And the fix contained §5d's bug again
+
+`lastKnownBreaks` read the recorded value with a counted offset — `at + 16` for a
+15-character key — so it silently dropped the first digit and no baseline ever
+matched. The test caught it on first run.
+
+**Same class as §5d**: a hand-rolled extractor with a magic number, in a file
+whose whole purpose is to notice when something is wrong. It now derives the
+offset from `key.length()`, so the literal cannot drift from the number again.
+
+Twice in one day, in two different files, by the same author. The lesson is not
+*be more careful* — it is that ad-hoc string parsing keeps producing this, and
+the probe has no JSON parser because it has no dependencies. Recorded as
+`ARCHITECTURAL_DEBT.md` material for the production host, which is Kotlin and
+should never inherit this.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |

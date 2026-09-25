@@ -57,13 +57,22 @@ final class SelfTest {
         record(checks, failed, "encoder.payloadDigest",
             Journal.sha256(Vectors.PAYLOAD_CANONICAL).equals(Vectors.PAYLOAD_HASH));
         record(checks, failed, "encoder.eventDigest", eventDigestAgrees());
-        record(checks, failed, "chain.linksEndToEnd", chainVerifies(journal));
+        String breaks = breakSignature(journal);
+        String knownBreaks = lastKnownBreaks(journal);
+        boolean baseline = knownBreaks == null;
+        record(checks, failed, "chain.noNewBreaks",
+            baseline || knownBreaks.equals(breaks));
         record(checks, failed, "storage.appendSurvivesReopen", storageRoundTrips(context));
 
         Map<String, Object> payload = Json.obj();
         payload.put("checks", checks);
         payload.put("failed", failed);
         payload.put("ok", failed.isEmpty());
+        // Carried so the *next* run has something to compare against. The
+        // baseline lives in history, not in a file beside it -- state belongs
+        // where every other durable fact in this system lives (Art. I §3).
+        payload.put("chainBreaks", breaks);
+        if (baseline) payload.put("chainBaseline", Boolean.TRUE);
         // Recorded whether or not anything failed, because a divergence is
         // diagnosed from these and not from a later guess about the device.
         payload.put("locale", Locale.getDefault().toLanguageTag());
@@ -84,14 +93,66 @@ final class SelfTest {
         return Journal.sha256(Json.canonical(preimage)).equals(Vectors.HASH);
     }
 
-    private static boolean chainVerifies(Journal journal) {
+    /**
+     * Where the chain is broken, as a stable, comparable string.
+     *
+     * Positions, not the rendered sentence: an append-only file never moves a
+     * line, so a break at line 4 is at line 4 forever, while the sentence
+     * carries an event count that changes on every append.
+     */
+    private static String breakSignature(Journal journal) {
         try {
-            // `verify()` is linkage evidence only -- it does not re-derive a
-            // hash from the stored fields, so an edited payload passes here.
-            // See `Journal.verify` and `CLAIMS.md` C2a.
-            return journal.verify().startsWith("ok");
+            StringBuilder out = new StringBuilder();
+            for (Integer at : journal.chainBreaks()) {
+                if (out.length() > 0) out.append(',');
+                out.append(at);
+            }
+            return out.toString();
         } catch (IOException error) {
-            return false;
+            return "unreadable";
+        }
+    }
+
+    /**
+     * What the last self-test recorded, or null if there has never been one.
+     *
+     * **This is the fix for a check that was correct and useless.** Asking *"is
+     * the chain perfect?"* made the self-test report FAILED forever from the
+     * moment history contained one break — and history keeps its breaks
+     * permanently, because Art. I forbids editing it. A check that always fails
+     * trains its reader to ignore it, so the day something new breaks it looks
+     * exactly like the noise they have been dismissing for months
+     * (`DEVICE_LOOP.md` §5j).
+     *
+     * The question is therefore *"has anything broken since I last looked?"*,
+     * and the baseline is the previous `probe.selftest` event. A first run has
+     * nothing to compare against, says so with `chainBaseline`, and passes —
+     * which is honest, and is also the one moment an already-damaged journal
+     * would go unremarked.
+     *
+     * **This is not tamper detection and does not pretend to be.** Whoever can
+     * append to the journal can record a new break as known. `SelfTest` is a
+     * regression and liveness check; the tamper claim rests on off-device
+     * re-derivation and on witnesses (`CLAIMS.md` C2a, C2c).
+     */
+    private static String lastKnownBreaks(Journal journal) {
+        try {
+            Map<String, String> last = journal.lastOfType("probe.selftest");
+            if (last == null) return null;
+            String line = last.get("line");
+            // Derived from the key, never a counted literal. A hand-written
+            // offset is exactly how §5d happened, and how this method was
+            // wrong on its first run: `at + 16` for a 15-character key silently
+            // dropped the first digit, so every comparison failed and the
+            // baseline never matched.
+            final String key = "\"chainBreaks\":\"";
+            int at = line.indexOf(key);
+            if (at < 0) return null;
+            int start = at + key.length();
+            int end = line.indexOf('"', start);
+            return end < 0 ? null : line.substring(start, end);
+        } catch (IOException error) {
+            return null;
         }
     }
 
