@@ -1,0 +1,137 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * The checks the device runs on itself, so the instrument is self-contained.
+ *
+ * Deliberately minimal. The desktop suite (`tests/run.sh`) is the comprehensive
+ * one: it is fast, it runs on every change, and it can construct states the
+ * device cannot be talked into. What ships here is only what the desktop
+ * *cannot* answer, because each check needs this device, this runtime, this
+ * filesystem, on the day it runs.
+ *
+ * Three things qualify.
+ *
+ * **The encoder, under ART.** `tests/run.sh` proves the encoder matches the
+ * TypeScript runtime on JDK 21. ART is not JDK 21, and the device's default
+ * locale is not the test machine's. `Journal.sha256` formats bytes with
+ * `String.format("%02x", b)`, which resolves against `Locale.getDefault()`;
+ * `Json` sorts keys with the default collator's `compareTo`. Both are believed
+ * to be locale-independent. Believed is not measured, and a divergence here
+ * would not show up as a wrong answer — it would show up as this device being
+ * permanently unable to agree with any other about what history it holds.
+ *
+ * **The chain, now.** Whether the journal this device is actually carrying
+ * still links end to end. Only this device holds it.
+ *
+ * **Storage, through the real Context.** Whether the directory Android gives us
+ * today is still writable and whether an append survives a reopen. Permissions,
+ * scoped-storage rules and free space all change under the app's feet across OS
+ * updates, and a fake `Context` cannot notice.
+ *
+ * **What this is not.** The app reporting on itself is a regression and liveness
+ * check, not an attestation. A compromised instrument reports whatever it likes.
+ * The same limit as `CLAIMS.md` C2c: a claim checked only by the party who could
+ * have broken it is the weaker claim. This catches a broken build, a changed
+ * platform and a failing filesystem — not a hostile one.
+ */
+final class SelfTest {
+    private SelfTest() {}
+
+    /** Lane for the storage check. Never the real lane: this appends test data. */
+    private static final String SCRATCH_LANE = "selftest-scratch";
+
+    static Map<String, Object> run(Context context, Journal journal) {
+        List<Object> failed = new ArrayList<>();
+        Map<String, Object> checks = Json.obj();
+
+        record(checks, failed, "encoder.canonical",
+            Json.canonical(Vectors.payload()).equals(Vectors.PAYLOAD_CANONICAL));
+        record(checks, failed, "encoder.payloadDigest",
+            Journal.sha256(Vectors.PAYLOAD_CANONICAL).equals(Vectors.PAYLOAD_HASH));
+        record(checks, failed, "encoder.eventDigest", eventDigestAgrees());
+        record(checks, failed, "chain.linksEndToEnd", chainVerifies(journal));
+        record(checks, failed, "storage.appendSurvivesReopen", storageRoundTrips(context));
+
+        Map<String, Object> payload = Json.obj();
+        payload.put("checks", checks);
+        payload.put("failed", failed);
+        payload.put("ok", failed.isEmpty());
+        // Recorded whether or not anything failed, because a divergence is
+        // diagnosed from these and not from a later guess about the device.
+        payload.put("locale", Locale.getDefault().toLanguageTag());
+        payload.put("vm", System.getProperty("java.vm.name", "unknown"));
+        payload.put("vmVersion", System.getProperty("java.vm.version", "unknown"));
+        return payload;
+    }
+
+    private static void record(Map<String, Object> checks, List<Object> failed,
+                               String name, boolean passed) {
+        checks.put(name, Boolean.valueOf(passed));
+        if (!passed) failed.add(name);
+    }
+
+    private static boolean eventDigestAgrees() {
+        Map<String, Object> preimage = Vectors.preimageInput();
+        preimage.put("payloadHash", Vectors.PAYLOAD_HASH);
+        return Journal.sha256(Json.canonical(preimage)).equals(Vectors.HASH);
+    }
+
+    private static boolean chainVerifies(Journal journal) {
+        try {
+            // `verify()` is linkage evidence only -- it does not re-derive a
+            // hash from the stored fields, so an edited payload passes here.
+            // See `Journal.verify` and `CLAIMS.md` C2a.
+            return journal.verify().startsWith("ok");
+        } catch (IOException error) {
+            return false;
+        }
+    }
+
+    /**
+     * Writes, reopens and verifies a throwaway lane through the real Context.
+     *
+     * The reopen is the point: it is the path that `restore()` takes on every
+     * process start, and the one that carried the §5d defect. Running it here
+     * means a build whose restore is broken says so on this device, on its first
+     * start, instead of forking the real chain silently until someone exports.
+     */
+    private static boolean storageRoundTrips(Context context) {
+        File scratch = null;
+        try {
+            Journal first = Journal.open(context, SCRATCH_LANE, "selftest");
+            scratch = first.file();
+            // Start from a known state: a leftover from an interrupted run would
+            // otherwise make the count assertion below wrong for the wrong reason.
+            if (scratch.exists() && !scratch.delete()) return false;
+
+            first = Journal.open(context, SCRATCH_LANE, "selftest");
+            if (first.append("selftest.write", probe(1)) == null) return false;
+            if (first.append("selftest.write", probe(2)) == null) return false;
+
+            Journal reopened = Journal.open(context, SCRATCH_LANE, "selftest");
+            if (reopened.discontinuous()) return false;
+            if (reopened.append("selftest.write", probe(3)) == null) return false;
+
+            return reopened.verify().equals("ok (3 events)");
+        } catch (IOException error) {
+            return false;
+        } finally {
+            // Never leave test data on the device. It is not history.
+            if (scratch != null && scratch.exists()) scratch.delete();
+        }
+    }
+
+    private static Map<String, Object> probe(int n) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("n", (long) n);
+        return payload;
+    }
+}

@@ -628,6 +628,85 @@ only exported once can lose everything to a single mistake.
 
 ---
 
+## 7b. Written and held for pass 2 — the device checks itself
+
+**2026-09-25.** Written, tested on the desktop, compiled against `android.jar`
+API 36, and **not built into an APK and not installed.** §7 R4 stands: the
+instrument does not change while the run is under way. This ships when pass 1
+ends.
+
+### Why the device needs its own checks at all
+
+`tests/run.sh` (§5g) runs the probe's classes on a desktop JVM. That is the
+right place for most tests and the wrong place for three of them, because three
+questions are about *this device on the day it runs* and cannot be asked
+anywhere else:
+
+1. **Does the encoder agree under ART?** The desktop suite proves agreement on
+   JDK 21. ART is not JDK 21, and the device's default locale is not the test
+   machine's. `Journal.sha256` formats bytes with `String.format("%02x", b)`,
+   which resolves against `Locale.getDefault()`. The formatting is believed
+   locale-independent for hex. Believed is not measured, and this project
+   replaces believed with measured. A divergence would not look like a wrong
+   answer; it would look like this device being permanently unable to agree with
+   any other about the history it holds.
+2. **Does the chain this device is carrying still link end to end?** Only this
+   device holds it.
+3. **Is the directory Android gives us still writable, and does an append
+   survive a reopen?** Permissions, scoped storage and free space change under
+   the app across OS updates. A fake `Context` cannot notice. The reopen is the
+   path that carried the §5d defect, so a build whose `restore()` is broken says
+   so on its first start rather than forking the real chain silently.
+
+That is the whole set. Everything else stays on the desktop, where it is faster
+and where states can be constructed that a device cannot be talked into.
+
+### Why not an instrumentation test APK
+
+The usual Android answer — `androidTest`, a second APK, run over `adb` — needs a
+host running Gradle and a cable, which is the path this project has moved off
+(§5b addendum). It also tests the wrong artifact: the test APK is a *different*
+build, so it exercises a copy of the instrument rather than the one carrying the
+history. Installing a JDK on the phone is worse for the obvious reasons.
+
+Self-contained means the checks ship **inside** the production APK.
+
+### The result is an event, not a log line
+
+`SelfTest.run` returns a payload and `Probe` appends it as `probe.selftest` on
+every process start. Art. XI §42 — the runtime never assumes reality matched an
+expectation — applies to the instrument's belief about itself. Recording the
+check as history means a build that started encoding differently, or a
+filesystem that stopped accepting writes, appears in the same replay as
+everything it would have corrupted. The phone's own screen shows the last
+recorded result, read back from the journal rather than re-run.
+
+The storage check writes to a throwaway lane and deletes it. Test data in the
+real lane would be indistinguishable from history, and there is a test asserting
+it never lands there.
+
+### What this is not
+
+The app reporting on itself is a **regression and liveness check, not an
+attestation.** A compromised instrument reports whatever it likes. This is the
+same limit as `CLAIMS.md` C2c — a claim checked only by the party who could have
+broken it is the weaker claim — and it is why the desktop suite and the
+cross-implementation vectors still matter. It catches a broken build, a changed
+platform and a failing filesystem. It does not catch a hostile one.
+
+The self-test also cannot test itself: one that is broken toward always passing
+reports that everything is fine, which is the single failure it would never
+catch. Its coverage lives in `tests/SelfTestTest.java.in`, where a broken chain
+is staged deliberately and the self-test is required to notice.
+
+### Cost, stated
+
+One extra event per process start, and a few hashes plus one small file of work.
+Pass 2's journals will therefore not be shaped like pass 1's, which is worth
+remembering when comparing them.
+
+---
+
 ## 8. Exit criteria for pass 1
 
 1. ~~P0 answered, either way, before Kotlin is written.~~ **Done 2026-09-25:

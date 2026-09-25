@@ -39,6 +39,12 @@ for source in src/*.java.in; do
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
 
+# The cross-implementation vectors are compiled into the APK so the device can
+# check its own encoder against them (`src/SelfTest.java.in`). Generated from
+# the same fixture the desktop and TypeScript suites read, so all three check
+# one source of truth rather than three copies of it.
+python3 tools/gen-vectors.py tests/vectors.json "$PKG" > "$OUT/src/$PKG_PATH/Vectors.java"
+
 "$BT/aapt2" link \
   -o "$OUT/base.apk" \
   -I "$JAR" \

@@ -23,7 +23,7 @@ rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 # Only the classes that do not need a real Android runtime. The services and the
 # activity are platform glue and are answered by the device itself, not here.
-for name in Json Hlc Ids Journal; do
+for name in Json Hlc Ids Journal SelfTest; do
   sed -e "s/@PKG@/$PKG/g" "src/$name.java.in" > "$OUT/src/$PKG_PATH/$name.java"
 done
 for source in tests/*.java.in; do

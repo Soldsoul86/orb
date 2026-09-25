@@ -6,6 +6,7 @@ public final class Tests {
         System.out.println("pass-1 probe, host tests");
         JsonTest.run();
         JournalTest.run();
+        SelfTestTest.run();
         System.exit(Harness.report());
     }
 }

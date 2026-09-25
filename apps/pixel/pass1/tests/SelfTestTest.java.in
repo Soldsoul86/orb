@@ -1,0 +1,121 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Tests for the checks the device runs on itself.
+ *
+ * The self-test cannot test itself: a self-test that is broken in the direction
+ * of always passing reports that everything is fine, which is the one failure it
+ * would never catch. So its own coverage has to come from here, where a failure
+ * can be staged deliberately.
+ */
+final class SelfTestTest {
+
+    static void run() throws IOException {
+        passesOnAHealthyDevice();
+        failsWhenTheChainIsBroken();
+        leavesNothingBehind();
+        neverTouchesTheRealLane();
+    }
+
+    private static void passesOnAHealthyDevice() throws IOException {
+        Harness.suite("the self-test passes on a healthy journal");
+        File dir = temp("healthy");
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, "pixel", "test-device");
+        journal.append("probe.process.start", Json.obj());
+
+        Map<String, Object> result = SelfTest.run(context, journal);
+        Harness.equal("overall ok", result.get("ok"), Boolean.TRUE);
+        Harness.equal("nothing failed", ((List<?>) result.get("failed")).size(), 0);
+
+        Map<?, ?> checks = (Map<?, ?>) result.get("checks");
+        Harness.equal("the encoder agrees with the shared vectors",
+            checks.get("encoder.canonical"), Boolean.TRUE);
+        Harness.equal("the payload digest agrees",
+            checks.get("encoder.payloadDigest"), Boolean.TRUE);
+        Harness.equal("the event digest agrees",
+            checks.get("encoder.eventDigest"), Boolean.TRUE);
+        Harness.equal("the chain links end to end",
+            checks.get("chain.linksEndToEnd"), Boolean.TRUE);
+        Harness.equal("an append survives a reopen",
+            checks.get("storage.appendSurvivesReopen"), Boolean.TRUE);
+        Harness.check("the runtime is named, so a divergence is diagnosable",
+            result.get("vm") != null && result.get("locale") != null);
+    }
+
+    /**
+     * The negative control. A self-test that cannot fail proves the device is
+     * healthy exactly as well as printing "ok" would.
+     */
+    private static void failsWhenTheChainIsBroken() throws IOException {
+        Harness.suite("the self-test fails when the chain is broken");
+        File dir = temp("broken");
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, "pixel", "test-device");
+        for (int i = 0; i < 4; i++) journal.append("probe.heartbeat", Json.obj());
+
+        List<String> lines = Files.readAllLines(lane(dir).toPath(), StandardCharsets.UTF_8);
+        lines.remove(1);
+        Files.write(lane(dir).toPath(), (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> result = SelfTest.run(context, journal);
+        Map<?, ?> checks = (Map<?, ?>) result.get("checks");
+        Harness.equal("the broken chain is reported",
+            checks.get("chain.linksEndToEnd"), Boolean.FALSE);
+        Harness.equal("overall not ok", result.get("ok"), Boolean.FALSE);
+        Harness.check("the failure is named, not just counted",
+            ((List<?>) result.get("failed")).contains("chain.linksEndToEnd"));
+        Harness.equal("the encoder still passes, so the failure is localised",
+            checks.get("encoder.canonical"), Boolean.TRUE);
+    }
+
+    private static void leavesNothingBehind() throws IOException {
+        Harness.suite("the storage check leaves no test data on the device");
+        File dir = temp("scratch");
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, "pixel", "test-device");
+        // The lane file is not created until something is appended, so a bare
+        // open would leave the directory empty and pass the count below for the
+        // wrong reason.
+        journal.append("probe.process.start", Json.obj());
+        SelfTest.run(context, journal);
+
+        File scratch = new File(dir, "selftest-scratch.lane.jsonl");
+        Harness.check("the scratch lane is deleted", !scratch.exists());
+        Harness.equal("only the real lane remains", dir.list().length, 1);
+    }
+
+    private static void neverTouchesTheRealLane() throws IOException {
+        Harness.suite("the self-test never writes to the lane it is checking");
+        File dir = temp("isolation");
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, "pixel", "test-device");
+        journal.append("probe.process.start", Json.obj());
+        journal.append("probe.heartbeat", Json.obj());
+
+        SelfTest.run(context, journal);
+
+        // Test data in the real lane would be indistinguishable from history.
+        Harness.equal("the real lane is unchanged", journal.count(), 2);
+        Harness.equal("and still verifies", journal.verify(), "ok (2 events)");
+    }
+
+    private static File lane(File dir) {
+        return new File(dir, "pixel.lane.jsonl");
+    }
+
+    private static File temp(String name) throws IOException {
+        Path dir = Files.createTempDirectory("orb-selftest-" + name);
+        dir.toFile().deleteOnExit();
+        return dir.toFile();
+    }
+}

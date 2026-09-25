@@ -208,6 +208,7 @@ public final class MainActivity extends Activity {
             StringBuilder out = new StringBuilder();
             out.append("events: ").append(lines.size()).append('\n');
             out.append("chain:  ").append(journal.verify()).append('\n');
+            out.append("self:   ").append(lastSelfTest(journal)).append('\n');
             out.append("file:   ").append(journal.file().getAbsolutePath()).append("\n\n");
             out.append("last 12:\n");
             for (int i = Math.max(0, lines.size() - 12); i < lines.size(); i++) {
@@ -218,6 +219,25 @@ public final class MainActivity extends Activity {
         } catch (IOException error) {
             status.setText("read failed: " + error);
         }
+    }
+
+    /**
+     * The last self-test the device recorded, read back from the journal rather
+     * than re-run.
+     *
+     * Re-running it on every status refresh would write scratch files each time
+     * and could show the screen something the history does not say. What is
+     * shown is what was recorded (`SelfTest`).
+     */
+    private static String lastSelfTest(Journal journal) throws IOException {
+        java.util.Map<String, String> last = journal.lastOfType("probe.selftest");
+        if (last == null) return "not yet run";
+        String line = last.get("line");
+        if (line.contains("\"failed\":[]")) return "ok";
+        int at = line.indexOf("\"failed\":[");
+        int end = at < 0 ? -1 : line.indexOf(']', at);
+        if (end < 0) return "recorded, unreadable";
+        return "FAILED " + line.substring(at + 10, end);
     }
 
     private static String summarise(String line) {
