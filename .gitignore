@@ -33,3 +33,6 @@ coverage/
 # Local runtime data — Orb's journals and stores never enter version control
 *.orbdata
 /.orb-local/
+
+# Probe signing keys: throwaway test identities, never committed
+apps/pixel/*/keys/
