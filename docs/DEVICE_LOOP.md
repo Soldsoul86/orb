@@ -592,3 +592,17 @@ only exported once can lose everything to a single mistake.
    deferral — or P4 refuted, which is the more valuable outcome, because it would
    be found now rather than after a year of trusted history turned out to have
    holes in it.
+
+---
+
+## 9. The other loop
+
+This document tests whether the runtime survives a real device. It does not
+test whether the product promise is true — that Orb puts a consent gate at the
+irreversible moment, keeps a record no agent can rewrite, and holds data the
+user owns, with any provider.
+
+`CLAIMS.md` carries those as C1–C4, under the same rules these predictions
+follow: a named adversary, a negative control, a dated and versioned
+comparison, and a stated boundary. Same discipline, different subject. Neither
+loop starts a new test while the other one is mid-run.
