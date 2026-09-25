@@ -315,6 +315,45 @@ argument for §1.
 
 ---
 
+## 5d. Finding — the tamper-evidence caught its own author
+
+The probe's first real run reported `line 4: chain broken`, and it was right.
+
+`Journal.restore()` read the lane's head hash with the **numeric** extractor
+rather than the string one. A hash begins with a hex character, the numeric
+extractor stops at the first non-digit, so it returned null every time. `head`
+stayed null, and the first append after any process restart claimed no
+predecessor — forking the chain at every restart, silently, forever.
+
+**Nothing external found this.** No test, no review, no reading of the platform
+documentation. The hash chain found it, on its author's phone, within three
+minutes of the services first running — and it found it as what it was, an
+unexplained discontinuity, which is the same signal it would raise for
+tampering.
+
+That is the strongest evidence so far that the journal design is worth what it
+costs. `SECURITY.md` §5 argues hash chaining makes silent rewriting detectable;
+this is that property working before anyone was trying to attack anything, on a
+defect that would otherwise have produced a week of history in two disconnected
+halves with nothing to indicate it.
+
+**Three changes followed.**
+
+1. The extractor bug is fixed, so a restarted process continues its chain.
+2. `verify()` now reports **every** break rather than stopping at the first. A
+   single known break earlier in the file would otherwise hide every one after
+   it, which is precisely when a hidden break matters most.
+3. A lane whose head cannot be resolved on open now records
+   `probe.chain.discontinuity` before anything else. A journal that cannot link
+   to its own past must not look as though it did, and an unexplained break
+   sitting next to its explanation is worth far more than a clean-looking file.
+
+**The existing break stays.** Art. I forbids rewriting history to make it look
+tidy, and the break is a true record of what happened. `verify()` will keep
+reporting it, and now reports anything after it too.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |

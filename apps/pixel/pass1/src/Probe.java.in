@@ -50,6 +50,16 @@ public final class Probe extends Application implements ComponentCallbacks2 {
             return;
         }
 
+        if (journal.discontinuous()) {
+            // The lane exists but its head could not be read. Recording that
+            // before anything else means the discontinuity in the chain has an
+            // explanation sitting next to it, rather than looking like
+            // tampering to whoever verifies this later.
+            Map<String, Object> payload = Json.obj();
+            payload.put("reason", "previous chain head unreadable on open");
+            journal.append("probe.chain.discontinuity", payload);
+        }
+
         reconstructGap();
         recordStartup();
     }

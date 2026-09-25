@@ -122,3 +122,13 @@ whole purpose is the evidence it produces.
 | `probe.boot.restart` | whether restarting services from boot was permitted — P2 |
 | `probe.memory.trim` / `.low` | memory pressure, which may precede a kill |
 | `probe.export` | the journal was copied to shared storage — a recorded disclosure |
+| `probe.chain.discontinuity` | the lane's head could not be read on open, so what follows starts a new chain segment |
+
+## A known break
+
+A journal created before 2026-09-25 carries one chain break at the first process
+restart: `restore()` read the head hash with a numeric extractor and got null,
+so every restart began a new chain segment (`DEVICE_LOOP.md` §5d). Fixed, but
+the break in an existing file stays — Art. I forbids rewriting history to make
+it look tidy, and `verify()` reports every break rather than stopping at the
+first, so anything new is still visible behind it.

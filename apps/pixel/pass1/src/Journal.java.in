@@ -52,22 +52,47 @@ final class Journal {
         return file;
     }
 
-    /** Re-reads the tail so a restarted process continues the chain rather than forking it. */
+    /**
+     * Re-reads the tail so a restarted process continues the chain rather than
+     * forking it.
+     *
+     * The hash is a string field and must be read with the string extractor.
+     * Reading it with the numeric one returns null, `head` stays null, and the
+     * next append claims no predecessor — which forks the chain at every
+     * process restart. That was the defect the verifier caught on this probe's
+     * first real run (`DEVICE_LOOP.md` §5d).
+     */
     private synchronized void restore() throws IOException {
         if (!file.exists()) return;
         List<String> lines = readLines();
+        if (lines.isEmpty()) return;
+
         for (int i = lines.size() - 1; i >= 0; i--) {
             String line = lines.get(i);
-            String hash = extract(line, "\"hash\":\"");
+            String hash = extractString(line, "\"hash\":\"");
+            if (hash == null) continue;
+
+            head = hash;
             String physical = extract(line, "\"physical\":");
             String counter = extract(line, "\"counter\":");
-            if (hash == null) continue;
-            head = hash;
             if (physical != null && counter != null) {
                 clock = new Hlc(Long.parseLong(physical), Long.parseLong(counter));
             }
             return;
         }
+
+        // A non-empty lane whose head cannot be resolved. The next append will
+        // start a new chain segment, and saying so is the only honest option:
+        // a journal that cannot link to its own past must not look as though it
+        // did (Constitution Art. I §5).
+        discontinuous = true;
+    }
+
+    /** True when the previous chain head could not be recovered on open. */
+    private boolean discontinuous;
+
+    boolean discontinuous() {
+        return discontinuous;
     }
 
     synchronized List<String> readLines() throws IOException {
@@ -187,21 +212,36 @@ final class Journal {
      */
     synchronized String verify() throws IOException {
         List<String> lines = readLines();
+        List<Integer> breaks = new ArrayList<>();
         String previous = null;
+
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
             String recorded = extractString(line, "\"hash\":\"");
-            String claimed = extractString(line, "\"previous\":\"");
-            if (previous == null) {
-                if (line.contains("\"previous\":null")) claimed = null;
-            }
             if (recorded == null) return "line " + i + ": no hash";
+
+            String claimed = line.contains("\"previous\":null")
+                ? null
+                : extractString(line, "\"previous\":\"");
+
+            // Report every break rather than stopping at the first. A single
+            // known break earlier in the file would otherwise hide every one
+            // after it, which is exactly when a hidden break matters most.
             if (previous == null ? claimed != null : !previous.equals(claimed)) {
-                return "line " + i + ": chain broken";
+                breaks.add(i);
             }
             previous = recorded;
         }
-        return "ok (" + lines.size() + " events)";
+
+        if (breaks.isEmpty()) return "ok (" + lines.size() + " events)";
+        StringBuilder out = new StringBuilder();
+        out.append(breaks.size()).append(breaks.size() == 1 ? " break" : " breaks")
+           .append(" in ").append(lines.size()).append(" events, at line");
+        if (breaks.size() > 1) out.append('s');
+        for (int i = 0; i < breaks.size(); i++) {
+            out.append(i == 0 ? " " : ", ").append(breaks.get(i));
+        }
+        return out.toString();
     }
 
     private static String extract(String line, String key) {
