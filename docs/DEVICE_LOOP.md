@@ -106,18 +106,22 @@ foreground throughout and was never stopped. §2 G4 does not hold on this device
 this build, this day — and the design simplifies, subject to the uncontrolled
 variable in §5h.
 
-**P2 — Nothing resumes after a reboot until the user opens the app. — HELD in
-its conclusion, REFUTED in its mechanism, and partly CONFOUNDED by our own
-defect. 2026-09-25, §5i.** Observation did not resume: zero heartbeats in 13.3
-minutes, and the operator had to open the app. But the boot broadcast *did*
-arrive and the app *did* wake — and `specialUse` started successfully before
-being killed by an unhandled exception in a sibling service.
-*The consequence stands:* the human is part of the runtime, and that belongs in
-`RUNTIME_LOOP.md` rather than a footnote.
+**P2 — Nothing resumes after a reboot until the user opens the app. — REFUTED,
+2026-09-25, §5k.** Observation resumed **by itself**: `specialUse` reached the
+foreground 133 seconds after boot and recorded 15 consecutive beats with none
+skipped, while nothing opened the app. The first attempt (§5i) was confounded by
+our own unhandled exception; with that fixed, the measurement came through.
+*The consequence is the opposite of the one predicted:* the human is **not**
+necessarily part of the runtime, and continuous observation across a reboot is
+achievable on this device.
 
 **P3 — A `location`- or `health`-typed foreground service runs past six hours.**
 *If false:* there is no long-running option at all on this device, and the host
 must be `WorkManager`-only with much coarser cadence.
+*Partly overtaken, 2026-09-25.* §5h showed **`dataSync` itself** running 6h31m,
+so the premise that a different type is needed for duration has not been tested
+because it has not been needed. §5k found the types differ somewhere else
+entirely: at boot, where `dataSync` is refused by name and `specialUse` is not.
 
 **P4 — When the system kills or defers us, we can record that it happened, when,
 and why. — HELD, 2026-09-25, and re-held decisively in §5h.** Over 391 minutes,
@@ -861,6 +865,74 @@ Twice in one day, in two different files, by the same author. The lesson is not
 the probe has no JSON parser because it has no dependencies. Recorded as
 `ARCHITECTURAL_DEBT.md` material for the production host, which is Kotlin and
 should never inherit this.
+
+---
+
+## 5k. The reboot, measured — P2 refuted, and the always-on path exists
+
+**2026-09-25.** The §5i fix installed at 17:47, phone restarted at ~17:47:30,
+untouched for 15 minutes, exported at 18:04.
+
+| | |
+| --- | --- |
+| `BOOT_COMPLETED` delivered | 17:49:52, **133 s after boot** |
+| First heartbeat | 17:49:52 — the same second |
+| Process starts after boot | **none.** The app was never opened |
+| `specialUse` | 15 beats, max gap 60 s, **zero skipped** |
+
+### Android said it in words, because we caught the exception
+
+```
+probe.service.start  service: dataSync
+  outcome:  refused
+  error:    android.app.ForegroundServiceStartNotAllowedException
+  message:  "FGS type dataSync not allowed to start from BOOT_COMPLETED!"
+  foregroundType: 1
+
+probe.service.start  service: specialUse
+  outcome:  foreground
+  foregroundType: 1073741824
+
+probe.service.stop   service: dataSync  cause: onDestroy  beats: 0
+```
+
+`dataSync` is **refused by name** at boot. `specialUse` is not. And `dataSync`
+stopped cleanly rather than crashing the process, so it **did not take
+`specialUse` with it** — the §5i confound, removed, and the measurement came
+through on the first attempt afterwards.
+
+This is the loop working exactly as it is supposed to: a defect in the
+instrument produced an ambiguous result, the defect was fixed, and the re-run
+answered the question that the first run could only hint at.
+
+### What it settles
+
+**The always-on path exists on this device.** `specialUse` survived 6h31m
+alongside `dataSync` (§5h) *and* starts itself after a reboot. Nothing in the
+two runs required a human.
+
+`RUNTIME_LOOP.md` does not need the human in it after all — on this device, this
+build, today.
+
+### What it does not settle, stated plainly
+
+- **Fourteen minutes is not six hours.** This run shows `specialUse` recording
+  cleanly for 14 minutes post-boot. §5h showed it running 6.5 hours *alongside*
+  `dataSync`; nothing yet shows it running long after a boot, alone.
+- **The battery-optimisation setting is still unrecorded** (§5h). It remains the
+  uncontrolled variable across both results.
+- **`specialUse` carries a cost this journal cannot see.** The type requires a
+  written justification in the manifest, and on the Play Store that is reviewed.
+  A sideloaded personal build is not. So this path may be available to the
+  operator and not to anything distributed — which is a distribution question,
+  not a platform one, and belongs in `MOBILE_SENSING.md` rather than here.
+
+### The other half of the reboot
+
+`gap.inferred` fired again for the 145-second shutdown, and the two process
+starts around the APK install are both explained. Across three runs today — a
+clean six hours, a crash loop, and two reboots — **every gap has an entry next
+to it.** P4 has not failed once.
 
 ---
 
