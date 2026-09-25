@@ -106,10 +106,14 @@ foreground throughout and was never stopped. §2 G4 does not hold on this device
 this build, this day — and the design simplifies, subject to the uncontrolled
 variable in §5h.
 
-**P2 — Nothing resumes after a reboot until the user opens the app.**
-*If true:* "continuous observation" has a hard floor, and the human is part of
-the runtime whether the architecture says so or not. That belongs in
-`RUNTIME_LOOP.md`, not in a footnote.
+**P2 — Nothing resumes after a reboot until the user opens the app. — HELD in
+its conclusion, REFUTED in its mechanism, and partly CONFOUNDED by our own
+defect. 2026-09-25, §5i.** Observation did not resume: zero heartbeats in 13.3
+minutes, and the operator had to open the app. But the boot broadcast *did*
+arrive and the app *did* wake — and `specialUse` started successfully before
+being killed by an unhandled exception in a sibling service.
+*The consequence stands:* the human is part of the runtime, and that belongs in
+`RUNTIME_LOOP.md` rather than a footnote.
 
 **P3 — A `location`- or `health`-typed foreground service runs past six hours.**
 *If false:* there is no long-running option at all on this device, and the host
@@ -701,6 +705,95 @@ instruct anyone to check the shade.
 
 The screen counts also say the phone was **used normally** throughout, which
 makes this a realistic carry test rather than a device left face-down on a desk.
+
+---
+
+## 5i. The reboot — what came back, and what killed it
+
+**2026-09-25.** Operator rebooted at 17:20 IST, waited 15 minutes without
+opening the app, then exported. 32 new events.
+
+| Time | Event |
+| --- | --- |
+| 17:18:30 | Last heartbeat before shutdown |
+| ~17:18:52 | Boot (derived from `elapsedRealtimeMs`, not from the reported clock) |
+| 17:21:45 | `BOOT_COMPLETED` delivered at 172 s uptime; process starts; **194 s gap recorded** |
+| 17:21:45 | `probe.boot.restart` → `outcome: "requested"` |
+| 17:21:50 | Process dies and restarts — **4.7 s gap recorded** |
+| 17:21:50 | `specialUse` `service.start`. **No `dataSync` start, ever** |
+| 17:35:10 | Operator opens the app — **800 s gap recorded** |
+
+**Zero heartbeats in 13.3 minutes.**
+
+### What the prediction got wrong
+
+P2 assumed nothing would arrive. **The boot broadcast works**: a
+manifest-registered receiver was delivered at 172 seconds of uptime, and the app
+learned the phone had rebooted without anyone touching it.
+
+### `outcome: "requested"` is a false positive, and that is our bug
+
+`startForegroundService()` does not throw at the call site. The denial arrives
+later, *inside* the service, when it calls `startForeground()`. So
+`SignalReceiver` recorded a success for something that had not happened yet, and
+the field means **"the request was accepted for delivery"**, not "the service
+started".
+
+`probe.boot.restart` therefore cannot answer the question it was written to
+answer. Recorded as a defect in the instrument, not a finding about the platform.
+
+### `dataSync` did not start; `specialUse` did
+
+No `probe.service.start` was ever written for `dataSync`. That append sits at
+`HeartbeatService.java.in:108`, **after** `startForeground()` at line 100, with
+nothing catching in between — so an exception there writes nothing and takes the
+process down. A process death 5 seconds later fits exactly.
+
+`specialUse` wrote its `service.start`. **It worked.** Then it died anyway,
+because it shares a process with `dataSync`, whose unhandled exception killed
+both.
+
+### So one leg of this is confounded, and the claim must say so
+
+**We cannot conclude `specialUse` fails at boot.** The evidence says it
+succeeded and was killed by our own missing `try`/`catch` in a sibling.
+
+That matters more than the rest of this section: **if `specialUse` starts at boot
+and `dataSync` cannot, the always-on path exists** — the host simply must not
+attempt `dataSync` at boot. Today's data hints at exactly that and does not
+establish it, and the difference between those two is the whole reason this loop
+exists.
+
+### The fix, made 2026-09-25 — not shipped
+
+Three defects, all in the instrument rather than the platform:
+
+1. **`startForeground()` is now wrapped.** A refusal is caught, its exception
+   class and message journaled on `probe.service.start` as
+   `outcome: "refused"`, and the service stops cleanly with
+   `START_NOT_STICKY`. **A service that may not start no longer takes its
+   sibling down with it** — which is the confound above, removed.
+2. **`probe.service.start` gained an `outcome`.** `"foreground"` or
+   `"refused"`, written where the answer is actually known, plus the
+   `foregroundType` so the record says which type was refused rather than
+   leaving it to be inferred from the service name.
+3. **The boot receiver asks for each service separately**, and records each
+   answer separately. One try/catch around both meant a throw on the first left
+   the second unasked, so a type that boots could never be observed booting
+   behind a type that does not. Its `outcome` is now `"accepted"` rather than
+   `"requested"`, because accepted-for-delivery is all a call site can honestly
+   claim.
+
+Compiles against `android.jar` API 36; the desktop suite still passes. **Not
+built into an APK and not installed** — it ships with pass 2, and until then P2's
+`specialUse` leg stays confounded and is written that way.
+
+### P4, three times in one reboot
+
+194 s, 4.7 s, 800 s. Every gap inferred and recorded, including the 13 minutes
+during which the runtime was blind and nothing else in the system knew. The
+honesty property is now demonstrated across a clean six-hour run, a crash loop,
+and a reboot.
 
 ---
 

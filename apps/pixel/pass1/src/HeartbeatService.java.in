@@ -97,15 +97,47 @@ abstract class HeartbeatService extends Service {
             .setOngoing(true)
             .build();
 
-        startForeground(notificationId(), notification, foregroundType());
-
+        // The refusal is the measurement, so it must survive being refused.
+        //
+        // `startForegroundService()` does not throw at the call site; the denial
+        // arrives here, when the service tries to go foreground. Uncaught, it
+        // kills the process -- and on 2026-09-25 that killed `specialUse` too,
+        // which had started correctly, because both services share one process.
+        // A whole leg of P2 was confounded by this (`DEVICE_LOOP.md` §5i): the
+        // evidence says `specialUse` boots and cannot prove it, because our own
+        // exception destroyed the witness.
+        //
+        // Caught here, named, and journaled. A service that may not start says
+        // so and stops; it does not take its sibling down with it.
         Journal journal = Probe.get().journal();
+        Throwable refusal = null;
+        try {
+            startForeground(notificationId(), notification, foregroundType());
+        } catch (Throwable error) {
+            refusal = error;
+        }
+
         if (journal != null) {
             Map<String, Object> payload = Json.obj();
             payload.put("service", serviceType());
             payload.put("startId", (long) startId);
             payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+            payload.put("foregroundType", (long) foregroundType());
+            if (refusal != null) {
+                payload.put("outcome", "refused");
+                payload.put("error", refusal.getClass().getName());
+                payload.put("message", String.valueOf(refusal.getMessage()));
+            } else {
+                payload.put("outcome", "foreground");
+            }
             journal.append("probe.service.start", payload);
+        }
+
+        if (refusal != null) {
+            // Refused. Stop cleanly rather than running a service that is not
+            // foreground and will be killed without explanation.
+            stopSelf(startId);
+            return START_NOT_STICKY;
         }
 
         handler.removeCallbacks(beat);

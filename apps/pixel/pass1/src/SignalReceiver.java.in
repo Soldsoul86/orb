@@ -40,21 +40,41 @@ public final class SignalReceiver extends BroadcastReceiver {
         // whether the services come back, so try — and let the journal record
         // whether the attempt was permitted.
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-            Map<String, Object> attempt = Json.obj();
-            attempt.put("trigger", "BOOT_COMPLETED");
-            try {
-                context.startForegroundService(new Intent(context, DataSyncService.class));
-                context.startForegroundService(new Intent(context, SpecialUseService.class));
-                attempt.put("outcome", "requested");
-            } catch (Throwable error) {
-                // Android 15+ forbids starting most foreground-service types
-                // from BOOT_COMPLETED. The refusal is the finding, so it is
-                // recorded rather than allowed to crash the receiver.
-                attempt.put("outcome", "refused");
-                attempt.put("error", error.getClass().getName());
-                attempt.put("message", String.valueOf(error.getMessage()));
-            }
-            journal.append("probe.boot.restart", attempt);
+            // Each service is asked separately, and each answer is recorded
+            // separately.
+            //
+            // Asking for both in one try/catch was wrong twice over
+            // (`DEVICE_LOOP.md` §5i). A throw on the first left the second
+            // unasked, so a type that boots could never be observed booting
+            // behind one that does not. And `startForegroundService` does not
+            // throw at the call site at all -- the denial lands later, inside
+            // the service -- so the old `"requested"` meant only *accepted for
+            // delivery*, and was recorded as if it meant *started*.
+            //
+            // What this call can honestly report is whether the request was
+            // accepted. Whether the service reached the foreground is
+            // `probe.service.start`'s `outcome`, written where it is known.
+            requestStart(context, journal, DataSyncService.class, "dataSync");
+            requestStart(context, journal, SpecialUseService.class, "specialUse");
         }
+    }
+
+    private static void requestStart(
+        Context context, Journal journal, Class<?> service, String name) {
+        Map<String, Object> attempt = Json.obj();
+        attempt.put("trigger", "BOOT_COMPLETED");
+        attempt.put("service", name);
+        try {
+            context.startForegroundService(new Intent(context, service));
+            // Deliberately not "started". This says the system accepted the
+            // request; only the service itself can say whether it went
+            // foreground.
+            attempt.put("outcome", "accepted");
+        } catch (Throwable error) {
+            attempt.put("outcome", "refused");
+            attempt.put("error", error.getClass().getName());
+            attempt.put("message", String.valueOf(error.getMessage()));
+        }
+        journal.append("probe.boot.restart", attempt);
     }
 }
