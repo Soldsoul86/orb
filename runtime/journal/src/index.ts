@@ -29,6 +29,7 @@ export {
   hashPayload,
   verifyEnvelope,
   verifyPayload,
+  verifiablePayload,
   verifyEvent,
   verifyLane,
 } from "./integrity.js";
@@ -53,6 +54,10 @@ export {
   isDeclaredErased,
 } from "./erasure.js";
 export type { ErasureRecord } from "./erasure.js";
+
+export { MemoryPayloadKeyring, isSealed } from "./keyring.js";
+export type { PayloadKeyring, SealedPayload } from "./keyring.js";
+export { sealedStore } from "./sealed-store.js";
 
 export { planErasure, decisionsRequired } from "./erasure-plan.js";
 export type {

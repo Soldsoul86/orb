@@ -239,6 +239,77 @@ also the only way §6's "erasure is local" stops being a serious limitation: the
 witness who holds an envelope, the peer who holds a payload, and the backup on
 a drive in a cupboard all hold something that no longer decodes.
 
+### Built, 2026-09-25 — `keyring.ts` and `sealed-store.ts`
+
+`PayloadKeyring` is a port, injected as `JournalStore` is, with an AES-256-GCM
+implementation for tests — real encryption rather than a stub, so what the tests
+demonstrate is the property itself and not that a flag changed.
+
+**Keys are stored, never derived.** Deriving a per-event key from a root would be
+far cheaper and would make erasure impossible: anything derivable is
+re-derivable, so destroying a derived key destroys nothing. The cost is roughly
+32 bytes per event and a keyring that is now the most sensitive object on the
+device.
+
+**Sealing is a decorator, not an edit to each store.** `sealedStore(inner,
+keyring)` gives every store the rule at once, including ones written later, and
+`SECURITY.md` §3's *"the store holds ciphertext"* becomes true without any store
+implementing cryptography.
+
+**Only the payload is sealed, and `payloadHash` commits to the plaintext.** Three
+things depend on that: verification behaves identically before and after
+sealing; a payload recovered from any source is still checkable against its
+envelope; and two devices sealing the same payload under different keys still
+agree on its hash, so the cross-implementation vectors are untouched.
+
+**The keyring is the ground truth for erasure.** A read whose key has gone
+returns the envelope marked `erased`, whatever the stored marker says — so a
+keyring restored without its journal, or a partial failure, still reports the
+erasure rather than the content.
+
+**A destroyed payload cannot be re-sealed back into existence.** A peer
+helpfully returning the bytes would otherwise mint a fresh key for content its
+owner destroyed, undoing an erasure with nobody deciding to. Refused before a
+key is minted, and refused again by the store beneath.
+
+**The negative control:** a *pruned* payload keeps its key and comes back. A
+keyring that destroyed keys on every detach would pass every other test here
+while making pruning silently irreversible.
+
+### The finding: sealing breaks verification, and the wrong answer is alarming
+
+`verifyLane` hashed the payload and compared it to `payloadHash`. Against a
+sealed blob that compares two unrelated values, so it reported **corruption
+where nothing was corrupt** — and the device most affected is the one holding
+envelopes and sealed blobs and no keys at all: a witness, told its history had
+been tampered with every time it looked.
+
+`verifiablePayload` now separates *cannot check* from *failed the check*. Third
+time today the same distinction has decided a design — alongside `closed` rather
+than *complete* in lineage, and *unavailable* rather than *none* in the erasure
+plan. A verifier that collapses them lies in the more alarming direction.
+
+It opens no new hole: substituting a sealed blob for a real payload destroys
+content without declaring it, which is `CLAIMS.md` C2d, already named as
+undetectable and not made worse here.
+
+### Still open — the confirmation oracle
+
+`payloadHash` commits to the plaintext, which is what makes everything above
+work. It also means **a hash over guessable plaintext is a confirmation
+oracle**: an adversary holding envelopes can hash candidate payloads — `{"beat":
+1}`, `{"beat": 2}` — until one matches, and learn the content of a structurally
+predictable event without any key.
+
+Sealing does not touch this, because the hash is in the envelope and the
+envelope is deliberately plaintext.
+
+The usual mitigation is a random nonce inside each payload, so the plaintext is
+not guessable. It is cheap, and it is **not** done here: injecting a field into
+every payload changes what replay sees and what a schema describes, which is a
+decision about the shape of every event in the system rather than a change to
+this module. Recorded as open rather than taken quietly.
+
 ### What makes this checkable by anyone but the owner
 
 Per-event keys give the owner erasure. They do not, on their own, give anyone
@@ -768,11 +839,9 @@ After it, and after AD-6:
 
 1. ~~**A reason on absence** (§7).~~ **Done 2026-09-25**, with the erasure
    declaration alongside it. 453 tests pass, lint clean.
-1a. **Payload key granularity** (§2a). Encryption at rest is already mandatory;
-   what is missing is a key small enough to destroy per event or per epoch.
-   Without it the ruling's *destroyed* is only *deleted*, and D4's account of
-   what cannot be recalled would be wrong in the owner's favour — the worst
-   direction for it to be wrong in.
+1a. ~~**Payload key granularity** (§2a).~~ **Done 2026-09-25**, 10 cases. What
+   remains is the confirmation oracle above, and putting the keyring itself
+   behind hardware (device predictions P8 and P11).
 1b. **The coarse vocabulary, then the envelope change** (§2b). The vocabulary
    is a decision (§9.4); the envelope edit that follows touches `Event.md`,
    `EVENT_MODEL.md`, the TypeScript envelope and the phone's encoder together,

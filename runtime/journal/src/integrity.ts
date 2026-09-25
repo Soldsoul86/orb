@@ -97,15 +97,47 @@ export function verifyEnvelope(envelope: EventEnvelope): boolean {
  *
  * This is the gate a payload must pass when it is fetched back after being
  * dropped, whoever supplied it.
+ *
+ * Only meaningful on plaintext. `payloadHash` commits to the plaintext, so
+ * hashing a sealed blob compares two unrelated values — see
+ * {@link verifiablePayload}.
  */
 export function verifyPayload(event: OrbEvent): boolean {
   return hashPayload(event.payload) === event.integrity.payloadHash;
 }
 
-/** Verifies the envelope always, and the payload when this device holds it. */
+/**
+ * Whether this device can check the payload at all.
+ *
+ * A sealed payload cannot be: `payloadHash` commits to the plaintext, and the
+ * device reading the store may hold no key — a witness holds envelopes and
+ * sealed blobs and never any key (`WITNESSES.md` W2).
+ *
+ * The distinction matters because the alternative is worse than useless.
+ * Hashing the ciphertext and finding a mismatch would report **corruption**
+ * where nothing is corrupt, telling a witness its history was tampered with
+ * every time it looked. *Cannot check* and *failed the check* are different
+ * answers, and a verifier that collapses them is lying in the more alarming
+ * direction.
+ *
+ * This opens no new hole. Substituting a sealed blob for a real payload destroys
+ * content without declaring it, which is `CLAIMS.md` C2d — already named as
+ * undetectable, and not made worse here.
+ */
+export function verifiablePayload(event: OrbEvent): boolean {
+  const payload = event.payload;
+  return !(
+    typeof payload === "object" &&
+    payload !== null &&
+    typeof (payload as { sealed?: unknown }).sealed === "string"
+  );
+}
+
+/** Verifies the envelope always, and the payload when this device can read it. */
 export function verifyEvent(event: StoredEvent): boolean {
   if (!verifyEnvelope(event)) return false;
-  return hasPayload(event) ? verifyPayload(event) : true;
+  if (!hasPayload(event)) return true;
+  return verifiablePayload(event) ? verifyPayload(event) : true;
 }
 
 /**
@@ -135,7 +167,7 @@ export function verifyLane(events: readonly (StoredEvent | EventEnvelope)[]): vo
         index,
       });
     }
-    if (hasPayload(event) && !verifyPayload(event)) {
+    if (hasPayload(event) && verifiablePayload(event) && !verifyPayload(event)) {
       throw new JournalIntegrityError("payload does not match the hash its envelope commits to", {
         eventId: event.id,
         index,
