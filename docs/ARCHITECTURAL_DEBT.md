@@ -319,6 +319,14 @@ currently tell that arrangement apart from one person holding two phones, and
 for tamper-evidence those are opposite things. See `WITNESSES.md`, which is
 blocked on this entry.
 
+**And keys are not the last step.** `WITNESSES.md` §6a: six keys in two
+buildings is two. What resists collusion is *unconnected groups*, which no
+software can observe — it can count devices, and it can count keys once this
+entry is paid down, but it cannot know whether two people share a home, an
+employer or a jurisdiction. Whatever shape this takes must therefore leave room
+for a count the **user declares**, carrying the user's confidence rather than
+presented as something the system established (Art. XI §43).
+
 **What adopting it would touch.** A key identity as a *value* attributed to a
 custody receipt — following the `Observation.md` source-identity precedent that
 AD-5 also leans on, rather than a new kernel contract with a dependency edge.

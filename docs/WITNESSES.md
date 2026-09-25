@@ -96,7 +96,8 @@ none:
 - **Collusion.** K witnesses means an attacker needs all K. Witnesses who know
   each other, live together, or answer to the same authority are closer to one
   witness than to K. Choosing unconnected people is the only defence, and it is
-  a social act, not a cryptographic one.
+  a social act, not a cryptographic one. §6a works out what this does to a
+  proximity-based scheme, where the tension is at its sharpest.
 - **Forward secrecy of the truncation.** A witness proves the lane *was* at a
   given height. It cannot prove what the removed events said. It converts a
   silent deletion into a detected one; it does not recover the content.
@@ -140,6 +141,98 @@ Practical constraints that follow, and they are hard constraints:
 
 ---
 
+## 6a. Proximity — how attestations travel is not who counts
+
+**The operator's proposal, 2026-09-25.** Distribute by physical closeness:
+people recently near you, same wifi, same cell, five to ten metres. Start with
+six — household, and someone at the office.
+
+It contains one of the strongest ideas in this document and one of the sharpest
+traps, and they are the same property seen from two sides.
+
+### What is right about it
+
+**Physical presence is expensive to forge.** An adversary can create a million
+identities for nothing. They cannot cheaply put a million devices in your
+kitchen. Of the few costly signals available without an authority to vouch for
+anyone, being somewhere is the best one.
+
+**It needs no server, no accounts, and no network.** Two phones at the same
+dinner table can exchange attestations directly. That makes the witness scheme
+work under the same conditions as the rest of Orb — offline, local-first,
+nothing to shut down — and it is why proximity belongs in the design at all.
+
+**The graph already exists.** People repeatedly near you are your family, your
+colleagues, your friends. Nothing has to be built to discover it.
+
+### What is wrong about it
+
+**Proximity selects against independence, which is the entire point of a
+witness.**
+
+A witness only helps if reaching them is a *separate act* from reaching you.
+People near you are, almost by definition, reachable the same way you are: one
+search of a home takes every phone in it; one demand to an employer reaches
+every device in the building; one flood takes the street.
+
+So the six become **two** — a household and an office — and if a single
+compromise spans both, fewer. The proposal maximises the *availability* of
+witnesses and minimises their *independence*. Those are opposite goals, and the
+design must choose knowingly rather than collect availability and assume it
+bought the other thing.
+
+### Three failures that follow
+
+**The distribution pattern is itself a tracking record.** If who holds your
+attestations follows who you were near, then that set *is* a location and
+association history — even with no payload ever leaving. "Her device attested
+his lane at 21:04" says they were together. Aggregated, that rebuilds precisely
+the surveillance Orb exists to replace, as a by-product of the privacy
+mechanism. It must be designed against deliberately; it will not avoid itself.
+
+**The signals are unequal and some are spoofable.** Same cell can mean
+kilometres. Same wifi can mean a café of strangers. Received signal strength is
+noisy and an adversary can simply raise transmit power to appear close. Only a
+**mutual handshake** — both sides transmitting and receiving — costs an attacker
+anything, and even that is not proof of distance, only evidence of it.
+
+**Flooding.** If nearness enrols automatically, an adversary who wants your
+witness set diluted parks devices near you, becomes most of it, and then goes
+silent together. The count looks healthy and is worth nothing. This is §5's
+silent-witness failure, caused on purpose rather than by accident.
+
+### The resolution: separate the transport from the trust
+
+Proximity is an excellent way for attestations to **travel**. It is a poor way
+to decide who **counts**. Keep the first, refuse the second.
+
+| | Who they are | What they are for | Counts toward K? |
+| --- | --- | --- | --- |
+| **Named witnesses** | Chosen deliberately; ideally distant, and unconnected to each other | Tamper-evidence | **Yes** |
+| **Proximity peers** | Whoever is actually nearby | Redundancy, freshness, and moving bytes with no network | **No** |
+
+Both are useful and they are not the same thing. A cousin in another city is a
+better witness than the colleague at the next desk, for exactly the reason that
+makes the colleague easier to reach.
+
+### What this does to the count — the next step past AD-6
+
+AD-6 established that Orb counts **devices** where it should count **keys**.
+This proposal exposes the step after: counting keys is also not enough. Six keys
+in two buildings is two.
+
+The quantity that actually resists collusion is **unconnected groups**. And the
+honest part: software cannot measure that. It can count devices. It can count
+keys once AD-6 is paid down. It cannot know whether two people share a home, an
+employer, or a jurisdiction.
+
+So the design must **ask the user to declare it** rather than pretend to infer
+it — and a declared group is a claim by the user, carrying the user's
+confidence, not a fact the system established. That is Art. XI §43 applied to
+the user's own assertions about their social graph.
+
+---
+
 ## 7. Why this is not a server, and why that is the point
 
 The ordinary solution is to put the log on a company's server. Then the company
@@ -175,6 +268,13 @@ exchange that carries them are built and tested.
 3. **W0/W1 as policies.** The ladder above stops at W2; the cheap rungs, which
    are the ones a person would actually stand on, are not expressible.
 4. **Witness liveness.** §5.
+5. **A proximity transport.** `SyncPeer` is a port, so a Bluetooth or
+   wifi-direct exchange is an implementation of something that already exists
+   rather than a new concept — which is the port earning its keep. Nothing
+   implements it yet.
+6. **The two tiers.** §6a. Named witnesses count toward K; proximity peers do
+   not. Neither distinction is expressible today, and a design that stored them
+   in one list would quietly make every nearby stranger a witness.
 
 ---
 
@@ -183,9 +283,13 @@ exchange that carries them are built and tested.
 1. **Which rung is the default?** W1 is far more useful for diagnosis and leaks
    volume. W0 leaks almost nothing and can only say *something changed*. This is
    a privacy call, not an engineering one.
-2. **What is K, and how are witnesses chosen?** The design can enforce a number.
-   It cannot enforce unconnectedness, and pretending otherwise would be false
-   assurance.
+2. **~~What is K, and how are witnesses chosen?~~** *Largely answered by §6a,
+   2026-09-25.* Proximity carries attestations; people choose witnesses; the
+   count that matters is unconnected groups, which the user declares because no
+   software can observe it. What remains open is narrower: **how many groups,
+   and does Orb refuse to make a tamper-evidence claim below that number?** A
+   system that silently claims less than it implies is the failure this whole
+   document exists to avoid.
 3. **Does a witness learn it is a witness?** A silent installation protects the
    witness from being asked what they hold. Telling them respects their
    autonomy. These pull against each other and the answer is the user's.
@@ -201,3 +305,8 @@ is also what makes `CLAIMS.md` C2c runnable. The witness attestation is a small
 addition once a key can be named; the ladder is smaller still. The social
 design — who, how many, told or not — is the part that will take longest and is
 not code.
+
+The proximity transport is deliberately **last**, despite being the most
+interesting to build. An exchange that works perfectly while the count it feeds
+is meaningless would be a well-engineered wrong answer, and it would be hard to
+walk back once people had it installed.
