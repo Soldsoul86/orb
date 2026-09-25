@@ -27,6 +27,14 @@ back refuted.
 
 ---
 
+`THREAT_MODEL.md` states what Orb is *for* — the harms it must prevent. This
+document states what it must be able to *demonstrate*. The two are different
+questions and a mechanism can satisfy one without the other: R5 there, machine-
+verifiable proofs over a committed record, has no claim here yet, because
+nothing is built to test.
+
+---
+
 ## 1. What makes a claim a test rather than a demonstration
 
 Four rules. A claim that fails any of them is not ready to run.

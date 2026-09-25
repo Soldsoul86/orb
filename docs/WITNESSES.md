@@ -233,6 +233,29 @@ the user's own assertions about their social graph.
 
 ---
 
+## 6b. Witnesses are also what makes a proof mean anything
+
+*Added 2026-09-25, from `THREAT_MODEL.md` §6.*
+
+This document motivates witnesses by tamper-detection: C2c, the key holder who
+truncates their own tail. A second use arrived from an unrelated direction and
+is at least as important.
+
+A proof *about* a record — "no event of this kind occurred in this window" —
+requires committing to **which** record. Without that anchor, a favourable
+record is constructed after the fact and proofs are made about that instead.
+
+The commitment is a head hash at a point in time, which is precisely what a
+witness attestation already is. So a witness is not only the party who notices a
+truncation; it is **what pins a record to a past its owner could not have edited
+afterwards**, and therefore the precondition for the owner being able to answer
+an accusation without opening everything.
+
+That raises the stakes on the freshness property in §6a: a proof can only speak
+about a record as recently anchored as the last attestation.
+
+---
+
 ## 7. Why this is not a server, and why that is the point
 
 The ordinary solution is to put the log on a company's server. Then the company

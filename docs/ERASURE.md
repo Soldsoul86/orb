@@ -193,6 +193,13 @@ erased."* That is information, it is permanent, and no future feature will take
 it away. §9.3 records the one lever that could narrow it without breaking this
 ruling.
 
+**And a second cost, found later and recorded here rather than moved.** Shape
+implicates; content exonerates. E1 destroys content and this ruling makes shape
+permanent, so **an erasure removes the owner's defence and leaves the accusation
+standing.** Erasure is therefore not a neutral safety action — it is a choice
+about which adversary is being defended against, protective against a reader and
+costly in front of an accuser. `THREAT_MODEL.md` §3 and §5.
+
 ---
 
 ## 2a. What "cannot be decoded" requires
