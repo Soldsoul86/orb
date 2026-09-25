@@ -194,10 +194,79 @@ the same defect as counting devices where keys are meant, and counting keys
 where unconnected groups are meant — now logged as one entry, AD-6, because
 fixing them separately would encode one mistake three times.
 
-The other genuinely absent piece is **hardware attestation**: evidence that a
-reading came from a real sensor on an unmodified device. It raises the cost of
-software spoofing and does nothing about physical spoofing. No contract covers
-it.
+The other genuinely absent piece is **hardware attestation** — see §7a, which
+also corrects the sentence this one used to carry.
+
+### 7a. Hardware attestation — what it proves, and what it must never be
+
+**PROPOSAL, 2026-09-25.** Nothing built. Availability and behaviour are device
+questions, not facts asserted here.
+
+**What Android key attestation actually asserts.** A key generated in the TEE or
+StrongBox yields a certificate chain stating that the key **lives in hardware
+and cannot be exported**, the **verified boot state** (bootloader locked, boot
+verified, OS version, patch level), and **which app owns it** (package name and
+signing certificate).
+
+**What it does not assert, and this is the part that gets assumed.** Nothing
+about any sensor. Readings travel sensor → kernel → framework → app and no step
+in that path is signed. Attestation cannot say a location fix came from a real
+GPS.
+
+What it gives instead is *transitive inference*: with verified boot and a locked
+bootloader, the OS is unmodified, so injecting a false reading needs either
+developer settings — themselves observable — or an actual compromise. That is a
+meaningful raise in cost. **It is not a signed statement from the sensor and must
+never be recorded as one.**
+
+#### It is an Observation, never a root of trust
+
+The attestation chain roots in a vendor certificate. Art. VIII §30 says the user
+is the root of trust, never a server or provider, and `CLAUDE.md` forbids vendor
+lock-in. The tension is real, and the resolution is to give attestation no
+special status at all:
+
+> An attestation is an **Observation like any other** — its own source identity,
+> its own Confidence of Reality, weighed by a reader like any other signal. Orb
+> records what the device asserted. It stakes nothing on that assertion being
+> true.
+
+The vendor dependency then belongs to whoever chooses to *verify* the chain, not
+to Orb, and nothing in the architecture rests on it. Any design that promotes an
+attestation above other evidence — treating it as settling a question rather
+than informing one — has reintroduced a provider as root of trust by the back
+door, and should be read as a defect.
+
+**It is also a genuinely independent source.** The TEE is a different trust
+domain from the process asking it, which is the scarce property AD-6 is about.
+An attested claim corroborating an app-level one is worth more than two
+app-level claims agreeing.
+
+#### The strongest use is not sensor provenance
+
+Put the **lane's signing key in StrongBox and attest it.**
+
+A truncate-and-re-sign then requires physical possession of that device, because
+the key cannot be lifted and used elsewhere. With a rollback-resistant counter
+(`ERASURE.md` §2a) this narrows `CLAIMS.md` C2c without a witness at all.
+
+More usefully: attestation is **what lets someone else believe the key is where
+its owner says it is.** Unattested, *"my key is in secure hardware"* is a claim.
+Attested, it is checkable — which is the step that makes §2a mean anything to
+anyone but the owner.
+
+#### Limits, so this is not oversold
+
+- **Physical spoofing is untouched.** A camera pointed at a screen, or a GPS
+  simulator beside the phone: attestation says *genuine sensor, genuine device*,
+  and the genuine sensor faithfully reports a fake world. §7, again.
+- **Verified boot green is not "uncompromised."** It means nothing was detected.
+- **Attestation keys have been extracted from devices before.** This raises the
+  cost of forgery; it does not remove it, and no claim here should imply it does.
+- **Availability varies** by device, OEM and patch level. StrongBox is not
+  universal.
+
+---
 
 ### Why Orb should not try to prove truth
 

@@ -239,6 +239,21 @@ also the only way §6's "erasure is local" stops being a serious limitation: the
 witness who holds an envelope, the peer who holds a payload, and the backup on
 a drive in a cupboard all hold something that no longer decodes.
 
+### What makes this checkable by anyone but the owner
+
+Per-event keys give the owner erasure. They do not, on their own, give anyone
+else a reason to believe the keys were ever where the owner says.
+
+**Hardware attestation is that step** (`THREAT_MODEL.md` §7a): a lane key held
+in StrongBox and named by an attestation turns *"my key is in secure hardware"*
+from a claim into something a reader can check — and makes a truncate-and-re-sign
+require physical possession of the device. Recorded as device predictions P8 and
+P11 rather than assumed, because nothing has tested either on this hardware.
+
+Attestation stays an Observation with its own confidence, never a root of trust;
+a design that let it settle a question rather than inform one would have put a
+vendor back at the root by the back door.
+
 ### The property worth naming
 
 **A key that no longer exists cannot be produced under compulsion.**

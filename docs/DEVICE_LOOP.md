@@ -140,6 +140,13 @@ answering before anything is ever handed to someone else.
 
 ### Pass 2 — is the capability map accurate?
 
+P10 and P11 are recorded here before anything can test them, because
+`THREAT_MODEL.md` §7a rests on assumptions about this device that nobody has
+checked. An unchecked assumption written as a prediction is honest; the same
+assumption written as a fact is not. Both need the instrument to change, so
+neither moves while pass 1 runs (§7 R4).
+
+
 **P5 — `AdvancedProtectionManager.isAdvancedProtectionEnabled` is readable on
 Android 16 with `QUERY_ADVANCED_PROTECTION_MODE`.** Settles the hedge in §4.4.
 
@@ -151,7 +158,33 @@ features (§5) costs one deliberate user action or is unavailable.
 carrying `RootOfTrust` with `deviceLocked` and `verifiedBootState`, verifiable
 against a pinned root with no network call. This is the substitute for Play
 Integrity in `MOBILE_SENSING.md` §9.2; if it does not work here, that row is
-wrong.
+wrong. It is also the prediction `THREAT_MODEL.md` §7a rests on: that section
+describes what attestation asserts, and nothing has checked it on this device.
+
+**P10 — Android Protected Confirmation works on this device.** The TEE signs a
+statement that a human confirmed *specific text* on a display the app cannot
+draw over.
+*If true:* the consent gate in `CLAIMS.md` C1 becomes hardware-backed, and two
+of its six routes close outright — **A4** (approve a dry run, then change an
+argument) and **A5** (batch into a moment of inattention) — because the signature
+commits to the bytes actually shown. A better answer to `THREAT_MODEL.md` R5
+than sensor attestation, and the attestation-adjacent capability worth chasing
+first.
+*If false:* consent stays an app-level dialog that anything with the same
+privileges can draw over, and C1 narrows to what software can promise itself.
+*Recorded as a question, not a fact.* Believed available from API 28 with patchy
+support — believed is not measured, which is what this loop is for.
+
+**P11 — the journal's signing key can live in StrongBox on this device, and P8's
+attestation can name it.**
+*If true:* a truncate-and-re-sign needs physical possession of the device, and —
+the part that matters — *someone else can check that*, which is what makes
+`ERASURE.md` §2a mean anything to anyone but the owner. Unattested, "my key is
+in secure hardware" is a claim; attested, it is checkable.
+*If false:* key custody is a claim the owner makes about themselves, and
+`CLAIMS.md` C2c depends entirely on witnesses.
+*Distinct from P8:* that one asks whether a chain verifies offline; this asks
+whether the key the journal actually signs with can be the attested one.
 
 ### Pass 3 — does the architecture hold across devices?
 
