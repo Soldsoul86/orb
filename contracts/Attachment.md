@@ -145,3 +145,38 @@ resolution with bytes that do not match the requested hash.
 - **Tamper check.** A backup process flips a bit in a stored blob; on next
   resolution the re-hash mismatches, the blob is treated as corrupt, and an intact
   copy is re-replicated from a peer.
+
+---
+
+## 9. Open — non-normative
+
+Nothing in this section is part of the contract. It records two questions this
+contract does not answer, raised 2026-09-25 and set out in full in
+`docs/ERASURE.md` §2c. **Both need answering before the first implementation,**
+because §5 freezes content-addressing deliberately and a kernel contract is the
+wrong thing to amend afterwards.
+
+1. **Erasure is not mentioned by any invariant above.** The operator's erasure
+   ruling is implemented as *destroy the payload key* (`ERASURE.md` §2a). An
+   Attachment is not payload: it is a separate blob under separate encryption,
+   so a photograph outlives the erasure of the Observation that carried it — §1
+   says it persists *"for the life of the journal"*, which is right for
+   continuity and wrong for erasure. §2c sets out three shapes and recommends a
+   per-Attachment key destroyed with the last reference, which keeps inv. 2.
+   Whatever is chosen, `ERASURE.md` §2a's rule applies: **keys are stored, never
+   derived** — a derived key is re-derivable, so destroying it destroys nothing.
+
+2. **Inv. 2's deduplication is a confirmation oracle.** *Identical content yields
+   one identity* is what lets a holder of any file test whether this device has
+   it, with no key and no bytes — the same capability the payload nonce closed
+   (`ERASURE.md` §2a). Weaker here, because the bytes are high-entropy and
+   cannot be guessed; not absent, because the interesting query names a file the
+   asker already holds. The payload fix does not transfer: a nonce would destroy
+   inv. 2, and here deduplication is load-bearing (`PARTIAL_REPLICATION.md`
+   §228).
+
+Related and smaller: inv. 6 lets an Attachment be *"momentarily unavailable"*
+with no reason recorded. Events had the same gap and it was closed with
+`AbsenceReason` (`ERASURE.md` §7), because *never fetched*, *dropped for space*
+and *destroyed by the owner* are three different answers — and a peer that
+confuses them helpfully restores content its owner destroyed.

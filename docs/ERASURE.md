@@ -4,6 +4,12 @@
 permanent prohibition on E2/E3 (§2), the coarse envelope type, and the coarse
 vocabulary (both §2b). The rest is a PROPOSAL.** §9 carries what is still open.
 
+**Two gaps are open and both are in Attachments (§2c, questions 5 and 6).**
+Erasure destroys a payload key, and an Attachment is not payload — so a
+photograph outlives the erasure of the entry that carried it. The ruling is
+delivered for `{"beat": 47}` and not for the content it was made for. Nothing
+implements Attachments yet, which is why now is when to answer it.
+
 **§2a and §2b are now IMPLEMENTED** in `runtime/journal` as envelope v2: the
 coarse type and schema, stated lineage moved into the payload, per-event nonces,
 and per-event keys. `tests/coarse-envelope.test.ts` pins what the migration
@@ -430,7 +436,15 @@ blobs rather than `{"beat": 1}` — guessing them at random is hopeless. It is n
 absent, because the interesting query is not random: *does this device hold this
 particular file?* A known document, a known image, a known recording is
 confirmable by hash by anyone holding the reference, with no key and no bytes.
-And §6 means the reference is on every device that replicated the envelope.
+
+**Corrected 2026-09-25, same day.** This first said the reference is on every
+device that replicated the envelope. It is not. A reference *"enters history as
+an Event"* (`Attachment.md` §1) — so it is payload, which §2b sealed and
+encrypted. A witness holding envelopes never sees an Attachment hash. The
+exposure needs someone who can read the **Attachment store itself**: the device,
+a backup, or a peer that syncs attachments. Narrower than stated, and still
+real, because a content-addressed store is a list of content hashes by
+construction — encrypting the bytes does not hide the addresses.
 
 Three reasons this is worth raising now rather than when Attachments are built:
 
@@ -649,6 +663,104 @@ rediscovered as a bug.
 **This changes a kernel contract.** `Event.md` and `EVENT_MODEL.md` define the
 envelope, and the type field's meaning changes for every Event in the system.
 That edit is not made here; it is named so it is not discovered later.
+
+---
+
+## 2c. Erasure does not reach Attachments
+
+**Found 2026-09-25, while correcting §2a. Not ruled — this is question 6.**
+
+The ruling was *"all these proofs are mine, I should be able to erase it."* For
+anything carrying a photograph, a recording or a voice note, the implementation
+does not deliver it, and the contract as written says it never will.
+
+### The gap
+
+Erasure destroys the **payload key** (§2a). An Attachment is not payload. It is a
+separate blob, in a separate store, under separate encryption
+(`Attachment.md` inv. 4), referenced from the payload by content hash.
+
+So erasing an event destroys the record's own account of itself and leaves the
+attached bytes untouched. `Attachment.md` §1 is explicit about how long they
+stay:
+
+> *The Attachment persists, encrypted, for as long as anything references it
+> (and, by default, for the life of the journal — continuity is the product).*
+
+The diary entry becomes unreadable; the photograph stapled to it stays in the
+drawer, for the life of the journal, by default and by contract.
+
+**This is where the sensitive material actually is.** Nobody is coerced over
+`{"beat": 47}`. The ruling is delivered for exactly the content nobody needed it
+for, and not delivered for the content it was made for.
+
+`Attachment.md` carries six invariants and none of them mentions erasure,
+deletion or destruction. This is not a conflict between two rules — it is a rule
+that was never written.
+
+### A second gap, already solved once
+
+Inv. 6 says an Attachment *"may be momentarily unavailable on a device without
+invalidating the history that references it."* Unavailable, with no reason
+recorded, and "momentarily" doing work it cannot do.
+
+That is precisely the defect fixed for events in §7 — `AbsenceReason`, where
+*never fetched*, *dropped for space* and *destroyed by the owner* are three
+different answers and a peer that confuses them restores content its owner
+destroyed. Attachments need the same distinction, for the same reason, and a
+helpful peer re-offering an erased photograph is the exact failure it prevents.
+
+### Three shapes, and what each costs
+
+| | What erasure destroys | Deduplication (inv. 2) | Delivers the ruling |
+| --- | --- | --- | --- |
+| **A. Share the event's payload key** | Key dies, blob is inert | **Lost** — one photo under two keys is two blobs | Yes |
+| **B. Per-attachment key, destroyed with the last reference** | Key dies when nothing points at it | **Kept** — one blob, one key, many references | Yes, with a caveat |
+| **C. Attachments are not erasable** | Only the reference | Kept | **No** |
+
+**A** is the simplest and it is wrong here. Deduplication is load-bearing for
+heavy bytes — `PARTIAL_REPLICATION.md` §228 leans on it to make high-rate signal
+affordable at all — and A trades the thing that makes attachments viable for a
+property B also delivers.
+
+**C** is honest and contradicts the ruling. Named so it is not arrived at by
+default, which is what happens today.
+
+**B is the recommendation.** It is the same mechanism §2a already chose — destroy
+a key, not bytes — applied one layer down, and the reference count is a
+projection over history rather than a stored set, so it adds no second source of
+truth (Art. IX §33).
+
+### The caveat B carries, which the owner must be told
+
+Under B, erasing one event does **not** destroy an attachment another event still
+references. That is correct behaviour and it is not what "erase this" sounds
+like.
+
+> **You can only erase content that nothing else of yours still points at.**
+
+This belongs in the preview (§1) as a D-point, beside the existing eight: *this
+erasure will not remove the attached photograph, because N other entries still
+reference it — here they are.* Silence here would be a declared erasure that did
+not happen, which is the deception this document exists to prevent.
+
+And §6 still applies underneath: a peer holding the blob holds it. What dies is
+the key, everywhere at once.
+
+### What this requires of the Attachment contract
+
+`Attachment.md` is a **permanent kernel contract** and says so deliberately, to
+stop content-addressing being revised as an implementation detail. That is the
+right call and it is exactly why this cannot wait: nothing implements Attachments
+today — the name appears in `runtime/journal` only as precedent in comments — so
+there is no store, no resolver and no key scheme to migrate. The cost of
+answering now is a paragraph. The cost of answering later is amending a contract
+whose whole purpose is not being amendable.
+
+Whichever shape is chosen needs, at minimum: a seventh invariant naming erasure,
+an absence reason on inv. 6, and §2a's rule that **keys are stored, never
+derived** restated for attachment keys — a derived key is re-derivable, and
+destroying it destroys nothing.
 
 ---
 
@@ -980,6 +1092,17 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    coarse type in the envelope, real type inside the payload.** See §2b.
 4. ~~**What is the coarse vocabulary?**~~ **Ruled 2026-09-25: bookkeeping keeps
    its real names; everything else gets one label.** See §2b.
+6. **Erasure does not reach Attachments — what should it do?** Raised
+   2026-09-25. Erasure destroys the payload key; an Attachment is a separate
+   blob under separate encryption, so a photograph outlives the erasure of the
+   entry that carried it — by contract, *"for the life of the journal"*.
+   `Attachment.md` has six invariants and none mentions erasure. **This is the
+   ruling failing for exactly the content it was made for.** Three shapes are
+   set out in §2c with the recommendation (per-attachment key, destroyed with
+   the last reference) and the caveat the owner must be shown (you can only
+   erase what nothing else of yours points at). Needed before the first
+   Attachment implementation — a kernel contract is the wrong thing to amend
+   later. See §2c.
 5. **Does `Attachment`'s content-addressing keep the confirmation oracle the
    payload nonce just closed?** Raised 2026-09-25, from writing up the
    deduplication cost in §2a. Deduplication by hash and the oracle are the same
