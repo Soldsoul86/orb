@@ -46,7 +46,27 @@ export type { CustodyReceipt, HeldCustody } from "./custody.js";
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";
 
-export type { JournalStore } from "./store.js";
+export {
+  SYNC_POLICY_TYPE,
+  SYNC_POLICY_SCHEMA,
+  pullFrom,
+  exchange,
+  LocalSyncPeer,
+  holdEverything,
+  holdNothing,
+  holdSince,
+  holdTypes,
+} from "./sync.js";
+export type {
+  SyncPeer,
+  LaneWatermark,
+  PayloadPolicy,
+  SyncRound,
+  SyncResult,
+  SyncPolicyRecord,
+} from "./sync.js";
+
+export type { JournalStore, PayloadRecord } from "./store.js";
 export { MemoryJournalStore } from "./store.js";
 export { FileJournalStore } from "./file-store.js";
 

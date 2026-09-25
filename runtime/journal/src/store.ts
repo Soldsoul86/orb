@@ -12,8 +12,13 @@ export interface JournalStore {
   /**
    * Appends events to `lane` in the given order. Must be atomic per call and
    * durable before resolving: the journal treats a resolved append as history.
+   *
+   * Takes `StoredEvent`, not `OrbEvent`, because replication legitimately
+   * delivers envelopes whose payloads this device will not hold. Narrowing this
+   * to `OrbEvent` makes a partial replica silently discard the history it was
+   * sent, which is the worst failure this package has.
    */
-  append(lane: LaneId, events: readonly OrbEvent[]): Promise<void>;
+  append(lane: LaneId, events: readonly StoredEvent[]): Promise<void>;
   /**
    * Every event in `lane`, in append order.
    *
@@ -37,8 +42,28 @@ export interface JournalStore {
    * @returns how many payloads were actually dropped.
    */
   detach(lane: LaneId, eventIds: readonly string[]): Promise<number>;
+  /**
+   * Restores payloads this device had dropped, or never fetched.
+   *
+   * The inverse of `detach`, and the arrival path for a payload pulled back
+   * from a peer. The journal verifies each payload against the hash its
+   * envelope commits to before calling this, so a store never has to trust the
+   * source — that check is what lets a payload come from anywhere.
+   *
+   * Events not present in the lane are ignored: a payload for an event whose
+   * envelope has not arrived yet is not history, it is noise.
+   *
+   * @returns how many payloads were actually restored.
+   */
+  attach(lane: LaneId, payloads: readonly PayloadRecord[]): Promise<number>;
   /** Releases any held resources. Appends after `close` are errors. */
   close(): Promise<void>;
+}
+
+/** A payload travelling on its own, identified by the event it belongs to. */
+export interface PayloadRecord {
+  readonly eventId: string;
+  readonly payload: unknown;
 }
 
 /** In-memory store. Loses history on exit — for tests and ephemeral runtimes. */
@@ -46,7 +71,7 @@ export class MemoryJournalStore implements JournalStore {
   readonly #lanes = new Map<LaneId, StoredEvent[]>();
   #closed = false;
 
-  async append(lane: LaneId, events: readonly OrbEvent[]): Promise<void> {
+  async append(lane: LaneId, events: readonly StoredEvent[]): Promise<void> {
     if (this.#closed) throw new Error("journal store is closed");
     const existing = this.#lanes.get(lane);
     if (existing) existing.push(...events);
@@ -79,6 +104,25 @@ export class MemoryJournalStore implements JournalStore {
     }
 
     return dropped;
+  }
+
+  async attach(lane: LaneId, payloads: readonly PayloadRecord[]): Promise<number> {
+    if (this.#closed) throw new Error("journal store is closed");
+    const events = this.#lanes.get(lane);
+    if (!events) return 0;
+
+    const incoming = new Map(payloads.map((record) => [record.eventId, record.payload]));
+    let restored = 0;
+
+    for (const [index, event] of events.entries()) {
+      if (event.payload !== undefined) continue;
+      const payload = incoming.get(event.id);
+      if (payload === undefined) continue;
+      events[index] = { ...event, payload };
+      restored += 1;
+    }
+
+    return restored;
   }
 
   async close(): Promise<void> {

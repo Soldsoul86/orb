@@ -303,20 +303,32 @@ canonical preimage**, so any lane written before it will not verify — see
 history yet; after it does, the same change would have required `Event v2`
 alongside v1 under Art. X §38.
 
-**Not built, and deliberately so:**
+Invariants 1 and 6 landed with the sync port (`runtime/journal/src/sync.ts`,
+18 tests in `tests/sync.test.ts`):
 
-- **Invariant 1 (emission completeness)** and **6 (journaled policy)** — both
-  need a sync implementation, and there is none in this repository yet. Until
-  sync exists, nothing prunes in production and the guard is the only thing that
-  matters.
+| §9 invariant | Where it lives |
+| --- | --- |
+| 1 — emission completeness | `Journal.tail` serves every envelope regardless of what this device retains; tested onward to a third device |
+| 6 — journaled policy | `PayloadPolicy.describe`, appended when the policy in force changes |
+
+That work also closed **fetch-on-demand**: a device skips envelope adoption for
+its own lane but still pulls payloads for it, which is how a pruned payload
+comes back. It is safe because the envelope is the device's own and already
+commits to the payload's hash.
+
+**Not built, and deliberately so:**
 - **Invariant 7 (no retention authority)** holds by construction: `detach` takes
   the calling device's own policy and no device can invoke another's.
 - **Tiers 2 and 3** (source-class policy; per-class payload keys so an exposed
   device carries ciphertext it cannot read). Tier 3 remains the strongest answer
   to §1 and the largest piece of new design; it should not be attempted before
   Tier 1 runs against real sync.
-- **Fetch-on-demand.** A dropped payload can be verified when it comes back
-  (`verifyPayload`), but nothing fetches it yet. That is a sync concern too.
+- **Transport, discovery, device identity, encryption.** All behind `SyncPeer`,
+  which is injected exactly as `JournalStore` is. `SECURITY.md` §10 defers cipher
+  suites to implementation time; adding them changes no semantics in `sync.ts`.
+- **Retention policy read *from* the journal.** The policy is recorded when it
+  changes; nothing yet reads it back to decide behaviour. That matters once a
+  policy is set remotely or varies over time.
 
 ---
 

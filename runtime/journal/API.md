@@ -148,3 +148,56 @@ interface EventDraft<Payload = unknown> {
 `JournalIntegrityError` — a broken hash chain, a non-increasing HLC within a
 lane, a write to a foreign lane, or a mismatched lane on replication. Carries a
 `detail` object naming the offending event.
+
+## Sync
+
+See `docs/SYNC_PROTOCOL.md` §4. Transport, discovery, identity and encryption
+live behind `SyncPeer` and are not implemented here.
+
+```ts
+interface SyncPeer {
+  readonly device: string;
+  advertise(): Promise<readonly LaneWatermark[]>;
+  tail(lane: LaneId, afterHash: string | null): Promise<readonly EventEnvelope[]>;
+  payloads(lane: LaneId, eventIds: readonly string[]): Promise<readonly PayloadRecord[]>;
+}
+```
+Every method is read-only with respect to the peer. A device never pushes into
+another device, which is what makes Art. IV §15 mechanical: nothing can write a
+lane it does not own because nothing writes remotely at all.
+
+```ts
+pullFrom(journal: Journal, peer: SyncPeer, policy: PayloadPolicy): Promise<SyncResult>
+exchange(a, aPolicy, b, bPolicy): Promise<readonly [SyncResult, SyncResult]>
+```
+One direction, then both. Envelopes are accepted and verified before any payload
+is requested, so a payload always arrives to an envelope that already commits to
+its hash and can reject it.
+
+A device skips envelope adoption for its **own** lane — it is the writer — but
+still fetches payloads for it. That is the recovery path for a payload it
+pruned, and it is safe because the envelope is its own.
+
+```ts
+holdEverything() | holdNothing() | holdSince(ms) | holdTypes([...])
+```
+`PayloadPolicy` decides which payloads this device holds. It is the device's own
+decision; no other device consults it (inv. 7). `describe` is journaled when the
+policy changes (inv. 6), so a horizon can be explained later.
+
+```ts
+advertise(): Promise<readonly LaneWatermark[]>
+tail(lane, afterHash): Promise<readonly EventEnvelope[]>
+payloads(lane, eventIds): Promise<readonly PayloadRecord[]>
+attach(lane, payloads): Promise<number>
+```
+`Journal`'s side of the same port. `tail` never withholds — inv. 1, partiality is
+about retention, never emission. `attach` verifies every payload against its
+envelope before storing and throws `JournalIntegrityError` otherwise.
+
+### Convergence
+
+A round is **returned, not journaled**. What gets appended is the policy when it
+changes, and custody that advanced over at least one non-bookkeeping event.
+Without that second condition sync never settles: each round would replicate the
+last round's records and record that it had done so, forever.

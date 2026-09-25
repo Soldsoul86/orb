@@ -55,3 +55,11 @@ knows exactly what it is missing rather than answering as though nothing were.
 
 `fold` and `replay` therefore return a `BoundedFold`: the state plus whether it
 was complete and which events were skipped. See `docs/PARTIAL_REPLICATION.md`.
+
+## Sync
+
+`pullFrom` and `exchange` implement `docs/SYNC_PROTOCOL.md` §4 over an injected
+`SyncPeer`. Envelopes replicate in full regardless of what the sender retains;
+payloads are pulled afterwards, only for what the receiving device's own
+`PayloadPolicy` says it should hold. Transport, discovery, device identity and
+encryption are deliberately absent and live behind the port.

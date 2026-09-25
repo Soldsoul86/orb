@@ -7,10 +7,11 @@
  */
 import { HybridLogicalClock, type Hlc, type PhysicalClock } from "./hlc.js";
 import { hashEvent, hashPayload, verifyLane } from "./integrity.js";
+import type { LaneWatermark } from "./sync.js";
 import { newEventId } from "./ids.js";
-import type { JournalStore } from "./store.js";
+import type { JournalStore, PayloadRecord } from "./store.js";
 import { MemoryJournalStore } from "./store.js";
-import type { EventDraft, LaneId, OrbEvent, StoredEvent } from "./types.js";
+import type { EventDraft, EventEnvelope, LaneId, OrbEvent, StoredEvent } from "./types.js";
 import { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
 import { latestCustody } from "./custody.js";
 import { evaluatePrune, type RetentionPolicy } from "./retention.js";
@@ -24,8 +25,14 @@ export interface JournalOptions {
   readonly now?: PhysicalClock;
 }
 
-/** Notified after events become durable. Listeners must not throw. */
-export type JournalListener = (events: readonly OrbEvent[]) => void;
+/**
+ * Notified after events become durable. Listeners must not throw.
+ *
+ * Receives `StoredEvent`: replicated history may arrive as envelopes whose
+ * payloads this device does not hold, and a listener that never saw those would
+ * be building a projection over a subset without knowing it.
+ */
+export type JournalListener = (events: readonly StoredEvent[]) => void;
 
 /** What one lane is missing on this device. */
 export interface LaneHorizon {
@@ -181,11 +188,11 @@ export class Journal {
     if (fresh.length === 0) return;
 
     verifyLane([...existing, ...fresh]);
-    await this.#store.append(lane, fresh.filter(hasPayload));
+    await this.#store.append(lane, fresh);
 
     const last = fresh.at(-1);
     if (last) this.#clock.merge(last.hlc);
-    for (const listener of this.#listeners) listener(fresh.filter(hasPayload));
+    for (const listener of this.#listeners) listener(fresh);
   }
 
   /** Every event in every lane, unordered. Use `replay` for ordered folding. */
@@ -278,6 +285,89 @@ export class Journal {
     }
 
     return this.#store.detach(lane, eventIds);
+  }
+
+  /**
+   * How far this device has seen in every lane it holds.
+   *
+   * The advertisement half of anti-entropy (`SYNC_PROTOCOL.md` §4.2). Because
+   * lanes are hash-chained and single-writer, a head hash names the gap
+   * unambiguously.
+   */
+  async advertise(): Promise<readonly LaneWatermark[]> {
+    const out: LaneWatermark[] = [];
+    for (const lane of await this.#store.lanes()) {
+      const events = await this.#store.read(lane);
+      out.push({ lane, head: events.at(-1)?.integrity.hash ?? null, count: events.length });
+    }
+    return out;
+  }
+
+  /**
+   * The envelopes in `lane` after `afterHash`, or the whole lane when it is null.
+   *
+   * Envelopes only, and never withheld: `PARTIAL_REPLICATION.md` §9 inv. 1 —
+   * partiality is about what a device *retains*, never about what it *emits*.
+   * A device is never the sole holder of anything it produced.
+   *
+   * An `afterHash` this device does not know yields nothing: the peer is ahead
+   * of us, or the chains diverge. Either way we have nothing to give, and the
+   * other direction of the exchange settles it.
+   */
+  async tail(lane: LaneId, afterHash: string | null): Promise<readonly EventEnvelope[]> {
+    const events = await this.#store.read(lane);
+    const envelopes = events.map((event) => {
+      const { payload: _payload, ...envelope } = event as OrbEvent;
+      return envelope;
+    });
+
+    if (afterHash === null) return envelopes;
+    const at = envelopes.findIndex((envelope) => envelope.integrity.hash === afterHash);
+    return at === -1 ? [] : envelopes.slice(at + 1);
+  }
+
+  /** The payloads this device actually holds, of those asked for. */
+  async payloads(lane: LaneId, eventIds: readonly string[]): Promise<readonly PayloadRecord[]> {
+    const wanted = new Set(eventIds);
+    const events = await this.#store.read(lane);
+    const out: PayloadRecord[] = [];
+
+    for (const event of events) {
+      if (!wanted.has(event.id) || !hasPayload(event)) continue;
+      out.push({ eventId: event.id, payload: event.payload });
+    }
+    return out;
+  }
+
+  /**
+   * Takes payloads back into this device, verifying each against history first.
+   *
+   * A payload is accepted only when it hashes to what its envelope already
+   * commits to, so it may come from a peer, a relay, or anywhere else without
+   * that source being trusted (`PARTIAL_REPLICATION.md` §3). Anything that does
+   * not match is rejected rather than stored and flagged.
+   *
+   * @throws {JournalIntegrityError} on the first payload that does not match.
+   */
+  async attach(lane: LaneId, payloads: readonly PayloadRecord[]): Promise<number> {
+    if (!this.#opened) throw new Error("journal is not open");
+    if (payloads.length === 0) return 0;
+
+    const events = await this.#store.read(lane);
+    const byId = new Map(events.map((event) => [event.id, event]));
+
+    for (const record of payloads) {
+      const event = byId.get(record.eventId);
+      if (!event) continue; // an envelope we have not replicated yet is not history here
+      if (hashPayload(record.payload) !== event.integrity.payloadHash) {
+        throw new JournalIntegrityError("payload does not match the hash its envelope commits to", {
+          lane,
+          eventId: record.eventId,
+        });
+      }
+    }
+
+    return this.#store.attach(lane, payloads);
   }
 
   /** Verifies every lane's hash chain. Throws on the first corruption found. */

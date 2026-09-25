@@ -9,7 +9,7 @@
  * read rather than repaired, because Art. I §2 forbids mutating history and a
  * partial line was never a complete event.
  *
- * `detach` is the one operation that rewrites a lane file. It is compaction in
+ * `detach` and `attach` are the operations that rewrite a lane file. Both are compaction in
  * the sense of `RUNTIME_LOOP.md` §13 — it drops payload bytes and keeps every
  * envelope, so the chain still verifies afterwards and nothing about any event's
  * identity, content or replayability changes (`contracts/Event.md` §2). The
@@ -19,7 +19,7 @@
 import { open, mkdir, readFile, readdir, rename, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
-import type { JournalStore } from "./store.js";
+import type { JournalStore, PayloadRecord } from "./store.js";
 import type { LaneId, OrbEvent, StoredEvent } from "./types.js";
 
 const LANE_FILE_SUFFIX = ".lane.jsonl";
@@ -56,7 +56,7 @@ export class FileJournalStore implements JournalStore {
     return handle;
   }
 
-  async append(lane: LaneId, events: readonly OrbEvent[]): Promise<void> {
+  async append(lane: LaneId, events: readonly StoredEvent[]): Promise<void> {
     if (this.#closed) throw new Error("journal store is closed");
     if (events.length === 0) return;
 
@@ -98,11 +98,44 @@ export class FileJournalStore implements JournalStore {
   }
 
   async detach(lane: LaneId, eventIds: readonly string[]): Promise<number> {
-    if (this.#closed) throw new Error("journal store is closed");
     if (eventIds.length === 0) return 0;
+    const wanted = new Set(eventIds);
+    return this.#rewrite(lane, (event) => {
+      if (!wanted.has(event.id) || event.payload === undefined) return event;
+      const { payload: _payload, ...envelope } = event as OrbEvent;
+      return envelope;
+    });
+  }
+
+  async attach(lane: LaneId, payloads: readonly PayloadRecord[]): Promise<number> {
+    if (payloads.length === 0) return 0;
+    const incoming = new Map(payloads.map((record) => [record.eventId, record.payload]));
+    return this.#rewrite(lane, (event) => {
+      if (event.payload !== undefined) return event;
+      const payload = incoming.get(event.id);
+      return payload === undefined ? event : { ...event, payload };
+    });
+  }
+
+  /**
+   * Rewrites a lane file through `transform`, atomically.
+   *
+   * Compaction in the sense of `RUNTIME_LOOP.md` §13: envelopes are preserved
+   * exactly, so the chain still verifies afterwards. The rewrite goes to a
+   * temporary file and is renamed into place, so a crash leaves either the old
+   * lane or the new one and never a half-written lane.
+   *
+   * Serialised behind the lane's write queue, because an append landing partway
+   * through a rewrite would be lost when the file is swapped.
+   */
+  async #rewrite(
+    lane: LaneId,
+    transform: (event: StoredEvent) => StoredEvent,
+  ): Promise<number> {
+    if (this.#closed) throw new Error("journal store is closed");
 
     const previous = this.#writeQueues.get(lane) ?? Promise.resolve();
-    const next = previous.then(() => this.#detachNow(lane, eventIds));
+    const next = previous.then(() => this.#rewriteNow(lane, transform));
     this.#writeQueues.set(
       lane,
       next.then(
@@ -113,18 +146,19 @@ export class FileJournalStore implements JournalStore {
     return next;
   }
 
-  async #detachNow(lane: LaneId, eventIds: readonly string[]): Promise<number> {
+  async #rewriteNow(
+    lane: LaneId,
+    transform: (event: StoredEvent) => StoredEvent,
+  ): Promise<number> {
     const events = await this.read(lane);
-    const wanted = new Set(eventIds);
-    let dropped = 0;
+    let changed = 0;
 
     const rewritten = events.map((event) => {
-      if (!wanted.has(event.id) || event.payload === undefined) return event;
-      const { payload: _payload, ...envelope } = event as OrbEvent;
-      dropped += 1;
-      return envelope;
+      const next = transform(event);
+      if (next !== event) changed += 1;
+      return next;
     });
-    if (dropped === 0) return 0;
+    if (changed === 0) return 0;
 
     const target = laneFile(this.#directory, lane);
     const temporary = `${target}.compacting`;
@@ -153,7 +187,7 @@ export class FileJournalStore implements JournalStore {
       throw error;
     }
 
-    return dropped;
+    return changed;
   }
 
   async lanes(): Promise<readonly LaneId[]> {

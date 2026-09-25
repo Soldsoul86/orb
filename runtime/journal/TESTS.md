@@ -77,3 +77,27 @@ horizon names exactly what is missing. A replay over a partial replica reports
 
 **Durability.** A compacted lane survives a reopen with the payload still gone,
 and a later append extends the compacted chain rather than forking it.
+
+## Sync — `tests/sync.test.ts`
+
+**Anti-entropy.** An exchange leaves both devices holding the union. Sync
+resumes from where it stopped rather than resending. A device never adopts a
+foreign copy of its own lane. The union verifies on both sides afterwards.
+
+**Convergence.** Bookkeeping is history and replicates, so a round settles on
+the second exchange — and must never provoke a third. Repeated exchanges move
+nothing and grow neither lane.
+
+**Emission vs retention.** A device holding no payloads still serves every
+envelope, including onward to a third device — inv. 1. A policy selects which
+payloads are held and the rest stay envelopes. A payload skipped under a narrow
+policy is picked up under a wider one. A peer offering a payload that does not
+match history is rejected, so no peer has to be trusted.
+
+**What is journaled.** The policy is recorded when it changes and not otherwise.
+Custody is claimed only for what is actually held, so a device that fetched
+nothing claims nothing.
+
+**The guard, live.** A phone may drop a payload once enough peers have fetched
+it, and not before. A peer that took envelopes only does not count as a holder.
+A dropped payload comes back from a peer that kept it.
