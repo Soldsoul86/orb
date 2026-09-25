@@ -1,9 +1,9 @@
 # Erasure — the right to delete, and the duty to say so
 
-**Status: three rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading and the
-permanent prohibition on E2/E3 (§2), and the coarse envelope type (§2b). The
-rest is a PROPOSAL.** Nothing here is implemented; §9 carries what is still
-open.
+**Status: four rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading and the
+permanent prohibition on E2/E3 (§2), the coarse envelope type, and the coarse
+vocabulary (both §2b). The rest is a PROPOSAL.** Nothing here is implemented;
+§9 carries what is still open.
 
 ---
 
@@ -249,21 +249,86 @@ Verified against the envelope (`runtime/journal/src/types.ts:52`):
 The wall clock stays as it is. It is inside the hash preimage and the HLC
 depends on it, so coarsening it is not available without a deeper change.
 
-### What the coarse vocabulary must satisfy
+### The vocabulary, ruled
 
-Not decided here (§9.4), but the constraints are fixed by code and by the
-Constitution:
+> **Bookkeeping events keep their real names. Everything else gets one label.**
+>
+> **Ruled 2026-09-25.**
 
-- **Bookkeeping must stay legible.** `isBookkeeping` (`sync.ts:128`) reads
-  `event.type` to tell custody receipts and sync policy from content, and sync
-  **cannot converge without it**. A witness holds no payloads at all, so it can
-  never decrypt to find out. Bookkeeping types are *about* history rather than
-  *of* a life, and must remain readable in the envelope.
-- **A principled basis already exists.** Art. XI §41 distinguishes Observations,
-  which originate from reality, from Events that record runtime activity — a
-  reasoning step, a plan, an issued Action. That is a distinction the envelope
-  can carry honestly without describing anyone's life, and it is a better basis
-  than a vocabulary invented for this purpose.
+Bookkeeping types stay exactly as they are — `orb.custody.receipt`,
+`orb.sync.policy`, and the erasure declaration and chain-discontinuity records
+still to be written. They are *about* the record rather than *of* a life, they
+disclose nothing under compulsion, and the sync layer cannot function without
+them: `isBookkeeping` (`sync.ts:128`) reads `event.type`, `latestCustody` needs
+receipts told from policy specifically, and **a witness holds no payloads ever**,
+so it can never decrypt to find out.
+
+Everything else — observation, inference, plan, issued Action, disclosure —
+carries a single type: **an event whose nature is inside the payload.**
+
+**Why the minimum rather than a richer split.** Every label is permanent under
+§2, so the choice is asymmetric: starting coarse stays reversible, because
+finer labels can begin later while the old prefix stays safely coarse. Starting
+fine is irreversible, because the events already written keep their labels and
+§2 forbids removing them. A survey of what reads `event.type` without the key
+found only bookkeeping on the list — so a three-way split (`observation` /
+`activity` / bookkeeping, following Art. XI §41) would spend an irreversible
+privacy budget on a distinction no current code consumes. If that changes, it
+can begin then.
+
+**Schema follows.** `schema` describes the payload, so it belongs with the
+payload. A content event's envelope carries only a schema for *"an encrypted
+payload"* — not for what is inside. Bookkeeping events keep their real schema,
+since peers parse them without decrypting. The envelope shape stays uniform and
+the leak closes at both fields.
+
+### What this costs, and why the operator accepted it
+
+An erased event becomes **completely uninterpretable**. Not "a health record was
+erased," not "an observation was erased" — only *something was here, at this
+time, and its content is gone.*
+
+That includes to the owner. There is no record of what was erased, and no undo.
+
+> *"This is perfectly alright, else someone will just try to erase and get the
+> summary."*
+> — the operator, 2026-09-25
+
+**This is the deciding argument, and it is stronger than the privacy one.** A
+record of what was erased is an **oracle**. It turns coercion into a two-step
+procedure: compel an erasure, then read the summary of what was erased. The
+mechanism for forgetting would become the most efficient way to interrogate.
+
+It is also the same object §5b already identified. A "what I erased" log and a
+suppression list are one thing under two names: a permanent record of exactly
+what the owner wanted forgotten. §5b ruled it unbuildable on privacy grounds;
+this rules it unwanted on adversarial grounds. Both point the same way.
+
+### The consequence for the erasure declaration itself
+
+The erasure declaration is **bookkeeping** — a peer must read it to know *"never
+send this again"* without decrypting anything. It is therefore legible.
+
+So it must carry **only a reference**: which envelope, by hash and position, and
+the fact of erasure. Never the type, never a summary, never a plain-text reason.
+A legible declaration that described its subject would reintroduce the oracle at
+exactly the point the ruling removes it.
+
+### The preview may be rich; the record must be bare
+
+§4 requires that the owner be shown what will be torn down *before* it is torn
+down. That preview is **ephemeral** — computed at the moment of decision, from
+data that still exists, shown once, never written to history.
+
+The distinction is the whole design:
+
+| | Preview | Record |
+| --- | --- | --- |
+| When | Before erasure, while the payloads still exist | After, forever |
+| Contains | Everything: types, content, blast radius, disclosures | A reference and a fact |
+| Survives | No | Yes |
+
+An implementation that journals the preview has built the oracle by accident.
 
 ### What this breaks
 
@@ -319,7 +384,7 @@ correctly on the owner's behalf, and each is checkable.
 | --- | --- | --- |
 | **D1** | A conclusion rests on the erased event **and others** | That it will survive rebuilding, and why. Then: keep it, erase it too, or keep it marked |
 | **D2** | A conclusion rests on the erased event **alone** | That it will disappear — stated, not silent, because the owner may not have known it existed |
-| **D3** | The blast radius is large | The full list of what will be torn down, before anything is torn down |
+| **D3** | The blast radius is large | The full list of what will be torn down, before anything is torn down — **shown, never journaled** (§2b) |
 | **D4** | Some of it was already disclosed | What left, when, to whom, and that it **cannot** be recalled |
 | **D5** | Peers hold copies | Which peers confirmed the erasure and which have not been seen |
 | **D6** | The pattern will re-derive from ongoing collection | That erasing the past does not stop the future — with the option to change the collection policy in the same breath |
@@ -356,6 +421,13 @@ which blocks exact reappearance without keeping the thing. It does nothing for
 patterns, because a pattern has no fixed content to hash.
 
 So the guarantee is not available. Orb should say so rather than imply otherwise.
+
+**And it would not be wanted even if it were available.** §2b: a suppression
+list and a record of what was erased are the same object under two names, and
+either one turns coercion into *compel an erasure, then read what it removed.*
+The privacy argument and the adversarial argument reach the same conclusion from
+opposite directions, which is the strongest kind of agreement a design decision
+can have.
 
 ### 5c. Erasing the past does not stop the future
 
@@ -445,8 +517,8 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    including its owner. See §2.
 3. ~~**Does the envelope have to be this legible?**~~ **Ruled 2026-09-25:
    coarse type in the envelope, real type inside the payload.** See §2b.
-4. **What is the coarse vocabulary?** *Open.* §2b names the constraints it must
-   satisfy and a candidate basis, but not the list itself.
+4. ~~**What is the coarse vocabulary?**~~ **Ruled 2026-09-25: bookkeeping keeps
+   its real names; everything else gets one label.** See §2b.
 
 ---
 
