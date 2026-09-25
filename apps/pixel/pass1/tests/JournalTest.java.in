@@ -1,0 +1,224 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Tests for the journal the phone actually writes.
+ *
+ * These exist because of `DEVICE_LOOP.md` section 5d. A defect in `restore()`
+ * -- reading a hex hash with the digits-only extractor -- forked the chain at
+ * every process restart, and nothing caught it until it ran on the operator's
+ * phone. The chain caught its own author, which is the strongest evidence this
+ * project has that the design works; it is also evidence that the instrument
+ * was shipped untested.
+ *
+ * The regression test for it is `restartsContinueTheChain`, and it is written
+ * to fail the way the phone failed: many restarts, so a hash beginning with a
+ * letter is certain to occur, because that is the only case in which the old
+ * defect bit.
+ */
+final class JournalTest {
+
+    static void run() throws IOException {
+        restartsContinueTheChain();
+        deletingAnEventIsDetected();
+        editingAHashIsDetected();
+        reorderingIsDetected();
+        editingAPayloadIsNotDetected();
+        everyBreakIsReported();
+        anUnreadableHeadIsDeclaredDiscontinuous();
+    }
+
+    /**
+     * The section 5d regression. Each cycle is a fresh `open()`, which is what a
+     * restarted process does; the chain must span all of them.
+     */
+    private static void restartsContinueTheChain() throws IOException {
+        Harness.suite("a restarted process continues the chain (section 5d)");
+        File dir = temp("restart");
+        boolean sawLetterLeadingHash = false;
+
+        for (int cycle = 0; cycle < 20; cycle++) {
+            Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+            Harness.check("cycle " + cycle + " opens continuous", !journal.discontinuous());
+            journal.append("probe.heartbeat", beat(cycle));
+            String head = hashOf(lastLine(dir));
+            if (!Character.isDigit(head.charAt(0))) sawLetterLeadingHash = true;
+        }
+
+        // Without this the suite could pass on a run where every hash happened to
+        // start with a digit -- the exact case the old defect survived.
+        Harness.check("exercised a hash beginning with a letter", sawLetterLeadingHash);
+
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        Harness.equal("chain verifies across 20 restarts", journal.verify(), "ok (20 events)");
+        Harness.equal("every event is present", journal.count(), 20);
+    }
+
+    private static void deletingAnEventIsDetected() throws IOException {
+        Harness.suite("a deleted event is detected");
+        File dir = temp("delete");
+        Journal journal = write(dir, 5);
+
+        List<String> lines = lines(dir);
+        lines.remove(2);
+        rewrite(dir, lines);
+
+        Harness.equal("the break is reported at the join",
+            journal.verify(), "1 break in 4 events, at line 2");
+    }
+
+    private static void editingAHashIsDetected() throws IOException {
+        Harness.suite("an edited hash is detected");
+        File dir = temp("edit-hash");
+        Journal journal = write(dir, 4);
+
+        List<String> lines = lines(dir);
+        String line = lines.get(1);
+        String hash = hashOf(line);
+        lines.set(1, line.replace("\"hash\":\"" + hash + "\"",
+            "\"hash\":\"" + hash.substring(0, 63) + (hash.endsWith("a") ? "b" : "a") + "\""));
+        rewrite(dir, lines);
+
+        // The edited line still links to its own predecessor; the line after it
+        // no longer links to the edited one. One edit, one break, at line 2.
+        Harness.equal("the break is reported after the edit",
+            journal.verify(), "1 break in 4 events, at line 2");
+    }
+
+    private static void reorderingIsDetected() throws IOException {
+        Harness.suite("reordering is detected");
+        File dir = temp("reorder");
+        Journal journal = write(dir, 4);
+
+        List<String> lines = lines(dir);
+        String second = lines.get(1);
+        lines.set(1, lines.get(2));
+        lines.set(2, second);
+        rewrite(dir, lines);
+
+        Harness.check("swapping two events breaks the chain",
+            !journal.verify().startsWith("ok"));
+    }
+
+    /**
+     * A limit, recorded as a passing assertion rather than left implicit.
+     *
+     * `verify()` compares each event's `previous` against the recorded hash of
+     * the line before it. It never recomputes a hash from the stored fields, so
+     * an edit that leaves the hash fields alone -- changing what an event says
+     * happened, while keeping the linkage intact -- passes.
+     *
+     * The chain as shipped is therefore evidence against deletion, insertion and
+     * reordering, and NOT against alteration in place. `CLAIMS.md` C2a must say
+     * so. Re-derivation needs a JSON parser the probe does not have, and adding
+     * one is an instrument change, which does not happen mid-run
+     * (`DEVICE_LOOP.md` section 7 R4).
+     */
+    private static void editingAPayloadIsNotDetected() throws IOException {
+        Harness.suite("an edited payload is NOT detected -- a stated limit");
+        File dir = temp("edit-payload");
+        Journal journal = write(dir, 3);
+
+        List<String> lines = lines(dir);
+        Harness.check("the fixture's payload is what we think it is",
+            lines.get(1).contains("\"beat\":1"));
+        lines.set(1, lines.get(1).replace("\"beat\":1", "\"beat\":9"));
+        rewrite(dir, lines);
+
+        Harness.equal("linkage still verifies, so the edit passes unseen",
+            journal.verify(), "ok (3 events)");
+        Harness.check("the altered value is what the journal now reports",
+            lines(dir).get(1).contains("\"beat\":9"));
+    }
+
+    private static void everyBreakIsReported() throws IOException {
+        Harness.suite("every break is reported, not just the first");
+        File dir = temp("breaks");
+        Journal journal = write(dir, 6);
+
+        List<String> lines = lines(dir);
+        lines.remove(4);
+        lines.remove(1);
+        rewrite(dir, lines);
+
+        // An earlier break must not hide a later one; that is when a hidden
+        // break matters most.
+        Harness.equal("both breaks are named",
+            journal.verify(), "2 breaks in 4 events, at lines 1, 3");
+    }
+
+    private static void anUnreadableHeadIsDeclaredDiscontinuous() throws IOException {
+        Harness.suite("a lane whose head cannot be read is declared discontinuous");
+        File dir = temp("discontinuous");
+        write(dir, 2);
+
+        List<String> lines = lines(dir);
+        lines.add("{\"this line has no hash\":true}");
+        rewrite(dir, lines);
+
+        // The trailing line has no hash, but an earlier one does: restore walks
+        // back and finds it, so this is continuous.
+        Journal recovered = Journal.open(new Context(dir), "pixel", "test-device");
+        Harness.check("a readable head further back is still a head",
+            !recovered.discontinuous());
+
+        rewrite(dir, List.of("{\"no hash here\":1}", "{\"nor here\":2}"));
+        Journal lost = Journal.open(new Context(dir), "pixel", "test-device");
+        Harness.check("no readable head anywhere is declared, not hidden",
+            lost.discontinuous());
+    }
+
+    // -- helpers ------------------------------------------------------------
+
+    private static Map<String, Object> beat(int n) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("beat", (long) n);
+        payload.put("service", "dataSync");
+        return payload;
+    }
+
+    private static Journal write(File dir, int events) throws IOException {
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        for (int i = 0; i < events; i++) journal.append("probe.heartbeat", beat(i));
+        return journal;
+    }
+
+    private static String hashOf(String line) {
+        int at = line.indexOf("\"hash\":\"") + 8;
+        return line.substring(at, line.indexOf('"', at));
+    }
+
+    private static File temp(String name) throws IOException {
+        Path dir = Files.createTempDirectory("orb-pass1-" + name);
+        dir.toFile().deleteOnExit();
+        return dir.toFile();
+    }
+
+    private static File lane(File dir) {
+        return new File(dir, "pixel.lane.jsonl");
+    }
+
+    private static List<String> lines(File dir) throws IOException {
+        return new ArrayList<>(Files.readAllLines(lane(dir).toPath(), StandardCharsets.UTF_8));
+    }
+
+    private static String lastLine(File dir) throws IOException {
+        List<String> lines = lines(dir);
+        return lines.get(lines.size() - 1);
+    }
+
+    private static void rewrite(File dir, List<String> lines) throws IOException {
+        StringBuilder out = new StringBuilder();
+        for (String line : lines) out.append(line).append('\n');
+        Files.write(lane(dir).toPath(), out.toString().getBytes(StandardCharsets.UTF_8));
+    }
+}

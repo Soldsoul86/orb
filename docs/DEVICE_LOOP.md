@@ -497,6 +497,53 @@ The next run's `lateByMs` and `skippedBeats` are its test.
 
 ---
 
+## 5g. Finding — the instrument was untested, and one comment was false
+
+**2026-09-25, off-device.** Not a device finding: the phone was untouched
+throughout, the pass-1 run continued, and nothing was rebuilt or reinstalled.
+
+The probe's Java had no automated tests. `runtime/journal` has 441; the code
+that actually decides what this project's history says had none, and the one
+silent data-corrupting defect found so far (§5d) was in it. That defect reached
+a real run and had to be caught by the hash chain rather than by a test.
+
+`apps/pixel/pass1/tests/run.sh` now runs the shipped sources on a desktop JVM —
+43 checks. `Journal` touches Android in exactly one place, a `Context` asked for
+a directory, so a fake `Context` on the test classpath runs `src/` unmodified.
+Nothing in `src/` is conditioned on being under test; what the tests exercise is
+what the phone runs.
+
+**The §5d regression test was verified by failing.** Reintroducing the defect in
+a scratch copy — `extract` in place of `extractString` — fails the suite in
+under a second. A regression test that has never failed pins nothing, which is
+rule R2 in `CLAIMS.md` applied to this project's own tests.
+
+### What the tests found, which is worth more than the tests
+
+`verify()` checks **linkage only**: each event's `previous` against the recorded
+hash of the line before it. It never re-derives a hash from the stored fields.
+
+So the chain as shipped is evidence against **deletion, insertion, reordering,
+and a forked restart** — which is exactly the class §5d fell into, so the §5d
+result stands unchanged. It is **not** evidence against **alteration in place**:
+an edit that changes what an event says happened, while leaving the hash fields
+alone, verifies clean. `JournalTest` asserts that as a passing test, so the
+limit is recorded rather than implicit.
+
+`verify()`'s own docstring claimed the opposite — that it "deliberately
+re-derives from the stored fields rather than trusting them". That comment was
+false, and a comment asserting a security property the code does not have is how
+the next reader re-derives the wrong conclusion. Corrected. `CLAIMS.md` C2a made
+the same overclaim and is corrected too.
+
+Re-derivation needs a JSON parser the probe does not have. It is not being added
+now (§7 R4), and the desktop analyser is the better home for it regardless: a
+chain checked only by the device that wrote it is the weaker check — the same
+argument that makes tail truncation undetectable single-device in `CLAIMS.md`
+C2c.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |
@@ -593,7 +640,6 @@ only exported once can lose everything to a single mistake.
    be found now rather than after a year of trusted history turned out to have
    holes in it.
 
----
 
 ## 9. The other loop
 

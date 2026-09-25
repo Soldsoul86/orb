@@ -1,0 +1,80 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * The cross-implementation vectors, run from the Java side.
+ *
+ * `runtime/journal/tests/vectors.test.ts` has always checked these from
+ * TypeScript. The Java half of the agreement was checked once, by hand, and
+ * then trusted -- which is the weaker half, because it is the half that runs on
+ * the device.
+ *
+ * A disagreement here would not surface as a wrong answer. It would surface as
+ * two devices that can never agree they hold the same history, long after the
+ * cause was introduced (`DEVICE_LOOP.md` section 7 R2).
+ *
+ * `Vectors` is generated from `tests/vectors.json` at test time, so the fixture
+ * stays the single source of truth for both implementations.
+ */
+final class JsonTest {
+
+    static void run() {
+        Harness.suite("canonical JSON matches the shared vectors");
+
+        Harness.equal("the payload encodes to the pinned canonical form",
+            Json.canonical(Vectors.payload()), Vectors.PAYLOAD_CANONICAL);
+
+        Harness.equal("the payload hashes to the pinned digest",
+            Journal.sha256(Json.canonical(Vectors.payload())), Vectors.PAYLOAD_HASH);
+
+        // Guards the fixture itself: a vector whose stated canonical form and
+        // stated hash disagree would pin nothing and still look like a pass.
+        Harness.equal("the fixture's own canonical form hashes to its digest",
+            Journal.sha256(Vectors.PAYLOAD_CANONICAL), Vectors.PAYLOAD_HASH);
+
+        Map<String, Object> preimage = Vectors.preimageInput();
+        preimage.put("payloadHash", Vectors.PAYLOAD_HASH);
+        Harness.equal("the event preimage hashes to the pinned digest",
+            Journal.sha256(Json.canonical(preimage)), Vectors.HASH);
+
+        Harness.suite("encoding edge cases the fixture does not reach");
+
+        Map<String, Object> sorted = Json.obj();
+        sorted.put("b", "second");
+        sorted.put("a", "first");
+        Harness.equal("keys sort regardless of insertion order",
+            Json.canonical(sorted), "{\"a\":\"first\",\"b\":\"second\"}");
+
+        Harness.equal("a null value is emitted, not dropped",
+            Json.canonical(nullValued()), "{\"previous\":null}");
+
+        Harness.equal("controls below 0x20 escape as \\u00xx",
+            Json.canonical("\u0001\u001f"), "\"\\u0001\\u001f\"");
+
+        Harness.equal("DEL and the C1 range stay raw, as JSON.stringify leaves them",
+            Json.canonical("\u007f\u0080"), "\"\u007f\u0080\"");
+
+        Harness.equal("a lone surrogate survives the encoder unaltered",
+            Json.canonical("\ud800").length(), 3);
+
+        Harness.equal("an astral codepoint stays raw",
+            Json.canonical("😀"), "\"😀\"");
+
+        Harness.equal("an empty object and an empty array",
+            Json.canonical(pair()), "{\"array\":[],\"object\":{}}");
+    }
+
+    private static Map<String, Object> nullValued() {
+        Map<String, Object> map = Json.obj();
+        map.put("previous", null);
+        return map;
+    }
+
+    private static Map<String, Object> pair() {
+        Map<String, Object> map = Json.obj();
+        map.put("object", Json.obj());
+        map.put("array", new java.util.ArrayList<>());
+        return map;
+    }
+}

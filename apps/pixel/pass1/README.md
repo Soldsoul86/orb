@@ -48,9 +48,34 @@ means what it measures is the platform.
 
 The encoding in `src/Json.java.in` is the one part that must match the
 TypeScript runtime byte for byte, and `tests/vectors.json` pins that agreement
-from both sides (`runtime/journal/tests/vectors.test.ts`). Two implementations
-that disagree would not produce a wrong answer; they would produce two devices
-that can never agree they hold the same history.
+from both sides (`runtime/journal/tests/vectors.test.ts`, and `tests/run.sh`
+below). Two implementations that disagree would not produce a wrong answer; they
+would produce two devices that can never agree they hold the same history.
+
+## Tests
+
+```sh
+./tests/run.sh        # needs a JDK and python3; no Android SDK, no Gradle
+```
+
+Runs `src/` on a desktop JVM. `Journal` touches Android in exactly one place — a
+`Context` asked for a directory — so a fake `Context` on the test classpath runs
+the shipped sources unmodified. Nothing in `src/` is conditioned on being under
+test, so what the tests exercise is what the phone runs. Nothing here is
+compiled into the APK.
+
+`Vectors.java` is generated from `tests/vectors.json` at test time rather than
+transcribed, so the fixture stays one source of truth for both implementations.
+
+What it covers, and why each is there:
+
+| Test | Why |
+| --- | --- |
+| A restarted process continues the chain | The §5d regression. Verified by failing: reintroduce `extract` for `extractString` and the suite fails in under a second. |
+| Deletion, reordering, an edited hash | What linkage evidence actually catches. |
+| **An edited payload is NOT detected** | A recorded limit, asserted rather than assumed. `verify()` checks linkage only; it never re-derives a hash. |
+| Every break is reported | An earlier break must not hide a later one. |
+| Canonical JSON edge cases | The half of the cross-implementation agreement that runs on the device, executed for the first time. |
 
 ## Build
 

@@ -271,3 +271,49 @@ not cost something:
    both repositories that they are separate lineages and stop calling them the
    same thing.
 
+
+---
+
+## AD-6 — Witnesses are counted as devices; tamper-evidence needs keys
+
+- **Status:** Open · **Raised:** 2026-09-25, while turning the product promise
+  into testable claims (`CLAIMS.md` C2c) · **Revisit at:** before any
+  multi-device custody claim is made publicly, and before C2c is run
+- **Domain:** History / Distribution · **Kind (if adopted):** a key identity
+  concept, and a correction to what `RetentionPolicy` counts
+
+**The finding.** `evaluatePrune` requires K≥2 holders before a payload may be
+pruned, and at least one of them owned. `holders` are **device identifiers**
+(`runtime/journal/src/retention.ts:93`). There is no key concept anywhere in
+`runtime/` or `contracts/`: a search for signature, signing key, public key or
+key id across both returns one hit, and it is the word "signature" used
+metaphorically about a torn line in a file.
+
+K≥2 is asked to carry two different properties, and counting devices is right
+for one and wrong for the other:
+
+| Property | What K≥2 is protecting against | Do shared-key devices count separately? |
+| --- | --- | --- |
+| **Durability** | Losing the last copy of a payload | **Yes.** Two copies are two copies. |
+| **Tamper-evidence** | The key holder truncating the tail and re-signing | **No.** One key is one witness. |
+
+A device restored from a backup, or a second install provisioned from the same
+material, satisfies the quorum while adding nothing against the failure C2c
+describes: whoever holds the key can make every device holding it tell the same
+false story.
+
+**Why it is debt and not a bug.** Nothing shipped is wrong for its stated
+purpose — the retention rule is a durability rule, and for durability it is
+correct. What is missing is the *vocabulary*: Orb cannot currently express
+"independent key", so it cannot state the tamper-evidence property at all, let
+alone test it. That is why `CLAIMS.md` C2c is marked not runnable rather than
+unproven.
+
+**Raised by the operator**, reviewing C2's wording: a witness only counts if it
+does not hold the same signing key.
+
+**What adopting it would touch.** A key identity as a *value* attributed to a
+custody receipt — following the `Observation.md` source-identity precedent that
+AD-5 also leans on, rather than a new kernel contract with a dependency edge.
+`RetentionPolicy` would then distinguish a durability quorum from a witness
+quorum instead of conflating them under one K.

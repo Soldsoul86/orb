@@ -117,9 +117,25 @@ piece of evidence this project has, precisely because nobody staged it.
 It is partly earned and not fully earned because "the record" has three
 different failure modes and only one of them has been demonstrated.
 
-**C2a — Alteration in place.** An envelope is edited. *Detected by the chain
-alone, on one device, with no witness needed.* This is what §5d demonstrated.
-Mechanical to test: `verify()` already collects every break.
+**C2a — Alteration in place.** An envelope is edited. **Not detected by the
+shipped probe**, and the earlier draft of this document was wrong to say it was.
+
+`verify()` compares each event's `previous` against the recorded hash of the
+line before it. It never recomputes a hash from the stored fields. So an edit
+that changes what an event *says happened* while leaving the hash fields alone
+passes clean — demonstrated, not argued, by
+`apps/pixel/pass1/tests/JournalTest.java.in`, which edits a payload and asserts
+that `verify()` still returns `ok`.
+
+What §5d actually demonstrated is narrower and still valuable: **linkage**
+evidence. The chain detects deletion, insertion, reordering, and a restart that
+forks the chain — which is the defect it caught. That is a real property and it
+caught a real bug. It is not alteration-detection, and calling it that would
+have been the exact overreach this document exists to prevent.
+
+Re-derivation needs a JSON parser the probe does not have. The right home for it
+is the desktop analyser rather than the phone, because a chain checked only by
+the device that wrote it is the weaker check — the same reasoning as C2c.
 
 **C2b — A missing payload.** Under `PARTIAL_REPLICATION.md` this is *legitimate*
 — pruning is a feature, not damage. The bar is therefore not "payloads are never
@@ -135,6 +151,20 @@ by a second witness comparing watermarks — which is what custody receipts and
 K≥2 are for, and is the reason the `SyncPeer` port exists at all. The property
 is not "tamper-proof". It is: *tampering requires defeating every witness, and
 the number of witnesses is the user's choice.*
+
+**A witness counts only if it holds an independent key.** Two devices sharing a
+signing key are one witness, because whoever holds the key can make both say the
+same false thing. This is not what the code counts today: `evaluatePrune`'s
+`holders` are device identifiers (`runtime/journal/src/retention.ts:93`), and
+there is no key concept anywhere in `runtime/` or `contracts/` — a search for
+signing key, public key or key id returns nothing.
+
+The distinction matters differently for the two properties K≥2 is asked to
+carry. For **durability**, two devices sharing a key are still two copies, so
+counting devices is defensible. For **tamper-detection**, they are one witness,
+so counting devices is wrong. Orb cannot currently tell these apart because it
+cannot express "independent key" at all. Logged as architectural debt; C2c is
+not runnable until it can.
 
 **Negative control (R2).** The same three mutations against a product whose log
 lives on the vendor's server. C2c is that product's default configuration: the
@@ -227,9 +257,11 @@ instrument does not change while it is running.
 
 After it, in this order, because each is gated by what it needs:
 
-1. **C2** — needs nothing that does not already exist. The harness is
-   mechanical, the journal is built, and C2a is already half-answered by a
-   finding nobody staged.
+1. **C2** — the harness is mechanical and the journal is built. C2b is
+   runnable now. C2a needs re-derivation, which belongs in the desktop
+   analyser. C2c needs the key concept that does not yet exist (AD-6), so the
+   claim that looked nearest to runnable is the one with the most missing under
+   it — which is what writing the tests was for.
 2. **C3** — needs no phone and no airwall. Pure runtime.
 3. **C1** — needs the three contracts accepted and Ruling 1 made.
 4. **C4** — needs the airwall to exist.

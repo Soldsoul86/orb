@@ -207,8 +207,16 @@ final class Journal {
      * Verifies the whole chain: every hash self-consistent, every event
      * committing to its predecessor.
      *
-     * Deliberately re-derives from the stored fields rather than trusting them,
-     * because a chain that is only checked by the writer is not tamper-evident.
+     * Checks LINKAGE ONLY: that each event's `previous` is the recorded hash of
+     * the event before it. It does not re-derive any hash from the stored
+     * fields, so it detects deletion, insertion and reordering -- and does NOT
+     * detect an edit that leaves the hash fields alone. An altered payload
+     * verifies clean (`tests/JournalTest.java.in`, and `CLAIMS.md` C2a).
+     *
+     * Re-derivation needs a JSON parser this probe does not have. Adding one is
+     * an instrument change and does not happen mid-run (`DEVICE_LOOP.md` §7 R4);
+     * the desktop analyser is the better home for it anyway, since a chain
+     * checked only by the device that wrote it is the weaker check.
      */
     synchronized String verify() throws IOException {
         List<String> lines = readLines();

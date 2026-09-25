@@ -1,0 +1,11 @@
+package @PKG@;
+
+/** Entry point. Exits non-zero on any failed check, so CI and a human agree. */
+public final class Tests {
+    public static void main(String[] args) throws Exception {
+        System.out.println("pass-1 probe, host tests");
+        JsonTest.run();
+        JournalTest.run();
+        System.exit(Harness.report());
+    }
+}
