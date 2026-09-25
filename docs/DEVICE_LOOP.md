@@ -352,6 +352,14 @@ halves with nothing to indicate it.
 tidy, and the break is a true record of what happened. `verify()` will keep
 reporting it, and now reports anything after it too.
 
+**Verified on the device, 2026-09-25 10:24.** The fixed build restarted the
+process to install itself — precisely the event that used to fork the chain —
+and the journal still reports exactly one break, at line 4. A restart thirty
+events later produced none. The old break remains visible behind the new
+events, which is what change 2 was for: had `verify()` still stopped at the
+first break, this confirmation would have been impossible to obtain from the
+device at all.
+
 ---
 
 ## 6. What a finding does
@@ -392,6 +400,27 @@ date against a stated version is never a rate.
 observation of the user's actual life would be a failure even if every
 prediction were answered. Pass 2 should end with at least one signal that is
 useful to a person rather than to this document.
+
+---
+
+## 7a. Sequencing the pass-1 run
+
+The predictions are not independent in practice, because P6 needs the services
+**stopped** and P1/P3 need them running for six uninterrupted hours. Run them in
+an order that does not spoil the long one:
+
+1. **P1 and P3 first, and alone.** Leave the probe recording and the phone
+   untouched for more than six cumulative hours. A `probe.service.timeout`, and
+   which service it names, is the answer. Interrupting this is the only mistake
+   that costs a whole day.
+2. **P2.** Reboot, then wait without opening the app. Anything that appears
+   arrived without the user.
+3. **P4.** Force-stop from Settings, reopen, look for `probe.gap.inferred`.
+4. **P6.** Stop the services, install or uninstall any app, and look for a
+   `probe.signal` carrying `"registration":"manifest"`.
+
+Export after each, not only at the end: an export is cheap, and a run that is
+only exported once can lose everything to a single mistake.
 
 ---
 
