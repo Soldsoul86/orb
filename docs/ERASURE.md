@@ -4,11 +4,14 @@
 permanent prohibition on E2/E3 (§2), the coarse envelope type, and the coarse
 vocabulary (both §2b). The rest is a PROPOSAL.** §9 carries what is still open.
 
-**Two gaps are open and both are in Attachments (§2c, questions 5 and 6).**
-Erasure destroys a payload key, and an Attachment is not payload — so a
-photograph outlives the erasure of the entry that carried it. The ruling is
-delivered for `{"beat": 47}` and not for the content it was made for. Nothing
-implements Attachments yet, which is why now is when to answer it.
+**A fifth ruling, 2026-09-25 — Attachments are erasable (§2c).** Erasure
+destroys a payload key and an Attachment is not payload, so a photograph
+outlived the erasure of the entry that carried it: the ruling delivered for
+`{"beat": 47}` and not for the content it was made for. Ruled: *a per-photo key
+that dies with the last reference.* Now `Attachment.md` inv. 7, with **D9** in
+the preview reporting `unavailable` until Attachments exist. **Question 5 stays
+open** — inv. 2's deduplication is still a confirmation oracle, and the payload
+fix does not transfer.
 
 **§2a and §2b are now IMPLEMENTED** in `runtime/journal` as envelope v2: the
 coarse type and schema, stated lineage moved into the payload, per-event nonces,
@@ -726,12 +729,66 @@ property B also delivers.
 **C** is honest and contradicts the ruling. Named so it is not arrived at by
 default, which is what happens today.
 
-**B is the recommendation.** It is the same mechanism §2a already chose — destroy
-a key, not bytes — applied one layer down, and the reference count is a
-projection over history rather than a stored set, so it adds no second source of
-truth (Art. IX §33).
+**B. Ruled 2026-09-25 by the operator: *"per-photo key that dies with the last
+reference."*** It is the same mechanism §2a already chose — destroy a key, not
+bytes — applied one layer down, and it keeps the deduplication that makes heavy
+bytes affordable at all.
 
-### The caveat B carries, which the owner must be told
+### What "the last reference" has to mean
+
+Writing the ruling down forces a question the shape does not answer, and the
+naive reading of it does not survive contact with erasure itself.
+
+References live in payloads. Erasure destroys payloads. **So after erasing
+anything, you can no longer recount what it referenced** — and a rule of the form
+*count the references, destroy the key at zero* would break the first time it was
+used. Recording what an erased event referenced is not available either: that is
+the erasure oracle, forbidden by §2b.
+
+The resolution is that the count was the wrong question. Ask instead:
+
+> **Can any event that is still readable resolve this Attachment?**
+
+Three kinds of event, three answers, and only one of them is a count:
+
+| The referring event is… | Can it resolve the Attachment? | Effect on the key |
+| --- | --- | --- |
+| **Readable here** | Yes | **Keeps it alive** |
+| **Erased** | Never again — its payload is destroyed, so the reference is destroyed with it | **Does not keep it alive** |
+| **Unfetched or pruned** | Unknown; the payload may come back | **Blocks destruction, and is reported** |
+
+An erased event cannot resolve anything. Its reference is not merely unreadable,
+it is *gone* — which means erasure decrements the count by the same act that
+hides it, and nothing needs to remember what was decremented. The rule composes
+with itself.
+
+The third row is the same shape that has now decided five designs here: *cannot
+check* is not *failed the check*. A pruned payload that might name this
+Attachment is **unknown**, not absent, and a device that treated unknown as
+absent would destroy a photograph its own history still points at.
+
+### What the owner must be shown, and why it is a ninth D-point
+
+Under B, erasing one entry does **not** destroy an Attachment another readable
+entry still references. That is correct and it is not what "erase this" sounds
+like.
+
+> **You can only erase content that nothing else of yours still points at.**
+
+And §6 cuts the other way too, harder than for payloads. Destroying a key is
+global in effect: it reaches every copy, including the copy on a device whose
+readable entry still legitimately displays that photograph. So the preview owes
+the owner two facts, not one — *N readable entries here still reference this*,
+and *other devices may hold entries this one cannot see*.
+
+Silence on either is a declared erasure that did not happen, or an undeclared
+one that did. **D9** carries both.
+
+Everything B needs is a projection over history — no stored count, no second
+source of truth (Art. IX §33) — precisely because the erased row above needs no
+bookkeeping.
+
+### The caveat B carries, restated for the preview
 
 Under B, erasing one event does **not** destroy an attachment another event still
 references. That is correct behaviour and it is not what "erase this" sounds
@@ -739,13 +796,11 @@ like.
 
 > **You can only erase content that nothing else of yours still points at.**
 
-This belongs in the preview (§1) as a D-point, beside the existing eight: *this
-erasure will not remove the attached photograph, because N other entries still
-reference it — here they are.* Silence here would be a declared erasure that did
-not happen, which is the deception this document exists to prevent.
-
-And §6 still applies underneath: a peer holding the blob holds it. What dies is
-the key, everywhere at once.
+Implemented as **D9** in `erasure-plan.ts`, reported `unavailable` on every plan
+until Attachments exist — the same posture as D4, D5 and D6. A preview that
+omitted the question entirely would let an owner erase an entry believing the
+photograph went with it. Reported-and-unanswerable is the honest state; silent is
+not.
 
 ### What this requires of the Attachment contract
 
@@ -1092,7 +1147,9 @@ Stronger than most systems offer. Smaller than "it's gone." True.
    coarse type in the envelope, real type inside the payload.** See §2b.
 4. ~~**What is the coarse vocabulary?**~~ **Ruled 2026-09-25: bookkeeping keeps
    its real names; everything else gets one label.** See §2b.
-6. **Erasure does not reach Attachments — what should it do?** Raised
+6. ~~**Erasure does not reach Attachments — what should it do?**~~ **Ruled
+   2026-09-25: a per-photo key that dies with the last reference.** Now
+   `Attachment.md` inv. 7; mechanism and the D9 caveat in §2c. Raised
    2026-09-25. Erasure destroys the payload key; an Attachment is a separate
    blob under separate encryption, so a photograph outlives the erasure of the
    entry that carried it — by contract, *"for the life of the journal"*.

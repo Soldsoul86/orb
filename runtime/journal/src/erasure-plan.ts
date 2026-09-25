@@ -20,8 +20,17 @@ import type { LaneId, StoredEvent } from "./types.js";
 import { indexLineage, descendantsOf, type Traversal } from "./lineage.js";
 import { latestCustody, type HeldCustody } from "./custody.js";
 
-/** The eight points at which erasure must stop and ask. */
-export type DecisionPoint = "D1" | "D2" | "D3" | "D4" | "D5" | "D6" | "D7" | "D8";
+/** The nine points at which erasure must stop and ask. */
+export type DecisionPoint =
+  | "D1"
+  | "D2"
+  | "D3"
+  | "D4"
+  | "D5"
+  | "D6"
+  | "D7"
+  | "D8"
+  | "D9";
 
 /**
  * Why a finding could not be computed.
@@ -153,6 +162,16 @@ export function planErasure(input: {
         "not stop the future re-deriving the same pattern from ongoing collection " +
         "(`ERASURE.md` §5c), and this plan cannot say whether it will.",
     },
+    {
+      point: "D9",
+      reason:
+        "attachments are not implemented, so this plan cannot say whether any photograph, " +
+        "recording or voice note is attached to these events, nor whether erasing them " +
+        "would destroy it. Under the ruling (`ERASURE.md` §2c) an attachment's key dies " +
+        "only when no readable event still references it, so an erasure may leave the " +
+        "attached content fully readable through another entry — and other devices may " +
+        "hold entries this one cannot see. Assume nothing attached is destroyed.",
+    },
   ];
 
   // Two different ways the radius can be untrustworthy, and only one of them is
@@ -237,6 +256,16 @@ export function decisionsRequired(plan: ErasurePlan): readonly DecisionPoint[] {
   // the facts, which is exactly when they most need telling.
   for (const gap of plan.unavailable) required.add(gap.point);
 
-  const order: readonly DecisionPoint[] = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"];
+  const order: readonly DecisionPoint[] = [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6",
+    "D7",
+    "D8",
+    "D9",
+  ];
   return order.filter((point) => required.has(point));
 }

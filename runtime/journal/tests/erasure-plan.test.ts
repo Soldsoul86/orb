@@ -117,6 +117,11 @@ describe("the plan never looks more certain than it is", () => {
     assert.ok(points.includes("D4"), "prior disclosure cannot be checked and must say so");
     assert.ok(points.includes("D5"), "no confirmation protocol exists");
     assert.ok(points.includes("D6"), "re-derivation cannot be predicted without a policy layer");
+    // D9 is D4's twin and the newer trap. Attachments are where the sensitive
+    // content actually lives, and erasure does not reach them (`ERASURE.md`
+    // §2c). A plan that omitted the question would let an owner erase an entry
+    // believing the photograph went with it.
+    assert.ok(points.includes("D9"), "attachments cannot be checked and must say so");
     for (const gap of plan.unavailable) {
       assert.ok(gap.reason.length > 0, `${gap.point} must explain itself`);
     }
@@ -244,7 +249,7 @@ describe("the decisions the owner is asked for", () => {
 
     assert.deepEqual(required, [...new Set(required)], "no duplicates");
     assert.deepEqual(required, [...required].sort(), "in D-order");
-    for (const point of ["D1", "D2", "D3", "D4", "D6", "D7"]) {
+    for (const point of ["D1", "D2", "D3", "D4", "D6", "D7", "D9"]) {
       assert.ok(required.includes(point as never), `${point} must be asked`);
     }
   });

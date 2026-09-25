@@ -77,8 +77,18 @@ currently holds them* may change. No transition alters the bytes or the identity
 4. **Encrypted at rest.** Attachment bytes are always stored encrypted.
 5. **Verifiable.** Resolved content can be re-hashed and checked against its
    identity; mismatch means corruption.
-6. **Decoupled availability.** An Attachment may be momentarily unavailable on a
-   device without invalidating the history that references it.
+6. **Decoupled availability.** An Attachment may be unavailable on a device
+   without invalidating the history that references it, and **absence always
+   carries a reason**: never fetched, dropped for space, or destroyed by the
+   owner. The three are not interchangeable — a peer that confuses the last with
+   the first helpfully restores content its owner erased.
+7. **Erasable with its last reader.** An Attachment is encrypted under its own
+   key, and that key is destroyed when no *readable* event references it any
+   more. An erased event does not keep an Attachment alive: its payload is gone,
+   so the reference is gone, and it can never resolve the content again. An
+   event whose payload is merely unfetched or pruned is **unknown, not absent**,
+   and blocks destruction until it can be read. Keys are stored, never derived —
+   a derived key is re-derivable, and destroying it destroys nothing.
 
 Upholds Constitution Articles I (History) and VIII (Ownership and Trust).
 
@@ -156,15 +166,12 @@ contract does not answer, raised 2026-09-25 and set out in full in
 because §5 freezes content-addressing deliberately and a kernel contract is the
 wrong thing to amend afterwards.
 
-1. **Erasure is not mentioned by any invariant above.** The operator's erasure
-   ruling is implemented as *destroy the payload key* (`ERASURE.md` §2a). An
-   Attachment is not payload: it is a separate blob under separate encryption,
-   so a photograph outlives the erasure of the Observation that carried it — §1
-   says it persists *"for the life of the journal"*, which is right for
-   continuity and wrong for erasure. §2c sets out three shapes and recommends a
-   per-Attachment key destroyed with the last reference, which keeps inv. 2.
-   Whatever is chosen, `ERASURE.md` §2a's rule applies: **keys are stored, never
-   derived** — a derived key is re-derivable, so destroying it destroys nothing.
+1. ~~**Erasure is not mentioned by any invariant above.**~~ **Ruled 2026-09-25
+   by the operator: a per-Attachment key that dies with the last reference.**
+   Now inv. 7, and set out with its mechanism in `ERASURE.md` §2c. Note that §1's
+   *"persists for the life of the journal"* is a **retention default, not a
+   guarantee against the owner** — it describes what happens when nobody erases
+   anything, and inv. 7 governs when somebody does.
 
 2. **Inv. 2's deduplication is a confirmation oracle.** *Identical content yields
    one identity* is what lets a holder of any file test whether this device has
@@ -175,8 +182,8 @@ wrong thing to amend afterwards.
    inv. 2, and here deduplication is load-bearing (`PARTIAL_REPLICATION.md`
    §228).
 
-Related and smaller: inv. 6 lets an Attachment be *"momentarily unavailable"*
-with no reason recorded. Events had the same gap and it was closed with
-`AbsenceReason` (`ERASURE.md` §7), because *never fetched*, *dropped for space*
-and *destroyed by the owner* are three different answers — and a peer that
-confuses them helpfully restores content its owner destroyed.
+Closed alongside the first: inv. 6 previously let an Attachment be *"momentarily
+unavailable"* with no reason recorded. Events had the same gap and it was closed
+with `AbsenceReason` (`ERASURE.md` §7). Inv. 6 now carries the same three
+reasons, and inv. 7 needs the distinction to work at all — *unknown* must block
+a key destruction that *absent* would allow.
