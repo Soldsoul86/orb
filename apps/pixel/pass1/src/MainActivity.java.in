@@ -2,8 +2,13 @@ package @PKG@;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -15,7 +20,12 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -59,6 +69,13 @@ public final class MainActivity extends Activity {
         });
         root.addView(stop);
 
+        Button export = new Button(this);
+        export.setText("Export journal to Downloads");
+        export.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { export(); }
+        });
+        root.addView(export);
+
         status = new TextView(this);
         status.setTextSize(13);
         status.setTextIsSelectable(true);
@@ -85,6 +102,68 @@ public final class MainActivity extends Activity {
     private void stopServices() {
         stopService(new Intent(this, DataSyncService.class));
         stopService(new Intent(this, SpecialUseService.class));
+    }
+
+    /**
+     * Copies the journal into the public Downloads folder.
+     *
+     * Without this the journal is unreachable on a phone with developer mode
+     * off: since Android 11 the Files app cannot browse into another app's
+     * `Android/data`, so `adb pull` was the only way out. A cable-free device
+     * needs a cable-free export or it produces no evidence at all.
+     *
+     * The export is itself appended to the journal before it happens.
+     * `SECURITY.md` §7 requires that data leaving the device is recorded as
+     * history, and a copy into shared storage that anything can read is exactly
+     * that — the fact that it is convenient does not make it not a disclosure.
+     */
+    private void export() {
+        Journal journal = Probe.get() == null ? null : Probe.get().journal();
+        if (journal == null) {
+            status.setText("journal unavailable");
+            return;
+        }
+
+        try {
+            List<String> lines = journal.readLines();
+            String name = "orb-pass1-"
+                + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date())
+                + ".jsonl";
+
+            Map<String, Object> record = Json.obj();
+            record.put("destination", "Downloads/" + name);
+            record.put("events", (long) lines.size());
+            record.put("reason", "operator export");
+            journal.append("probe.export", record);
+
+            // Re-read, so the export contains the record of itself. A disclosure
+            // that is missing from the copy it produced would be a gap in the
+            // very history the copy exists to carry.
+            lines = journal.readLines();
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+            values.put(MediaStore.Downloads.MIME_TYPE, "application/x-ndjson");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+            ContentResolver resolver = getContentResolver();
+            Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (target == null) {
+                status.setText("export failed: no destination");
+                return;
+            }
+
+            try (OutputStream out = resolver.openOutputStream(target)) {
+                for (String line : lines) {
+                    out.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+                }
+            }
+
+            status.setText("exported " + lines.size() + " events\nDownloads/" + name
+                + "\n\nOpen Files > Downloads to share it.");
+        } catch (IOException error) {
+            status.setText("export failed: " + error);
+        }
     }
 
     private void render() {

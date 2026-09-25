@@ -69,15 +69,31 @@ Open **Orb pass 1**, allow notifications, tap **Start recording**. Then leave
 the phone alone and carry it normally. The screen shows the event count and
 chain state; the journal is the actual output.
 
-### Pull the journal
+### Get the journal out
+
+**With a cable:**
 
 ```sh
 adb pull /sdcard/Android/data/dev.orb.pass1/files/pixel.lane.jsonl
 ```
 
-Readable without root, which is why the journal is written to external files
-rather than private storage. That is wrong for a real runtime and right for an
-instrument whose whole purpose is the evidence it produces.
+**Without one:** tap **Export journal to Downloads**, then open Files →
+Downloads and share `orb-pass1-<timestamp>.jsonl` however you like.
+
+The second path exists because it is the only one on a phone with developer
+mode off: since Android 11 the Files app cannot browse into another app's
+`Android/data`, so without `adb` the journal would be unreachable and the probe
+would produce no evidence at all.
+
+The export appends a `probe.export` event *before* it copies, so the copy
+contains the record of its own making. `SECURITY.md` §7 requires that data
+leaving the device is recorded as history, and a copy into shared storage that
+any app can read is exactly that — being convenient does not make it not a
+disclosure.
+
+The journal itself lives in external files rather than private storage so it is
+readable without root. Wrong for a real runtime, right for an instrument whose
+whole purpose is the evidence it produces.
 
 ### Worth doing during the run
 
@@ -105,3 +121,4 @@ instrument whose whole purpose is the evidence it produces.
 | `probe.signal` | a broadcast, tagged `manifest` or `runtime` — P6 |
 | `probe.boot.restart` | whether restarting services from boot was permitted — P2 |
 | `probe.memory.trim` / `.low` | memory pressure, which may precede a kill |
+| `probe.export` | the journal was copied to shared storage — a recorded disclosure |

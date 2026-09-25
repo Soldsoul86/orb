@@ -265,6 +265,32 @@ Two consequences, both worth carrying forward:
    representative of a carried, protected phone. Findings about battery, kills
    and deferral transfer; findings about the device's security posture do not.
 
+### Addendum, 2026-09-25 — the operator is turning developer mode off
+
+Chosen deliberately, and it is the right call for a phone that is meant to carry
+a life rather than a build. Two consequences follow, and the first undoes part
+of what P0a bought:
+
+- **Every future install goes through the scan.** `adb` is the only path that
+  bypassed it (§5b). A device without developer mode installs by tapping the
+  file, which means each build is uploaded to Google before it runs. P0a's
+  finding stands as a fact about Android and stops being a fact about *this*
+  project: "development stays private" is true only for a workflow that uses a
+  cable, and this one will not.
+- **The journal needed a way out.** Since Android 11 the Files app cannot browse
+  another app's `Android/data`, so `adb pull` was the only route off the device.
+  The probe now exports to Downloads on demand, and records the export as an
+  event before performing it.
+
+**No prediction is lost.** P1, P2, P3, P4 and P6 are all answerable from the
+phone alone — the six-hour run, the reboot, a package install with the services
+stopped, a force-stop and reopen. Only `logcat` corroboration goes, and that was
+convenience rather than evidence: the probe was built to record its own death
+precisely so it would not depend on something watching from outside.
+
+The device is also no longer knowingly degraded, which makes its posture
+findings meaningful again.
+
 ---
 
 ## 6. What a finding does
