@@ -229,13 +229,15 @@ Nothing here is built. Approval would be for:
    gap, extending Art. XI §42's treatment of unconfirmed Actions to unanswered
    questions.
 
-**Open question for review, stated rather than assumed:** `SYNC_PROTOCOL.md`
-replicates lanes between devices, which means every device holds the full
-history — including the phone, which is the most exposed device you own. The
-airwall keeps the *network* away from Orb; it says nothing about *which device
-holds what*. Partial replication may be a storage policy rather than a
-constitutional matter, but it is a bigger hole in the same wall and should be
-settled alongside this, not after it.
+**The open question this raised is now addressed separately.**
+`SYNC_PROTOCOL.md` replicates lanes to every device, so the phone — the most
+exposed device you own — holds the full history. The airwall keeps the *network*
+away from Orb and says nothing about *which device holds what*. That is the
+larger hole in the same wall, and `PARTIAL_REPLICATION.md` proposes the fix:
+envelope-complete, payload-partial replication, with pruning gated on journaled
+custody receipts. It should be reviewed **before** this document, because it is
+the bigger exposure and because it turns out to need no constitutional
+amendment.
 
 ---
 
