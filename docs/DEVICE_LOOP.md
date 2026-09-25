@@ -548,9 +548,31 @@ an order that does not spoil the long one:
    untouched for more than six cumulative hours. A `probe.service.timeout`, and
    which service it names, is the answer. Interrupting this is the only mistake
    that costs a whole day.
+
+   **Do not open the app.** Android's own description of the cap is that the six
+   hours accrue *unless the user interacts with the app, which resets the
+   timer* — so opening it to check on it is enough to restart the clock, and the
+   test would then run forever without ever firing. Force-stopping obviously
+   ends it too, but the subtler failure is the well-meaning check.
+
+   The foreground-service notification is the check that costs nothing: it is
+   visible in the shade without launching anything, and the probe's notification
+   carries no tap action, so it cannot accidentally foreground the app.
+
+   Exporting means opening the app, so **export only after the timeout fires**
+   or after the window has clearly elapsed.
+
+   A consequence worth holding onto: if interaction resets the timer, then the
+   cap binds a runtime the user never opens far more tightly than one they touch
+   during the day. P1 measures the **worst case**, which is the right thing to
+   measure and is not the same as the typical one. `MOBILE_SENSING.md` §2 G4
+   should be read that way once this returns an answer.
 2. **P2.** Reboot, then wait without opening the app. Anything that appears
    arrived without the user.
 3. **P4.** Force-stop from Settings, reopen, look for `probe.gap.inferred`.
+   Already held once (§5f), so this is corroboration on a deliberate kill rather
+   than an incidental one — cheap, and strictly after the long run, never during
+   it.
 4. **P6.** Stop the services, install or uninstall any app, and look for a
    `probe.signal` carrying `"registration":"manifest"`.
 
