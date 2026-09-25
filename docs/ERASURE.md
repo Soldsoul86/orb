@@ -304,11 +304,36 @@ predictable event without any key.
 Sealing does not touch this, because the hash is in the envelope and the
 envelope is deliberately plaintext.
 
-The usual mitigation is a random nonce inside each payload, so the plaintext is
-not guessable. It is cheap, and it is **not** done here: injecting a field into
-every payload changes what replay sees and what a schema describes, which is a
-decision about the shape of every event in the system rather than a change to
-this module. Recorded as open rather than taken quietly.
+**A nonce inside the payload is not one option among several — it is the only
+shape the constraints allow.** Anyone holding a payload must be able to verify it
+against the envelope, and anyone holding only envelopes must not be able to
+guess it. So the entropy has to be available to whoever has the payload and
+unavailable to whoever has only the envelope, and exactly one place satisfies
+both. The alternatives each fail on one side:
+
+| | Why not |
+| --- | --- |
+| Salt in the envelope | The adversary has the envelope, so they have the salt |
+| Hash the event id in | Same — high entropy, but *public* entropy |
+| HMAC with a device secret | Kills cross-device verification; `PARTIAL_REPLICATION.md` §3 goes with it |
+| Commit to the ciphertext | Two devices sealing the same payload get different hashes; the envelope stops being reproducible and a peer's payload can never be checked |
+
+**And it should not be a field anyone sees.** Not `_nonce` beside the data, where
+every consumer, schema and disclosed slice must know to ignore it — wrapped at
+the storage layer, as `{n, v}`, unwrapped on read. The same decorator shape as
+sealing, for the same reason: it is a storage concern, not a data concern.
+Replay sees what it always saw, schemas describe what they always described, the
+nonce travels with the payload so verification still works anywhere, and it dies
+with the payload on erasure.
+
+**Applied uniformly**, not only to low-entropy payloads: selective application
+would make the *absence* of a nonce a signal that the payload was high-entropy,
+and would be forgotten the first time someone added an event type.
+
+**Held, 2026-09-25 — ships with the envelope migration (§10.1b).** It changes
+what the hash preimage covers, exactly as `type`, `schema` and `causes` moving
+into the payload do. Four changes to the same preimage is one break in the
+cross-implementation vectors if they travel together, and four if they do not.
 
 ### What makes this checkable by anyone but the owner
 
@@ -843,9 +868,11 @@ After it, and after AD-6:
    remains is the confirmation oracle above, and putting the keyring itself
    behind hardware (device predictions P8 and P11).
 1b. **The coarse vocabulary, then the envelope change** (§2b). The vocabulary
-   is a decision (§9.4); the envelope edit that follows touches `Event.md`,
-   `EVENT_MODEL.md`, the TypeScript envelope and the phone's encoder together,
-   and moves `schema` with `type` or achieves nothing. It is also the **last
+   is ruled; the envelope edit that follows touches `Event.md`, `EVENT_MODEL.md`,
+   the TypeScript envelope and the phone's encoder together. **Four things move
+   in this one migration** — `type` becomes coarse, and `schema`, `causes` and
+   the payload nonce (§2a) go inside — because each changes the hash preimage,
+   and together they cost one break in the vectors instead of four. It is also the **last
    cheap moment**: every event already written carries a fine type, and changing
    the rule later leaves a permanent, legible prefix of history that no erasure
    may remove — because §2 forbids removing it.
