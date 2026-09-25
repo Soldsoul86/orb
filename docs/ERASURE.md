@@ -1,7 +1,8 @@
 # Erasure — the right to delete, and the duty to say so
 
-**Status: the Art. I §2 reading is ACCEPTED, 2026-09-25 (§2). The rest is a
-PROPOSAL.** Nothing here is implemented, and §9 carries what is still open.
+**Status: two rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading, and the
+permanent prohibition on E2/E3 (both §2). The rest is a PROPOSAL.** Nothing here
+is implemented; §9 carries what is still open.
 
 ---
 
@@ -101,13 +102,101 @@ witnesses are left with one narrow job: detect **undeclared** removal.
 | --- | --- | --- | --- |
 | **E0** | Nothing | — | Today's behaviour |
 | **E1** | The payload | Intact; height and hashes unchanged | **No** — ruled 2026-09-25. **Adopted.** |
-| **E2** | Payload and the event's *type* | Hash changes; the chain must be re-linked | **Yes** |
-| **E3** | The whole event | Height changes; indistinguishable from truncation | **Yes**, and every witness attestation must be reconciled |
+| **E2** | Payload and the event's *type* | Hash changes; the chain must be re-linked | **Forbidden** — ruled 2026-09-25 |
+| **E3** | The whole event | Height changes; indistinguishable from truncation | **Forbidden** — ruled 2026-09-25 |
 
 **E1's honest limit:** the envelope still carries type and timestamp. Erasing
 the payload of a `health.appointment` at 15:04 does not hide that an event of
 that kind happened then. E1 gives the right to erase *what happened*. Erasing
-*that something happened* is E2 or above.
+*that something happened* would be E2 or above.
+
+### E2 and E3 are forbidden, not merely unadopted
+
+> *"E2 and E3 should never be possible. There can always be a representation,
+> but someone should not be able to go and decode what has happened."*
+> — the operator, 2026-09-25
+
+**Ruled.** This is a law, not a deferral. The shape of history — that an event
+occurred, of some type, at some time, in some position — is **permanent and not
+erasable by anyone, including its owner.** Only content is erasable.
+
+The reason it is worth fixing as law rather than leaving open: an erasure that
+can remove the shape is indistinguishable from truncation, which would undo the
+orthogonality §2 just bought and re-open the conflict with witnesses. Forbidding
+it keeps `CLAIMS.md` C2c's job narrow forever, rather than only until someone
+asks for more.
+
+**The cost, accepted knowingly.** Under compulsion the shape is visible and
+cannot be removed: an adversary sees *"twelve events of this type in March, all
+erased."* That is information, it is permanent, and no future feature will take
+it away. §9.3 records the one lever that could narrow it without breaking this
+ruling.
+
+---
+
+## 2a. What "cannot be decoded" requires
+
+The ruling says *destroyed*, not *deleted*. Those are different engineering
+problems and only one of them is achievable.
+
+### Deleting the bytes is the weak answer
+
+Two reasons it does not deliver what was ruled:
+
+- **Flash does not overwrite where you tell it to.** Wear levelling and
+  copy-on-write mean a payload "removed" from a file may persist in cells the
+  filesystem no longer references. Forensic recovery is a real possibility, not
+  a theoretical one.
+- **It cannot reach a copy you do not control.** §6 — erasure is local. A peer
+  that holds the payload holds it whether or not this device deleted anything.
+
+### Destroying the key is the strong answer, and it is nearly in place
+
+`SECURITY.md` §3 already makes encryption at rest **mandatory** and states that
+the store holds ciphertext; `STORAGE.md` §49 repeats it. So the architecture
+already stores payloads encrypted. The missing piece is **granularity**: one
+store-wide key cannot be destroyed for one event.
+
+With a per-event or per-epoch payload key, erasure becomes *destroy that key*:
+
+| | Delete the bytes | Destroy the key |
+| --- | --- | --- |
+| Copy on a peer's device | Still readable | **Inert ciphertext** |
+| Residue in flash | May survive | **Survives, and is undecodable** |
+| Copy in a backup | Still readable | **Inert** — unless the key was backed up too |
+| Cost of the operation | Proportional to the payload | A few bytes |
+
+This is the mechanism that makes the ruling true rather than aspirational. It is
+also the only way §6's "erasure is local" stops being a serious limitation: the
+witness who holds an envelope, the peer who holds a payload, and the backup on
+a drive in a cupboard all hold something that no longer decodes.
+
+### The property worth naming
+
+**A key that no longer exists cannot be produced under compulsion.**
+
+This is one of very few genuine protections against coercion available to
+anyone. It is a direct consequence of the ruling and should be stated as a
+designed property, not discovered later as a side effect.
+
+### What it costs, and one trap
+
+- **There is no undo, at all.** That is the point, and it is also a foot-gun.
+  The two-phase preview in §1 is not a nicety here; it is the only thing standing
+  between the owner and an irreversible mistake.
+- **The key store becomes the crown jewels.** Losing it loses everything, which
+  is a different failure from the one erasure is for.
+- **A backed-up key is an un-erased payload.** Key backup policy is therefore
+  *part of erasure semantics*, not a separate operational concern. An erasure
+  that leaves a key in a backup is a declared erasure that did not happen, which
+  is exactly the deception this document exists to prevent. D4 must cover it.
+- **It interacts with AD-6.** Keys become load-bearing in two unrelated places —
+  witness independence and payload erasure — which is an argument for getting the
+  key identity right once rather than twice.
+
+**What it does not fix:** §5a and §5b stand unchanged. Destroying a key removes
+the content. It does not remove a pattern that was over-determined, and it does
+not make re-derivation impossible.
 
 ---
 
@@ -214,6 +303,14 @@ gone"* but *"gone here; three of four peers confirmed; one has not been seen
 since Tuesday."* Same move as everywhere else in this project — state the
 boundary instead of promising past it. D5.
 
+**§2a changes how much this limitation hurts.** If a peer only ever held
+ciphertext and the key is destroyed, their unconfirmed copy is inert. Locality
+then constrains *bookkeeping* — knowing who acknowledged — rather than
+*exposure*. The sentence becomes "gone here, undecodable everywhere, and one
+peer has not yet acknowledged," which is a far smaller admission. This is the
+strongest argument for key destruction over byte deletion, and it is why §2a is
+a requirement of the ruling rather than an optimisation of it.
+
 ---
 
 ## 7. A gap in code that blocks all of this
@@ -261,12 +358,24 @@ Stronger than most systems offer. Smaller than "it's gone." True.
 ## 9. Open — for the operator, in their own words
 
 1. ~~**The Art. I §2 reading (§2).**~~ **Ruled 2026-09-25: E1 accepted.** See §2.
-2. **How far up the ladder (§2).** E1 is adopted; E2 and E3 are **not**, and
-   neither is ruled out. Adopting E1 does not decide whether Orb must ever erase
-   the *fact* that an event occurred. That would be an amendment rather than a
-   reading, and it would put erasure back into conflict with witnesses, so it
-   stays open until something concrete demands it. Left open deliberately: a
-   right the operator has not asked for is not a right to design in advance.
+2. ~~**How far up the ladder (§2).**~~ **Ruled 2026-09-25: E1 only. E2 and E3
+   are forbidden, permanently.** The shape of history is not erasable by anyone,
+   including its owner. See §2.
+3. **Does the envelope have to be this legible?** *Open, and the only lever left
+   on the accepted cost.* Today an envelope names a precise type and a precise
+   wall clock, so an erased `health.appointment` at 15:04:07 still says a great
+   deal. A **coarse public type with the true type inside the encrypted payload**
+   — the envelope saying only `orb.observation` — would leak far less while
+   leaving the sequence, the hashes and the count exactly as the E2/E3 ruling
+   requires. It is not E2: nothing is erased, the envelope is simply less
+   revealing from the start.
+   The cost is real and belongs in the decision: `holdTypes()`
+   (`runtime/journal/src/sync.ts:98`) lets a peer choose what to hold *by type*,
+   and coarse types would blunt it; routing, indexing and schema resolution all
+   read the type today. The wall clock is harder still — it is inside the hash
+   preimage and the HLC depends on it, so coarsening it is not a free change.
+   **Not decided here.** It is a privacy-versus-function trade with no obviously
+   right answer, and §1 says the operator is told rather than defaulted.
 
 ---
 
@@ -278,6 +387,11 @@ After it, and after AD-6:
 
 1. **A reason on absence** (§7). Nothing else can start until pruned and erased
    are different things in the type system.
+1a. **Payload key granularity** (§2a). Encryption at rest is already mandatory;
+   what is missing is a key small enough to destroy per event or per epoch.
+   Without it the ruling's *destroyed* is only *deleted*, and D4's account of
+   what cannot be recalled would be wrong in the owner's favour — the worst
+   direction for it to be wrong in.
 2. **Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
    `InferenceRecord.md` are still Draft and cheap to change.
 3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
