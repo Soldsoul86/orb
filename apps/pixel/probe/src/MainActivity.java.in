@@ -1,4 +1,4 @@
-package dev.orb.probe;
+package @PKG@;
 
 import android.app.Activity;
 import android.os.Build;
@@ -18,7 +18,7 @@ public class MainActivity extends Activity {
         super.onCreate(state);
 
         String body =
-            "Orb probe — P0\n\n"
+            "Orb probe — @PKG@\n\n"
             + "A self-signed APK installs on this device.\n\n"
             + "Model:    " + Build.MODEL + "\n"
             + "Device:   " + Build.DEVICE + "\n"

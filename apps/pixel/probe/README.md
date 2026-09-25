@@ -20,8 +20,19 @@ about our case.
 
 ```sh
 ANDROID_HOME=/path/to/android-sdk ./build.sh
-# → build/orb-probe.apk
+# → build/probe/probe.apk           (package dev.orb.probe)
+
+ANDROID_HOME=/path/to/android-sdk \
+  ORB_PROBE_PKG=dev.orb.probec ORB_PROBE_LABEL="Orb probe C" ./build.sh
+# → build/probec/probec.apk         (package dev.orb.probec, fresh signing key)
 ```
+
+**Every test of the install gate needs a new package name.** Play Protect gates
+on novelty, not identity (`DEVICE_LOOP.md` §5a), so an app it has already scanned
+proves nothing about the gate — and neither does a rebuild of the same package.
+A new `ORB_PROBE_PKG` also generates a new signing key, so the artifact is novel
+by both measures. The activity prints its own package, which keeps a screenshot
+unambiguous about which probe it came from.
 
 Needs only the SDK: `build-tools;36.0.0`, `platforms;android-36`. No Gradle, no
 Android Studio, nothing resolved from a network at build time, so the artifact is
@@ -43,11 +54,18 @@ which have very different consequences for this project.
 2. Open Files, tap it. Android will ask whether to allow installs from that app.
 3. It installs, or it is blocked.
 
-**Path B — over USB.** The path development takes.
+**Path B — over USB.** The path development takes. Tests P0a: whether `adb`
+bypasses the Play Protect scan, and so whether every development build has to be
+disclosed to Google or only every distributed one.
 
 1. Settings → About phone → tap **Build number** seven times.
 2. Settings → System → Developer options → enable **USB debugging**.
-3. `adb install orb-probe.apk`
+3. Connect the cable; accept the RSA fingerprint prompt on the phone.
+4. `adb devices` — the device should be listed as `device`, not `unauthorized`.
+5. `adb install <probe>.apk`
+
+Use a package the phone has not seen. Reinstalling one that was already scanned
+answers nothing.
 
 ## Record
 
