@@ -86,15 +86,18 @@ testing.
 
 ### Pass 1 — can the runtime survive, and does it know when it didn't?
 
-**P0 — A self-signed APK installs on this device today.**
+**P0 — A self-signed APK installs on this device today. — HELD, 2026-09-25.**
 *Source:* `MOBILE_SENSING.md` §3 — devices shipping with Android 16 QPR2 or later
-preload a verifier that blocks unverified-developer installs. This device is on
-Android 16, and whether the verifier is present or arrives in a later update is
-unknown from here.
-*Test:* install a do-nothing APK. Twenty minutes, before any Kotlin is written.
-*If false:* everything stops until a registered signing identity exists. **Test
-this first** — every other prediction is downstream of it, and there may be a
-closing window rather than an open door.
+preload a verifier that blocks unverified-developer installs.
+*Result:* installed and ran, by the tap-the-file path, on build
+`CP1A.260405.005` (security patch 2026-04-05). **No developer-verification block
+appeared.** See §5a for what did appear, which was not predicted.
+
+Whether the verifier is absent from this build or merely has not reached this
+device is not determinable from the device alone, so the claim in
+`MOBILE_SENSING.md` §3 is **not refuted — it is not yet applicable.** The
+practical consequence is the one that matters: the door is open today, and the
+window argument in §7 R1 stands and is now dated. An update may close it.
 
 **P1 — A `dataSync` foreground service is stopped at roughly six cumulative
 hours per 24, and cannot be restarted from the background.**
@@ -124,6 +127,15 @@ than adjusting.
 service.** `ACTION_USER_PRESENT`, `PACKAGE_ADDED`/`_REMOVED`, USB attach.
 *If false:* even the cheapest sensor in the catalogue needs a service, and the
 first-sensor recommendation in `MOBILE_SENSING.md` §8 is wrong.
+
+**P0a — `adb install` bypasses the Play Protect novel-app scan.** *Untested.*
+Raised by the P0 run (§5a). Decides whether every development build has to be
+uploaded to Google before it can be run, or only every distributed one.
+
+**P0b — the scan is declinable.** *Untested.* The dialog offered "Scan app" and
+"Don't install app" and nothing else on its face; whether an install-without-
+scanning path exists behind "More details" was not explored. A device where the
+scan cannot be declined is a device where private builds are not private.
 
 ### Pass 2 — is the capability map accurate?
 
@@ -174,6 +186,46 @@ the phone behaved.
 
 ---
 
+## 5a. Finding — the gate is a scan, not a signature check
+
+The predicted obstacle was identity: an unverified *developer* being refused.
+What actually stood in the way was novelty, and the remedy was disclosure.
+
+The sequence on 2026-09-25, tapping the file in Files by Google:
+
+1. **Install unknown apps** — "Allow from this source" for Files. Expected.
+2. **Google Play Protect — "App scan recommended."** *"Play Protect hasn't seen
+   this app before. To protect your device and data, send this app to Google for
+   a security scan."* Offered: **Scan app** / **Don't install app**.
+3. **Google Play Protect — "This app looks safe."** Install proceeded.
+4. The app ran.
+
+**The finding, stated carefully.** On this build, installing a self-signed APK
+that Google has not seen before was gated on **sending the APK to Google**. The
+two options presented were to scan or to abandon the install; whether a decline
+path exists behind "More details" was not tested (P0b).
+
+**Why it matters here more than it would elsewhere.** This is an egress event, in
+a project whose subject is deciding what leaves the device. The artifact
+containing everything the app does is uploaded to a third party as a condition of
+running it on hardware the user owns. That is not a criticism of Play Protect,
+which is doing something sensible for most people — it is a fact that belongs in
+`SOVEREIGN_STACK.md`'s ladder, because it is a rung nobody had counted:
+
+> **The build itself is subject to the same egress question as the data.**
+
+A private build is not private until P0b says it can be. If the scan cannot be
+declined, then either development moves to `adb` (P0a), or every iteration of
+Orb's phone host is disclosed to Google before it ever observes anything.
+
+**A second observation, incidental but not trivial.** The device reports security
+patch **2026-04-05** — roughly five months old at time of test. That is almost
+certainly *why* P0 held, and it means this result describes a device that is
+behind, not a device that is current. It should be re-tested after the next
+update, and R1's window is narrower than it looks.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |
@@ -217,7 +269,8 @@ useful to a person rather than to this document.
 
 ## 8. Exit criteria for pass 1
 
-1. P0 answered, either way, before Kotlin is written.
+1. ~~P0 answered, either way, before Kotlin is written.~~ **Done 2026-09-25:
+   held.** P0a and P0b raised in its place and carried into pass 1.
 2. P1, P2, P3, P4, P6 each answered `held` or `refuted`, with evidence from the
    device.
 3. `MOBILE_SENSING.md` corrected wherever the device disagreed with it.

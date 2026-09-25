@@ -108,9 +108,21 @@ gates have moved recently.
 - **Developer verification.** Devices shipping with Android 16 QPR2 or later
   preload a verifier that blocks installation of apps from unverified
   developers. A personal build needs a registered signing identity, or an
-  install path that the verifier exempts. This is the single most likely thing
-  to invalidate a "just sideload it" plan, and it is worth confirming against
-  the target device before any APK work begins.
+  install path that the verifier exempts.
+
+  **Tested 2026-09-25 on a Pixel 10a, Android 16, build `CP1A.260405.005`: no
+  such block appeared** and a self-signed APK installed and ran
+  (`DEVICE_LOOP.md` P0). The claim is not refuted — that build predates the
+  condition — but the practical warning stands and is dated: an update may close
+  this.
+- **Play Protect gates novelty, not identity.** The obstacle that actually
+  appeared was different and was not predicted here: an app Google has not seen
+  before is gated on **being uploaded to Google for a scan**, with "Scan app" or
+  "Don't install app" the options presented. **The build is therefore subject to
+  the same egress question as the data** — a point this document had missed
+  entirely, and one that belongs beside `SOVEREIGN_STACK.md` §5. Whether the
+  scan is declinable, and whether `adb` bypasses it, are open
+  (`DEVICE_LOOP.md` P0a, P0b).
 - **`PACKAGE_USAGE_STATS` is not a runtime dialog.** It is granted by hand in
   Settings → Special app access. Same for `SCHEDULE_EXACT_ALARM` on most builds.
 
