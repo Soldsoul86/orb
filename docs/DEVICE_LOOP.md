@@ -100,10 +100,11 @@ practical consequence is the one that matters: the door is open today, and the
 window argument in §7 R1 stands and is now dated. An update may close it.
 
 **P1 — A `dataSync` foreground service is stopped at roughly six cumulative
-hours per 24, and cannot be restarted from the background.**
-*If false:* §2 G4 is wrong for this device and the host design simplifies
-considerably.
-*If true:* the host cannot be one perpetual service, and §2's conclusion stands.
+hours per 24, and cannot be restarted from the background. — REFUTED,
+2026-09-25.** See §5h. One process ran **6h31m untouched** with `dataSync`
+foreground throughout and was never stopped. §2 G4 does not hold on this device,
+this build, this day — and the design simplifies, subject to the uncontrolled
+variable in §5h.
 
 **P2 — Nothing resumes after a reboot until the user opens the app.**
 *If true:* "continuous observation" has a hard floor, and the human is part of
@@ -115,7 +116,9 @@ the runtime whether the architecture says so or not. That belongs in
 must be `WorkManager`-only with much coarser cadence.
 
 **P4 — When the system kills or defers us, we can record that it happened, when,
-and why. — HELD, 2026-09-25 (§5f).**
+and why. — HELD, 2026-09-25, and re-held decisively in §5h.** Over 391 minutes,
+332 beats were delivered and 59 were declared skipped: **391 accounted for, zero
+unexplained**, independently for both services.
 *This is the prediction the architecture depends on.* Everything else is a
 capability question; this one is an honesty question.
 *If false* — if the process can die without leaving a trace — then a history with
@@ -597,6 +600,107 @@ now (§7 R4), and the desktop analyser is the better home for it regardless: a
 chain checked only by the device that wrote it is the weaker check — the same
 argument that makes tail truncation undetectable single-device in `CLAIMS.md`
 C2c.
+
+---
+
+## 5h. The pass-1 run — 1410 events, and what they settle
+
+**2026-09-25, 10:17–17:10 IST.** Exported `orb-pass1-20260925-171046.txt`, 1410
+events, read off-device.
+
+### Integrity, checked by a machine that did not write the file
+
+| Check | Result |
+| --- | --- |
+| Envelope hashes re-derived from stored fields | **1410 / 1410** |
+| Payload hashes re-derived | **1410 / 1410** |
+| Linkage (`previous` = predecessor's hash) | 1409 / 1410 — **one break, at line 4** |
+
+This is the check the phone **cannot** perform. `verify()` on the device is
+linkage-only (§5g); it never recomputes a hash from the stored fields, so
+alteration in place passes there. Recomputing off-device closes `CLAIMS.md` C2a
+for this file — and demonstrates the point C2c rests on: *a chain checked only
+by the device that wrote it is the weaker check.*
+
+### The one break is the old defect, preserved
+
+Line 4 carries `"previous": "35"`. Line 2's hash is `35bc0525b7bb`: the digit
+prefix, read back by the numeric extractor. **That is the §5d defect's
+signature**, written at 10:19:54 by the build that still had it.
+
+Everything from line 5 to line 1409 links perfectly, across **four further
+process starts**. So the fix is verified over four real restarts and seven
+hours — and the fork it replaced is still sitting in history, immutable,
+exactly where it happened. The chain kept the evidence of its own author's bug.
+
+### P1 — refuted
+
+One process, from 10:39:27 to the export at 17:10:46. Between event 96 and event
+1341 there is **nothing but heartbeats and signals**: no process start, no
+service start, no gap, no timeout. Both services report `serviceUptimeMs` of
+**6.52 hours** at the final beat.
+
+The last foreground interaction was the export at **10:39:33**. From there to
+17:10:46 is **6h31m with the app never brought forward**, and `dataSync` ran
+throughout. The cap did not fire.
+
+**The uncontrolled variable, stated rather than glossed.** This is one device,
+one build, one day, and the phone's battery-optimisation setting for this app
+was never recorded. An app set to *Unrestricted* would plausibly explain the
+result, and nothing here rules it out. The refutation is of *"this always
+happens"*, not of *"this can happen"* — `MOBILE_SENSING.md` §2 G4 is downgraded
+from a constraint to a condition, and the setting must be captured before pass 2.
+
+### P4 — held, and more tightly than the prediction asked
+
+The prediction was about the runtime noticing it had been **killed**. What the
+run produced is stronger: the process was never killed, and it recorded being
+**frozen** instead.
+
+Doze deferred the heartbeat 47 times by more than 90 seconds, the longest by
+**9.6 minutes**. Every one of those is declared:
+
+| | dataSync | specialUse |
+| --- | --- | --- |
+| Elapsed | 391.0 min | 391.0 min |
+| Beats delivered | 332 | 332 |
+| Beats declared skipped | 59 | 59 |
+| **Accounted for** | **391** | **391** |
+| **Unexplained** | **0** | **0** |
+
+Every minute of six and a half hours is covered either by an observation or by a
+recorded absence. That is the property the whole architecture rests on, measured
+rather than argued — and it only exists because §5f's fixed-**rate** correction
+made a skipped beat something the instrument counts instead of something it
+silently loses.
+
+### The finding nobody predicted: the notification is not a liveness signal
+
+At **16:48:16** both services recorded `probe.service.taskRemoved` — the app's
+task was cleared from recents. The operator then reported seeing **no Orb
+notification at all** and assumed the run had ended.
+
+It had not. **The services kept beating for another 22 minutes**, through to the
+export.
+
+So on this device: the task leaving recents does not stop a foreground service,
+and the foreground-service notification can be absent while the service runs.
+**Anything that treats the notification as evidence of liveness is wrong**, and
+the only trustworthy liveness signal is the journal itself. Recorded because the
+operator nearly ended a good run on that reading, and because pass 2 must not
+instruct anyone to check the shade.
+
+### What the run did not test
+
+- **P2 (reboot)** — the device never rebooted; `elapsedRealtime` rises monotonically.
+- **P3** — both service types survived, so nothing distinguishes them. The half
+  that mattered is answered anyway: `dataSync` itself was not capped.
+- **P6** — signals arrived in volume (252 `SCREEN_OFF`, 252 `SCREEN_ON`, 172
+  `USER_PRESENT`, 2 power connect/disconnect), but a foreground service was
+  running the whole time, which is the condition P6 excludes.
+
+The screen counts also say the phone was **used normally** throughout, which
+makes this a realistic carry test rather than a device left face-down on a desk.
 
 ---
 

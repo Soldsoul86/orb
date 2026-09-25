@@ -155,6 +155,12 @@ Re-derivation needs a JSON parser the probe does not have. The right home for it
 is the desktop analyser rather than the phone, because a chain checked only by
 the device that wrote it is the weaker check — the same reasoning as C2c.
 
+**First evidence, 2026-09-25.** The 1410-event pass-1 export was re-derived
+off-device: **1410/1410 envelope hashes and 1410/1410 payload hashes matched**
+(`DEVICE_LOOP.md` §5h). That is C2a demonstrated for one file by a machine that
+did not write it — not the claim earned, which needs the check to be routine
+rather than manual, but the first time it has been done at all.
+
 **C2b — A missing payload.** Under `PARTIAL_REPLICATION.md` this is *legitimate*
 — pruning is a feature, not damage. The bar is therefore not "payloads are never
 missing" but: **a pruned payload is distinguishable from a lost one.** The
