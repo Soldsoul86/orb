@@ -328,7 +328,184 @@ unblocked; alarming is not. That boundary is the honest stopping point.
 
 ---
 
-## 9. Sources
+## 9. Degrees of freedom
+
+§4 asks *what can be observed*. This section asks the harder question: **for each
+capability, how much of it do I own, and what is left when the platform takes it
+back?**
+
+Freedom here is not one number. It is three:
+
+> **who grants it**  ×  **what survives revocation**  ×  **which direction it is moving**
+
+### 9.1 — The grant ladder
+
+Android is usually discussed as one platform. For sovereignty purposes it is
+seven, and they are not equally yours.
+
+| Level | Grantor | Who can withdraw it | Examples |
+| --- | --- | --- | --- |
+| **L0 — Silicon + kernel** | The hardware, through the HAL | Nobody, short of different hardware | `TYPE_ACCELEROMETER`, `TYPE_GYROSCOPE`, `TYPE_PRESSURE`, `TYPE_SIGNIFICANT_MOTION` |
+| **L1 — AOSP, unpermissioned** | AOSP | AOSP at a major release | `ACTION_SCREEN_ON/OFF`, `USER_PRESENT`, `PACKAGE_ADDED`, `BOOT_COMPLETED`, USB attach |
+| **L2 — AOSP, user-permissioned** | **The user** | The user, at will | `LocationManager`, `AudioRecord`, `BluetoothGatt`, `SensorManager` high-rate, `TelephonyManager` |
+| **L3 — Mainline module** | AOSP nominally, **Google operationally** | Google, via a Play system update, between OS releases | Health Connect (`com.google.android.healthconnect`, a HealthFitness APEX), Bluetooth, Permission Controller, Remote Key Provisioner |
+| **L4 — Play Services** | Google, closed proprietary binary, auto-updating, **not in AOSP** | Google, silently, at any time | `FusedLocationProviderClient`, `GeofencingClient`, Activity Recognition Transition API |
+| **L5 — Remote verdict** | Google's servers, per call | Google, per call, and any network outage | Play Integrity |
+| **L6 — System app only** | Google/OEM privileged app | n/a — never yours | Crash detection, unknown tracker alerts, Intrusion Logging, cell-security warnings |
+| **L7 — Distribution** | Play policy; device developer-verification | Google, by policy change | Background-location declarations, sensitive-permission review, sideload verification |
+
+**L2 is the constitutionally ideal tier**, and it is worth naming why: at L2 the
+grantor *is* the root of trust. Art. VIII §30 says authority lives with the user.
+A capability the user grants and can revoke is not a dependency — it is the
+architecture working. Everything above L2 replaces the user with a vendor as the
+party who decides.
+
+**L3 is the trap.** "Health Connect is part of Android now" reads as a move
+*down* the ladder. It is not. A Mainline module ships through Google Play system
+updates, which means its behaviour can change between OS releases, on Google's
+schedule, on a device you did not update. Being inside the OS image is not the
+same as being under your control.
+
+**L4 is undeclared vendor lock-in.** Most Android code reaches for
+`FusedLocationProviderClient` without noticing it has just taken a dependency on
+a closed, auto-updating, non-AOSP binary. Art. III §11 forbids hardcoding a model
+provider. Play Services is a *sensor* provider, and the same law should bind it.
+
+### 9.2 — What each high-tier capability costs, and its freer substitute
+
+The useful finding is that **almost every L4/L5 capability has an L0–L2
+substitute**, at a stated price. The price is nearly always *power* or
+*accuracy* — never *function*.
+
+| Want | Convenient path | Freest path | What you give up |
+| --- | --- | --- | --- |
+| Position | `FusedLocationProviderClient` (L4) | `LocationManager` `GPS_PROVIDER` (L2) | Sensor fusion, battery efficiency, indoor/urban-canyon accuracy. You keep position. |
+| Place transitions | `GeofencingClient` (L4) | Own hysteresis over L2 fixes, **woken by `TYPE_SIGNIFICANT_MOTION` (L0)** | Power — unless you gate on significant motion, which is the whole trick. Then the gap narrows a lot. |
+| Motion class | AR Transition API (L4) | Own classifier over L0 IMU | Google's trained model and its batching efficiency. You *gain* a model tuned to one body — which is what a Digital Twin is for. |
+| Heart rate | Health Connect (L3) | **Direct BLE GATT — Heart Rate Service `0x180D`, measurement `0x2A37`** (L2, open Bluetooth SIG standard) | The vendor's cleaned-up data and history. You gain a path that needs no Google module and no vendor app — any strap exposing the standard service works. |
+| Device integrity | Play Integrity (L5) | **Keystore key attestation** (L2): `getCertificateChain()`, verify the chain offline against a pinned Google attestation root, read `RootOfTrust` in the hardware-enforced list for `deviceLocked` and `verifiedBootState` | Google's device-reputation database. You gain *offline verification* — no server round-trip at check time. **Caveats, stated honestly:** the chain still roots in a Google key; attestation-key provisioning is itself now remote (Remote Key Provisioner, a Mainline module); revocation checking is an online step; and hardware attestation has been bypassed via leaked keyboxes. Better than L5, not absolute. |
+| Fake cell tower | OS warnings (L6, modem-dependent) | `TelephonyManager` cell-info watch (L2): cell ID / LAC / TAC changes, implausible tower transitions, `NETWORK_TYPE` downgrades | Everything the modem knows and won't tell you — cipher state, IMSI requests. You get the classic pre-Android-16 heuristic: weak evidence, honestly recorded as weak. |
+| Crash detection | Pixel Personal Safety (L6) | Own threshold over L0 IMU against a personal baseline | Google's accuracy and its tuning across millions of crashes. You own the threshold, and can see why it fired. |
+| Tracker detection | Unknown tracker alerts (L6) | Raw BLE scan (L2) | **Do not substitute.** Resolvable-private-address rotation defeats a naïve scanner. This is the one row where the platform genuinely beats anything you would build, it works cross-platform, and a worse copy is a liability. Take the L6 shadow via notification and be glad. |
+
+The pattern: **you can buy your way down the ladder almost everywhere, and the
+currency is battery.** That is a much better trade than it first looks, because
+Orb is not a real-time system. Art. V §20 — *nothing is live* — means a sensor
+that is 90 seconds late and vendor-free is architecturally *preferable* to one
+that is instant and owned by Google.
+
+### 9.3 — The four freedoms, in time
+
+A capability's freedom changes across its life. Separating the four is what makes
+the question answerable.
+
+| | Freedom | Who decides | Where Orb stands |
+| --- | --- | --- | --- |
+| **F1** | **Acquisition** — can I get it at all? | User (L2), Google (L3–L5), nobody (L6) | Varies by row; §9.1 is the map. |
+| **F2** | **Continuity** — once granted, does it keep producing? | The platform: Doze, App Standby, while-in-use, the 6h `dataSync` cap | **Weakest link.** §2 G4. Mitigated by typed services, not solved. |
+| **F3** | **Revocation** — who takes it, how fast, and do I *learn* it happened? | User or Google | Solvable, and currently unbuilt — see below. |
+| **F4** | **Retention** — when it is gone, what do I keep? | **You. Entirely.** | **Already maximal.** |
+
+**F4 is the answer to the question as asked.** A platform takes over the *future*
+of a capability. It never takes its *past* — provided the past went through the
+journal. Append-only, hash-chained, encrypted at rest, replicated across the
+user's own devices (Art. I, `SECURITY.md` §3, `SYNC_PROTOCOL.md`). Google can
+delete an API in the next release; it cannot reach into a lane and remove what
+was already observed. Every observation recorded today is permanently outside
+any platform's reach.
+
+That is not a consolation prize. It inverts the usual calculus: **the value of
+recording a signal now is not only what it tells you now, but that it is the last
+moment the platform cannot revoke.** A capability with a falling derivative
+(§9.4) is an argument to start recording *sooner*, not to avoid depending on it.
+
+**F3 has a design consequence that costs almost nothing and is currently
+missing.** If a sensor census runs each cycle — enumerate our own granted
+permissions, FGS eligibility, Advanced Protection state, Play Services presence
+and version — then every loss of freedom becomes *an observation with a
+timestamp*. Replay then shows exactly when each capability was withdrawn and by
+whom. `Sensor.md` §7 already permits this ("the revocation itself may be
+recorded"); nothing yet does it. It converts losing freedom into evidence, which
+is the most Orb-native response available.
+
+### 9.4 — The derivative
+
+Freedom has a direction. Android's travel has been consistently one way, and a
+capability's *trend* matters more than its current value for anything meant to
+last decades.
+
+**Narrowing — do not build a foundation here:**
+
+| Capability | Narrowed at |
+| --- | --- |
+| Background location | Android 10, 11; Play policy and the location button for Android 17+ targets, enforcement anticipated late Oct 2026 |
+| Package visibility | Android 11 (`QUERY_ALL_PACKAGES` restricted) |
+| SMS | Long restricted; Android 17 withholds WebOTP messages from non-recipients for 3h |
+| Accessibility / notification listener | Restricted Settings, sideload-gated |
+| Local network | **Android 17 — `ACCESS_LOCAL_NETWORK` is a brand-new gate on something previously free** |
+| Foreground services | Android 14 types → 15 caps and boot restrictions → 16 job quotas |
+| Sideload install | Android 16 QPR2 developer verification |
+
+**Stable for a decade or strengthening — safe to build on:**
+
+| Capability | Why |
+| --- | --- |
+| `SensorManager` IMU | L0. Unchanged in substance since Android 1.5. |
+| Screen / boot / package *events* | L1. The events survive; only the freedom to react in background has narrowed. |
+| `BluetoothGatt` + SIG standard profiles | L2 + an **open standard body that is not Google**. The single most durable non-trivial row in this document. |
+| Keystore key attestation | Strengthened since May 2025 (hardware-backed signals required), not narrowed. |
+
+Note the shape: **everything durable sits at L0–L2, and the most durable thing
+here is the one governed by a standards body rather than a vendor.** Orb's
+existing law — no vendor lock-in, no hardcoded provider — is the correct
+instinct, and §9.2 gives it a concrete sensor-level reading.
+
+### 9.5 — Cross-device arbitrage
+
+The constraints in §2 are the *Pixel's*, not Orb's. Art. IV §14 says devices are
+equal peers and §15 says each writes only its own lane — which means **an
+observation's value does not depend on which device produced it.** So:
+
+> Put each sensor on the freest device that can see the signal, and let
+> replication carry it.
+
+- A **Mac** has no Doze, no foreground-service type system, no 6-hour cap, and no
+  Play Services dependency. Anything it can perceive, it perceives more freely.
+- A **stationary BLE observer** you own — a Pi with a radio — can watch for
+  persistent unknown devices at home continuously, with no phone permission, no
+  battery constraint, and no vendor in the path at all. That is an L0 answer to
+  an L6 problem, available only because sync makes the device irrelevant.
+- The **Pixel's genuine monopoly** is small and specific: it is the device that
+  is *on the person*. Body signals, real-world position, and physical proximity
+  are its and nothing else's. Everything else is better observed elsewhere.
+
+This reframes the roadmap item. The Pixel host is not "the mobile version of
+Orb." It is the sensor for the three things only a carried device can see — and
+deliberately *not* the place to put anything another device could observe more
+freely.
+
+### 9.6 — What this changes
+
+1. **Add a principle to sensor selection, mirroring Art. III §11:** prefer the
+   lowest-level implementation that answers the question. Take a higher-level one
+   only when its advantage is decisive (almost always power), and when you do,
+   **name the provider in the observation's source identity** — so history shows
+   the dependency, and a future migration off it is a query rather than an
+   excavation.
+2. **The §8 first step is already the high-freedom set** — integrity (L1/L2),
+   presence (L2 woken by L0), deferral (internal). That was arrived at on
+   privacy-cost grounds and sovereignty grounds independently, which is a good
+   sign.
+3. **Extend sensor 1 with a self-census** (§9.3 F3): our own permissions, FGS
+   eligibility, Advanced Protection state, Play Services presence and version,
+   recorded each cycle. It is the cheapest sensor in the catalogue and the only
+   one that measures Orb's own freedom.
+4. **Revisit the Play Integrity question with an actual answer.** Keystore
+   attestation, verified offline against a pinned root, is the
+   constitutionally-compatible substitute — with the caveats in §9.2 stated in
+   the observation rather than hidden.
+
+## 10. Sources
 
 Platform facts above were verified 2026-09-25 against:
 
@@ -345,6 +522,9 @@ Platform facts above were verified 2026-09-25 against:
 - [Find unknown trackers](https://support.google.com/android/answer/13658562), [Unknown tracker alert updates](https://blog.google/feed/android-unknown-tracker-alerts/)
 - [Personal Safety app](https://www.android.com/articles/personal-safety-app/), [Get help in an emergency using your Pixel](https://support.google.com/pixelphone/answer/7055029) — crash detection, Safety Check
 - [UsageStatsManager](https://developer.android.com/reference/android/app/usage/UsageStatsManager); Restricted Settings for sideloaded apps; Android 16 QPR2 developer verification
+- [Verify hardware-backed key pairs with key attestation](https://developer.android.com/privacy-and-security/security-key-attestation) and [Key and ID attestation](https://source.android.com/docs/security/features/keystore/attestation) (AOSP) — offline chain verification, `RootOfTrust`, `deviceLocked`, `verifiedBootState`; bypass caveat from [Quarkslab](https://blog.quarkslab.com/bypassing-android-hardware-attestation.html)
+- [Heart Rate Service](https://www.bluetooth.com/wp-content/uploads/Files/Specification/HTML/HRS_v1.0/out/en/index-en.html) (Bluetooth SIG) — `0x180D` / `0x2A37`
+- [Mainline](https://source.android.com/docs/core/ota/modular-system) (AOSP) and [Project Mainline in Android 14](https://www.androidpolice.com/project-mainline-android-14/) — HealthFitness APEX, Google Play system updates
 
 Where a row says "no API", that is the absence of a documented public API as of
 the date above — an absence, not a proof. It should be re-checked before it is
