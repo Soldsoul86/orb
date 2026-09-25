@@ -128,14 +128,15 @@ service.** `ACTION_USER_PRESENT`, `PACKAGE_ADDED`/`_REMOVED`, USB attach.
 *If false:* even the cheapest sensor in the catalogue needs a service, and the
 first-sensor recommendation in `MOBILE_SENSING.md` §8 is wrong.
 
-**P0a — `adb install` bypasses the Play Protect novel-app scan.** *Untested.*
-Raised by the P0 run (§5a). Decides whether every development build has to be
-uploaded to Google before it can be run, or only every distributed one.
+**P0a — `adb install` bypasses the Play Protect novel-app scan. — HELD,
+2026-09-25.** A package the device had never seen (`dev.orb.probeb`, fresh
+signing key) installed over USB with no dialog at all. **Development builds stay
+private; only the sideload path discloses.** See §5b.
 
-**P0b — the scan is declinable.** *Untested.* The dialog offered "Scan app" and
-"Don't install app" and nothing else on its face; whether an install-without-
-scanning path exists behind "More details" was not explored. A device where the
-scan cannot be declined is a device where private builds are not private.
+**P0b — the scan is declinable on the sideload path.** *Untested, and downgraded
+by P0a.* It no longer blocks development; it decides only whether a build can
+reach a phone without a cable and without going through Google first. Worth
+answering before anything is ever handed to someone else.
 
 ### Pass 2 — is the capability map accurate?
 
@@ -223,6 +224,46 @@ patch **2026-04-05** — roughly five months old at time of test. That is almost
 certainly *why* P0 held, and it means this result describes a device that is
 behind, not a device that is current. It should be re-tested after the next
 update, and R1's window is narrower than it looks.
+
+---
+
+## 5b. Finding — privacy of the build is a property of the install path
+
+P0a settles what §5a raised. The two paths are not variations of one mechanism;
+they are different mechanisms with different disclosure consequences.
+
+| Path | Mechanism | Novel app is | Disclosure |
+| --- | --- | --- | --- |
+| Tap the file | session installer, via Files | scanned by Google before installing | **the APK is uploaded** |
+| `adb install` | direct, over USB | installed | **none** |
+
+**So the loop can run privately.** Every iteration of Orb's phone host can be
+built, installed and tested over a cable without the artifact ever leaving the
+two machines that made it. That is a materially better position than §5a
+implied, and it means the disclosure question only arrives at distribution —
+which this project may never reach, since a personal runtime has an install base
+of one.
+
+### The cost, which is not nothing
+
+`adb install` requires **USB debugging enabled**, and that is a standing
+weakening of the device. A phone with developer mode on is meaningfully easier
+to extract data from with physical access — which is precisely the threat
+`MOBILE_SENSING.md` §4.1 and §4.4 were written to detect.
+
+So the private install path and the security posture this project exists to
+protect are in direct tension, and the tension is not resolvable by cleverness.
+Two consequences, both worth carrying forward:
+
+1. **Developer mode is itself an integrity signal.** "USB debugging is enabled"
+   belongs in the device-integrity sensor alongside app installs and USB attach,
+   because for any device *not* being developed on it is an anomaly worth
+   raising. Orb's own development posture should trip Orb's own alarm — and the
+   alarm firing correctly on its author's phone is the cheapest honest test of
+   whether it works at all.
+2. **The development device is knowingly degraded** and should not be treated as
+   representative of a carried, protected phone. Findings about battery, kills
+   and deferral transfer; findings about the device's security posture do not.
 
 ---
 

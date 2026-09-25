@@ -121,8 +121,15 @@ gates have moved recently.
   "Don't install app" the options presented. **The build is therefore subject to
   the same egress question as the data** — a point this document had missed
   entirely, and one that belongs beside `SOVEREIGN_STACK.md` §5. Whether the
-  scan is declinable, and whether `adb` bypasses it, are open
-  (`DEVICE_LOOP.md` P0a, P0b).
+  scan is declinable is open (`DEVICE_LOOP.md` P0b).
+
+  **`adb install` bypasses it entirely** — tested 2026-09-25 with a package the
+  device had never seen: no dialog, direct install (`DEVICE_LOOP.md` P0a). The
+  disclosure is therefore a property of the *install path*, not of the build:
+  development over a cable stays private, and only the cable-free sideload
+  discloses. The cost is that `adb` needs USB debugging enabled, which is a
+  standing weakening of the device and belongs in §4.4's integrity signals in
+  its own right.
 - **`PACKAGE_USAGE_STATS` is not a runtime dialog.** It is granted by hand in
   Settings → Special app access. Same for `SCHEDULE_EXACT_ALARM` on most builds.
 
@@ -196,6 +203,7 @@ a decades-long record of a life.
 | Screen unlock / lock | `ACTION_USER_PRESENT`, `ACTION_SCREEN_OFF` | none | Y | 1.00 | Unlocks at times you were asleep are a strong signal. Note the OS records this too, in Intrusion Logging, where you cannot read it. |
 | USB attach | `UsbManager` broadcasts | per-device consent | Y | 0.95 | A physical-access signal. Correlates with forensic extraction attempts. |
 | SIM / carrier change | `TelephonyManager` + `ACTION_SIM_STATE_CHANGED` | `READ_PHONE_STATE` | Y | 0.95 | SIM swap in the physical sense. |
+| USB debugging enabled | `Settings.Global.ADB_ENABLED` | none | Y | 1.00 | A standing weakening of the device: developer mode makes physical extraction substantially easier. On a phone nobody is developing on, switching on is an anomaly worth raising on its own. Added after `DEVICE_LOOP.md` §5b, where it turned out to be the price of a private install path. |
 
 ### 4.5 — "What is the device being told?"
 
