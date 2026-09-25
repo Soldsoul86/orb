@@ -115,6 +115,63 @@ durable reflection-state need materializes.
 
 ---
 
+## AD-5 — `KERNEL.md` lists two State→Service dependency edges
+
+- **Status:** Open · **Raised:** Phase 3b, Execution domain review · **Revisit at:**
+  the Phase 3b gate, before any Execution implementation interface is written
+- **Domain:** Execution · **Kind (if adopted):** correction to `KERNEL.md`, not a
+  new contract
+
+**The finding.** `KERNEL.md` states as ratified kernel-wide law (Constitution
+Art. X §40):
+
+> A State contract depends only on other State (or on nothing); it never depends
+> on a Service.
+
+Two of the Execution domain's dependency lines contradict it:
+
+| Contract | Kind | `KERNEL.md` says it depends on | Problem |
+| --- | --- | --- | --- |
+| `Action` | **State** | Capability (Service), Policy | State → Service |
+| `Policy` | **State** | Capability (Service) | State → Service |
+
+Those same two edges also close a cycle — `Capability` → `Action` → `Capability`
+— against the section's own claim that the rule "keeps the kernel a directed
+acyclic graph".
+
+**Why it is a finding and not a bug in the contracts.** The resolution is
+already prescribed by the law that the edges violate, and by existing precedent
+in this repository. `Observation.md` met exactly this shape with `Sensor` and
+resolved it by attribution rather than dependency:
+
+> An Observation is attributed to a **source identity** — a stable value naming
+> whatever produced it… The source is a *value*, not a kernel contract. This is
+> deliberate: it keeps the kernel smaller, avoids a circular dependency with
+> `Sensor`.
+
+`Action` names its Capability by **identity and declaration version**, and
+`Policy` names Capabilities by **identity and tier** — values in both cases. The
+specifications as drafted therefore declare:
+
+- `Action` — depends on `Event`, `Policy`
+- `Policy` — depends on `Event`
+- `Capability` — depends on `Action`, `Policy` (Service → State, which is legal)
+
+This is acyclic, satisfies Art. X §40, and has the additional merit of being
+correct on its own terms: an Action must stay explainable after the Capability
+that produced it has been retired, which a live dependency could not guarantee.
+
+**What is owed.** `KERNEL.md`'s three dependency lines should be corrected to
+match. That file records the *accepted* Phase 3a gate, so the correction is not
+made unilaterally here; it is recorded for the reviewer. Nothing else in the
+kernel is affected — no contract is added, removed or renamed.
+
+**Decision owner:** reviewer (architecture). **Resolution:** accept the
+attribution-by-value reading and correct `KERNEL.md`, or reject it and say how
+the DAG is otherwise preserved.
+
+---
+
 ## Executables built ahead of their contract specifications
 
 **Recorded:** Phase 3, alongside the Hyperliquid trade executor.

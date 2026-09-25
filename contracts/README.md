@@ -102,11 +102,16 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 5. Execution
 | Contract | Kind | Status |
 | --- | --- | --- |
-| Capability | Service | _pending_ |
-| Action | State | _pending_ |
-| Policy | State | _pending_ |
+| [Capability](Capability.md) | Service | Draft |
+| [Action](Action.md) | State | Draft |
+| [Policy](Policy.md) | State | Draft |
 | Scheduler | Service | _pending_ |
 | Agent | Service | _pending_ |
+
+> `Action` and `Policy` declare narrower dependencies than `KERNEL.md` lists for
+> them: both name Capabilities by **value** rather than depending on the
+> `Capability` Service, because a State contract never depends on a Service
+> (Art. X §40). See `../docs/ARCHITECTURAL_DEBT.md` AD-5.
 
 ### 6. Infrastructure
 | Contract | Kind | Status |
