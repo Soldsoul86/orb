@@ -518,6 +518,29 @@ a scratch copy — `extract` in place of `extractString` — fails the suite in
 under a second. A regression test that has never failed pins nothing, which is
 rule R2 in `CLAIMS.md` applied to this project's own tests.
 
+**Confirmed on a second machine, 2026-09-25.** The operator ran both the clean
+suite and the negative control on their MacBook Air, from a fresh checkout with
+nothing installed beyond a JDK and `python3`. 59 checks green; the canonical
+encoder produced byte-identical output and identical digests against the pinned
+vectors on different hardware, a different JDK build and a different default
+locale. That is two independent machines agreeing with the TypeScript runtime —
+and **not** an answer for ART, which is neither of them, and which is why the
+on-device self-test in §7b exists.
+
+The negative control failed four checks there and five here. Neither count is
+the reproduction: `extract` scans digits only, so what the defect does depends
+on the first character of a head hash, which varies with the wall clock and the
+random event id. A digit-leading hash yields non-null garbage and the chain
+forks **silently**; a letter-leading one can leave the head unresolved and the
+journal declares itself discontinuous. Only `chain verifies across 20 restarts`
+fails on every run — 19 breaks in 20 events — because the chain forks either way.
+
+The quiet path is the one that matters, and it is the one the device actually
+took in §5d: the chain forked at every restart while the probe reported nothing
+wrong. A defect that announced itself would not have needed a hash chain to be
+found. Recorded in `apps/pixel/pass1/README.md` so a differing failure count is
+not later read as a differing result.
+
 ### What the tests found, which is worth more than the tests
 
 `verify()` checks **linkage only**: each event's `previous` against the recorded

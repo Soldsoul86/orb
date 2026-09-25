@@ -71,11 +71,34 @@ What it covers, and why each is there:
 
 | Test | Why |
 | --- | --- |
-| A restarted process continues the chain | The §5d regression. Verified by failing: reintroduce `extract` for `extractString` and the suite fails in under a second. |
+| A restarted process continues the chain | The §5d regression. Verified by failing: reintroduce `extract` for `extractString` and the suite fails in under a second. Expect `chain verifies across 20 restarts` to fail every time, with 19 breaks in 20 events; the *other* checks that fail vary between runs (see below), so match on that line rather than on a total. |
 | Deletion, reordering, an edited hash | What linkage evidence actually catches. |
 | **An edited payload is NOT detected** | A recorded limit, asserted rather than assumed. `verify()` checks linkage only; it never re-derives a hash. |
 | Every break is reported | An earlier break must not hide a later one. |
 | Canonical JSON edge cases | The half of the cross-implementation agreement that runs on the device, executed for the first time. |
+
+### Why the negative control's failure count moves
+
+Reintroducing the §5d defect does not fail the same set of checks twice running,
+and a run that fails four is not a weaker reproduction than one that fails five.
+
+`extract` scans digits only, so what it does to a head hash depends on the first
+character of that hash — and hashes vary with the wall clock and the random
+event id:
+
+| Head hash starts with | `extract` returns | `head` | `discontinuous` |
+| --- | --- | --- | --- |
+| a digit (`0`–`9`) | that digit prefix — non-null garbage | wrong | **false**: nothing announces it |
+| a letter (`a`–`f`) | `null`, so `restore()` walks further back | unset if nothing yields digits | **true** |
+
+Only the second path is loud. So the `cycle N opens continuous` checks fail on
+some runs and not others, while `chain verifies across 20 restarts` fails on
+every run, because the chain forks either way.
+
+The quiet path is the one that matters. It is what actually happened on the
+device in §5d: the chain forked at every restart and the probe reported nothing
+wrong, which is why `verify()` had to exist for the defect to be caught at all.
+A defect that announced itself would not have needed a hash chain to find it.
 
 ## Build
 
