@@ -276,6 +276,13 @@ would be quietly reinterpreted again. Art. I §2 is unamended; this is its
 application to the store, which `STORAGE.md` had already distinguished from the
 journal.
 
+**This ruling does not extend to erasure.** It turns on *relocated, not
+deleted* — the payload still exists, readable, on K other devices, so identity,
+content and replayability survive, which is the test `Event.md` §2 states.
+Erasure destroys content and fails that test. `ERASURE.md` §2 proposes a
+separate reading and leaves it for the operator to rule on, rather than
+stretching this one to cover a case it was not argued for.
+
 Had it been rejected, the fallbacks were Tier 0 (today's behaviour) or
 lane-granular replication — a device holds whole lanes or none, which preserves
 per-lane chains perfectly and loses §3's "knows what it does not know" property

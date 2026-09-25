@@ -1,0 +1,274 @@
+# Erasure — the right to delete, and the duty to say so
+
+**Status: PROPOSAL, 2026-09-25.** Records a ruling the operator made in
+principle; two questions in §9 are left for them to answer in their own words
+before anything is built. Nothing here is implemented.
+
+---
+
+## 0. The ruling
+
+> *"All these proofs are mine. I should be able to erase it — just that Orb
+> should know that I have done it."*
+> — the operator, 2026-09-25
+
+Which gives the rule this document is built on:
+
+> **History may shrink. It may never shrink silently.**
+
+Both halves matter. Immutable history denies the owner a right over their own
+life. Silent deletion deceives whoever reads the record. This is the third path:
+erasure is legitimate, and erasure is declared.
+
+**The consequence worth noticing first.** If you can delete openly, the only
+reason to delete secretly is to deceive someone. Silent truncation therefore
+becomes, by definition, an attack — never an exercise of a right. Orb stops
+having to work against its owner, which is the fork `CLAIMS.md` could not
+resolve and this ruling closes.
+
+---
+
+## 1. The second ruling: no silent choices
+
+> *"Wherever there is ambiguity, user should be notified and then proceed, so
+> everything is transparent to me."*
+> — the operator, 2026-09-25
+
+This is not a preference about dialogs. It decides a design question that was
+open: when erasure reaches something it cannot cleanly resolve — a conclusion
+that only partly depended on the erased event, a peer that has not confirmed, a
+disclosure that cannot be recalled — the system **does not pick a default.** It
+names the ambiguity and waits.
+
+§4 turns that into a list of the specific points where it fires, so it is a
+testable obligation rather than a slogan.
+
+It also settles the shape of the operation. Erasure is **two-phase**: compute
+the full consequence, show it, then act — never act and report. Art. VII §28
+requires explicit, scoped authorization for irreversible actions, and there is
+no more irreversible action in Orb than this one.
+
+---
+
+## 2. Art. I §2, and why an amendment may not be needed
+
+Art. I §2: *"Events are never edited, reordered, or deleted."*
+
+`PARTIAL_REPLICATION.md` §10 already ruled on this clause, but that ruling does
+not cover erasure. It turned on **"relocated, not deleted"** — a pruned payload
+still exists, readable, on K other devices, so identity, content and
+replayability survive. Erasure destroys content. It fails the test that ruling
+passed, and cannot ride on it.
+
+**The proposed reading — awaiting the operator's ruling (§9):**
+
+> Erase the payload. Keep the envelope.
+>
+> No event is edited, none reordered, none removed from the sequence. The
+> sequence is the same length, in the same order, with the same hashes. One
+> event has no readable content any more, and says so.
+
+**The envelope with no payload *is* the tombstone.** It is not a separate record
+that could itself be erased, so there is no regress to argue about.
+
+### What falls out of it
+
+Height does not change. The head does not change. No hash changes.
+
+**So erasure never looks like truncation.** A witness's attestation — lane at
+height 4,812, fingerprint `a7f3` — still reconciles exactly after two hundred
+payloads are destroyed. Erasure and `CLAIMS.md` C2c become fully orthogonal, and
+witnesses are left with one narrow job: detect **undeclared** removal.
+
+### The ladder, and what each rung costs
+
+| | What goes | Chain | Amendment? |
+| --- | --- | --- | --- |
+| **E0** | Nothing | — | Today's behaviour |
+| **E1** | The payload | Intact; height and hashes unchanged | **No** — §2 as read above |
+| **E2** | Payload and the event's *type* | Hash changes; the chain must be re-linked | **Yes** |
+| **E3** | The whole event | Height changes; indistinguishable from truncation | **Yes**, and every witness attestation must be reconciled |
+
+**E1's honest limit:** the envelope still carries type and timestamp. Erasing
+the payload of a `health.appointment` at 15:04 does not hide that an event of
+that kind happened then. E1 gives the right to erase *what happened*. Erasing
+*that something happened* is E2 or above.
+
+---
+
+## 3. Erasure is a graph operation, not a row operation
+
+Deleting an event does not delete what was learned from it. The Belief, the
+Fact, the index entry, the summary, the twin — each was computed once and now
+stands on its own, still answering questions from content that is gone.
+
+Art. I §3 gives the mechanism and needs no amendment:
+
+> *"All other state is a derived projection and may be discarded and rebuilt."*
+
+So: **erase the event, discard everything derived from it, replay what remains,
+rebuild.**
+
+### The requirement this creates
+
+**No derivation without recorded lineage.**
+
+Given an event, Orb must be able to find every Belief, Fact, index entry and
+summary that used it. `Belief.md` carries provenance and Inference Records point
+*backward*, from conclusion to evidence. Erasure walks the same edges *forward*.
+
+If one derivation exists whose inputs were not recorded, **erasure is a lie** —
+something downstream still holds what was destroyed, and nothing knows to clear
+it. This is a hard constraint on `Belief.md`, `Fact.md`, `InferenceRecord.md` and
+`EVIDENCE_GRAPH.md`, and all of them are still Draft. Now is the cheap moment.
+
+---
+
+## 4. Where the system must stop and ask
+
+The §1 ruling, made concrete. Each is a point where erasure cannot decide
+correctly on the owner's behalf, and each is checkable.
+
+| | Situation | What must be shown, **before** erasing |
+| --- | --- | --- |
+| **D1** | A conclusion rests on the erased event **and others** | That it will survive rebuilding, and why. Then: keep it, erase it too, or keep it marked |
+| **D2** | A conclusion rests on the erased event **alone** | That it will disappear — stated, not silent, because the owner may not have known it existed |
+| **D3** | The blast radius is large | The full list of what will be torn down, before anything is torn down |
+| **D4** | Some of it was already disclosed | What left, when, to whom, and that it **cannot** be recalled |
+| **D5** | Peers hold copies | Which peers confirmed the erasure and which have not been seen |
+| **D6** | The pattern will re-derive from ongoing collection | That erasing the past does not stop the future — with the option to change the collection policy in the same breath |
+| **D7** | E1 leaves the envelope | Exactly what still remains visible: type, timestamp, position |
+| **D8** | Witness attestations exist | That they are unaffected at E1 — and, at E2/E3, that they will conflict and how that is resolved |
+
+A system that resolves any of these quietly is not doing erasure. It is doing
+something else and calling it erasure.
+
+---
+
+## 5. Three things that cannot be bought
+
+Stated plainly, because a deletion feature that oversells itself is worse than
+none at all.
+
+### 5a. An over-determined pattern survives its own evidence
+
+A Belief resting on one event dissolves when that event is erased. A Belief
+resting on fifty, minus one, **rebuilds almost unchanged.** The knowledge
+survives because it never depended on the part that was removed.
+
+You cannot erase your way out of a pattern. D1 exists because of this.
+
+### 5b. "Never re-derived" is an impossibility, not a gap
+
+To guarantee something is never concluded again, Orb must remember what it is
+forbidden to conclude — a suppression list, which is *a permanent record of
+exactly the thing the owner asked it to forget*, and would become the most
+sensitive object in the system.
+
+A partial dodge: store a **hash** of the erased content rather than the content,
+which blocks exact reappearance without keeping the thing. It does nothing for
+patterns, because a pattern has no fixed content to hash.
+
+So the guarantee is not available. Orb should say so rather than imply otherwise.
+
+### 5c. Erasing the past does not stop the future
+
+Sensors keep running. Erase every record of going somewhere, keep going there,
+and the record honestly rebuilds from new evidence next week.
+
+Which points at the conclusion that matters most in this document:
+
+> **Prevention beats erasure. The strongest control is not recording it.**
+
+That places `Policy` and `Capability` *above* deletion in the architecture. A
+rule that says *do not observe this* is strictly more powerful than any amount
+of erasing afterwards. Erasure is the fallback for what the owner did not
+anticipate — necessary, and the weaker tool. It must not be presented as the
+main one.
+
+---
+
+## 6. Erasure is local
+
+The owner can destroy what is on their device. They cannot make another device
+forget — offline, lost, unwilling, or simply not yet asked.
+
+What is available: erase locally, declare it, propagate the declaration, and
+**record which peers confirmed**. The honest statement is then not *"it is
+gone"* but *"gone here; three of four peers confirmed; one has not been seen
+since Tuesday."* Same move as everywhere else in this project — state the
+boundary instead of promising past it. D5.
+
+---
+
+## 7. A gap in code that blocks all of this
+
+`DetachedEvent` (`runtime/journal/src/types.ts:77`) is defined as exactly one
+thing: `payload?: undefined`. Absence carries no reason.
+
+So **pruned and erased are indistinguishable today** — and they mean opposite
+things to a peer:
+
+| | Meaning | What a peer should do |
+| --- | --- | --- |
+| Pruned for space | "I dropped this; K others hold it" | Send it back on request |
+| Erased by the owner | "This is destroyed" | Never send it again; destroy yours |
+
+As built, a peer holding the payload would helpfully restore the thing the owner
+deliberately destroyed, **and it would be behaving correctly**. Erasure cannot
+exist until absence carries a reason. Small to fix, and first.
+
+---
+
+## 8. What erasure actually outputs
+
+Not *"it's gone."* Four statements:
+
+1. **What was removed.**
+2. **What was rebuilt without it.**
+3. **What survived rebuilding, and why** — because the pattern did not need it
+   (§5a).
+4. **What had already left the device**, when, and to whom (§5c, D4).
+
+The fourth line only exists because disclosures are themselves recorded as
+history under Art. VIII §32. This is the first place that requirement pays for
+itself.
+
+So the full promise is larger than the ruling as first stated:
+
+> **I can erase; Orb records it; Orb tears down what was built on it; and Orb
+> tells me honestly what it could not take back.**
+
+Stronger than most systems offer. Smaller than "it's gone." True.
+
+---
+
+## 9. Open — for the operator, in their own words
+
+1. **The Art. I §2 reading (§2).** The proposed reading is E1: the payload is
+   destroyed, the envelope remains, nothing is edited, reordered or removed from
+   the sequence. `PARTIAL_REPLICATION.md` §10 was ruled on explicitly rather
+   than assumed, for the stated reason that *a law quietly reinterpreted once
+   would be quietly reinterpreted again.* The same applies here.
+2. **How far up the ladder (§2).** E1 alone, or must Orb eventually erase the
+   *fact* that an event occurred — which is an amendment, not a reading, and
+   which puts erasure back into conflict with witnesses.
+
+---
+
+## 10. Sequencing
+
+Not now. The pass-1 run is in progress and `DEVICE_LOOP.md` §7 R4 stands.
+
+After it, and after AD-6:
+
+1. **A reason on absence** (§7). Nothing else can start until pruned and erased
+   are different things in the type system.
+2. **Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
+   `InferenceRecord.md` are still Draft and cheap to change.
+3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
+   local, needing no external service, and impossible to undo. That makes it the
+   natural first test of `CLAIMS.md` C1's consent gate — the six routes an agent
+   might use to avoid asking are all testable against an operation that never
+   leaves the device.
+4. **The two-phase preview** (§1, §4) — the part the owner actually touches.

@@ -168,6 +168,14 @@ not runnable until it can. `WITNESSES.md` works out what a witness should be —
 another person's phone holding a few hundred bytes it cannot read — and is
 blocked on the same entry.
 
+**The owner is not the adversary here, as of 2026-09-25.** `ERASURE.md` records
+the operator's ruling that deletion is a right, exercised openly and declared in
+history. That removes the awkwardness in C2: Orb is not trying to stop its owner
+from deleting, it is trying to ensure no deletion is *silent*. Undeclared
+removal is therefore an attack by definition, never an exercise of a right — and
+since a declared erasure leaves the envelope, the height and every hash
+unchanged, it is invisible to C2c. The two concerns are orthogonal.
+
 **Negative control (R2).** The same three mutations against a product whose log
 lives on the vendor's server. C2c is that product's default configuration: the
 operator of the log is, by construction, the party who can truncate it. Naming
@@ -265,7 +273,10 @@ After it, in this order, because each is gated by what it needs:
    claim that looked nearest to runnable is the one with the most missing under
    it — which is what writing the tests was for.
 2. **C3** — needs no phone and no airwall. Pure runtime.
-3. **C1** — needs the three contracts accepted and Ruling 1 made.
+3. **C1** — needs the three contracts accepted and Ruling 1 made. Its first
+   subject should be erasure (`ERASURE.md` §10): the canonical irreversible
+   Action, wholly local, needing no external service, and impossible to undo, so
+   all six routes above are testable without anything leaving the device.
 4. **C4** — needs the airwall to exist.
 
 A claim moves from UNPROVEN to EARNED the same way P0, P0a and P4 did: a dated
