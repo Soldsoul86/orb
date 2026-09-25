@@ -1,8 +1,9 @@
 # Erasure — the right to delete, and the duty to say so
 
-**Status: two rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading, and the
-permanent prohibition on E2/E3 (both §2). The rest is a PROPOSAL.** Nothing here
-is implemented; §9 carries what is still open.
+**Status: three rulings ACCEPTED, 2026-09-25 — the Art. I §2 reading and the
+permanent prohibition on E2/E3 (§2), and the coarse envelope type (§2b). The
+rest is a PROPOSAL.** Nothing here is implemented; §9 carries what is still
+open.
 
 ---
 
@@ -200,6 +201,87 @@ not make re-derivation impossible.
 
 ---
 
+## 2b. The envelope is coarse from birth
+
+> *"Coarse type in the envelope, real type inside the payload."*
+> — the operator, 2026-09-25
+
+**Ruled.** The envelope carries a coarse public type. The true type travels
+inside the encrypted payload.
+
+### This is not E2, and the distinction matters
+
+E2 was *erasing* the type from an existing envelope: the hash changes, the chain
+must be re-linked, and it is forbidden. This is different in kind — **nothing is
+ever erased from an envelope.** The envelope simply never carried the fine type
+in the first place. Sequence, order, count and every hash are untouched, exactly
+as the E2/E3 ruling requires.
+
+### It also makes E1 stronger than it was
+
+Under the original E1, erasing a payload left `health.appointment` standing in
+the envelope. Under this ruling, the fine type lives in the payload — so
+**erasure takes the type with it.** What remains is `orb.observation` at a
+timestamp: that something was observed, and nothing about what.
+
+The cost accepted in §2 — *"twelve events of this type in March, all erased"* —
+shrinks to *"twelve observations in March, all erased."* The shape stays
+permanent, as ruled, but it says much less.
+
+### Three other fields leak the same thing, or the ruling is cosmetic
+
+Verified against the envelope (`runtime/journal/src/types.ts:52`):
+
+1. **`schema`.** Today `schema.id` *is* the type — `Journal.java.in` sets
+   `schema.put("id", type)` and the TypeScript side matches. Coarsening `type`
+   while leaving `schema.id: "health.appointment"` would leak everything the
+   ruling removes. **The schema reference must move into the payload too**, or
+   become coarse alongside the type. This is the one that would have quietly
+   undone the whole change.
+2. **`lane`.** A lane named for a content domain reinstates the leak by another
+   route. Lanes are per-device today (`pixel`), and this ruling makes that a
+   **constraint rather than a convention**: lanes are named for devices or
+   origins, never for subject matter.
+3. **`device`.** Stays legible. It is needed for attribution and ordering, and it
+   says who recorded rather than what — but it is a linkability signal and is
+   recorded here as an accepted residue, not an oversight.
+
+The wall clock stays as it is. It is inside the hash preimage and the HLC
+depends on it, so coarsening it is not available without a deeper change.
+
+### What the coarse vocabulary must satisfy
+
+Not decided here (§9.4), but the constraints are fixed by code and by the
+Constitution:
+
+- **Bookkeeping must stay legible.** `isBookkeeping` (`sync.ts:128`) reads
+  `event.type` to tell custody receipts and sync policy from content, and sync
+  **cannot converge without it**. A witness holds no payloads at all, so it can
+  never decrypt to find out. Bookkeeping types are *about* history rather than
+  *of* a life, and must remain readable in the envelope.
+- **A principled basis already exists.** Art. XI §41 distinguishes Observations,
+  which originate from reality, from Events that record runtime activity — a
+  reasoning step, a plan, an issued Action. That is a distinction the envelope
+  can carry honestly without describing anyone's life, and it is a better basis
+  than a vocabulary invented for this purpose.
+
+### What this breaks
+
+`holdTypes()` (`sync.ts:98`) lets a device choose what to hold *by type*. Across
+a trust boundary it now sees only coarse types, so a fine-grained hold policy is
+no longer expressible remotely — it would need an encrypted index shared between
+devices that already share keys, which is machinery that does not exist.
+
+Recorded as a cost of the ruling rather than argued against it. `holdEverything`,
+`holdNothing` and `holdSince` are unaffected, and those are the policies a
+witness and a durability peer actually use.
+
+**This changes a kernel contract.** `Event.md` and `EVENT_MODEL.md` define the
+envelope, and the type field's meaning changes for every Event in the system.
+That edit is not made here; it is named so it is not discovered later.
+
+---
+
 ## 3. Erasure is a graph operation, not a row operation
 
 Deleting an event does not delete what was learned from it. The Belief, the
@@ -361,21 +443,10 @@ Stronger than most systems offer. Smaller than "it's gone." True.
 2. ~~**How far up the ladder (§2).**~~ **Ruled 2026-09-25: E1 only. E2 and E3
    are forbidden, permanently.** The shape of history is not erasable by anyone,
    including its owner. See §2.
-3. **Does the envelope have to be this legible?** *Open, and the only lever left
-   on the accepted cost.* Today an envelope names a precise type and a precise
-   wall clock, so an erased `health.appointment` at 15:04:07 still says a great
-   deal. A **coarse public type with the true type inside the encrypted payload**
-   — the envelope saying only `orb.observation` — would leak far less while
-   leaving the sequence, the hashes and the count exactly as the E2/E3 ruling
-   requires. It is not E2: nothing is erased, the envelope is simply less
-   revealing from the start.
-   The cost is real and belongs in the decision: `holdTypes()`
-   (`runtime/journal/src/sync.ts:98`) lets a peer choose what to hold *by type*,
-   and coarse types would blunt it; routing, indexing and schema resolution all
-   read the type today. The wall clock is harder still — it is inside the hash
-   preimage and the HLC depends on it, so coarsening it is not a free change.
-   **Not decided here.** It is a privacy-versus-function trade with no obviously
-   right answer, and §1 says the operator is told rather than defaulted.
+3. ~~**Does the envelope have to be this legible?**~~ **Ruled 2026-09-25:
+   coarse type in the envelope, real type inside the payload.** See §2b.
+4. **What is the coarse vocabulary?** *Open.* §2b names the constraints it must
+   satisfy and a candidate basis, but not the list itself.
 
 ---
 
@@ -392,6 +463,13 @@ After it, and after AD-6:
    Without it the ruling's *destroyed* is only *deleted*, and D4's account of
    what cannot be recalled would be wrong in the owner's favour — the worst
    direction for it to be wrong in.
+1b. **The coarse vocabulary, then the envelope change** (§2b). The vocabulary
+   is a decision (§9.4); the envelope edit that follows touches `Event.md`,
+   `EVENT_MODEL.md`, the TypeScript envelope and the phone's encoder together,
+   and moves `schema` with `type` or achieves nothing. It is also the **last
+   cheap moment**: every event already written carries a fine type, and changing
+   the rule later leaves a permanent, legible prefix of history that no erasure
+   may remove — because §2 forbids removing it.
 2. **Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
    `InferenceRecord.md` are still Draft and cheap to change.
 3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
