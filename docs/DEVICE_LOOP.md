@@ -115,7 +115,7 @@ the runtime whether the architecture says so or not. That belongs in
 must be `WorkManager`-only with much coarser cadence.
 
 **P4 — When the system kills or defers us, we can record that it happened, when,
-and why.**
+and why. — HELD, 2026-09-25 (§5f).**
 *This is the prediction the architecture depends on.* Everything else is a
 capability question; this one is an honesty question.
 *If false* — if the process can die without leaving a trace — then a history with
@@ -418,6 +418,82 @@ appended and read as a line count that was one short; renamed to
 `eventsBeforeThis`. Identical signal payloads share a `payloadHash` because they
 carry no timestamp — correct, since the envelope hash still differs. Screen-off
 periods never exceeded ~45 s, so this pass does not exercise Doze.
+
+---
+
+## 5f. First full journal read — P4 held, and the run has not started
+
+97 events, 10:17–10:39 IST, verified independently against the recipe in
+`runtime/journal/src/integrity.ts`.
+
+**Integrity: 97/97 payload hashes and 97/97 envelope hashes verify.** One chain
+break, at line 4 — the known `previous='35'` from §5d. The three later restarts
+(lines 29, 67, 91) all link correctly, so the `restore()` fix is now confirmed
+three more times in a file that also still carries the original defect. A
+journal that shows both the bug and its repair in the same verified chain is a
+better artefact than a clean one.
+
+### P4 — HELD
+
+`probe.gap.inferred` at 10:39:27: **47.1 s**, last event a heartbeat, flagged
+`shortGap: true`, `confidence 0.6`.
+
+The data also settles the §5e argument rather than merely supporting it. Every
+gap in this run:
+
+| Restart | Gap | Old 135 s threshold |
+| --- | --- | --- |
+| 10:19:54 | 93.0 s | missed |
+| 10:24:48 | 48.4 s | missed |
+| 10:33:35 | 34.9 s | missed |
+| 10:39:27 | 47.1 s | **recorded** (gate removed) |
+
+**Four silent deaths, and the old build would have recorded none of them.** Not
+a threshold that was slightly too high: one that would have missed every case in
+the sample.
+
+### P1, P2, P3, P6 — all still untested, and one of them is my fault
+
+- **P1 and P3.** No `probe.service.timeout`. The longest process lived about six
+  minutes against a six-hour cap.
+- **P2.** No reboot. `elapsedRealtime` climbs monotonically across all five
+  starts — the device has been up roughly 13 days.
+- **P6.** Zero manifest-registered signals, **and that is not a refutation.**
+  All 34 signals are runtime-registered (`SCREEN_ON/OFF`, `USER_PRESENT`,
+  `POWER_CONNECTED`). The manifest receiver listens for `BOOT_COMPLETED` and
+  package changes; no reboot happened and no third-party app was installed or
+  removed, so nothing that *should* have produced a manifest signal occurred. An
+  absence with no corresponding attempt is untested, not refuted — the same
+  distinction `PARTIAL_REPLICATION.md` §5 insists on for a partial replica.
+
+### The finding that matters most
+
+**Four of the five process deaths were caused by me installing a new build.**
+Only the first — 10:18, after `TRIM_MEMORY_BACKGROUND`, with no services
+running — was Android reclaiming the process.
+
+So **no process running foreground services has yet been left alone long enough
+for the platform to do anything to it.** The instrument is now validated; the
+experiment has not begun. Everything in this journal is the instrument
+describing its own construction.
+
+That is §7 R4 arriving on schedule — the loop becoming the product. The
+correction is not another build. `ACTION_MY_PACKAGE_REPLACED` would be a genuine
+addition, and it waits for pass 2, because shipping it now would restart the
+process, upload another APK to Google, and reset the clock on the only
+prediction that needs six uninterrupted hours.
+
+**Stop improving the instrument. Start the run.**
+
+### Heartbeat drift, measured
+
+Fixed-delay scheduling costs a consistent **60–70 ms per beat** — about 21 s of
+cumulative drift over six hours — and the 65.86 s beat after the 10:29:55 export
+shifted every subsequent beat permanently, from `:54` to `:00`. Both services
+slipped identically, confirming the shared main looper.
+
+This run predates the fixed-rate build, so **the fix is shipped but unverified.**
+The next run's `lateByMs` and `skippedBeats` are its test.
 
 ---
 
