@@ -34,6 +34,8 @@ abstract class HeartbeatService extends Service {
     private BroadcastReceiver runtimeReceiver;
     private long startedAt;
     private long beats;
+    /** When the next beat is due, in elapsed-realtime. Fixed rate, not fixed delay. */
+    private long nextBeatAt;
 
     abstract String serviceType();
 
@@ -44,16 +46,37 @@ abstract class HeartbeatService extends Service {
     private final Runnable beat = new Runnable() {
         @Override
         public void run() {
+            long now = SystemClock.elapsedRealtime();
+            long lateBy = now - nextBeatAt;
+
+            // Fixed rate, not fixed delay. Re-posting a constant interval from
+            // the end of each beat means any single stall shifts every later
+            // beat by the same amount, permanently -- which is how a 66-second
+            // beat after a blocking export turned into a lasting offset rather
+            // than a one-off. Advancing a schedule instead lets the cadence
+            // recover, and reports what it lost.
+            long skipped = 0;
+            do {
+                nextBeatAt += Probe.HEARTBEAT_MS;
+                if (nextBeatAt <= now) skipped++;
+            } while (nextBeatAt <= now);
+
             Journal journal = Probe.get().journal();
             if (journal != null) {
                 Map<String, Object> payload = Json.obj();
                 payload.put("service", serviceType());
                 payload.put("beat", ++beats);
-                payload.put("serviceUptimeMs", SystemClock.elapsedRealtime() - startedAt);
-                payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+                payload.put("serviceUptimeMs", now - startedAt);
+                payload.put("elapsedRealtimeMs", now);
+                payload.put("lateByMs", lateBy);
+                // A skipped beat is a stall this process survived but could not
+                // service. It is the smallest unit of "we were here and could
+                // not observe", and it belongs in history rather than in a log.
+                payload.put("skippedBeats", skipped);
                 journal.append("probe.heartbeat", payload);
             }
-            handler.postDelayed(this, Probe.HEARTBEAT_MS);
+
+            handler.postDelayed(this, Math.max(0, nextBeatAt - SystemClock.elapsedRealtime()));
         }
     };
 
@@ -86,6 +109,7 @@ abstract class HeartbeatService extends Service {
         }
 
         handler.removeCallbacks(beat);
+        nextBeatAt = SystemClock.elapsedRealtime();
         handler.post(beat);
         // START_STICKY so the system may restart us: whether it actually does,
         // and after how long, is part of what P1 and P4 are measuring.

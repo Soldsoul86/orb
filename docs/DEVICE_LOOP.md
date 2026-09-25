@@ -362,6 +362,65 @@ device at all.
 
 ---
 
+## 5e. Findings from the first exported journal
+
+74 events, 17 minutes, read independently against its own hash chain. All 74
+`payloadHash` and all 74 envelope `hash` values verified, which confirms the
+encoding on the device matches the recipe the vectors pin (§7 R2).
+
+**The `"35"` link, root-caused.** The break at line 5 carried a `previous` of
+the literal string `"35"`. The reading offered was a persisted head lagging the
+store and being truncated on reload; the actual cause is simpler and worth
+recording precisely, because the two would be fixed differently.
+
+`restore()` read the head hash with the **numeric** extractor, which consumes
+digits and stops at the first non-digit. Line 4's hash began `c23c88bb…`, so it
+returned null and the loop walked *backwards*; line 3's hash began `35…`, so it
+returned those two digits and stopped. Hence a link that is both truncated and
+stale, and hence intermittent — whether it fires at all depends on the first
+character of a SHA-256. Fixed in §5d before this journal was read; the later
+restarts at lines 30 and 68 link correctly in this same file, which is the fix
+working.
+
+**Heartbeat drift, and a design error behind it.** Both services beat at
+60.00–60.07 s except one at 65.9 s, immediately after an export, slipping both
+services identically and **permanently**. Two causes, both mine: the export did
+file I/O on the main looper, which both services share, and the beat re-posted
+a constant interval *from the end of each beat* — fixed delay, so any single
+stall shifts every later beat forever.
+
+Now a fixed **rate**: the schedule advances on its own clock and the beat
+reports `lateByMs` and `skippedBeats`. A skipped beat is the smallest unit of
+"we were here and could not observe", and it belongs in history rather than
+being silently absorbed by the cadence.
+
+**The gap threshold was wrong, and would have cost P4 its first evidence.**
+Four process starts, no stops — every death silent, exactly what P4 exists to
+catch — and **no `probe.gap.inferred` was recorded for any of them**, because
+each gap was around 90 seconds and the threshold was 135.
+
+That threshold was a mistake of category. `reconstructGap()` only ever runs when
+a *new process* is starting, and a new process whose predecessor recorded no
+stop is a discontinuity **whatever its length**: the old process was observing,
+then it was not, and nothing said so. A duration gate belongs to detecting a
+stall *within* a living process, which is what `skippedBeats` now does. The gate
+is gone; the duration is recorded as a property, and a short gap is flagged
+rather than dropped.
+
+This is the most valuable finding in the pass so far, and it is one the probe
+could not have produced about itself: it required reading a journal against the
+predictions rather than watching the instrument appear to work. It had been
+running, beating steadily, looking healthy, and silently failing the single
+prediction it was built for.
+
+**Minor.** The export's `events` field was taken before the export event was
+appended and read as a line count that was one short; renamed to
+`eventsBeforeThis`. Identical signal payloads share a `payloadHash` because they
+carry no timestamp — correct, since the envelope hash still differs. Screen-off
+periods never exceeded ~45 s, so this pass does not exercise Doze.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |

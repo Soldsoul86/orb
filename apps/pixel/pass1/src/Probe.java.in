@@ -88,14 +88,26 @@ public final class Probe extends Application implements ComponentCallbacks2 {
 
             long lastAt = Long.parseLong(at);
             long silence = System.currentTimeMillis() - lastAt;
-            if (silence < GAP_THRESHOLD_MS) return;
+
+            // No duration threshold. This code only ever runs when a *new
+            // process* is starting, and a new process whose predecessor did not
+            // record a stop is a discontinuity whatever its length: the old
+            // process was observing, then it was not, and nothing said so.
+            //
+            // Gating this on two missed heartbeats was wrong and would have
+            // cost P4 its first real evidence -- the probe's own first three
+            // deaths left gaps of roughly 90 seconds, under the threshold, and
+            // were therefore recorded nowhere. A threshold belongs to detecting
+            // a stall *within* a living process, which is what `skippedBeats`
+            // on the heartbeat now does.
 
             Map<String, Object> payload = Json.obj();
             payload.put("fromWallClock", lastAt);
             payload.put("toWallClock", System.currentTimeMillis());
             payload.put("durationMs", silence);
             payload.put("lastEventType", type);
-            payload.put("detectedBy", "heartbeat-discontinuity-on-restart");
+            payload.put("detectedBy", "process-restart-after-unexplained-last-event");
+            payload.put("shortGap", silence < GAP_THRESHOLD_MS);
             // Inferred, not observed. The gap certainly happened; its cause and
             // exact boundaries did not come from anything that saw them.
             payload.put("confidence", "0.6");

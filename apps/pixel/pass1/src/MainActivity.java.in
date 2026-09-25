@@ -152,7 +152,9 @@ public final class MainActivity extends Activity {
 
             Map<String, Object> record = Json.obj();
             record.put("destination", "Downloads/" + name);
-            record.put("events", (long) lines.size());
+            // Named for what it is. `events` read as the file's line count and
+            // was one short, because it is taken before this event is appended.
+            record.put("eventsBeforeThis", (long) lines.size());
             record.put("reason", "operator export");
             journal.append("probe.export", record);
 
