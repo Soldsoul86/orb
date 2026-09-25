@@ -168,9 +168,9 @@ not runnable until it can. `WITNESSES.md` works out what a witness should be —
 another person's phone holding a few hundred bytes it cannot read — and is
 blocked on the same entry.
 
-**The owner is not the adversary here, as of 2026-09-25.** `ERASURE.md` records
-the operator's ruling that deletion is a right, exercised openly and declared in
-history. That removes the awkwardness in C2: Orb is not trying to stop its owner
+**The owner is not the adversary here — ruled 2026-09-25.** `ERASURE.md` §2
+carries the operator's ruling: deletion is a right, exercised openly, declared
+in history, and taking the payload while the envelope stays. That removes the awkwardness in C2: Orb is not trying to stop its owner
 from deleting, it is trying to ensure no deletion is *silent*. Undeclared
 removal is therefore an attack by definition, never an exercise of a right — and
 since a declared erasure leaves the envelope, the height and every hash

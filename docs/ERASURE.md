@@ -1,8 +1,7 @@
 # Erasure — the right to delete, and the duty to say so
 
-**Status: PROPOSAL, 2026-09-25.** Records a ruling the operator made in
-principle; two questions in §9 are left for them to answer in their own words
-before anything is built. Nothing here is implemented.
+**Status: the Art. I §2 reading is ACCEPTED, 2026-09-25 (§2). The rest is a
+PROPOSAL.** Nothing here is implemented, and §9 carries what is still open.
 
 ---
 
@@ -60,13 +59,29 @@ still exists, readable, on K other devices, so identity, content and
 replayability survive. Erasure destroys content. It fails the test that ruling
 passed, and cannot ride on it.
 
-**The proposed reading — awaiting the operator's ruling (§9):**
+**The reading, ruled on:**
 
 > Erase the payload. Keep the envelope.
 >
 > No event is edited, none reordered, none removed from the sequence. The
 > sequence is the same length, in the same order, with the same hashes. One
 > event has no readable content any more, and says so.
+
+> *"E1 is right, payload goes, envelope stays."*
+> — the operator, 2026-09-25
+
+**Ruled: accepted, 2026-09-25**, explicitly rather than by assumption, for the
+reason `PARTIAL_REPLICATION.md` §10 gives — *a law quietly reinterpreted once
+would be quietly reinterpreted again.* Art. I §2 is unamended. What it forbids
+is a change to the **sequence**: editing an event, moving one, removing one. A
+payload destroyed in place leaves the sequence identical in length, order and
+every hash. The event is still there, still linked, still counted, and now says
+of itself that its content is gone.
+
+The cost this accepts, stated at the moment of accepting it rather than
+discovered later: **the envelope still carries type and timestamp** (§2's ladder,
+E1's limit). The right ruled on here is the right to erase *what happened*, not
+the right to erase *that something happened*.
 
 **The envelope with no payload *is* the tombstone.** It is not a separate record
 that could itself be erased, so there is no regress to argue about.
@@ -85,7 +100,7 @@ witnesses are left with one narrow job: detect **undeclared** removal.
 | | What goes | Chain | Amendment? |
 | --- | --- | --- | --- |
 | **E0** | Nothing | — | Today's behaviour |
-| **E1** | The payload | Intact; height and hashes unchanged | **No** — §2 as read above |
+| **E1** | The payload | Intact; height and hashes unchanged | **No** — ruled 2026-09-25. **Adopted.** |
 | **E2** | Payload and the event's *type* | Hash changes; the chain must be re-linked | **Yes** |
 | **E3** | The whole event | Height changes; indistinguishable from truncation | **Yes**, and every witness attestation must be reconciled |
 
@@ -245,14 +260,13 @@ Stronger than most systems offer. Smaller than "it's gone." True.
 
 ## 9. Open — for the operator, in their own words
 
-1. **The Art. I §2 reading (§2).** The proposed reading is E1: the payload is
-   destroyed, the envelope remains, nothing is edited, reordered or removed from
-   the sequence. `PARTIAL_REPLICATION.md` §10 was ruled on explicitly rather
-   than assumed, for the stated reason that *a law quietly reinterpreted once
-   would be quietly reinterpreted again.* The same applies here.
-2. **How far up the ladder (§2).** E1 alone, or must Orb eventually erase the
-   *fact* that an event occurred — which is an amendment, not a reading, and
-   which puts erasure back into conflict with witnesses.
+1. ~~**The Art. I §2 reading (§2).**~~ **Ruled 2026-09-25: E1 accepted.** See §2.
+2. **How far up the ladder (§2).** E1 is adopted; E2 and E3 are **not**, and
+   neither is ruled out. Adopting E1 does not decide whether Orb must ever erase
+   the *fact* that an event occurred. That would be an amendment rather than a
+   reading, and it would put erasure back into conflict with witnesses, so it
+   stays open until something concrete demands it. Left open deliberately: a
+   right the operator has not asked for is not a right to design in advance.
 
 ---
 
