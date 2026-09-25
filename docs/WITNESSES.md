@@ -280,8 +280,10 @@ exchange that carries them are built and tested.
 
 **Does not exist.**
 
-1. **A key identity.** AD-6. Orb counts device identifiers and has no concept of
-   a key anywhere in `runtime/` or `contracts/`. Until it does, it cannot
+1. **A key identity, and then independence.** AD-6 — one entry now, because the
+   same defect appears in custody, in witness groups and in evidence. Orb counts
+   device identifiers and has no concept of a key anywhere in `runtime/` or
+   `contracts/`. Until it does, it cannot
    distinguish two people from one person's two phones — and for this purpose
    those are opposite things. **This is the blocker.**
 2. **A witness attestation.** Distinct from `CustodyReceipt`, which answers

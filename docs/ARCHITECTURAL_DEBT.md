@@ -274,13 +274,29 @@ not cost something:
 
 ---
 
-## AD-6 — Witnesses are counted as devices; tamper-evidence needs keys
+## AD-6 — Independence is counted but never expressed
 
 - **Status:** Open · **Raised:** 2026-09-25, while turning the product promise
-  into testable claims (`CLAIMS.md` C2c) · **Revisit at:** before any
-  multi-device custody claim is made publicly, and before C2c is run
-- **Domain:** History / Distribution · **Kind (if adopted):** a key identity
-  concept, and a correction to what `RetentionPolicy` counts
+  into testable claims (`CLAIMS.md` C2c). **Widened the same day** when the same
+  defect appeared a third time, in the Evidence Graph · **Revisit at:** before
+  any multi-device custody claim is made publicly, before C2c is run, and before
+  a corroborated Observation is treated as stronger than an uncorroborated one
+- **Domain:** History / Distribution / Knowledge · **Kind (if adopted):** an
+  independence concept — expressed once, used in three places
+
+**One defect, three appearances.** Orb repeatedly counts things whose value
+depends entirely on their being independent, while having no way to say whether
+they are:
+
+| | What is counted | What actually matters | Where |
+| --- | --- | --- | --- |
+| **Custody** | Devices holding a payload | Distinct **keys** | `retention.ts:93` |
+| **Witnesses** | Keys, once the above is fixed | Unconnected **groups** — six keys in two buildings is two | `WITNESSES.md` §6a |
+| **Evidence** | Signals that corroborate | Whether the sources are **independent** — two readings from one compromised sensor corroborate perfectly and mean nothing | `EVIDENCE_GRAPH.md` §5 |
+
+In every case the count is an honest number and a misleading one, because the
+property it is standing in for is not the property being measured. Fixing them
+separately would encode the same mistake three times in three vocabularies.
 
 **The finding.** `evaluatePrune` requires K≥2 holders before a payload may be
 pruned, and at least one of them owned. `holders` are **device identifiers**
@@ -326,6 +342,29 @@ entry is paid down, but it cannot know whether two people share a home, an
 employer or a jurisdiction. Whatever shape this takes must therefore leave room
 for a count the **user declares**, carrying the user's confidence rather than
 presented as something the system established (Art. XI §43).
+
+**The third appearance, and it is not in this domain at all.**
+`EVIDENCE_GRAPH.md` §5 records `corroborates` / `contradicts` between signals,
+deliberately as structure rather than resolved truth, and `Evidence.md:134`
+states plainly that Evidence may corroborate a wrong Observation. That part is
+right and needs no change.
+
+What is missing is the same thing: **two signals from one compromised source
+corroborate each other perfectly.** A corroboration count without independence
+is worth no more than a witness count without keys. `EVIDENCE_GRAPH.md` uses the
+phrase *"independent signals"* descriptively; nothing in the model can hold or
+check it.
+
+This matters most under `THREAT_MODEL.md` §7, where an adversary upstream of a
+sensor produces readings that Orb faithfully records, chains and will prove
+forever. Corroboration is the main defence against that — and it only defends if
+the corroborating sources could not both have been fed by the same hand.
+
+**A likely shape, not a decision.** Independence is a claim *about* sources, and
+software cannot establish it any more than it can establish that two witnesses
+do not share a kitchen. It is probably one concept — an independence assertion
+carrying the asserter and a confidence — applied to keys, to witness groups and
+to evidence sources alike, rather than three mechanisms that happen to rhyme.
 
 **What adopting it would touch.** A key identity as a *value* attributed to a
 custody receipt — following the `Observation.md` source-identity precedent that

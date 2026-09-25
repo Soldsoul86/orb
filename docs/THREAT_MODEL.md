@@ -179,7 +179,46 @@ a detail of the sensing layer:
 - **Where a reading came from**, recorded as a value, not assumed.
 - **How sure the device is**, which `Observation.md` already requires.
 - **Whether independent sensors agree.** A corroborated observation is worth
-  more than a chained one, and the architecture currently has no way to say so.
+  more than a chained one.
+
+**Corrected 2026-09-25.** An earlier draft of this section said corroboration
+"has no contract" and that agreement between sources "is not expressible." That
+was wrong. `EVIDENCE_GRAPH.md` §5 carries `corroborates` / `contradicts` edges
+between signals, recorded as structure and deliberately not resolved into truth,
+and `Evidence.md:134` states that Evidence may corroborate a wrong Observation.
+The concept is present and it is already right.
+
+**What is missing is independence, not corroboration.** Two readings from one
+compromised sensor corroborate each other perfectly and mean nothing. That is
+the same defect as counting devices where keys are meant, and counting keys
+where unconnected groups are meant — now logged as one entry, AD-6, because
+fixing them separately would encode one mistake three times.
+
+The other genuinely absent piece is **hardware attestation**: evidence that a
+reading came from a real sensor on an unmodified device. It raises the cost of
+software spoofing and does nothing about physical spoofing. No contract covers
+it.
+
+### Why Orb should not try to prove truth
+
+Asked directly by the operator, and worth answering in the document rather than
+leaving implied.
+
+It is not achievable by anything: every sensor is a transducer and every
+transducer can be lied to. But the stronger reason is that **claiming it would
+make Orb more dangerous.** A record everyone believes is true, which can be
+spoofed at the source, hands any fabricator the system's whole credibility — a
+perfect alibi or a perfect accusation, chained, witnessed, provable forever.
+
+A record that says *this is what I believed, from this source, with this
+confidence* cannot be used that way, because its limits travel with it. **The
+refusal to claim truth is a safety property, not a shortfall** — the same move as
+everywhere else here: state the boundary rather than hide it.
+
+What Orb offers instead is the standard real evidence is held to. Nobody asks a
+security camera to prove reality; they ask whether the footage is the original,
+unedited, from that camera, at that time. Custody and integrity, which Orb can
+demonstrate. Art. XI §43 already had this right.
 
 Recorded here so that the five requirements are not read as assuming an honest
 input. They do not.
@@ -193,8 +232,9 @@ input. They do not.
    floor in §4.
 2. **The resolution setting itself.** Not decidable in the abstract: it depends
    on §8.1.
-3. **Sensor corroboration** (§7) has no contract. `Observation.md` carries
-   confidence and source identity; agreement between independent sources is not
-   expressible.
+3. **Independence** (§7) — AD-6, now one entry spanning custody, witnesses and
+   evidence. Corroboration itself is already modelled; whether the corroborating
+   sources are independent is not. **Hardware attestation** has no contract at
+   all.
 4. **AD-6** still blocks witnesses, and therefore blocks the anchor in §6, and
    therefore blocks R5 having anything to commit against.
