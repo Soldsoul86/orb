@@ -652,12 +652,32 @@ The last foreground interaction was the export at **10:39:33**. From there to
 17:10:46 is **6h31m with the app never brought forward**, and `dataSync` ran
 throughout. The cap did not fire.
 
-**The uncontrolled variable, stated rather than glossed.** This is one device,
-one build, one day, and the phone's battery-optimisation setting for this app
-was never recorded. An app set to *Unrestricted* would plausibly explain the
-result, and nothing here rules it out. The refutation is of *"this always
-happens"*, not of *"this can happen"* — `MOBILE_SENSING.md` §2 G4 is downgraded
-from a constraint to a condition, and the setting must be captured before pass 2.
+**The uncontrolled variable — checked, 2026-09-25, and it was not the
+explanation.**
+
+`Settings → Apps → Orb pass 1 → App battery usage → Allow background usage` reads
+**Optimised** — *"Optimise based on your usage. Recommended for most apps."* —
+with `Unrestricted` **not** selected, and `Allow background usage` on, which is
+also the default.
+
+So no exemption was ever granted. **`dataSync` ran 6h31m under ordinary battery
+management on a default-configured app.** The refutation stands without the
+hedge: on this device and build, `MOBILE_SENSING.md` §2 G4's quota did not fire
+under the conditions a normal user would have.
+
+Still one device, one build, one day. But not one *specially configured* device,
+which is what the caveat was there to guard against.
+
+**And it cost nothing.** App battery usage reads **0% since last full charge**
+after 6h31m of continuous foreground service, 706 heartbeats and 680 signals.
+Rounded to whole percent, and the window may not span the whole run — but it
+answers the operator's question about whether an always-on recorder can be
+negligible, in the affirmative, with a measurement rather than an argument.
+
+**Storage is the cost that is not negligible.** 598 bytes per event, so 1.6 MB
+per day and **0.59 GB per year** at the current two-services-per-minute cadence.
+Another argument for the event-driven design and a coarser ticker: the heartbeat
+is most of that volume and almost none of the information.
 
 ### P4 — held, and more tightly than the prediction asked
 
