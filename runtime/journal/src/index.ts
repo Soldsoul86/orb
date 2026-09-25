@@ -18,8 +18,9 @@ export type {
   LaneId,
   SchemaRef,
   Integrity,
+  AbsenceReason,
 } from "./types.js";
-export { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
+export { hasPayload, isErased, JournalIntegrityError, RetentionError } from "./types.js";
 
 export {
   canonicalJson,
@@ -42,6 +43,16 @@ export {
   latestCustody,
 } from "./custody.js";
 export type { CustodyReceipt, HeldCustody } from "./custody.js";
+
+export {
+  ERASURE_TYPE,
+  ERASURE_SCHEMA,
+  erasureDraft,
+  isErasureDeclaration,
+  erasedHashes,
+  isDeclaredErased,
+} from "./erasure.js";
+export type { ErasureRecord } from "./erasure.js";
 
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";

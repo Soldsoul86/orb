@@ -69,6 +69,38 @@ export interface OrbEvent<Payload = unknown> extends EventEnvelope {
 }
 
 /**
+ * Why a payload is not here.
+ *
+ * Absence must carry a reason, because the two reasons mean opposite things to
+ * a peer and are otherwise indistinguishable (`docs/ERASURE.md` §7):
+ *
+ * - `unfetched` — the envelope replicated here and the payload was never asked
+ *   for, because this device's policy did not want it. It was never held. May
+ *   be fetched at any time.
+ * - `pruned` — held once, then dropped for space, with journaled proof that K
+ *   others hold it. May be fetched back. `docs/PARTIAL_REPLICATION.md`.
+ * - `erased` — destroyed by the owner, deliberately and irreversibly. **Never
+ *   fetch it, never offer it, never restore it**, on any device, forever.
+ *
+ * Without the last distinction a peer would helpfully restore the payload its
+ * owner had just destroyed — and would be behaving correctly.
+ *
+ * The first two are not interchangeable either, and the type system found that
+ * rather than a reviewer: `unfetched` says *this device chose not to hold it*
+ * and `pruned` says *this device held it and let it go*, which are different
+ * answers to "why does my phone not know this?" — the question inv. 6 exists to
+ * make answerable.
+ *
+ * This is **local storage state, never part of identity.** It is deliberately
+ * not on `EventEnvelope`: the envelope is what the hash commits to, and an
+ * Event's identity cannot depend on what one device happens to hold. The
+ * durable, replicating statement is the erasure declaration in history
+ * (`erasure.ts`); this field is that declaration's local projection, exactly as
+ * Art. I §3 describes derived state.
+ */
+export type AbsenceReason = "unfetched" | "pruned" | "erased";
+
+/**
  * An envelope whose payload this device no longer holds.
  *
  * The Event still exists, unchanged, in history; only its availability here has
@@ -76,6 +108,8 @@ export interface OrbEvent<Payload = unknown> extends EventEnvelope {
  */
 export interface DetachedEvent extends EventEnvelope {
   readonly payload?: undefined;
+  /** Why the payload is gone. Required: absence without a reason is the gap. */
+  readonly absence: AbsenceReason;
 }
 
 /** What a store hands back: an event with its payload, or the envelope alone. */
@@ -87,8 +121,21 @@ export type StoredEvent<Payload = unknown> = OrbEvent<Payload> | DetachedEvent;
  * A payload can never legitimately be `undefined` — `canonicalJson` rejects it —
  * so absence is unambiguous. `null` is a value, and is present.
  */
-export function hasPayload<Payload>(event: StoredEvent<Payload>): event is OrbEvent<Payload> {
-  return event.payload !== undefined;
+export function hasPayload<Payload>(
+  event: StoredEvent<Payload> | EventEnvelope,
+): event is OrbEvent<Payload> {
+  return (event as OrbEvent<Payload>).payload !== undefined;
+}
+
+/**
+ * Whether this payload was destroyed by its owner rather than dropped for space.
+ *
+ * The one question every payload-moving path must ask before acting. An erased
+ * payload is never fetched, never offered and never restored — see
+ * `AbsenceReason`.
+ */
+export function isErased<Payload>(event: StoredEvent<Payload>): boolean {
+  return !hasPayload(event) && event.absence === "erased";
 }
 
 /** What a caller supplies; the journal assigns identity, ordering and integrity. */

@@ -115,9 +115,15 @@ export function verifyEvent(event: StoredEvent): boolean {
  * Accepts envelopes, so a device that has dropped payloads still verifies its
  * whole history. Events that do carry payloads have those checked too.
  *
+ * The parameter is deliberately wider than `StoredEvent`: a bare
+ * `EventEnvelope` carries no `absence`, because it has not been stored anywhere
+ * and so nothing has a reason for not holding it. Integrity is a property of the
+ * chain, never of what one device happens to have — narrowing this would make
+ * the check demand a fact it does not use.
+ *
  * @throws {JournalIntegrityError} naming the first event that fails.
  */
-export function verifyLane(events: readonly StoredEvent[]): void {
+export function verifyLane(events: readonly (StoredEvent | EventEnvelope)[]): void {
   let previousHash: string | null = null;
   let previousPhysical = -1;
   let previousCounter = -1;

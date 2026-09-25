@@ -467,22 +467,73 @@ a requirement of the ruling rather than an optimisation of it.
 
 ---
 
-## 7. A gap in code that blocks all of this
+## 7. Absence carries a reason — **built, 2026-09-25**
 
-`DetachedEvent` (`runtime/journal/src/types.ts:77`) is defined as exactly one
-thing: `payload?: undefined`. Absence carries no reason.
+`DetachedEvent` used to be exactly one thing: `payload?: undefined`. Pruned and
+erased were indistinguishable, and they mean opposite things to a peer, so a
+peer holding the payload would have helpfully restored what its owner destroyed
+**and would have been behaving correctly**.
 
-So **pruned and erased are indistinguishable today** — and they mean opposite
-things to a peer:
+`AbsenceReason` now has **three** values, not the two this section originally
+called for. The type checker found the third:
 
-| | Meaning | What a peer should do |
+| | Meaning | May it be fetched? |
 | --- | --- | --- |
-| Pruned for space | "I dropped this; K others hold it" | Send it back on request |
-| Erased by the owner | "This is destroyed" | Never send it again; destroy yours |
+| `unfetched` | The envelope replicated here; this device's policy never wanted the payload | Yes |
+| `pruned` | Held once, then dropped for space, with journaled proof K others hold it | Yes |
+| `erased` | Destroyed by the owner | **Never, on any device, forever** |
 
-As built, a peer holding the payload would helpfully restore the thing the owner
-deliberately destroyed, **and it would be behaving correctly**. Erasure cannot
-exist until absence carries a reason. Small to fix, and first.
+Making `absence` required turned every construction site into a compile error,
+and one of them had no honest answer: an envelope arriving by replication was
+never pruned — it was never held. `unfetched` and `pruned` are also not
+interchangeable, because they are different answers to *"why does my phone not
+know this?"*, which is the question inv. 6 exists to make answerable.
+
+**Where the rule lives.** `Journal.replicate` marks arriving envelopes
+`unfetched` rather than each call site doing it, so the journal keeps ownership
+of the invariant that absence always explains itself and a store can never be
+handed one that does not.
+
+**Reasons move only toward `erased`, never back.** An already-absent payload can
+still be raised to `erased` — a device that never held a payload receives the
+owner's declaration like any other event and must obey it from that moment,
+rather than keeping the right to ask forever because it had not got round to
+asking. `unfetched` is never relabelled `pruned`: that would claim this device
+once held something it never did, and a horizon explained by a false history is
+worse than one left unexplained.
+
+That transition was **found by a failing test, not by review** — the sync test
+asserted an erased envelope is never named to a peer, and it was, because
+`detach` acted only on payloads that were present.
+
+**The protections, each with a negative control** (`tests/erasure.test.ts`, 12
+cases):
+
+- `attach` restores a pruned payload and refuses an erased one **in the same
+  call** — so the refusal is specific, not a store that refuses everything.
+- Sync never names an erased envelope to a peer, and still asks for the one it
+  should. Checked in `pullFrom` as well as in the store because **asking is
+  itself a disclosure**: a request tells the peer which envelope this device
+  wanted back, even when the answer is no.
+- The reason survives a round trip through the file store, read back by a second
+  store over the same directory.
+
+### The declaration (`src/erasure.ts`)
+
+The durable, replicating half; `AbsenceReason` is its local projection and
+cannot replicate on its own (Art. I §3).
+
+It is **bookkeeping**, so a peer reads it without decrypting and a witness can
+read it holding no payloads at all. Being legible, it says almost nothing: a
+lane and an envelope hash. The hash rather than the event id, because the hash
+is what the chain commits to — a reader can check the reference without trusting
+whoever sent it. A test asserts the payload has exactly two keys, so an added
+field fails CI rather than review (§2b: a record of *what* was erased is an
+oracle).
+
+A declaration whose own payload is not held is **skipped, never guessed**: it is
+still a declaration, it can no longer say what it referred to, and acting on a
+guess would erase the wrong thing.
 
 ---
 
@@ -528,8 +579,8 @@ Not now. The pass-1 run is in progress and `DEVICE_LOOP.md` §7 R4 stands.
 
 After it, and after AD-6:
 
-1. **A reason on absence** (§7). Nothing else can start until pruned and erased
-   are different things in the type system.
+1. ~~**A reason on absence** (§7).~~ **Done 2026-09-25**, with the erasure
+   declaration alongside it. 453 tests pass, lint clean.
 1a. **Payload key granularity** (§2a). Encryption at rest is already mandatory;
    what is missing is a key small enough to destroy per event or per epoch.
    Without it the ruling's *destroyed* is only *deleted*, and D4's account of

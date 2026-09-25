@@ -173,8 +173,19 @@ export class Journal {
   /**
    * Adopts events from a foreign lane (Art. IV §18: merge is set union of
    * immutable lanes). Rejects anything claiming to be this device's lane.
+   *
+   * Accepts bare envelopes as well as stored events, because that is what
+   * anti-entropy delivers: envelopes replicate in full and payloads are pulled
+   * afterwards, only for what this device's policy wants (inv. 1). An envelope
+   * arriving without a payload is marked `unfetched` here rather than at each
+   * call site — the journal owns the invariant that absence always carries a
+   * reason, so a store can never be handed an absence that does not explain
+   * itself.
    */
-  async replicate(lane: LaneId, events: readonly StoredEvent[]): Promise<void> {
+  async replicate(
+    lane: LaneId,
+    events: readonly (StoredEvent | EventEnvelope)[],
+  ): Promise<void> {
     if (lane === this.lane) {
       throw new JournalIntegrityError("a device never accepts writes to its own lane", { lane });
     }
@@ -182,9 +193,15 @@ export class Journal {
       throw new JournalIntegrityError("replicated event does not belong to the named lane", { lane });
     }
 
+    const arriving: readonly StoredEvent[] = events.map((event) =>
+      "payload" in event && event.payload !== undefined
+        ? (event as StoredEvent)
+        : { ...(event as EventEnvelope), payload: undefined, absence: "unfetched" as const },
+    );
+
     const existing = await this.#store.read(lane);
     const known = new Set(existing.map((event) => event.id));
-    const fresh = events.filter((event) => !known.has(event.id));
+    const fresh = arriving.filter((event) => !known.has(event.id));
     if (fresh.length === 0) return;
 
     verifyLane([...existing, ...fresh]);
@@ -284,7 +301,11 @@ export class Journal {
       }
     }
 
-    return this.#store.detach(lane, eventIds);
+    // Pruning, explicitly. Erasure is a different act with a different
+    // declaration and reaches the store by its own path (`erasure.ts`); routing
+    // both through one call is how a store ends up unable to tell a payload it
+    // may fetch back from one it must never see again.
+    return this.#store.detach(lane, eventIds, "pruned");
   }
 
   /**

@@ -20,7 +20,8 @@ import { open, mkdir, readFile, readdir, rename, unlink } from "node:fs/promises
 import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { JournalStore, PayloadRecord } from "./store.js";
-import type { LaneId, OrbEvent, StoredEvent } from "./types.js";
+import type { AbsenceReason, LaneId, OrbEvent, StoredEvent } from "./types.js";
+import { hasPayload } from "./types.js";
 
 const LANE_FILE_SUFFIX = ".lane.jsonl";
 
@@ -97,13 +98,25 @@ export class FileJournalStore implements JournalStore {
     return events;
   }
 
-  async detach(lane: LaneId, eventIds: readonly string[]): Promise<number> {
+  async detach(
+    lane: LaneId,
+    eventIds: readonly string[],
+    absence: AbsenceReason,
+  ): Promise<number> {
     if (eventIds.length === 0) return 0;
     const wanted = new Set(eventIds);
     return this.#rewrite(lane, (event) => {
-      if (!wanted.has(event.id) || event.payload === undefined) return event;
+      if (!wanted.has(event.id)) return event;
+
+      if (!hasPayload(event)) {
+        // Already gone. Only a raise to `erased` changes anything, and reasons
+        // never move back — see `JournalStore.detach`.
+        if (absence !== "erased" || event.absence === "erased") return event;
+        return { ...event, absence };
+      }
+
       const { payload: _payload, ...envelope } = event as OrbEvent;
-      return envelope;
+      return { ...envelope, absence };
     });
   }
 

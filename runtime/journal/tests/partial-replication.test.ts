@@ -29,7 +29,9 @@ import {
   verifyEnvelope,
   verifyLane,
   verifyPayload,
+  type AbsenceReason,
   type CustodyReceipt,
+  type DetachedEvent,
   type EventEnvelope,
   type HeldCustody,
   type OrbEvent,
@@ -40,11 +42,20 @@ import {
 const NOTE_SCHEMA = { id: "test.note", version: 1 } as const;
 const note = (text: string) => ({ type: "note", schema: NOTE_SCHEMA, payload: { text } });
 
-/** Strips payloads the way a store does, so envelopes can be tested alone. */
-function envelopesOf(events: readonly StoredEvent[]): readonly EventEnvelope[] {
+/**
+ * Strips payloads the way a store does, so envelopes can be tested alone.
+ *
+ * Produces `DetachedEvent`, not a bare envelope, because that is what a store
+ * actually holds: absence always carries a reason. `pruned` by default, since
+ * that is what these tests are about; pass `erased` to model destruction.
+ */
+function envelopesOf(
+  events: readonly StoredEvent[],
+  absence: AbsenceReason = "pruned",
+): readonly DetachedEvent[] {
   return events.map((event) => {
     const { payload: _payload, ...envelope } = event as OrbEvent;
-    return envelope;
+    return { ...envelope, absence };
   });
 }
 
@@ -131,7 +142,7 @@ describe("custody receipts", () => {
     const events = [...(await journal.readLane("pixel"))];
     const second = events[1];
     assert.ok(second);
-    events[1] = envelopesOf([second])[0] as EventEnvelope;
+    events[1] = envelopesOf([second])[0] as DetachedEvent;
 
     const receipt = custodyReceiptFor("pixel", events);
     assert.equal(receipt?.count, 1, "custody of a sieve is not custody of a prefix");

@@ -5,7 +5,8 @@
  * them apart lets the same journal run over memory (tests), a file (the device
  * runtime), or any future encrypted store without changing its semantics.
  */
-import type { LaneId, OrbEvent, StoredEvent } from "./types.js";
+import type { AbsenceReason, LaneId, OrbEvent, StoredEvent } from "./types.js";
+import { hasPayload } from "./types.js";
 
 /** Durable, append-only storage for one device's journal. */
 export interface JournalStore {
@@ -39,9 +40,26 @@ export interface JournalStore {
    * The journal gates every call behind `evaluatePrune`; a store must not
    * second-guess the decision, only carry it out durably.
    *
-   * @returns how many payloads were actually dropped.
+   * `absence` is recorded against each envelope and is **not optional**:
+   * `pruned` and `erased` mean opposite things to every path that moves
+   * payloads, and a store that cannot tell them apart will restore what its
+   * owner destroyed (`docs/ERASURE.md` §7).
+   *
+   * **An already-absent payload can still be raised to `erased`.** A device that
+   * never held a payload — `unfetched`, because its policy did not want it —
+   * receives the owner's erasure declaration like any other event, and from that
+   * moment must never fetch it. Without this it would keep the right to ask
+   * forever, purely because it had not got round to asking yet.
+   *
+   * Reasons only ever move **toward** `erased`, and never back. `unfetched` is
+   * not raised to `pruned`: that would claim this device once held something it
+   * never held, and a horizon explained with a false history is worse than one
+   * left unexplained (inv. 6).
+   *
+   * @returns how many events changed state — a payload dropped, or an absence
+   * raised to `erased`.
    */
-  detach(lane: LaneId, eventIds: readonly string[]): Promise<number>;
+  detach(lane: LaneId, eventIds: readonly string[], absence: AbsenceReason): Promise<number>;
   /**
    * Restores payloads this device had dropped, or never fetched.
    *
@@ -52,6 +70,12 @@ export interface JournalStore {
    *
    * Events not present in the lane are ignored: a payload for an event whose
    * envelope has not arrived yet is not history, it is noise.
+   *
+   * **An erased payload is never restored**, whatever the caller sends and
+   * however well it verifies. This is the last line of the erasure guarantee:
+   * every layer above should already have refused, and this one refuses anyway,
+   * because the cost of a single missed check is the owner's destroyed content
+   * coming back.
    *
    * @returns how many payloads were actually restored.
    */
@@ -86,7 +110,11 @@ export class MemoryJournalStore implements JournalStore {
     return [...this.#lanes.keys()].sort();
   }
 
-  async detach(lane: LaneId, eventIds: readonly string[]): Promise<number> {
+  async detach(
+    lane: LaneId,
+    eventIds: readonly string[],
+    absence: AbsenceReason,
+  ): Promise<number> {
     if (this.#closed) throw new Error("journal store is closed");
     const events = this.#lanes.get(lane);
     if (!events) return 0;
@@ -95,11 +123,20 @@ export class MemoryJournalStore implements JournalStore {
     let dropped = 0;
 
     for (const [index, event] of events.entries()) {
-      if (!wanted.has(event.id) || event.payload === undefined) continue;
+      if (!wanted.has(event.id)) continue;
+
+      if (!hasPayload(event)) {
+        // Already gone; only a raise to `erased` is a change worth making.
+        if (absence !== "erased" || event.absence === "erased") continue;
+        events[index] = { ...event, absence };
+        dropped += 1;
+        continue;
+      }
+
       // Rebuild without the key rather than setting it undefined, so the stored
       // shape matches what a file store round-trips through JSON.
       const { payload: _payload, ...envelope } = event as OrbEvent;
-      events[index] = envelope;
+      events[index] = { ...envelope, absence };
       dropped += 1;
     }
 
@@ -115,10 +152,16 @@ export class MemoryJournalStore implements JournalStore {
     let restored = 0;
 
     for (const [index, event] of events.entries()) {
-      if (event.payload !== undefined) continue;
+      if (hasPayload(event)) continue;
+      // Erased is forever, and this is the last place that can still say no.
+      if (event.absence === "erased") continue;
       const payload = incoming.get(event.id);
       if (payload === undefined) continue;
-      events[index] = { ...event, payload };
+      // Drop `absence` rather than spreading it: a restored event holds its
+      // payload, so a reason for not holding it would be a stale contradiction
+      // sitting inside the same object.
+      const { absence: _absence, ...envelope } = event;
+      events[index] = { ...envelope, payload };
       restored += 1;
     }
 

@@ -22,6 +22,7 @@
  * so adding them later changes no semantics here (`SECURITY.md` §10).
  */
 import type { EventEnvelope, LaneId } from "./types.js";
+import { hasPayload, isErased } from "./types.js";
 import type { PayloadRecord } from "./store.js";
 import type { Journal } from "./journal.js";
 import {
@@ -200,10 +201,15 @@ export async function pullFrom(
       }
     }
 
-    // Payloads come second, and only for what this device chooses to hold.
+    // Payloads come second, and only for what this device chooses to hold —
+    // and never for what its owner destroyed. `isErased` is checked here as
+    // well as in the store because asking is itself a disclosure: a request
+    // names the envelope to the peer, so a device that asks for an erased
+    // payload has told someone what it wanted back even if the answer is
+    // refused (`docs/ERASURE.md` §7).
     const held = await journal.readLane(theirs.lane);
     const wanted = held
-      .filter((event) => event.payload === undefined && policy.wants(event))
+      .filter((event) => !hasPayload(event) && !isErased(event) && policy.wants(event))
       .map((event) => event.id);
     if (wanted.length === 0) continue;
 
