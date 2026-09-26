@@ -39,6 +39,52 @@ final class Grants {
     private Grants() {}
 
     /**
+     * Splits a `Settings.Secure` component list.
+     *
+     * Colon-separated, and **`null` is not empty**. A device that has never had
+     * an accessibility service returns `null`; a device whose setting could not
+     * be read returns `null` too. The caller decides which it is — this only
+     * refuses to invent an empty list out of a missing one, because *cannot
+     * read* and *nothing is enabled* are opposite facts and a signal built on
+     * confusing them would announce that everything had just been revoked.
+     */
+    static List<String> split(String setting) {
+        List<String> out = new ArrayList<>();
+        if (setting == null) return out;
+        for (String part : setting.split(":")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) out.add(trimmed);
+        }
+        return out;
+    }
+
+    /**
+     * The inverse of `split`: sorted, de-duplicated, colon-joined.
+     *
+     * This is the form a holding set is **recorded** in, and it is the platform's
+     * own form rather than a JSON array, for one reason: the next process has to
+     * read it back, and `Journal` has no JSON parser. A single-field extraction
+     * over the stored line plus this `split` recovers the set exactly, so the
+     * last observation lives in the journal and nowhere else — Art. IX §33, no
+     * second source of truth, and no cache that would outlive an erasure of the
+     * events it describes.
+     *
+     * Sorted and de-duplicated because the record is compared byte for byte: if
+     * the platform's ordering reached the line, two observations of one
+     * unchanged device would hash differently and the journal would look like it
+     * had moved when nothing did. Component names cannot contain a colon, so the
+     * separator is unambiguous.
+     */
+    static String join(List<String> entries) {
+        StringBuilder out = new StringBuilder();
+        for (String entry : new TreeSet<>(entries)) {
+            if (out.length() > 0) out.append(':');
+            out.append(entry);
+        }
+        return out.toString();
+    }
+
+    /**
      * The difference between two observations of the same kind.
      *
      * A sorted, de-duplicated comparison: the platform's own ordering of these
@@ -59,7 +105,9 @@ final class Grants {
         Map<String, Object> out = Json.obj();
         out.put("gained", gained);
         out.put("lost", lost);
-        out.put("holding", new ArrayList<>(now));
+        // The holding set is a joined string, not a list, because this is the
+        // field the next process reads back (see `join`).
+        out.put("holding", join(new ArrayList<>(now)));
         // Integers, never fractions: the two journals spell other numbers
         // differently (`runtime/journal/API.md`).
         out.put("gainedCount", (long) gained.size());
@@ -79,66 +127,85 @@ final class Grants {
     }
 
     /**
-     * Splits a `Settings.Secure` component list.
+     * One flat payload for every observation, first or not.
      *
-     * Colon-separated, and **`null` is not empty**. A device that has never had
-     * an accessibility service returns `null`; a device whose setting could not
-     * be read returns `null` too. The caller decides which it is — this only
-     * refuses to invent an empty list out of a missing one, because *cannot
-     * read* and *nothing is enabled* are opposite facts and a signal built on
-     * confusing them would announce that everything had just been revoked.
+     * Flat, with one key per fact and no nesting, because every field here has
+     * to survive being read back out of a stored line without a parser. And one
+     * shape rather than two — there is no separate "baseline event" — because
+     * *baseline* is a property of a **kind**, not of an observation: the device
+     * admin list can be new to us in the same breath as the accessibility list
+     * has three months of history behind it. A per-event flag would have to pick
+     * one of those and be wrong about the other.
+     *
+     * `observed` holds what was just read, with `null` for a kind that could not
+     * be read. `previous` holds what history says, with `null` for a kind with no
+     * usable prior record. Both nulls mean *we do not know*, and neither is ever
+     * silently turned into an empty set — which is the whole of §5j's lesson:
+     * a first look that reports what was already there as news says FAILED
+     * forever and means nothing.
      */
-    static List<String> split(String setting) {
-        List<String> out = new ArrayList<>();
-        if (setting == null) return out;
-        for (String part : setting.split(":")) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) out.add(trimmed);
-        }
-        return out;
-    }
-
-    /** The payload of a baseline: what was already here the first time we looked. */
-    static Map<String, Object> baseline(Map<String, List<String>> observed) {
+    static Map<String, Object> report(
+            String because,
+            Map<String, List<String>> observed,
+            Map<String, List<String>> previous) {
         Map<String, Object> out = Json.obj();
-        out.put("baseline", Boolean.TRUE);
+        out.put("because", because);
+
+        boolean anyChange = false;
         for (String kind : KINDS) {
             List<String> held = observed.get(kind);
-            // `null` means the read failed. Recorded as a reason, never as none.
             if (held == null) {
-                out.put(kind, "unreadable");
-            } else {
-                out.put(kind, new ArrayList<>(new TreeSet<>(held)));
+                // Recorded as a reason, never as none. No holding field at all,
+                // so a later read cannot mistake this for an observed empty set.
+                out.put(kind + "Readable", Boolean.FALSE);
+                continue;
             }
+            out.put(kind + "Readable", Boolean.TRUE);
+            out.put(kind + "Holding", join(held));
+            out.put(kind + "HoldingCount", (long) new TreeSet<>(held).size());
+
+            List<String> was = previous == null ? null : previous.get(kind);
+            if (was == null) {
+                out.put(kind + "Baseline", Boolean.TRUE);
+                continue;
+            }
+            Map<String, Object> d = diff(was, held);
+            out.put(kind + "Baseline", Boolean.FALSE);
+            out.put(kind + "Gained", d.get("gained"));
+            out.put(kind + "Lost", d.get("lost"));
+            out.put(kind + "GainedCount", d.get("gainedCount"));
+            out.put(kind + "LostCount", d.get("lostCount"));
+            if (changed(d)) anyChange = true;
         }
+        out.put("changed", anyChange ? Boolean.TRUE : Boolean.FALSE);
         return out;
     }
 
-    /** The last recorded holding set for one kind, from a previous event's payload. */
-    @SuppressWarnings("unchecked")
-    static List<String> previous(Map<String, Object> payload, String kind) {
-        if (payload == null) return null;
-        Object direct = payload.get(kind);
-        if (direct instanceof List) return (List<String>) direct;
-        if (direct instanceof String) return null; // "unreadable"
-        Object nested = payload.get(kind + "Diff");
-        if (nested instanceof Map) {
-            Object holding = ((Map<String, Object>) nested).get("holding");
-            if (holding instanceof List) return (List<String>) holding;
-        }
-        return null;
-    }
+    /**
+     * The last recorded holding set for one kind, read out of a stored line.
+     *
+     * A single-field extraction, which is all the journal's own `last()` does —
+     * not a parser, and not a claim to be one. It returns `null` for every shape
+     * of *we do not know*: no line, a line that recorded the kind as unreadable,
+     * or a line with no holding field for it. `null` here becomes `previous ==
+     * null` in `report`, which makes that kind a baseline rather than a diff
+     * against nothing — so the failure mode of a line this cannot read is a
+     * silent re-baseline, never a fabricated alarm that every grant on the
+     * device had just appeared.
+     *
+     * Component names contain no character JSON escapes, so a raw `indexOf` over
+     * the line recovers the value exactly.
+     */
+    static List<String> previous(String line, String kind) {
+        if (line == null) return null;
+        if (line.contains("\"" + kind + "Readable\":false")) return null;
 
-    /** Groups per-kind diffs into one payload, preserving reading order. */
-    static Map<String, Object> report(Map<String, Map<String, Object>> diffs) {
-        Map<String, Object> out = Json.obj();
-        out.put("baseline", Boolean.FALSE);
-        LinkedHashMap<String, Object> ordered = new LinkedHashMap<>();
-        for (String kind : KINDS) {
-            Map<String, Object> d = diffs.get(kind);
-            if (d != null) ordered.put(kind + "Diff", d);
-        }
-        out.putAll(ordered);
-        return out;
+        String key = "\"" + kind + "Holding\":\"";
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int from = at + key.length();
+        int to = line.indexOf('"', from);
+        if (to < 0) return null;
+        return split(line.substring(from, to));
     }
 }

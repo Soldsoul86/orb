@@ -23,13 +23,13 @@ needs, including the author in three months.*
 | **P2** | Nothing resumes after reboot until the app is opened | **Refuted.** `specialUse` reached the foreground **133 s after boot** and recorded 15 clean beats with nobody present (§5k) |
 | **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** Now across a full day: 21.1 h, two services, three reboots, eight process restarts, **zero unexplained** — and the beat counter never skips (§5l) |
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
-| **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
+| **P6** | Cheap signals arrive with no foreground service | **Under test** — `apps/pixel/pass2` runs no service at all |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
-| **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
-| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
+| **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Superseded** — pass 2 has no service, so the question became P6 |
+| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Under test** — the `because` field names which route caught it |
 
 ### What it establishes
 
@@ -1445,6 +1445,47 @@ desktop suite pins hardest. The per-component cross-check stays in the probe
 regardless — it is what turns a future `null` from an ambiguity back into a fact,
 and `Grants` needs that, because **on this platform a missing admin list and a
 withheld one are the same value.**
+
+### Pass 2's glue, built on those answers — 2026-09-26
+
+The Android side now exists: `Pass2` (an `Application`, no service), a
+`WakeReceiver` for boot and package events, a `ContentObserver` on the two
+settings that have a URI, and one screen to see it working and get the journal
+off the phone. One permission, `RECEIVE_BOOT_COMPLETED`; the three reads cost
+nothing, which is a measured fact rather than a hope.
+
+**The probe's finding is now code.** `GrantReader` does not pass a bare `null`
+from `getActiveAdmins()` through as *unknown* — that would make device admin
+unreadable on every ordinary phone for ever — nor read it as *none*, which would
+record a real stalkerware admin as an empty set. It asks `isAdminActive` per
+installed receiver and returns `null` only when that says something is active
+while the enumeration does not. Five runs of a throwaway bought exactly one
+branch, and it is the branch on which the signal is either honest or blind.
+
+**The last observation comes out of the journal, not a cache** (Art. IX §33; a
+cache would outlive an erasure of the events it describes). `Journal` has no JSON
+parser and is not getting one mid-run, so the holding set is stored in the
+platform's own colon-joined form and recovered by the same single-field
+extraction `Journal.last()` already uses — sorted and de-duplicated, so two
+observations of an unchanged device are byte-identical rather than merely
+equivalent. **This depends on the v1 envelope:** under v2 the fine type is
+coarsened to `orb.content`, `lastOfType` would match nothing, and every
+observation would silently re-baseline for ever. Switching pass 2 to v2 is
+therefore not a one-line change, and the note sits on the method that would break.
+
+**Every observation is recorded, changed or not.** Recording only changes would
+make silence mean *nothing happened* and *nothing was watching* at once, and a
+journal that cannot separate those cannot be used to say a grant did **not**
+appear on a given day. It is the same error as recording an unreadable setting
+as an empty one, one level up.
+
+**No foreground service, which makes this pass 1's missing experiment.** The
+comparison is against history, so the signal needs a live process only to be
+prompt, never to be correct. P6 — cheap signals arrive with no foreground
+service — was untestable in pass 1 because a service ran throughout. It is under
+test now, and the `because` field on every event names which route caught a
+change: the settings watch, a boot, a package broadcast, or only the next process
+start. That is P16 answered from the record instead of argued about.
 
 ---
 

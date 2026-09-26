@@ -1,0 +1,171 @@
+package @PKG@;
+
+import android.app.Application;
+import android.content.ContentResolver;
+import android.database.ContentObserver;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Pass 2's process: read the grants, compare against the journal, record.
+ *
+ * **No foreground service.** Pass 1 established that `specialUse` survives (13.5
+ * hours continuous across a reboot, §5k), so a service was available — but this
+ * signal does not need a live process to be correct, only to be prompt. It
+ * compares against *history*, so an observation taken at the next process start
+ * is the same observation, later. Battery is the constraint the operator named,
+ * and a signal that costs nothing while nothing is happening is the one worth
+ * having.
+ *
+ * That choice also runs pass 1's missing experiment. **P6** — cheap signals
+ * arrive with no foreground service — is recorded as *Untested*, because a
+ * service ran throughout pass 1, which is the condition P6 excludes. This app
+ * has no service at all, so whether `WakeReceiver` ever fires is P6 answered.
+ */
+public final class Pass2 extends Application {
+
+    /** Its own lane. Pass 1 holds `pixel`; two apps must never claim one chain. */
+    static final String LANE = "grants";
+    static final String OBSERVED = "grants.observed";
+
+    private static Pass2 instance;
+    private Journal journal;
+    private ContentObserver watcher;
+
+    public static Pass2 get() {
+        return instance;
+    }
+
+    Journal journal() {
+        return journal;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+
+        try {
+            journal = Journal.open(this, LANE, Build.MODEL + "/" + Build.DEVICE);
+        } catch (IOException error) {
+            return;
+        }
+
+        if (journal.discontinuous()) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("reason", "previous chain head unreadable on open");
+            journal.append("grants.chain.discontinuity", payload);
+        }
+
+        recordStart();
+        observe("process.start");
+        watchSettings();
+    }
+
+    /**
+     * Read the grants now, compare against what the journal last recorded, and
+     * append the result.
+     *
+     * **Every observation is recorded, changed or not.** Recording only changes
+     * would make silence mean two different things — *nothing happened* and
+     * *nothing was watching* — and a journal that cannot tell those apart cannot
+     * be used to say a grant did **not** appear on some day. That is the same
+     * mistake as recording an unreadable setting as an empty one, one level up.
+     * The `changed` field makes filtering trivial for anything that only wants
+     * the events where something moved.
+     */
+    synchronized Map<String, Object> observe(String because) {
+        if (journal == null) return null;
+
+        Map<String, List<String>> now = GrantReader.read(this);
+
+        String line = lastObservation();
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+
+        Map<String, Object> report = Grants.report(because, now, before);
+        report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(OBSERVED, report);
+        return report;
+    }
+
+    /**
+     * The last recorded observation, as a raw line, or null if there is none.
+     *
+     * **This depends on the v1 envelope**, where the event's real type is on the
+     * line. Under v2 the type is coarsened to `orb.content` (the whole point of
+     * that migration), `lastOfType` would match nothing, and every observation
+     * would silently re-baseline for ever — a signal that never reports a change
+     * and never says why. Switching this app's envelope version is therefore not
+     * a one-line change: it needs a way to find the last observation that does
+     * not read the fine type off the line, and that has to land first.
+     */
+    private String lastObservation() {
+        try {
+            Map<String, String> last = journal.lastOfType(OBSERVED);
+            return last == null ? null : last.get("line");
+        } catch (IOException error) {
+            // Unreadable history is not empty history. Returning null makes every
+            // kind a baseline for this one event, which is silent; inventing an
+            // empty set instead would announce that the whole device had just
+            // been granted.
+            return null;
+        }
+    }
+
+    /**
+     * Watch the two settings that have a URI, so a change while this process
+     * happens to be alive is seen at once rather than at the next wake.
+     *
+     * Costs nothing when nothing changes, and it is not load-bearing: the
+     * comparison against history catches the same change later if the process
+     * was dead. **Device admin has no settings URI**, so an admin enabled while
+     * this process is not running is only ever seen at the next wake — which is
+     * P16, and the `because` field is what will show which route caught it.
+     */
+    private void watchSettings() {
+        watcher = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange, Uri uri) {
+                observe("settings.changed");
+            }
+        };
+        ContentResolver resolver = getContentResolver();
+        register(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        register(resolver, "enabled_notification_listeners");
+    }
+
+    private void register(ContentResolver resolver, String key) {
+        try {
+            resolver.registerContentObserver(Settings.Secure.getUriFor(key), false, watcher);
+        } catch (Throwable error) {
+            // A watch that could not be registered costs promptness, never
+            // correctness — the next wake reads the same settings anyway.
+            Map<String, Object> payload = Json.obj();
+            payload.put("setting", key);
+            payload.put("threw", error.getClass().getName());
+            journal.append("grants.watch.failed", payload);
+        }
+    }
+
+    private void recordStart() {
+        Map<String, Object> payload = Json.obj();
+        payload.put("androidRelease", Build.VERSION.RELEASE);
+        payload.put("sdkInt", (long) Build.VERSION.SDK_INT);
+        payload.put("securityPatch", Build.VERSION.SECURITY_PATCH);
+        payload.put("fingerprintBuild", Build.DISPLAY);
+        // Elapsed realtime counts from boot, so a small value beside a large
+        // wall-clock gap says the device restarted rather than that this process
+        // was killed while it stayed up.
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append("grants.process.start", payload);
+    }
+}

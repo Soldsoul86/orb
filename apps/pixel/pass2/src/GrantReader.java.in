@@ -1,0 +1,123 @@
+package @PKG@;
+
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.provider.Settings;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The three platform reads, and nothing else.
+ *
+ * Everything here is a read with **no permission of any kind** — confirmed on
+ * this device on 2026-09-26 by `apps/pixel/probe-grants` (`DEVICE_LOOP.md` §7,
+ * P12–P14, all three answered). None of it was assumed.
+ *
+ * The contract with `Grants` is one value: a `null` list means *we could not
+ * find out*, and an empty list means *we found out, and it is none*. Nothing
+ * here may return the second when it means the first.
+ */
+final class GrantReader {
+
+    private GrantReader() {}
+
+    /** Reads all three kinds once. `null` for a kind means the read did not settle it. */
+    static Map<String, List<String>> read(Context context) {
+        Map<String, List<String>> out = new HashMap<>();
+        out.put("accessibility",
+            secure(context, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES));
+        // The constant is `@hide`, so the key is spelled out. Naming a setting is
+        // exactly what a third-party app may do, which is the whole basis of this.
+        out.put("notificationListener", secure(context, "enabled_notification_listeners"));
+        out.put("deviceAdmin", admins(context));
+        return out;
+    }
+
+    /** One `Settings.Secure` list. A throw is unknown; a null setting is none. */
+    private static List<String> secure(Context context, String key) {
+        try {
+            String raw = Settings.Secure.getString(context.getContentResolver(), key);
+            // A null setting here genuinely means the row was never written, i.e.
+            // nothing is enabled. Both lists on this platform are created the
+            // first time something is granted, and both came back non-null with
+            // a value once something was.
+            return Grants.split(raw);
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    /**
+     * Active device admins — and the reason this is not one line.
+     *
+     * `getActiveAdmins()` returns **`null` when none is active**, measured on
+     * this device: four readings with nothing enabled all returned `null`, and
+     * the reading with Find Hub's admin on returned a one-element list. So a
+     * bare `null` cannot be handed to `Grants` as *unknown* — this kind would
+     * then be unreadable on every ordinary phone forever, re-baselining at every
+     * process start and never able to report a change.
+     *
+     * Nor can `null` simply be read as *none*: a platform that withheld the list
+     * would produce the identical value, and then a real stalkerware admin would
+     * be recorded as an empty set. **Both readings are wrong on their own.**
+     *
+     * `isAdminActive` settles it. It is public, takes any component, needs no
+     * permission and does not require being that admin, so asking it once per
+     * installed admin receiver is a second route to the same fact. If it says
+     * nothing is active, a `null` enumeration is *none*; if it says something is
+     * active while the enumeration is empty, the list is being withheld and this
+     * returns `null` — unknown, honestly.
+     */
+    private static List<String> admins(Context context) {
+        try {
+            DevicePolicyManager policy =
+                (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+            if (policy == null) return null;
+
+            List<ComponentName> enumerated = policy.getActiveAdmins();
+            if (enumerated != null && !enumerated.isEmpty()) {
+                List<String> names = new ArrayList<>();
+                for (ComponentName admin : enumerated) names.add(admin.flattenToShortString());
+                return names;
+            }
+
+            // Nothing enumerated. Find out whether that is true before recording it.
+            List<String> active = activeByComponent(context, policy);
+            if (active == null) return null;      // could not corroborate: unknown
+            if (active.isEmpty()) return active;  // corroborated: genuinely none
+            // Corroborated the other way: something is active and the bulk call
+            // did not say so. The active set is withheld, and saying "none" here
+            // would be the one failure this signal exists to avoid.
+            return null;
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    /** Which installed admin receivers are active, asked one at a time. */
+    private static List<String> activeByComponent(Context context, DevicePolicyManager policy) {
+        try {
+            Intent intent = new Intent("android.app.action.DEVICE_ADMIN_ENABLED");
+            List<ResolveInfo> installed = context.getPackageManager()
+                .queryBroadcastReceivers(intent, PackageManager.MATCH_ALL);
+            if (installed == null) return null;
+            List<String> active = new ArrayList<>();
+            for (ResolveInfo info : installed) {
+                ComponentName component =
+                    new ComponentName(info.activityInfo.packageName, info.activityInfo.name);
+                if (policy.isAdminActive(component)) {
+                    active.add(component.flattenToShortString());
+                }
+            }
+            return active;
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+}

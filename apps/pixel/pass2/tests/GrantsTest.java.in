@@ -11,8 +11,8 @@ import java.util.Map;
  *
  * Every question here is about a *set changing over time*, which is where the
  * bugs are, and none of it needs Android. What does need the device is whether
- * the three settings can be read at all — that is a prediction, not a test, and
- * it lives in `DEVICE_LOOP.md`.
+ * the three settings can be read at all — answered on 2026-09-26, all three
+ * confirmed (`DEVICE_LOOP.md` §7).
  */
 final class GrantsTest {
 
@@ -21,7 +21,7 @@ final class GrantsTest {
         reorderingIsNotAChange();
         aBaselineIsNotAnAlarm();
         unreadableIsNotEmpty();
-        readsBackItsOwnPreviousSet();
+        readsBackOutOfAStoredLine();
     }
 
     private static void detectsWhatAppeared() {
@@ -35,8 +35,7 @@ final class GrantsTest {
             Json.canonical(d.get("gained")), "[\"com.new/.Accessibility\"]");
         Harness.equal("nothing was lost", Json.canonical(d.get("lost")), "[]");
         Harness.equal("and the whole holding set is recorded, not just the delta",
-            Json.canonical(d.get("holding")),
-            "[\"com.known/.Svc\",\"com.new/.Accessibility\"]");
+            d.get("holding"), "com.known/.Svc:com.new/.Accessibility");
         Harness.equal("counts are whole numbers", d.get("gainedCount"), 1L);
 
         Harness.suite("a grant disappearing is reported too");
@@ -47,15 +46,13 @@ final class GrantsTest {
         Harness.check("it is worth an event", Grants.changed(gone));
         Harness.equal("and names what went", Json.canonical(gone.get("lost")),
             "[\"com.known/.Svc\"]");
+        Harness.equal("and the emptied set records as empty, not as absent",
+            gone.get("holding"), "");
     }
 
     private static void reorderingIsNotAChange() {
         Harness.suite("the platform reordering a list is not a change");
         // §7 R6: false positives cost trust, and trust is the product.
-        //
-        // Set difference gives this for free — order never reaches the
-        // comparison — so these two assert a property the code has rather than
-        // one the sorting provides. The sorting earns its place below.
         Map<String, Object> d = Grants.diff(
             Arrays.asList("b/.B", "a/.A", "c/.C"),
             Arrays.asList("c/.C", "a/.A", "b/.B"));
@@ -66,25 +63,23 @@ final class GrantsTest {
         Harness.check("nor is a duplicate the platform repeated", !Grants.changed(dupes));
 
         Harness.suite("the same set recorded twice is byte-identical");
-        // What the sorting is actually for, and it is not noise suppression.
-        // The holding set is written into history and read back as the next
-        // comparison's `before`. If the platform's ordering reached the record,
-        // two observations of one unchanged device would produce two different
-        // payloads — different bytes, different payload hashes, a journal that
-        // looks like it moved when nothing did.
+        // What the sorting is for, and it is not noise suppression. The holding
+        // set is written into history and read back as the next comparison's
+        // `before`. If the platform's ordering reached the record, two
+        // observations of one unchanged device would produce two different
+        // lines — different bytes, different hashes, a journal that looks like
+        // it moved when nothing did.
         Harness.equal("order does not reach the record",
-            Json.canonical(Grants.diff(new ArrayList<String>(),
-                Arrays.asList("b/.B", "a/.A")).get("holding")),
-            Json.canonical(Grants.diff(new ArrayList<String>(),
-                Arrays.asList("a/.A", "b/.B")).get("holding")));
-        Harness.equal("and nor does a repeat",
-            Json.canonical(Grants.diff(new ArrayList<String>(),
-                Arrays.asList("a/.A", "a/.A")).get("holding")),
-            "[\"a/.A\"]");
+            Grants.join(Arrays.asList("b/.B", "a/.A")),
+            Grants.join(Arrays.asList("a/.A", "b/.B")));
+        Harness.equal("nor does a repeat", Grants.join(Arrays.asList("a/.A", "a/.A")), "a/.A");
+        Harness.equal("and the round trip is exact",
+            Json.canonical(Grants.split(Grants.join(Arrays.asList("b/.B", "a/.A")))),
+            "[\"a/.A\",\"b/.B\"]");
     }
 
     private static void aBaselineIsNotAnAlarm() {
-        Harness.suite("the first look is a baseline, not an alarm");
+        Harness.suite("the first look at a kind is a baseline, not an alarm");
         // The lesson §5j taught on the real phone: a self-test that reported a
         // pre-existing break as a new failure said FAILED forever and meant
         // nothing. Whatever was already installed when Orb arrived is not news.
@@ -93,24 +88,30 @@ final class GrantsTest {
         observed.put("notificationListener", new ArrayList<String>());
         observed.put("deviceAdmin", new ArrayList<String>());
 
-        Map<String, Object> base = Grants.baseline(observed);
-        Harness.equal("it says so in the payload", base.get("baseline"), Boolean.TRUE);
-        Harness.equal("and records what was already there",
-            Json.canonical(base.get("accessibility")), "[\"com.already/.Here\"]");
+        Map<String, Object> first = Grants.report("process.start", observed, null);
+        Harness.equal("the kind says it is a baseline",
+            first.get("accessibilityBaseline"), Boolean.TRUE);
+        Harness.equal("nothing is reported as gained", first.get("accessibilityGained"), null);
+        Harness.equal("and the event as a whole is not a change",
+            first.get("changed"), Boolean.FALSE);
+        Harness.equal("but it records what was already there",
+            first.get("accessibilityHolding"), "com.already/.Here");
 
-        // And the next look compares against it rather than against nothing.
-        List<String> before = Grants.previous(base, "accessibility");
-        Harness.equal("the baseline is readable back as the previous set",
-            Json.canonical(before), "[\"com.already/.Here\"]");
-        Harness.check("so an unchanged device is silent",
-            !Grants.changed(Grants.diff(before, Arrays.asList("com.already/.Here"))));
+        // Baseline is per kind, not per event: one list can be new to us while
+        // another has history. An event-level flag would have to pick one and be
+        // wrong about the other.
+        Map<String, List<String>> known = new HashMap<>();
+        known.put("accessibility", Arrays.asList("com.already/.Here"));
+        Map<String, Object> mixed = Grants.report("process.start", observed, known);
+        Harness.equal("a known kind diffs", mixed.get("accessibilityBaseline"), Boolean.FALSE);
+        Harness.equal("while an unknown one baselines in the same event",
+            mixed.get("deviceAdminBaseline"), Boolean.TRUE);
+        Harness.equal("and an unchanged known kind is silent",
+            mixed.get("changed"), Boolean.FALSE);
     }
 
     private static void unreadableIsNotEmpty() {
         Harness.suite("a setting that cannot be read is not an empty one");
-        // The distinction this project keeps arriving at. `null` from
-        // Settings.Secure means "never set" or "could not read"; treating it as
-        // an empty list would announce that every grant had just been revoked.
         Harness.equal("null splits to empty, for the caller to interpret",
             Json.canonical(Grants.split(null)), "[]");
         Harness.equal("and so does a blank setting", Json.canonical(Grants.split("")), "[]");
@@ -123,46 +124,95 @@ final class GrantsTest {
         unreadable.put("accessibility", null);
         unreadable.put("notificationListener", new ArrayList<String>());
         unreadable.put("deviceAdmin", new ArrayList<String>());
-        Map<String, Object> base = Grants.baseline(unreadable);
-        Harness.equal("a baseline records the reason rather than a false empty",
-            base.get("accessibility"), "unreadable");
-        Harness.check("and it reads back as unknown, never as none",
-            Grants.previous(base, "accessibility") == null);
+        Map<String, Object> report = Grants.report("process.start", unreadable, null);
+
+        Harness.equal("it records that it could not read",
+            report.get("accessibilityReadable"), Boolean.FALSE);
+        Harness.equal("and records no holding set at all, rather than an empty one",
+            report.get("accessibilityHolding"), null);
+        Harness.equal("a kind that genuinely has none records an empty set",
+            report.get("notificationListenerHolding"), "");
+        Harness.equal("and says it could be read",
+            report.get("notificationListenerReadable"), Boolean.TRUE);
 
         // The regression this guards, stated as the comparison it would cause.
-        // If an unreadable setting were recorded as `[]`, the next successful
-        // read would diff against nothing and announce that every service on
-        // the device had just been granted — an alarm manufactured out of a
-        // failed read. Worse than silence, because it is loud and wrong.
-        Harness.check("an empty list would have been a lie, and is distinguishable",
-            !"unreadable".equals(Json.canonical(new ArrayList<String>())));
-        Map<String, Object> reallyEmpty = Grants.baseline(bothEmpty());
-        Harness.equal("a device that genuinely has none records none",
-            Json.canonical(reallyEmpty.get("accessibility")), "[]");
-        Harness.check("and that one does read back as a set",
-            Grants.previous(reallyEmpty, "accessibility") != null);
+        // If an unreadable setting were recorded as an empty set, the next
+        // successful read would diff against nothing and announce that every
+        // service on the device had just been granted — an alarm manufactured
+        // out of a failed read. Worse than silence, because it is loud and wrong.
+        String line = line(report);
+        Harness.check("an unreadable kind reads back as unknown, never as none",
+            Grants.previous(line, "accessibility") == null);
+        Harness.equal("while an empty one reads back as a set that is empty",
+            Json.canonical(Grants.previous(line, "notificationListener")), "[]");
+
+        Map<String, List<String>> now = new HashMap<>();
+        now.put("accessibility", Arrays.asList("com.was/.There", "com.also/.There"));
+        now.put("notificationListener", new ArrayList<String>());
+        now.put("deviceAdmin", new ArrayList<String>());
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+        Map<String, Object> next = Grants.report("process.start", now, before);
+        Harness.equal("so a read that recovers does not claim two grants just appeared",
+            next.get("accessibilityBaseline"), Boolean.TRUE);
+        Harness.equal("and raises no alarm", next.get("changed"), Boolean.FALSE);
     }
 
-    private static Map<String, List<String>> bothEmpty() {
-        Map<String, List<String>> observed = new HashMap<>();
-        for (String kind : Grants.KINDS) observed.put(kind, new ArrayList<String>());
-        return observed;
-    }
-
-    private static void readsBackItsOwnPreviousSet() {
-        Harness.suite("the previous set comes from history, not from a side file");
+    private static void readsBackOutOfAStoredLine() {
+        Harness.suite("the previous set comes out of the journal, not a side file");
         // Art. IX §33 — no duplicate sources of truth. The last observation is
         // in the journal; a cache beside it would be a second one, and would
-        // survive an erasure that removed the events it describes.
-        Map<String, Map<String, Object>> diffs = new HashMap<>();
-        diffs.put("accessibility", Grants.diff(
-            new ArrayList<String>(), Arrays.asList("com.new/.Svc")));
-        Map<String, Object> report = Grants.report(diffs);
+        // survive an erasure that removed the events it describes. `Journal` has
+        // no JSON parser, so the holding set is stored in the platform's own
+        // colon-joined form and recovered by a single-field extraction — the
+        // same thing `Journal.last()` already does.
+        Map<String, List<String>> observed = new HashMap<>();
+        observed.put("accessibility", Arrays.asList("com.b/.Svc", "com.a/.Svc"));
+        observed.put("notificationListener", Arrays.asList("com.n/.Listener$Inner"));
+        observed.put("deviceAdmin", new ArrayList<String>());
+        String line = line(Grants.report("process.start", observed, null));
 
-        Harness.equal("a report is not a baseline", report.get("baseline"), Boolean.FALSE);
-        Harness.equal("the holding set survives in the event",
-            Json.canonical(Grants.previous(report, "accessibility")), "[\"com.new/.Svc\"]");
-        Harness.check("a kind that was not read is absent, not empty",
-            Grants.previous(report, "deviceAdmin") == null);
+        Harness.equal("the set survives the round trip, sorted",
+            Json.canonical(Grants.previous(line, "accessibility")),
+            "[\"com.a/.Svc\",\"com.b/.Svc\"]");
+        Harness.equal("including a component with an inner class in its name",
+            Json.canonical(Grants.previous(line, "notificationListener")),
+            "[\"com.n/.Listener$Inner\"]");
+        Harness.equal("and an empty set is a set", 
+            Json.canonical(Grants.previous(line, "deviceAdmin")), "[]");
+
+        // Reading one kind must not pick up another's value. The three keys share
+        // no prefix, and this is what says so rather than the eye.
+        Harness.check("kinds do not read each other's fields",
+            !Grants.previous(line, "accessibility")
+                .equals(Grants.previous(line, "notificationListener")));
+
+        // The next comparison, built entirely from the stored line.
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+        Map<String, List<String>> now = new HashMap<>();
+        now.put("accessibility", Arrays.asList("com.a/.Svc", "com.b/.Svc", "com.new/.Svc"));
+        now.put("notificationListener", Arrays.asList("com.n/.Listener$Inner"));
+        now.put("deviceAdmin", new ArrayList<String>());
+        Map<String, Object> next = Grants.report("settings.changed", now, before);
+
+        Harness.equal("a grant that appeared since the stored line is caught",
+            Json.canonical(next.get("accessibilityGained")), "[\"com.new/.Svc\"]");
+        Harness.equal("the kinds that did not move say nothing",
+            Json.canonical(next.get("notificationListenerGained")), "[]");
+        Harness.equal("the event is a change", next.get("changed"), Boolean.TRUE);
+        Harness.equal("and it carries why it was taken",
+            next.get("because"), "settings.changed");
+
+        Harness.check("a line from before this shape existed re-baselines rather than alarms",
+            Grants.previous("{\"type\":\"probe.process.start\",\"payload\":{}}",
+                "accessibility") == null);
+        Harness.check("and so does no line at all", Grants.previous(null, "accessibility") == null);
+    }
+
+    /** A payload as it is actually stored: canonical JSON, nested in an event. */
+    private static String line(Map<String, Object> payload) {
+        return "{\"type\":\"grants.report\",\"payload\":" + Json.canonical(payload)
+            + ",\"wallClock\":1790000000000}";
     }
 }

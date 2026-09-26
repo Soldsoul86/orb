@@ -1,0 +1,37 @@
+package @PKG@;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+/**
+ * The wakes this app gets without running: boot, and packages coming and going.
+ *
+ * With no foreground service anywhere in this package, whether these arrive at
+ * all is **P6** — pass 1 could not answer it, because a service ran throughout,
+ * which is precisely the condition P6 excludes.
+ *
+ * A package appearing is not itself a grant. It is the moment *before* one: an
+ * app is installed, and the grant is switched on in Settings some seconds later.
+ * Reading at both ends means the pair is in the journal either way — and if the
+ * settings watch was not alive for the second half, the next wake still catches
+ * it by comparison, just later.
+ */
+public final class WakeReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        Pass2 app = Pass2.get();
+        if (app == null || intent.getAction() == null) return;
+
+        // Named with the action, so the journal shows which route caught a
+        // change: the settings watch while alive, a boot, a package event, or
+        // only the next process start. That difference is P16 — whether this is
+        // a signal or a poll — and it is answered from the record rather than
+        // argued about.
+        String because = "signal:" + intent.getAction();
+        if (intent.getData() != null) {
+            because = because + ":" + intent.getData();
+        }
+        app.observe(because);
+    }
+}

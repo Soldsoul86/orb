@@ -96,6 +96,65 @@ these tests was weaker than it looked: the reordering case passed with sorting
 removed entirely, because set difference already ignores order, so the test was
 restated to pin what the sorting actually buys.
 
+## How it runs
+
+`Pass2` (the `Application`) opens its own journal lane — `grants`, never pass 1's
+`pixel`; two apps must not claim one chain — and reads on every wake it gets:
+
+| wake | `because` |
+| --- | --- |
+| the process starting | `process.start` |
+| a watched setting changing while the process is alive | `settings.changed` |
+| boot, or a package added, removed or replaced | `signal:<action>` |
+| the operator opening the app | `app.opened` |
+
+Each read is compared against **the last observation in the journal**, recovered
+by a single-field extraction from the stored line. There is no cache and no side
+file: Art. IX §33, and a cache would outlive an erasure of the events it
+describes. `Journal` has no JSON parser, so the holding set is stored in the
+platform's own colon-joined form — sorted and de-duplicated, so two observations
+of an unchanged device are byte-identical rather than merely equivalent.
+
+**Every observation is recorded, changed or not.** Recording only changes would
+make silence mean two things — *nothing happened* and *nothing was watching* —
+and a journal that cannot separate those cannot be used to say a grant did *not*
+appear on some day. The `changed` field makes filtering trivial for anything
+that only wants the events where something moved.
+
+**No foreground service.** The comparison is against history, so the signal does
+not need a live process to be correct, only to be prompt: a change missed while
+the process was dead is caught at the next wake. That keeps it free when nothing
+is happening — the operator named battery as the constraint — and it makes this
+app pass 1's missing **P6** experiment, since a service ran throughout pass 1,
+which is the condition P6 excludes.
+
+One permission: `RECEIVE_BOOT_COMPLETED`. All three reads cost nothing, which was
+confirmed on the device rather than assumed. The manifest also declares a
+`<queries>` element for `DEVICE_ADMIN_ENABLED`, because without it package
+visibility can hide third-party admin receivers while leaving Google's visible —
+and third-party is exactly the case this signal exists for.
+
+## What the device already settled
+
+`apps/pixel/probe-grants`, 2026-09-26, Pixel 10a / Android 16 / API 36:
+
+| | | |
+| --- | --- | --- |
+| **P12** | accessibility services enabled | confirmed, two independent APIs |
+| **P13** | notification listeners enabled | confirmed, 5 entries |
+| **P14** | device admins active | confirmed, 1 entry |
+
+**And one finding that is now code.** `getActiveAdmins()` returns `null` when no
+admin is active on this platform — four readings with none enabled, all `null`;
+one with Find Hub's admin on, a one-element list. So a bare `null` cannot be
+passed to `Grants` as *unknown*: this kind would be unreadable on every ordinary
+phone for ever. Nor can it be read as *none*: a platform withholding the list
+produces the same value, and a real stalkerware admin would be recorded as an
+empty set. `GrantReader` settles it with `isAdminActive` per installed receiver
+— public, no permission, does not require being that admin — and returns `null`
+only when that corroboration says something is active while the enumeration does
+not.
+
 ## What is still a prediction, not a result
 
 Nothing here has run on the device. `MOBILE_SENSING.md` §4.4's ratings are
@@ -110,17 +169,8 @@ version, never generalised.
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime-registered receiver inside a `specialUse` foreground service, as the screen signals already do (§5h) |
 | **P16** | A grant enabled while the app is not running is still detected at the next process start, from the journal's own last record |
 
-**P12–P14 are being answered first, and the Android glue waits on them.**
-`apps/pixel/probe-grants` is a throwaway zero-permission APK that performs the
-three reads once and prints what came back — its own package and key, no
-services, nothing stored, so it cannot disturb pass 1's run. Writing the manifest
-and service wiring here before those answers would be writing it against an
-assumption. Its scoring rule is fixed in advance and is stricter than it looks:
-an empty answer is INCONCLUSIVE, never a confirmation, because an empty list
-handed to a permissionless app is byte-identical to a full list being filtered
-out of it. What each possible answer changes in `Grants` is set out in that
-probe's README — including the case where P12 fails and `KINDS` loses a kind
-rather than gaining a permanent `"unreadable"`.
+**P12–P14 are answered and the glue is built.** What remains untested is how
+*promptly* changes are noticed, not whether they can be.
 
 P16 is the one that decides whether this is a *signal* or a *poll*: if the
 platform delivers nothing for a settings change, the design still works because

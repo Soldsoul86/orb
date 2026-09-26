@@ -1,0 +1,184 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Enough of a screen to see the signal working and to get the journal off the
+ * phone. Not a product surface — the output of pass 2 is the journal.
+ */
+public final class MainActivity extends Activity {
+    private TextView status;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Orb pass 2 — what holds power over this device");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        Button export = new Button(this);
+        export.setText("Export and share journal");
+        export.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { export(); }
+        });
+        root.addView(export);
+
+        status = new TextView(this);
+        status.setTextSize(12);
+        status.setTypeface(Typeface.MONOSPACE);
+        status.setTextIsSelectable(true);
+        root.addView(status);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    /**
+     * Opening the app is itself a wake, so it reads. Recorded with its own
+     * reason, because an observation the operator triggered by looking is not
+     * the same evidence as one the platform delivered.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render(Pass2.get() == null ? null : Pass2.get().observe("app.opened"));
+    }
+
+    private void render(Map<String, Object> report) {
+        if (report == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+        StringBuilder out = new StringBuilder("\n");
+        for (String kind : Grants.KINDS) {
+            out.append(kind).append('\n');
+            if (!Boolean.TRUE.equals(report.get(kind + "Readable"))) {
+                // Never "none". The one thing this screen must not do is show a
+                // failed read as an empty device.
+                out.append("  could not be read\n\n");
+                continue;
+            }
+            String holding = (String) report.get(kind + "Holding");
+            List<String> entries = Grants.split(holding);
+            if (entries.isEmpty()) {
+                out.append("  none\n");
+            } else {
+                for (String entry : entries) out.append("  ").append(entry).append('\n');
+            }
+            if (Boolean.TRUE.equals(report.get(kind + "Baseline"))) {
+                out.append("  (first record of this kind — nothing to compare against)\n");
+            } else {
+                append(out, "gained", report.get(kind + "Gained"));
+                append(out, "lost", report.get(kind + "Lost"));
+            }
+            out.append('\n');
+        }
+        out.append(Boolean.TRUE.equals(report.get("changed"))
+            ? "something changed since the last observation\n"
+            : "nothing changed since the last observation\n");
+        try {
+            out.append(journalOrNull()).append('\n');
+        } catch (IOException error) {
+            out.append("journal unreadable: ").append(error).append('\n');
+        }
+        status.setText(out.toString());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void append(StringBuilder out, String label, Object value) {
+        List<String> entries = value == null ? null : (List<String>) value;
+        if (entries == null || entries.isEmpty()) return;
+        for (String entry : entries) {
+            out.append("  ").append(label).append(": ").append(entry).append('\n');
+        }
+    }
+
+    private String journalOrNull() throws IOException {
+        Journal journal = Pass2.get().journal();
+        return journal == null ? "no journal" : journal.readLines().size() + " events recorded";
+    }
+
+    /**
+     * The journal into Downloads and then the share sheet.
+     *
+     * The export is appended to the journal before it happens and the file is
+     * re-read afterwards, so the copy contains the record of itself —
+     * `SECURITY.md` §7: data leaving the device is history, and a copy anything
+     * can read is a disclosure however convenient it was.
+     */
+    private void export() {
+        Journal journal = Pass2.get() == null ? null : Pass2.get().journal();
+        if (journal == null) {
+            status.setText("journal unavailable");
+            return;
+        }
+        try {
+            List<String> lines = journal.readLines();
+            String name = "orb-pass2-"
+                + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date())
+                + ".txt";
+
+            Map<String, Object> record = Json.obj();
+            record.put("destination", "Downloads/" + name);
+            record.put("eventsBeforeThis", (long) lines.size());
+            record.put("reason", "operator export");
+            journal.append("grants.export", record);
+            lines = journal.readLines();
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+            values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+            ContentResolver resolver = getContentResolver();
+            Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (target == null) {
+                status.setText("export failed: no destination");
+                return;
+            }
+            try (OutputStream out = resolver.openOutputStream(target)) {
+                for (String line : lines) {
+                    out.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+                }
+            }
+
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_STREAM, target);
+            send.putExtra(Intent.EXTRA_SUBJECT, name);
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(send, "Send journal"));
+        } catch (IOException error) {
+            status.setText("export failed: " + error);
+        }
+    }
+}

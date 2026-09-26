@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb pass 2 — the first signal (DEVICE_LOOP.md §7 R4).
+
+  One permission, and it is not for reading anything: BOOT_COMPLETED, so the app
+  is woken after a restart. The three reads this app exists to perform each cost
+  nothing, confirmed on the device as P12, P13 and P14 rather than assumed.
+
+  No foreground service. This signal compares against history rather than
+  watching continuously, so it does not need a live process to be correct — only
+  to be prompt. That keeps it free when nothing is happening, and it answers
+  pass 1's P6, which a service running throughout pass 1 made untestable.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@PKG@"
+    android:versionCode="@VERSION_CODE@"
+    android:versionName="0.1-pass2">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+      Package visibility. Without this, `queryBroadcastReceivers` for admin
+      receivers can see some packages and not others — and the ones it would
+      miss are third-party, which is exactly the case this signal exists for. A
+      signal blind to the thing it watches for is worse than no signal.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".Pass2"
+        android:label="@LABEL@"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- P6: do these arrive with nothing running? -->
+        <receiver
+            android:name=".WakeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

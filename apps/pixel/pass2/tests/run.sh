@@ -13,7 +13,10 @@ OUT="build/tests"
 
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
-for source in src/*.java.in ../pass1/src/Json.java.in tests/*.java.in; do
+# Only the pure logic. The rest of `src/` is platform code -- the reads, the
+# application, the receiver -- and compiling it here would need an android.jar
+# the desktop suite deliberately does without.
+for source in src/Grants.java.in ../pass1/src/Json.java.in tests/*.java.in; do
   name="$(basename "$source" .java.in)"
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
