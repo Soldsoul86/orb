@@ -1,0 +1,44 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A three-method test harness, for the same reason the probe has no libraries:
+ * a dependency that failed would leave us unable to say whether the probe or
+ * the framework was at fault, and this code's whole job is to be believable
+ * about what happened.
+ */
+final class Harness {
+    private static final List<String> failures = new ArrayList<>();
+    private static int checks;
+    private static String current = "";
+
+    static void suite(String name) {
+        current = name;
+        System.out.println("\n  " + name);
+    }
+
+    static void check(String what, boolean condition) {
+        checks++;
+        System.out.println((condition ? "    ok   " : "    FAIL ") + what);
+        if (!condition) failures.add(current + " / " + what);
+    }
+
+    static void equal(String what, Object actual, Object expected) {
+        boolean same = expected == null ? actual == null : expected.equals(actual);
+        checks++;
+        System.out.println((same ? "    ok   " : "    FAIL ") + what);
+        if (!same) {
+            failures.add(current + " / " + what);
+            System.out.println("           expected: " + expected);
+            System.out.println("           actual:   " + actual);
+        }
+    }
+
+    static int report() {
+        System.out.println("\n  " + checks + " checks, " + failures.size() + " failed");
+        for (String failure : failures) System.out.println("    - " + failure);
+        return failures.isEmpty() ? 0 : 1;
+    }
+}

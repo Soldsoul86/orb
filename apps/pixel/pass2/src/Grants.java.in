@@ -1,0 +1,144 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+/**
+ * What currently holds power over this device, and what changed since last time.
+ *
+ * `MOBILE_SENSING.md` §4.4 — *"Is the device itself under attack?"* — the group
+ * that document calls "the group most often skipped, and the one that matters
+ * most for a system holding a decades-long record of a life", and which costs
+ * no permission at all. §4.4 rates *a new package with Accessibility or Device
+ * Admin* as **the classic stalkerware install: cheap, high-value, low-noise.**
+ *
+ * This is pass 2's first signal under `DEVICE_LOOP.md` §7 R4, which asks for
+ * *"at least one signal that is useful to a person rather than to this
+ * document."* The occasion for it was measured rather than imagined: on
+ * 2026-09-26 an accessibility service was enabled on the operator's phone, a
+ * third-party payment app detected it within hours and refused to run, and the
+ * pass-1 journal contained no record that anything had happened. That is
+ * `CLAIMS.md` C1 route **A6** — a path Orb does not mediate — arriving as an
+ * event rather than a hypothesis.
+ *
+ * **It reports a fact, never a verdict.** A grant appearing is not an attack; it
+ * is usually the owner installing something. Art. XI §42 — the runtime never
+ * assumes reality matched an expectation — and `Observation.md`: an observation
+ * owns confidence, not truth. Whether a change is alarming is interpretation,
+ * and interpretation lives above this.
+ */
+final class Grants {
+
+    /** The three grants read here, in the order a reader should think about them. */
+    static final String[] KINDS = {"accessibility", "notificationListener", "deviceAdmin"};
+
+    private Grants() {}
+
+    /**
+     * The difference between two observations of the same kind.
+     *
+     * A sorted, de-duplicated comparison: the platform's own ordering of these
+     * lists is not promised to be stable, and a reordering is not a change. A
+     * signal that fired on reordering would be noise, and §7 R6 — *"false
+     * positives cost trust, and trust is the product"* — makes noise the
+     * expensive failure here rather than the cheap one.
+     */
+    static Map<String, Object> diff(List<String> before, List<String> after) {
+        TreeSet<String> was = new TreeSet<>(before);
+        TreeSet<String> now = new TreeSet<>(after);
+
+        List<String> gained = new ArrayList<>(now);
+        gained.removeAll(was);
+        List<String> lost = new ArrayList<>(was);
+        lost.removeAll(now);
+
+        Map<String, Object> out = Json.obj();
+        out.put("gained", gained);
+        out.put("lost", lost);
+        out.put("holding", new ArrayList<>(now));
+        // Integers, never fractions: the two journals spell other numbers
+        // differently (`runtime/journal/API.md`).
+        out.put("gainedCount", (long) gained.size());
+        out.put("lostCount", (long) lost.size());
+        out.put("holdingCount", (long) now.size());
+        return out;
+    }
+
+    /** Whether a diff is worth an event at all. */
+    static boolean changed(Map<String, Object> diff) {
+        return !asList(diff.get("gained")).isEmpty() || !asList(diff.get("lost")).isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> asList(Object value) {
+        return value == null ? Collections.<String>emptyList() : (List<String>) value;
+    }
+
+    /**
+     * Splits a `Settings.Secure` component list.
+     *
+     * Colon-separated, and **`null` is not empty**. A device that has never had
+     * an accessibility service returns `null`; a device whose setting could not
+     * be read returns `null` too. The caller decides which it is — this only
+     * refuses to invent an empty list out of a missing one, because *cannot
+     * read* and *nothing is enabled* are opposite facts and a signal built on
+     * confusing them would announce that everything had just been revoked.
+     */
+    static List<String> split(String setting) {
+        List<String> out = new ArrayList<>();
+        if (setting == null) return out;
+        for (String part : setting.split(":")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) out.add(trimmed);
+        }
+        return out;
+    }
+
+    /** The payload of a baseline: what was already here the first time we looked. */
+    static Map<String, Object> baseline(Map<String, List<String>> observed) {
+        Map<String, Object> out = Json.obj();
+        out.put("baseline", Boolean.TRUE);
+        for (String kind : KINDS) {
+            List<String> held = observed.get(kind);
+            // `null` means the read failed. Recorded as a reason, never as none.
+            if (held == null) {
+                out.put(kind, "unreadable");
+            } else {
+                out.put(kind, new ArrayList<>(new TreeSet<>(held)));
+            }
+        }
+        return out;
+    }
+
+    /** The last recorded holding set for one kind, from a previous event's payload. */
+    @SuppressWarnings("unchecked")
+    static List<String> previous(Map<String, Object> payload, String kind) {
+        if (payload == null) return null;
+        Object direct = payload.get(kind);
+        if (direct instanceof List) return (List<String>) direct;
+        if (direct instanceof String) return null; // "unreadable"
+        Object nested = payload.get(kind + "Diff");
+        if (nested instanceof Map) {
+            Object holding = ((Map<String, Object>) nested).get("holding");
+            if (holding instanceof List) return (List<String>) holding;
+        }
+        return null;
+    }
+
+    /** Groups per-kind diffs into one payload, preserving reading order. */
+    static Map<String, Object> report(Map<String, Map<String, Object>> diffs) {
+        Map<String, Object> out = Json.obj();
+        out.put("baseline", Boolean.FALSE);
+        LinkedHashMap<String, Object> ordered = new LinkedHashMap<>();
+        for (String kind : KINDS) {
+            Map<String, Object> d = diffs.get(kind);
+            if (d != null) ordered.put(kind + "Diff", d);
+        }
+        out.putAll(ordered);
+        return out;
+    }
+}

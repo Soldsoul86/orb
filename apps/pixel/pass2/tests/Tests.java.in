@@ -1,0 +1,9 @@
+package @PKG@;
+
+/** Entry point for the pass-2 desktop suite. */
+public final class Tests {
+    public static void main(String[] args) {
+        GrantsTest.run();
+        Harness.report();
+    }
+}

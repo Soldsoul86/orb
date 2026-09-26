@@ -25,6 +25,11 @@ needs, including the author in three months.*
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
+| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Untested** — pass 2's first signal (`apps/pixel/pass2`) |
+| **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Untested** |
+| **P14** | Active device admins are enumerable without being one | **Untested** |
+| **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
+| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
 ### What it establishes
 
@@ -1191,6 +1196,27 @@ date against a stated version is never a rate.
 observation of the user's actual life would be a failure even if every
 prediction were answered. Pass 2 should end with at least one signal that is
 useful to a person rather than to this document.
+
+**Started 2026-09-26 — `apps/pixel/pass2`.** *What currently holds power over
+this device, and what changed:* accessibility services, notification listeners,
+device admins. `MOBILE_SENSING.md` §4.4 rates a new package with Accessibility
+or Device Admin **the classic stalkerware install — cheap, high-value,
+low-noise**, at no permission cost.
+
+The occasion was measured rather than imagined. An accessibility service was
+enabled on this phone that day; a payment app detected it within hours and
+refused to run; **the pass-1 journal contained no record that anything had
+happened.** `CLAIMS.md` C1 route A6 — a path Orb does not mediate — arriving as
+an event rather than a hypothesis.
+
+**A separate package, because pass 1 is still running.** §8 criterion 4 wants a
+week of carrying and the run is at about a day; P6 is untested. R4 above forbids
+changing the instrument mid-run and §5h priced it. A second app restarts
+nothing, and takes `Json` from pass 1 at build time rather than copying it, so
+R2's one encoder stays one encoder.
+
+Logic tested on the desktop, 27 checks, three negative controls. **Nothing has
+run on the device**, so P12–P16 are predictions and §7 R3 stands.
 
 ---
 
