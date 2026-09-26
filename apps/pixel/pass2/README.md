@@ -26,6 +26,11 @@ within hours and refused to run; **the pass-1 journal contained no record that
 anything had happened.** That is `CLAIMS.md` C1 route **A6** — a path Orb does
 not mediate — arriving as an event rather than a hypothesis.
 
+That service was an experiment and the approach is discarded — `DECISIONS.md`
+DR-2, Orb will not request accessibility, partly *because* a counterparty
+detected it that easily. The signal here is unaffected: it watches what other
+apps gain, so Orb never appearing in its own list is a feature of it.
+
 *"Something just gained the ability to read every screen on your phone"* is a
 fact about a day rather than about an instrument, which is what R4 asks for.
 

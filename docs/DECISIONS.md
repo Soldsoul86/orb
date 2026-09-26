@@ -1,0 +1,225 @@
+# Decision Register
+
+> Architectural decisions that have been **made**, with what follows from each.
+>
+> The companion to `ARCHITECTURAL_DEBT.md`, which records what we have chosen
+> *not* to decide yet. Nothing belongs in both: an item leaves that register by
+> arriving here.
+>
+> Each record states who decided, what was decided, why, **what follows whether
+> we like it or not**, what it explicitly does *not* change, and what is still
+> open. The consequences are the point — a decision recorded without them is a
+> preference, and preferences do not survive a handoff.
+>
+> Decisions are the operator's. This file records them; it does not make them
+> (`CLAUDE.md`: *the architecture is permanent, the implementation is
+> replaceable*).
+
+---
+
+## DR-1 — Orb is a gateway, not a guard
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator · **Supersedes:** nothing recorded
+- **Bears on:** `CLAIMS.md` R4, `CAPABILITY_MODEL.md`, `Policy.md` (Draft)
+
+**Decision.** Orb does not interpose on other applications' actions. An
+irreversible action is **started inside Orb** and passes through *review →
+confirm → release*. Named at the time of the decision: large payments, and
+sending email, WhatsApp or Snap messages.
+
+**Why.** `CLAIMS.md` R4 already splits the honest claim in two:
+
+> Within the mediated set, the gate cannot be routed around.
+> Outside it, the action is *detected and recorded*, never silently absent.
+
+A guard implies cover over the outside. A gateway does not pretend to it. This
+decision makes the architecture match the claim that was already written down,
+rather than the other way round.
+
+**What follows.**
+
+- **A6 stays not-refusable.** `CLAIMS.md` is explicit that *"A6 is not refusable
+  and must not be claimed as such"*. A gateway posture is the version of Orb in
+  which that sentence is not an embarrassment: nothing about the design suggests
+  A6 should have been caught.
+- **The mediated set becomes small and legible** — it is exactly what the user
+  starts in Orb. That is a far more defensible boundary than "everything the
+  phone does", and it is checkable: for any action, either it began in Orb or it
+  did not.
+- **The gate's value now rests on Orb being worth opening first.** If nothing is
+  started in Orb, nothing is mediated. See DR-3, which is the same problem from
+  the other side.
+
+**What this does not change.** Detection. Pass 2's grant signal watches what
+*other* apps gain, which is independent of whether Orb mediates their actions —
+and `CLAIMS.md` R4's second clause (*detected and recorded, never silently
+absent*) is precisely that half of the claim, which survives intact.
+
+**Open.** What counts as "large" for a payment, and where that threshold is
+recorded. `Policy.md` is still Draft and `CLAIMS.md` §5 Ruling 2 — the general
+timing of consent — is unresolved.
+
+---
+
+## DR-2 — The accessibility-service approach is discarded
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator
+- **Bears on:** `DEVICE_LOOP.md` §7, `MOBILE_SENSING.md` §4.4, `apps/pixel/pass2`
+
+**Decision.** Orb will not request an `AccessibilityService`. The "pay guard"
+approach — reading other apps' payment screens in order to interpose — is not
+the path. (The operator's own `app.orb/app.actionlock.guard.PayGuardService`,
+which appears throughout this session's device findings, was an experiment, not
+a component.)
+
+**Why.** Three reasons, and each would be sufficient.
+
+1. It is the guard posture DR-1 rejects.
+2. **It was measured to be unreliable.** On 2026-09-26 a third-party payment app
+   detected the enabled service and refused to run — within hours. A capability
+   that announces itself to everything it touches, and that any counterparty may
+   decline, is not a foundation.
+3. **It would make Orb indistinguishable from what it warns about.** An app
+   holding accessibility can read every screen on the device. That is exactly
+   the power P12's signal exists to flag when *something else* acquires it, and
+   §4.4 rates it *"the classic stalkerware install"*. Orb cannot credibly report
+   that capability as a risk while holding it.
+
+**What follows.**
+
+- **Orb will not appear in its own P12 list**, which keeps that signal clean:
+  every entry in it is something other than Orb.
+- **The finding that motivated pass 2 stands.** It was `CLAIMS.md` C1 route A6
+  arriving as an event rather than a hypothesis: a payment app noticed an
+  accessibility service that Orb's own journal knew nothing about. Dropping the
+  approach does not retract the gap — the signal is about *other* apps gaining
+  power, so it survives its own origin story being abandoned.
+- `DEVICE_LOOP.md` §7 and `apps/pixel/pass2/README.md` still tell that story as
+  motivation. They now carry a pointer here so the approach is not read as
+  current.
+
+**What this does not change.** The three reads pass 2 performs
+(`DEVICE_LOOP.md` §7, P12–P14, all confirmed on the device 2026-09-26) cost no
+permission at all. None of them is an accessibility service; none is affected.
+
+**Open.** Nothing. This one is closed.
+
+---
+
+## DR-3 — Orb does not re-rank other apps' feeds
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator
+- **Bears on:** DR-1, DR-4, the choice of first workflow
+
+**Decision.** Orb cannot and will not reorder the Facebook, Instagram or Snap
+feeds. It competes for the **first thing you open**, with a daily overview built
+from sources the user controls.
+
+**Why.** There is no API for it, and obtaining one by other means requires the
+interception DR-2 rejects. The decision is therefore forced rather than chosen —
+which is worth recording, because a forced constraint that is not written down
+gets re-proposed every few months.
+
+**What follows.**
+
+- **Connector coverage becomes the product risk, not ranking quality.** An
+  overview is only as good as what it can see, so the binding question is which
+  sources are connected — not how cleverly the contents are ordered.
+- **DR-1 depends on this working.** A gateway mediates only what is started
+  inside it, so "Orb is the thing you open first" is not a growth goal; it is
+  the precondition for the gate having anything to gate.
+
+**Open.** Which sources, and which workflow comes first. The security-baseline
+alert (pass 2's grant signal) needs no permissions and no connectors, which makes
+it the cheapest candidate rather than necessarily the right one.
+
+---
+
+## DR-4 — Confirm in Orb, hand off prefilled; email end to end
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator
+- **Bears on:** `contracts/Action.md` (Draft), `Observation.md`, Art. XI §42
+
+**Decision.** There is no public send API for a personal WhatsApp or Snap
+account. Orb confirms the message, then hands it to the app **with the text
+prefilled**. Email is different: the Gmail API allows Orb to own the action end
+to end.
+
+**What follows — and this is the part that must not be blurred.**
+
+**The two halves produce different evidence, and the journal has to say which
+it has.**
+
+- For **email**, Orb performs the send. It can record that the message *was
+  sent*, because it sent it.
+- For **WhatsApp and Snap**, Orb performs a **hand-off**. What happens next is
+  outside it: the user may edit the text, send it to someone else, or discard it,
+  and **Orb never learns which**. The most Orb can truthfully record is that it
+  handed over a prefilled message.
+
+So a hand-off must never be journaled as a send. This is Art. XI §42 — the
+runtime never assumes reality matched an expectation — and it is the same
+distinction this project keeps arriving at from new directions: *cannot check* is
+not *failed the check*, and *I handed it over* is not *it was delivered*. A
+journal that recorded both as `sent` would be asserting, for one of them, a fact
+nobody observed.
+
+Consequently the two need different terminal states in DR-5's chain: `released`
+for the action Orb performed, and a hand-off state that is explicitly **not** an
+outcome for the one it did not.
+
+**Open.** Whether a hand-off can ever acquire a follow-up observation — a
+later, independent sighting that the message existed — and if so, at what
+confidence. Until then the chain ends without a result, and the absence is the
+honest record rather than a gap.
+
+---
+
+## DR-5 — The gateway action chain
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator
+- **Bears on:** `contracts/Capability.md` and `contracts/Action.md` (both Draft),
+  `contracts/Event.md`, `CLAIMS.md` pass bar
+
+**Decision.** One chain per intent:
+
+```
+intent → review → confirm | cancel → release → result
+```
+
+recorded whole, **including cancels and the time spent hesitating**.
+
+**Why the cancels.** A gate that records only what passed cannot demonstrate
+what it stopped. `CLAIMS.md` sets the pass bar as *"A1–A5 refused, each refusal
+journaled with the reason"* — the refusals **are** the evidence the gate works.
+An action chain that dropped them would leave the gate's whole value unevidenced.
+
+**What follows.**
+
+- **`intent_id` is a causal chain, which the Event envelope already has.** It is
+  `causes` (`contracts/Event.md`), not a new top-level field. Adding a parallel
+  identifier would be a second way to express one relationship, and the lineage
+  work of 2026-09-26 exists precisely so that `causes` is the one way.
+- **Hesitation time is content about the user, not bookkeeping.** It is
+  behavioural data of a fairly intimate kind — how long someone paused before
+  sending money — so it is subject to `ERASURE.md` like any other payload, and
+  it must not be recorded in a bookkeeping event that erasure does not reach.
+- **DR-4 splits the terminal state.** `release` and `result` mean what they say
+  for email; a hand-off ends the chain without a result and says so.
+
+**Open.** `Capability.md` and `Action.md` are Draft and this belongs in them.
+`CLAIMS.md` §5 Ruling 2 — the general timing of consent — bears directly on what
+`review` must guarantee, and is unresolved.
+
+---
+
+## Provenance
+
+DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
+transcript is not in this repository, and were relayed here as a written summary.
+This file is therefore the durable form: the reasoning below each decision is
+reconstructed from that summary and from the documents it bears on, not quoted
+from the original discussion. Where a consequence is drawn here that the summary
+did not state — DR-4's split evidence, DR-5's `causes` collision — it is drawn
+from this repository and should be checked against the operator's intent rather
+than assumed to carry their authority.

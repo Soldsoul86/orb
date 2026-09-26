@@ -1209,6 +1209,11 @@ refused to run; **the pass-1 journal contained no record that anything had
 happened.** `CLAIMS.md` C1 route A6 — a path Orb does not mediate — arriving as
 an event rather than a hypothesis.
 
+That service was the operator's own experiment, and the approach behind it has
+since been discarded (`DECISIONS.md` DR-2: Orb will not request accessibility).
+The gap it exposed is unaffected — this signal is about what *other* apps gain,
+so it outlives the story that prompted it.
+
 **A separate package, because pass 1 is still running.** §8 criterion 4 wants a
 week of carrying and the run is at about a day; P6 is untested. R4 above forbids
 changing the instrument mid-run and §5h priced it. A second app restarts
@@ -1266,14 +1271,31 @@ the framework and not around it, so they are facts about what Android hands a
 sandboxed app rather than about a sandbox that was not there.
 
 **P13 — confirmed.** `Settings.Secure.getString("enabled_notification_listeners")`
-returned 555 characters, five entries, to an app holding no permission:
-Android Auto (`gearhead`), the Auto dashboard (`dreamliner`), Android System
-Intelligence (`com.google.android.as`), the launcher (`nexuslauncher`), and
-`com.google.android.odad` — Google's own on-device defence service. Two things
+returned 555 characters, five entries, to an app holding no permission. Each was
+matched by the operator against the Settings *Allowed* list rather than read off
+its package name: **Pixel Stand** (`dreamliner`), **Android Auto** (`gearhead`),
+**Android System Intelligence** (`com.google.android.as`), the **Pixel Launcher**
+(`nexuslauncher`), and **Play Protect** (`com.google.android.odad`). Two things
 follow. The read works, so the signal is buildable; and the baseline on an
 untouched phone is five entries, all Google, which is what makes a sixth worth
 an event. The stalkerware case `MOBILE_SENSING.md` §4.4 describes is exactly a
 non-Google name appearing in that list.
+
+*Corrected 2026-09-26.* An earlier version of this paragraph named `dreamliner`
+as the Android Auto dashboard. That was inferred from the package name and it was
+wrong — the same mistake in miniature as every other artefact in this section:
+something that was not read being written down as if it had been. Package names
+are not evidence of what an app is; the Settings screen is.
+
+**A revocation was then observed**, which is worth more than the naming fix.
+Operator-reported, from a run of the probe this session did not see the file for:
+at 15:25 the list held five entries (555 characters); Pixel Stand was switched
+off; at 15:26 it held four (442 characters), with `dreamliner` the only name
+missing. So a **grant being taken away is visible to a zero-permission app on
+this device**, by hand and end to end, which is half of what pass 2 exists to
+emit — `MOBILE_SENSING.md` §4.4's note that *your own app's permissions being
+revoked is itself evidence* now has a measurement behind it. It also settles the
+naming: the entry that vanished is the app that was switched off.
 
 **P12 — inconclusive, and the first run scored it wrong.** Both reads came back
 empty: the setting, and `AccessibilityManager.getEnabledAccessibilityServiceList`.

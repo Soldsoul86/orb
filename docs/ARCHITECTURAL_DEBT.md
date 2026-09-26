@@ -9,6 +9,10 @@
 > Each item states the question, why it was deferred, the leading option, and the
 > milestone at which it must be revisited. Items are resolved by an explicit
 > decision recorded in version control — never silently.
+>
+> The companion register is `DECISIONS.md`, which records decisions that have been
+> **made** and what follows from each. Nothing belongs in both: an item leaves
+> this register by arriving there.
 
 ---
 
