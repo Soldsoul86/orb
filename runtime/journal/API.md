@@ -137,8 +137,27 @@ value means two devices that can never agree they hold the same history.
 the largest safe integer is sixteen digits, so no accepted value ever reaches
 exponent notation, and none exceeds what both languages represent exactly.
 
-**Fractions are carried scaled**, with the scale named in the payload schema —
-`confidence: 0.95` as `confidenceMilli: 950`, an accuracy radius in centimetres.
+### Fractions are carried scaled, and the scale is in the field name
+
+`confidence: 0.95` is written `confidencePercent: 95`.
+
+**The unit is the coarsest that loses no real distinction**, chosen once per
+quantity, because history is immutable: a v1 event's `confidencePercent: 95`
+must mean the same thing forever. A finer field may be added later; an old one
+may never be reinterpreted.
+
+| quantity | field | why that unit |
+| --- | --- | --- |
+| confidence | `confidencePercent` 0–100 | every value in `Observation.md` and `MOBILE_SENSING.md` §4 is at most two decimal places; those are *proposals, not measurements*, and a finer scale would permit a number nobody could defend |
+| GPS accuracy | `accuracyCm` | a fix good to 3 m versus 30 m is a real difference, and sub-metre exists |
+| heart rate | `bpm` | already whole |
+| skin temperature | `tempCentiC` | 0.1 °C matters; one step finer is cheap insurance |
+| pressure | `pressurePa` | already integral in practice |
+
+Picking too coarse is recoverable — a finer field begins later and the old ones
+stay honest. Picking too fine is not: every value written under it carries false
+precision forever, and `ERASURE.md` §2 forbids removing the history that would
+show it. The same asymmetry decided the coarse envelope in `ERASURE.md` §2b.
 
 ## Types
 

@@ -67,6 +67,40 @@ Confidence is *recorded*, never *resolved*: it is part of history, not a verdict
 A high confidence is still not truth, and a low confidence is still faithfully
 kept — interpretation (Evidence → Belief) weighs confidence later, revisably.
 
+#### How it is carried — `confidencePercent`, an integer 0–100
+
+**The value is in `[0, 1]` and that is unchanged.** This says only how it is
+written down, because the journal's canonical encoding takes safe integers only:
+Java and JavaScript spell `0.95` differently enough that a fraction cannot be
+written by both implementations, and one disagreement inside a hash preimage
+means two devices that can never agree they hold the same history
+(`runtime/journal/API.md`, measured 2026-09-26).
+
+So `0.95` is carried as `confidencePercent: 95`.
+
+**Percent rather than a finer scale, and the reason is not convenience.** Every
+confidence in this contract and in `MOBILE_SENSING.md` §4 is at most two decimal
+places — 0.97, 0.74, 0.41, 1.00, 0.95, 0.92, 0.75, 0.70 — and not one exceeds
+it. Percent holds all of them exactly, with nothing to spare. A milli scale
+would permit `947`, a number nobody could defend: `MOBILE_SENSING.md` §4 says
+these are *"proposals, not measurements"*, and a judgement written to three
+decimal places is claiming a measurement that was never made.
+
+The asymmetry decides it, and it is the same one `ERASURE.md` §2b used for the
+coarse envelope: **starting coarse stays reversible and starting fine does not.**
+If percent proves too coarse, a finer field begins later while old events keep a
+`confidencePercent` that was honestly a two-decimal judgement. If a finer scale
+proves too permissive, every value written under it carries false precision
+forever — and Art. I §2 forbids removing the history that would show it.
+
+**The general rule this is one case of.** The field name carries the unit, and
+the unit is the coarsest that loses no real distinction: `accuracyCm` because a
+fix good to 3 m versus 30 m is a real difference and sub-metre exists; `bpm`,
+already whole; `tempCentiC` because 0.1 °C matters and one step finer is cheap
+insurance. Choose it once — history is immutable, so a v1 event's
+`confidencePercent: 95` must mean the same thing forever. A finer field may be
+added; an old one may never be reinterpreted.
+
 ---
 
 ## 2. Lifecycle
@@ -132,6 +166,12 @@ Upholds Constitution Articles I (History) and II (Truth and Interpretation).
 - The core obligation — *attributed, occurrence-only, recorded as an Event* — is
   frozen at v1. Strengthening it is addition; weakening it is a breaking change
   requiring `Observation v2` alongside v1.
+- **`confidencePercent`'s scale is frozen at v1.** Its *meaning* was never
+  changed by naming it — confidence remains a value in `[0, 1]` — but the scale
+  it is written in cannot move, because an old event cannot be reinterpreted and
+  §1's obligation to record what a source vouched for would silently become a
+  record of something else. A finer field is an addition; redefining this one
+  never is.
 - Older Observation schemas remain valid and readable forever.
 
 ---
