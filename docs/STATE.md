@@ -1,12 +1,16 @@
 # Where Orb Is
 
-**As of 2026-09-26.** A snapshot, written so that picking this up does not require
-the conversation that produced it.
+**Standing overview plus a snapshot as of 2026-09-26**, written so that picking
+this up does not require the conversation that produced it.
 
 > **This document is not a source of truth.** Every claim here is decided
 > somewhere else and cited; where this disagrees with the document it cites, the
 > other one wins and this one is stale. Art. IX §33 forbids two sources for one
 > fact, and a summary that started arbitrating would become the second.
+>
+> **§1 is the standing overview** — what Orb is, and what exists as code.
+> **§§2–6 are the dated snapshot** — what was decided, measured, and neither, on
+> the date above.
 >
 > It exists because a session was switched by accident today and the handoff that
 > followed had to be audited rather than trusted. The audit found three
@@ -17,7 +21,80 @@ the conversation that produced it.
 
 ---
 
-## 1. The logic
+## 1. What Orb is
+
+**A personal runtime that continuously learns, reasons and acts alongside its
+user.** Long-lived — years rather than conversations. Its intelligence comes from
+*continuity* rather than from any single model; its foundation is evidence; its
+architecture is local-first, model-independent, and built to evolve for decades.
+
+`MASTER.md` sets seven principles — **local first, device native, event first,
+evidence first, model independent, continuous understanding, human agency** —
+and `CONSTITUTION.md` turns them into twelve articles: History, Truth and
+Interpretation, Models and Reasoning, Distribution, The Runtime, The Three
+Planes, Capabilities and Human Agency, Ownership and Trust, Engineering, The
+Kernel, Reality and Confidence, Identity and Continuity.
+
+One pipeline:
+
+```
+Sensors → Event Journal → Evidence Graph → Knowledge Engine → Digital Twin
+   → Reasoning Pipeline → Agent Runtime → Capabilities → Actions → Reflection
+```
+
+`contracts/` holds 23 kernel contracts, **9 Accepted** — Event, Observation,
+Evidence, Fact, Belief, Entity, Prediction, Sensor, Attachment — and 14 Draft.
+`docs/` is roughly 9,400 lines across 24 documents. By its own `ROADMAP.md`, Orb
+is in **Phase 3, the Kernel and Contracts**, with two amendments running beside
+it.
+
+### What exists as code
+
+Roughly 24,000 lines of TypeScript and 3,000 of Java. **627 tests, 0 failing**;
+lint clean; every package compiles independently.
+
+**The kernel.**
+
+| | | |
+| --- | --- | --- |
+| `runtime/journal` | ~8,900 | the Event Journal: hash chains, HLC ordering, envelopes v1/v2, erasure, partial replication, sync, Attachments |
+| `runtime/observation` | ~400 | occurrence, not truth — inv. 3, 5 and 7 enforced at the boundary |
+| `packages/connector` | ~550 | connector Sensors: the call, the synthesis, the outcome ladder |
+
+**Amendment one — the Hyperliquid trade executor.** *Entry may come from the
+signal provider; exit authority belongs to the executor.* Signal-agnostic: once a
+position is open it never depends on the signal source to tell it when to leave.
+This is the first real Capability — something Orb *does*, under a policy, with
+every decision journaled.
+
+| | | |
+| --- | --- | --- |
+| `packages/trade-executor` | ~7,700 | the execution engine |
+| `packages/hyperliquid` | ~2,850 | signing, REST, WebSocket |
+| `apps/executor` | ~2,950 | runtime host, production safety interlock, authenticated signal API |
+| `tests/` | ~1,100 | acceptance scenarios |
+
+**Amendment two — the device loop.** No Gradle and no libraries anywhere in it:
+an instrument that pulled in a framework could not say whether a death was the
+platform's or the framework's.
+
+| | | |
+| --- | --- | --- |
+| `apps/pixel/pass1` | ~1,650 | foreground-service and journal survival; the 21-hour run |
+| `apps/pixel/pass2` | ~730 | the grants signal; recording since 2026-09-26 |
+| `apps/pixel/probe-grants` | ~640 | the throwaway that answered P12–P14 |
+
+### What is not built at all
+
+**The whole middle of the pipeline.** Evidence Graph, Knowledge Engine, Digital
+Twin, Reasoning Pipeline, Agent Runtime — contracts written, no code. That order
+is the architecture's own and not an accident: everything above depends on a
+journal that cannot lie about what it knows, so the journal is finished first and
+the reasoning layers stay paper until it is.
+
+---
+
+## 2. The logic
 
 One distinction decided most of the design, and it keeps arriving under new
 names: **cannot check is not failed the check.** Every time it was collapsed,
@@ -95,7 +172,7 @@ both read back from history, and `horizon()` carries the policy that bounded it.
 
 ---
 
-## 2. The policies
+## 3. The policies
 
 `docs/DECISIONS.md` holds these in full, with consequences. The companion is
 `docs/ARCHITECTURAL_DEBT.md`, which holds what has deliberately **not** been
@@ -126,7 +203,7 @@ decided; nothing belongs in both.
 
 ---
 
-## 3. The hardware
+## 4. The hardware
 
 **Pixel 10a (`stallion`), Android 16 / API 36, security patch 2026-04-05, build
 `CP1A.260405.005`.** `DEVICE_LOOP.md` §7 R3 stands over all of it: a finding is
@@ -166,7 +243,7 @@ sideload it had never seen.
 
 ---
 
-## 4. The capability
+## 5. The capability
 
 **What Orb can see holding nothing:** which accessibility services are enabled,
 which apps hold notification access, which device admins are active, and every
@@ -177,19 +254,11 @@ high-value, low-noise"* made detectable at no permission cost. The baseline on a
 untouched phone is five notification listeners, all Google — which is what makes
 a sixth worth an event.
 
-### What is built
-
-| | |
-| --- | --- |
-| `runtime/journal` | the Event Journal. 581 tests across the workspace, 0 failing |
-| `apps/pixel/pass1` | foreground-service and journal survival probe; the 21-hour run |
-| `apps/pixel/pass2` | the grants signal. No foreground service, so it is also pass 1's missing P6 experiment |
-| `apps/pixel/probe-grants` | the throwaway that answered P12–P14 |
-| `packages/connector` | DR-7 tier 1: the call is journaled, content or not |
+What runs it is in §1. The three Android packages are there too.
 
 ---
 
-## 5. What is not proven
+## 6. What is not proven
 
 The section that matters most, and the one a summary is most tempted to shorten.
 
