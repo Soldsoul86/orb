@@ -123,6 +123,43 @@ Not guaranteed:
 
 ---
 
+## 6a. Connector Sensors — external calls
+
+A connector (Gmail, Calendar, Drive) is a Sensor whose source is reached over the
+network rather than read from the device. It perceives the same way and records
+the same way, with three additions ruled on 2026-09-26 (`docs/DECISIONS.md` DR-7).
+
+**The call is history, whether or not its content is.** Every fetch emits an
+event naming the connector, the scope or query shape, the time, the count
+returned, and the outcome — `value | empty | absent | threw | denied`. It carries
+no fetched content. Two reasons: an access the runtime does not record is an
+access nobody can audit, and the query is an *outbound* disclosure, because it
+tells the provider what was asked. §7's *source unavailable* is the `absent` case
+of this same ladder, and `denied` is distinct from `threw` — a refusal is a
+different fact from a failure.
+
+**What the connector yields is an Observation, never a Fact.** It carries
+`confidencePercent` and cites the call event in `causes`. A model's summary of
+fetched content is interpretation over external grounding, which is
+`Evidence.md`'s distinction, and it does not become a Fact by being convenient.
+
+**Raw content is an Attachment with a seven-day life.** Frozen and
+content-addressed at fetch — never a reference into the provider, because a
+mutable store is not evidence. It is held by `holdSince` for seven days from the
+fetch (the Attachment event's `wallClock` *is* the fetch time), after which the
+payload is released with `absence: "pruned"` and, under `Attachment.md` inv. 8,
+becomes unreadable everywhere rather than merely deleted here.
+
+After that the Observation is **grounded with its ground detached**: it still
+cites the call event, which is permanent, so a lineage walk resolves and reports
+that the content was released on a stated policy — which is a different fact from
+evidence that never existed. Its `confidencePercent` does not change; what it was
+worth when made is not edited by what can be verified later.
+
+**Credentials are never journaled.**
+
+---
+
 ## 7. Failure modes
 
 - **Source unavailable.** If the external source cannot be reached, the Sensor

@@ -318,6 +318,99 @@ but it is a fourth outcome, not a replacement for `absent`.
 
 ---
 
+## DR-7 — Connector Sensors: journal the call, keep the raw for seven days
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator · **Extends:** DR-6
+- **Bears on:** `contracts/Sensor.md`, `contracts/Attachment.md`,
+  `contracts/Observation.md`, `runtime/journal/src/retention.ts`
+
+**Decision.** A connector — Gmail, Calendar, Drive — is a **Sensor**: the
+boundary at which the external world becomes history. Raw fetched content does
+not live in the event payload. Instead, three tiers:
+
+1. **The call is always journaled, content or not.** Which connector, the scope
+   or query shape, when, how many items came back, and the outcome on DR-6's
+   ladder (`value | empty | absent | threw | denied`). No content. An access Orb
+   does not record is an access nobody can audit — and the query is itself an
+   outbound disclosure, since it tells the provider what was asked.
+2. **The synthesis is an Observation, never a Fact.** `confidencePercent`, and
+   `causes` pointing at the call event. `Observation.md`: an Observation *owns
+   confidence, not truth*.
+3. **The raw is kept as an Attachment for seven days, then released.** Frozen and
+   content-addressed — never a pointer, because Gmail is mutable and a reference
+   into a store that can change underneath is not evidence.
+
+**Why not simply drop the raw.** Because dropping it does not make the system
+safer, and the operator's own earlier observation is the reason: *scattered data
+is harder to assemble; concentrated data is already assembled*. A synthesis of
+six months of mail is more revealing than any message in it. Keeping only the
+synthesis discards the diffuse half and retains the dangerous half — and leaves a
+conclusion about a person that **nobody, including that person, can check against
+its source**. That is not safety; it is unaccountability, and it is the same
+distinction as everywhere else in this system: *cannot check* is not *failed the
+check*. Seven days buys the ability to check while it matters, and then spends it.
+
+### It needs no new machinery, which is the test it passed
+
+- **The window is `holdSince(7 days)`**, already in `retention.ts`: *hold payloads
+  newer than `windowMs`, by the event's own wall clock*.
+- **Seven days runs from the fetch, by construction rather than by rule.** The
+  Attachment event is created when Orb fetches, so its `wallClock` **is** the
+  fetch time. A three-month-old email fetched today is checkable for seven days
+  from today, which is the behaviour wanted, and no separate clock states it.
+- **The absence reason is `pruned`**, which already exists and already means what
+  is meant: dropped by local retention policy, as against `erased` (destroyed by
+  its owner) and `unfetched` (never held). No fourth reason.
+
+### What the synthesis becomes on day eight — a correction
+
+It does **not** become `ungrounded`. That was stated loosely when this was
+proposed and it is wrong. `ungrounded` in `lineage.ts` means *derived and citing
+nothing* — `causes` present and empty. Here the synthesis cites the call event,
+which is permanent: its envelope survives everything, under E1.
+
+The accurate state is **grounded, and its ground detached**: the chain resolves
+end to end, the Attachment event is still in history, and only its bytes are gone
+with `absence: "pruned"` recorded as the reason. So the lineage walk never breaks
+and never lies — it says *this rests on something recorded, whose content this
+device released on a stated policy*. A reader learns the difference between that
+and evidence that never existed, which is the whole point.
+
+**Confidence does not decay when the evidence does.** `confidencePercent` is what
+the Observation was worth when it was made, and history is not mutated
+(Art. I). What changes on day eight is a reader's ability to *verify* it, not its
+recorded worth — and conflating those would be editing the past to reflect the
+present.
+
+### Seven days must mean seven days on every device
+
+A window one device honours and another ignores is not a window. Two things make
+it real rather than advisory:
+
+- The policy attaches to the **Attachment kind**, not to a device's mood, so
+  every owned device applies the same `holdSince`.
+- **Attachment inv. 8** — the per-Attachment key dies with the last reference —
+  makes expiry arithmetic rather than a promise. When the last holder releases,
+  the bytes are unreadable everywhere, including on a relay that still has them
+  (`ERASURE.md` §2c).
+
+### Also decided
+
+**Connector tokens never enter the journal.** Credentials are not history. This
+is stated because it is the kind of thing that gets added "temporarily" for
+debugging and then lives in an append-only log for ever.
+
+**Open.**
+
+- Whether expiry should emit its own event. The absence reason travels on the
+  event, so a reader always learns *why* the bytes are gone; what is not recorded
+  is *whether anyone checked the synthesis while they still could*. That may
+  matter and may not.
+- Seven days is a number, not a principle. It is a `Policy.md` value, and
+  `Policy.md` is still Draft.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
