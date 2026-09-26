@@ -5,6 +5,9 @@
       "path": "./runtime/journal"
     },
     {
+      "path": "./runtime/observation"
+    },
+    {
       "path": "./packages/connector"
     },
     {

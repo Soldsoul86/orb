@@ -1,8 +1,8 @@
 {
-  "name": "@orb/connector",
+  "name": "@orb/observation",
   "version": "0.1.0",
   "private": true,
-  "description": "Connector Sensors: the boundary at which an external service becomes history.",
+  "description": "Observations: the recorded statement that something occurred in reality.",
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -12,21 +12,12 @@
       "default": "./dist/src/index.js"
     }
   },
-  "files": [
-    "dist/src",
-    "README.md",
-    "DESIGN.md",
-    "API.md",
-    "TESTS.md"
-  ],
+  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "test": "npm run build && node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
   },
-  "dependencies": {
-    "@orb/journal": "0.1.0",
-    "@orb/observation": "0.1.0"
-  },
+  "dependencies": { "@orb/journal": "0.1.0" },
   "license": "Apache-2.0"
 }

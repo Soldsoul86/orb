@@ -13,13 +13,23 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { Journal, MemoryJournalStore, unwrapPayload } from "@orb/journal";
+import { randomBytes } from "node:crypto";
+import {
+  Journal,
+  MemoryAttachmentKeyring,
+  MemoryAttachmentStore,
+  MemoryJournalStore,
+  resolveAttachment,
+  unwrapPayload,
+} from "@orb/journal";
+import { readObservation } from "@orb/observation";
 import {
   CONNECTOR_CALL_TYPE,
   ConnectorDenied,
   answered,
   outcomeOf,
   recordCall,
+  recordSynthesis,
   unknown,
   type ConnectorCall,
   type ConnectorDriver,
@@ -163,5 +173,75 @@ describe("a call is history whether or not its content is", () => {
     const [call] = await callsIn(j);
     assert.equal(call?.outcome, "threw");
     assert.match(call?.failure ?? "", /just a string/);
+  });
+});
+
+describe("what was made of a fetch, tied to the fetch", () => {
+  test("the synthesis cites the call, so a conclusion leads back to the asking", async () => {
+    const j = await journal();
+    const ports = {
+      store: new MemoryAttachmentStore(),
+      keyring: new MemoryAttachmentKeyring(),
+      addressSecret: randomBytes(32),
+    };
+    const call = await recordCall(j, driverReturning([{ subject: "a" }]), scope);
+
+    const { event, attachments } = await recordSynthesis(j, ports, call, {
+      source: "connector.gmail",
+      confidencePercent: 74,
+      data: { summary: "one message from the bank" },
+      raw: [Buffer.from('{"subject":"a"}')],
+    });
+
+    assert.deepEqual(event.causes, [call.eventId]);
+    assert.equal(attachments.length, 1);
+    const observation = readObservation<{ summary: string }>(event);
+    assert.equal(observation?.source, "connector.gmail");
+    assert.equal(observation?.confidencePercent, 74);
+    assert.deepEqual(observation?.attachments, attachments);
+  });
+
+  test("the raw is resolvable, and the synthesis never carries it", async () => {
+    const j = await journal();
+    const ports = {
+      store: new MemoryAttachmentStore(),
+      keyring: new MemoryAttachmentKeyring(),
+      addressSecret: randomBytes(32),
+    };
+    const raw = Buffer.from('{"subject":"the whole message"}');
+    const call = await recordCall(j, driverReturning([{ subject: "x" }]), scope);
+
+    const { event, attachments } = await recordSynthesis(j, ports, call, {
+      source: "connector.gmail",
+      confidencePercent: 74,
+      data: { summary: "a message" },
+      raw: [raw],
+    });
+
+    const resolved = await resolveAttachment(ports, attachments[0]!);
+    assert.equal(resolved.state, "held");
+    if (resolved.state === "held") assert.deepEqual(resolved.bytes, raw);
+    // The bytes are beside history, never inside it.
+    assert.equal(JSON.stringify(event.payload).includes("the whole message"), false);
+  });
+
+  test("a synthesis with no raw is still a synthesis", async () => {
+    const j = await journal();
+    const ports = {
+      store: new MemoryAttachmentStore(),
+      keyring: new MemoryAttachmentKeyring(),
+      addressSecret: randomBytes(32),
+    };
+    const call = await recordCall(j, driverReturning([]), scope);
+    const { event, attachments } = await recordSynthesis(j, ports, call, {
+      source: "connector.gmail",
+      confidencePercent: 100,
+      data: { summary: "nothing arrived" },
+    });
+
+    assert.equal(attachments.length, 0);
+    // Omitted rather than an empty list: this Observation cites no Attachment,
+    // which is not the same as citing none that resolved.
+    assert.equal("attachments" in (readObservation(event) as object), false);
   });
 });

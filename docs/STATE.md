@@ -197,7 +197,7 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | --- | --- |
 | **P6 and P16** | pass 2 was installed 2026-09-26 and has not yet been read back. Until then it is not known whether a broadcast reaches it with no service running, or how coarse the detection is |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
-| **Observation** | zero code. inv. 5 forbade inlining raw content, so it needed Attachment first; that is now unblocked |
+| ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
 | `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
 | `CLAIMS.md` §5 Ruling 2 | the general timing of consent, unresolved |
 | `AIRWALL.md` | an unapproved proposal |
@@ -205,6 +205,11 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | the pass-1 self-test fix | built, never installed; the running build reports `chain.linksEndToEnd` FAILED for ever |
 | the device's security patch | roughly six months old |
 
-**The next piece is Observation**, now that Attachment exists. It is what turns
-a connector from something that records having called into something that records
-what it learned.
+**The next ruling is DR-7 tier 3**, and it is a ruling rather than a task.
+`DECISIONS.md` DR-7 says the raw is *released* after seven days and becomes
+unreadable everywhere; `Attachment.md` inv. 8 destroys a key only when **no
+readable event references it**, and after seven days the Observation still does.
+So an expiry either drops the local bytes alone — leaving the content recoverable
+from any peer that kept them — or destroys a key while a live reference exists,
+which is a second ground for destruction that inv. 8 does not name. Implementing
+either without deciding would be choosing by accident.
