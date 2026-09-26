@@ -93,6 +93,8 @@ export type { LineageIndex, Traversal } from "./lineage.js";
 
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";
+export { latestOwnRecord, ownRecordHistory } from "./own-record.js";
+export type { OwnRecord } from "./own-record.js";
 export {
   RETENTION_POLICY_TYPE,
   RETENTION_POLICY_SCHEMA,
@@ -117,6 +119,8 @@ export {
   holdSince,
   holdTypes,
   holdContent,
+  syncPolicyInForce,
+  syncPolicyHistory,
 } from "./sync.js";
 export type {
   SyncPeer,
@@ -125,6 +129,7 @@ export type {
   SyncRound,
   SyncResult,
   SyncPolicyRecord,
+  SyncPolicyInForce,
 } from "./sync.js";
 
 export type { JournalStore, PayloadRecord } from "./store.js";

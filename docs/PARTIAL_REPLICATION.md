@@ -340,9 +340,15 @@ commits to the payload's hash.
   intention rather than a rule — and made a window like `DECISIONS.md` DR-7's
   seven days a constant in a build rather than something auditable or
   changeable. Two states of *we do not know* are kept apart and both refuse:
-  never recorded, and recorded but no longer readable. What is still open is the
-  **sync** payload policy (`orb.sync.policy`), which is recorded by `policyDraft`
-  and likewise not yet read back.
+  never recorded, and recorded but no longer readable.
+
+  The **sync** payload policy is read back too, by `syncPolicyInForce`, and
+  `horizon()` now carries it — so §6's sentence is answerable: a horizon says not
+  only that it is bounded but what bounded it, and since when. What comes back is
+  the policy's `describe`, not a rebuilt `wants`: a `PayloadPolicy` is a
+  predicate, and recovering one from a description would make an explanatory
+  label into a wire format where a typo silently changes what a device keeps.
+  Explaining a horizon needs the description; nothing yet needs the predicate.
 
 ---
 

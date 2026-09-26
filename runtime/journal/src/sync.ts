@@ -21,12 +21,13 @@
  * They live behind `SyncPeer`, which is injected exactly as `JournalStore` is,
  * so adding them later changes no semantics here (`SECURITY.md` §10).
  */
-import type { EventEnvelope, LaneId } from "./types.js";
+import type { EventEnvelope, LaneId, StoredEvent } from "./types.js";
 import { hasPayload, isErased } from "./types.js";
 import type { PayloadRecord } from "./store.js";
 import type { Journal } from "./journal.js";
 import { isBookkeepingType } from "./vocabulary.js";
 import { SYNC_POLICY_TYPE, SYNC_POLICY_SCHEMA } from "./sync-types.js";
+import { latestOwnRecord, ownRecordHistory } from "./own-record.js";
 import { unwrapPayload } from "./payload.js";
 import {
   custodyReceiptDraft,
@@ -151,6 +152,80 @@ export { SYNC_POLICY_TYPE, SYNC_POLICY_SCHEMA } from "./sync-types.js";
  */
 export interface SyncPolicyRecord {
   readonly policy: string;
+}
+
+/**
+ * The sync payload policy this device has been running, from its own history.
+ *
+ * `PARTIAL_REPLICATION.md` §6 states why inv. 6 journals policy at all: *"A
+ * retention change alters what a device can answer. If that is not in history,
+ * 'why doesn't my phone know this?' is unanswerable, and the horizon in §5
+ * becomes unexplainable."* Recording it satisfied the first half. This is the
+ * second: the horizon can now say **why** it is bounded, not only that it is.
+ *
+ * What comes back is `describe` — a policy's own account of itself — and not a
+ * rebuilt `wants`. That is deliberate. A `PayloadPolicy` is a predicate, and a
+ * predicate cannot be recovered from a description without making that string a
+ * wire format, at which point a typo in an explanatory label silently changes
+ * what a device keeps. Explaining a horizon needs the description; nothing yet
+ * needs the predicate, and inventing a parser for a caller that does not exist
+ * would be building the fragile half first.
+ */
+export type SyncPolicyInForce =
+  | { readonly state: "none" }
+  | { readonly state: "unreadable"; readonly at: string }
+  | {
+      readonly state: "policy";
+      /** `PayloadPolicy.describe`, as recorded. */
+      readonly policy: string;
+      readonly at: string;
+      /** When it took effect. Human-facing; never an ordering. */
+      readonly since: number;
+    };
+
+/**
+ * What policy this device is operating under, per its own lane.
+ *
+ * Only its own records: inv. 7 — no device decides what another may hold. And
+ * the newest record governs whether or not it is readable, because an earlier
+ * readable one is a policy this device has already replaced.
+ */
+export function syncPolicyInForce(
+  events: readonly StoredEvent[],
+  device: string,
+): SyncPolicyInForce {
+  const found = latestOwnRecord<SyncPolicyRecord>(events, device, SYNC_POLICY_TYPE);
+  if (found.state !== "record") return found;
+  return {
+    state: "policy",
+    policy: found.record.policy,
+    at: found.at,
+    since: found.wallClock,
+  };
+}
+
+/**
+ * Every payload policy this device has recorded, oldest first.
+ *
+ * A horizon is explained by the policy in force *now*; a horizon that changed is
+ * explained by the sequence. Unreadable entries are kept in place rather than
+ * dropped, because a gap in the sequence and a policy nobody can read are
+ * different facts and the second is the one that needs saying.
+ */
+export function syncPolicyHistory(
+  events: readonly StoredEvent[],
+  device: string,
+): readonly SyncPolicyInForce[] {
+  return ownRecordHistory<SyncPolicyRecord>(events, device, SYNC_POLICY_TYPE).map((entry) =>
+    entry.state === "record"
+      ? ({
+          state: "policy",
+          policy: entry.record.policy,
+          at: entry.at,
+          since: entry.wallClock,
+        } as const)
+      : entry,
+  );
 }
 
 /**

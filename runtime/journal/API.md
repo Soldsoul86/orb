@@ -50,7 +50,28 @@ unsure which payloads still exist. Throws `RetentionError`.
 horizon(): Promise<Horizon>
 ```
 What this device cannot answer: per lane, how many payloads are absent and which
-ids. `complete` is the only basis for an unqualified answer.
+ids. `complete` is the only basis for an unqualified answer. `policy` carries
+**why** — the sync payload policy this device has been running, from its own
+lane, so a bounded horizon names what bounded it (`PARTIAL_REPLICATION.md` §6).
+`none` there is not a fault: a device that never synced never recorded one.
+
+```ts
+syncPolicyInForce(events, device): SyncPolicyInForce
+syncPolicyHistory(events, device): readonly SyncPolicyInForce[]
+```
+The policy a device has been running, and the sequence of them. Same three states
+as `EffectivePolicy` and the same two rules: only the device's own records
+(inv. 7), and the newest record governs whether or not it is readable. What comes
+back is `PayloadPolicy.describe`, never a rebuilt `wants` — a predicate recovered
+from a description would make an explanatory label a wire format.
+
+```ts
+latestOwnRecord<T>(events, device, type): OwnRecord<T>
+ownRecordHistory<T>(events, device, type): readonly OwnRecord<T>[]
+```
+What both policy read-backs are built from, shared so the two cannot drift on the
+parts that matter: the device filter, and stopping at the newest record even when
+its payload is gone.
 
 ```ts
 evaluatePrune(request: PruneRequest): PruneDecision

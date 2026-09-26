@@ -17,6 +17,7 @@ import type { EventDraft, EventEnvelope, LaneId, OrbEvent, StoredEvent } from ".
 import { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
 import { latestCustody } from "./custody.js";
 import { evaluatePrune, type RetentionPolicy } from "./retention.js";
+import { syncPolicyInForce, type SyncPolicyInForce } from "./sync.js";
 
 export interface JournalOptions {
   /** This device's lane. The journal appends here and nowhere else. */
@@ -56,6 +57,19 @@ export interface Horizon {
   readonly complete: boolean;
   readonly missing: number;
   readonly lanes: readonly LaneHorizon[];
+  /**
+   * Why this device holds what it holds, from its own history.
+   *
+   * `PARTIAL_REPLICATION.md` §6 is the reason inv. 6 journals policy at all:
+   * *"If that is not in history, 'why doesn't my phone know this?' is
+   * unanswerable, and the horizon in §5 becomes unexplainable."* A count of
+   * missing payloads says a device is bounded; this says what bounded it.
+   *
+   * `none` is not a fault — a device that has never synced has never recorded a
+   * policy, and its payloads are all its own. `unreadable` is a fault worth
+   * seeing: the rule that shaped this horizon is in history and cannot be read.
+   */
+  readonly policy: SyncPolicyInForce;
 }
 
 /**
@@ -337,7 +351,15 @@ export class Journal {
       });
     }
 
-    return { complete: missing === 0, missing, lanes };
+    // Read from this device's own lane, which is the only lane whose policy
+    // records govern it (`PARTIAL_REPLICATION.md` inv. 7).
+    const own = await this.#store.read(this.lane);
+    return {
+      complete: missing === 0,
+      missing,
+      lanes,
+      policy: syncPolicyInForce(own, this.device),
+    };
   }
 
   /**

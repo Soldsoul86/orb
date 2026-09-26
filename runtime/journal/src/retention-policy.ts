@@ -16,8 +16,7 @@
  * the journal doing the I/O — the same shape as `latestCustody`.
  */
 import { canonicalJson } from "./integrity.js";
-import { unwrapPayload } from "./payload.js";
-import { hasPayload } from "./types.js";
+import { latestOwnRecord } from "./own-record.js";
 import type { EventDraft, SchemaRef, StoredEvent } from "./types.js";
 import type { PruneDecision, PruneRequest, RetentionPolicy } from "./retention.js";
 import { evaluatePrune } from "./retention.js";
@@ -79,16 +78,11 @@ export function effectivePolicy(
   events: readonly StoredEvent[],
   device: string,
 ): EffectivePolicy {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (!event || event.device !== device) continue;
-    if (!isPolicyEvent(event)) continue;
-    if (!hasPayload(event)) return { state: "unreadable", at: event.id };
-    const record = unwrapPayload(event.payload) as RetentionPolicyRecord | undefined;
-    if (record === undefined) return { state: "unreadable", at: event.id };
-    return { state: "policy", policy: record, at: event.id };
+  const found = latestOwnRecord<RetentionPolicyRecord>(events, device, RETENTION_POLICY_TYPE);
+  if (found.state === "record") {
+    return { state: "policy", policy: found.record, at: found.at };
   }
-  return { state: "none" };
+  return found;
 }
 
 /**
@@ -163,8 +157,4 @@ export function evaluatePruneFromHistory(request: HistoricalPruneRequest): Prune
 
   const { history: _history, ...rest } = request;
   return evaluatePrune({ ...rest, policy: current.policy });
-}
-
-function isPolicyEvent(event: StoredEvent): boolean {
-  return event.type === RETENTION_POLICY_TYPE;
 }
