@@ -213,6 +213,111 @@ An action chain that dropped them would leave the gate's whole value unevidenced
 
 ---
 
+## DR-6 — The pass-3 journal schema is a payload schema; the envelope does not change
+
+- **Status:** **Proposed** — this one is reasoned here, not relayed from the
+  operator, and needs ratifying · **Raised:** 2026-09-26
+- **Bears on:** `contracts/Event.md`, `docs/ERASURE.md` §2b, `runtime/journal/`,
+  `apps/pixel/pass1/tests/vectors.json`
+
+**The question.** A handoff summary proposed a journal entry format — `id`,
+`ts`, `seq`, `prev_hash`, `source`, `kind`, `device`, `read.outcome`,
+`read.evidence`, entities, `data`, `content_ref`, `retention` — described as
+*"one common format, whatever its source"*. Is that a **payload schema** for
+pass-3 sources, or a **replacement Event**?
+
+**Resolution: a payload schema. Nothing in it needs an envelope change**, and
+three of its fields would undo rulings already made.
+
+### Where each field already lives
+
+| proposed | resolution |
+| --- | --- |
+| `id` | `id` |
+| `ts` | `wallClock` — human-facing only, never ordering. *The timezone offset is new: payload.* |
+| `seq` | `hlc` = `{physical, counter}`; order is `(hlc, lane)` |
+| `prev_hash` | `integrity.previous` |
+| `device` | `device` (build, patch and `boot_id` are payload, as pass 1 already records them) |
+| `data` | that **is** `payload` |
+| `read.outcome`, `read.evidence` | payload |
+| entities (raw id → stable id → name) | payload; overlaps `EVIDENCE_GRAPH.md` |
+| `content_ref` | payload — an Attachment reference. `contracts/Attachment.md` already gives content addressing, inv. 7's blinded address and inv. 8's per-reference key |
+| snapshot + diff as separate entries | a type-and-payload pattern; `apps/pixel/pass2` already does it |
+| `intent_id` | `causes` — see DR-5 |
+| `source`, `kind` | **would undo the coarse-type ruling** — below |
+| `retention` | **exists, and not as a field on an event** — below |
+
+### The three that would undo a ruling
+
+**1. `source` and `kind` in the envelope reopen the leak §2b closed.** The
+operator's own ruling was *"coarse type in the envelope, real type inside the
+payload."* `source: gmail | notif | calendar | usage` is a fine type under
+another name. `vocabulary.ts` states why a richer split was refused, and the
+argument applies unchanged: *"Every label is permanent under the E2/E3 ruling,
+so the choice is asymmetric: starting coarse stays reversible… starting fine
+cannot be undone."* An envelope carrying `source` tells anyone holding envelopes
+— including a witness that never holds a payload and never gets a key — which
+sources a life runs on, how often, and in what rhythm. Under E1 the envelope
+survives erasure, so that is permanent.
+
+**2. `ts` with a timezone offset puts a location trail in the replicated part.**
+Envelopes go to every device and to witnesses; payloads do not. An offset says
+roughly where its owner was, and *changes when they travel*. In the payload it
+dies with the payload; in the envelope it is forever. There is no ordering need
+for it — `wallClock` is already explicitly not an ordering.
+
+**3. `retention` on an event turns a local storage choice into a travelling
+claim.** `sync.ts` is explicit: *"retention is a local storage choice, not a
+claim about what happened."* `RetentionPolicy` is per-device, listing owned
+devices and prune eagerness. A `retention` field on the event would be one
+device asserting how long another must keep something — either unenforceable, or
+an authority nobody granted.
+
+### The trade this is actually making, stated honestly
+
+The proposal is not arbitrary: a `source`/`kind` envelope field would restore
+**selective sync and retention by kind of content**, which is genuinely gone.
+`holdTypes` documents the loss and refuses to route around it:
+
+> `holdTypes(["note"])` therefore holds nothing. That is not a bug to route
+> around, and routing around it is what would be the bug: any envelope field
+> fine enough to make this work is a field that survives erasure and is readable
+> by whoever holds the envelope, which is the leak §2b closed.
+
+So the cost is real and it is being paid deliberately. What remains is `holdSince`
+plus lane, device and content-versus-bookkeeping — enough for *keep the last
+month*, *keep my own lane*, *keep nothing*, which were the motivating cases. The
+convenience given up is recoverable later; the privacy spent would not be.
+
+### The mechanical cost, separately
+
+Renaming `integrity.previous` → `prev_hash`, or splitting `hlc` into `ts` + `seq`,
+changes the **hash preimage**. `apps/pixel/pass1/tests/vectors.json` exists so the
+TypeScript and Java encoders cannot diverge (`DEVICE_LOOP.md` §7 R2); the v1
+vector hash `dce6c5bb…` is pinned, and the 2026-09-26 v2 work added to it without
+breaking it. A rename is therefore not a rename — it is a third event format, and
+every event already written becomes unverifiable. That is a reason to be sure, not
+by itself a reason to refuse.
+
+### One correction the schema needs before it is written down
+
+`read.outcome: value | empty | threw | denied` **drops the distinction that five
+probe runs were spent on**. The implemented shape is `value | absent | threw`,
+where `absent` (the call returned nothing) is **not** `empty` (the call returned
+an empty set). The summary's own note — *"empty must never be treated as all
+clear"* — is the right instinct with no slot to put it in.
+
+On this device that is not hypothetical: `getActiveAdmins()` returns `null` for
+*none*, and the whole `isAdminActive` corroboration in
+`apps/pixel/pass2/src/GrantReader.java.in` exists to tell *none* from *withheld*.
+`denied` is a worthwhile addition — a refusal is a different fact from a throw —
+but it is a fourth outcome, not a replacement for `absent`.
+
+**Proposed outcome:** `value | empty | absent | threw | denied`, with `absent` and
+`empty` never merged by any reader.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
@@ -223,3 +328,7 @@ from the original discussion. Where a consequence is drawn here that the summary
 did not state — DR-4's split evidence, DR-5's `causes` collision — it is drawn
 from this repository and should be checked against the operator's intent rather
 than assumed to carry their authority.
+
+**DR-6 is not one of theirs at all.** It is reasoned here from the repository in
+answer to a question the summary raised, and it is marked Proposed for that
+reason. It needs a yes or a no before anything is built on it.
