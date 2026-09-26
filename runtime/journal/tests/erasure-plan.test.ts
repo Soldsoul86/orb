@@ -14,6 +14,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CONTEMPORANEOUS_MS,
   type ErasurePlan,
   grantCovers,
   grantFor,
@@ -384,7 +385,7 @@ describe("an authorization binds to the exact plan it was given for", () => {
     const shown = await plan(journal, [target.id]);
 
     const grant = grantFor(shown, 1_000);
-    const check = grantCovers(await plan(journal, [target.id]), grant, 5_000);
+    const check = grantCovers(await plan(journal, [target.id]), grant, 5_000, CONTEMPORANEOUS_MS);
     assert.equal(check.ok, true);
     assert.equal(check.ageMs, 4_000, "the age is reported for the open ruling to use");
   });
@@ -395,7 +396,7 @@ describe("an authorization binds to the exact plan it was given for", () => {
     assert.ok(a && b);
 
     const grant = grantFor(await plan(journal, [a.id]), 1_000);
-    const check = grantCovers(await plan(journal, [b.id]), grant, 1_000);
+    const check = grantCovers(await plan(journal, [b.id]), grant, 1_000, CONTEMPORANEOUS_MS);
     assert.equal(check.ok, false);
     assert.match(check.reason ?? "", /given for a different plan/);
   });
@@ -419,7 +420,7 @@ describe("an authorization binds to the exact plan it was given for", () => {
 
     const now = await plan(journal, [target.id]);
     assert.equal(now.fallout.ids.length, 1, "and something is now");
-    assert.equal(grantCovers(now, grant, 2_000).ok, false);
+    assert.equal(grantCovers(now, grant, 2_000, CONTEMPORANEOUS_MS).ok, false);
   });
 
   test("an unrelated append does not void a grant", async () => {
@@ -432,7 +433,7 @@ describe("an authorization binds to the exact plan it was given for", () => {
     // within sixty seconds, protecting nothing `fallout` does not already cover.
     await journal.appendOne(note("an unrelated observation"));
 
-    assert.equal(grantCovers(await plan(journal, [target.id]), grant, 2_000).ok, true);
+    assert.equal(grantCovers(await plan(journal, [target.id]), grant, 2_000, CONTEMPORANEOUS_MS).ok, true);
   });
 
   test("a question the owner could not answer appearing is a different plan", async () => {
@@ -446,7 +447,7 @@ describe("an authorization binds to the exact plan it was given for", () => {
 
     const now = await plan(journal, [target.id]);
     assert.ok(now.unavailable.some((gap) => gap.point === "D3"));
-    assert.equal(grantCovers(now, grant, 2_000).ok, false);
+    assert.equal(grantCovers(now, grant, 2_000, CONTEMPORANEOUS_MS).ok, false);
   });
 
   test("the digest is stable across reordering, so it pins content and not order", async () => {
@@ -526,5 +527,101 @@ describe("the digest covers each part of the decision independently", () => {
     // The owner answered a set of questions, not a set of sentences. Editing an
     // explanation must not invalidate a live grant.
     assert.equal(planDigest(reworded), planDigest(plan));
+  });
+});
+
+/**
+ * The narrow ruling, accepted 2026-09-26 (`ERASURE.md` §4a).
+ *
+ * *A standing authorization is available only where waiting for consent would
+ * defeat the action's purpose.* Erasure's purpose is never defeated by waiting,
+ * so it is authorized contemporaneously, bound to the plan shown, or not at all.
+ */
+describe("erasure is authorized in the moment or not at all", () => {
+  const planFor = async (journal: Journal, targets: readonly string[]) =>
+    planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets,
+      derived: isDerived,
+    });
+
+  /**
+   * The case the binding alone cannot catch, and the reason the ruling was
+   * needed at all.
+   *
+   * On a quiet device the plan digest does not change, so a grant left lying
+   * around still binds perfectly. That is route A5 arriving by patience rather
+   * than by trickery, and only a window closes it.
+   */
+  test("a grant left lying around on a quiet device expires", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const plan = await planFor(journal, [target.id]);
+    const grant = grantFor(plan, 1_000);
+
+    // Nothing has changed. The binding is intact and would let this through.
+    assert.equal(planDigest(await planFor(journal, [target.id])), grant.planDigest);
+
+    const check = grantCovers(plan, grant, 1_000 + CONTEMPORANEOUS_MS + 1, CONTEMPORANEOUS_MS);
+    assert.equal(check.ok, false);
+    assert.equal(check.why, "expired");
+    assert.match(check.reason ?? "", /authorized in the moment or not at all/);
+  });
+
+  test("a careful reader is not refused mid-decision", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const plan = await planFor(journal, [target.id]);
+    const grant = grantFor(plan, 1_000);
+
+    // The other direction is a real harm too: refusing someone who read the
+    // whole preview teaches them to hurry through the one screen here that most
+    // deserves to be read slowly.
+    const check = grantCovers(plan, grant, 1_000 + 4 * 60 * 1000, CONTEMPORANEOUS_MS);
+    assert.equal(check.ok, true);
+  });
+
+  test("a grant from the future is refused, not trusted", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const plan = await planFor(journal, [target.id]);
+
+    // Wall clock moves backwards — a clock correction, a timezone edit, a lie.
+    // A negative age must not read as comfortably inside the window.
+    const check = grantCovers(plan, grantFor(plan, 10_000), 1_000, CONTEMPORANEOUS_MS);
+    assert.equal(check.ok, false);
+    assert.equal(check.why, "expired");
+  });
+
+  test("a changed plan is reported as changed even when it is also stale", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const grant = grantFor(await planFor(journal, [target.id]), 1_000);
+
+    await journal.appendOne(derived("appeared later", [target.id]));
+
+    // Both refusals apply. The owner needs the one whose remedy is "look again",
+    // not the one whose remedy is "confirm faster".
+    const check = grantCovers(
+      await planFor(journal, [target.id]),
+      grant,
+      1_000 + CONTEMPORANEOUS_MS + 1,
+      CONTEMPORANEOUS_MS,
+    );
+    assert.equal(check.ok, false);
+    assert.equal(check.why, "plan-changed");
+  });
+
+  test("the window is the caller's to state, so none is ever accidental", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const plan = await planFor(journal, [target.id]);
+    const grant = grantFor(plan, 0);
+
+    // `maxAgeMs` is required rather than defaulted: a grant with no stated
+    // window is the blanket authorization `Policy.md` §1 voids outright.
+    assert.equal(grantCovers(plan, grant, 60_000, 30_000).ok, false);
+    assert.equal(grantCovers(plan, grant, 60_000, 120_000).ok, true);
   });
 });

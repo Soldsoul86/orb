@@ -1108,15 +1108,7 @@ covered fields at once and any one shifts the hash. They passed for a reason
 other than the one they named. Two negative controls found it. The tests now
 mutate one field at a time, and four controls bite where two did not.
 
-### What it does not decide, and why not
-
-**Staleness.** Whether an authorization is valid only at the moment of issue or
-persists for a declared window is `CLAIMS.md` §5 Ruling 1, and it is the
-operator's. So `grantCovers` checks the binding, returns the grant's `ageMs`,
-and lets the caller apply whatever the ruling says — rather than baking in an
-answer and making a reserved ruling look already made.
-
-### The narrow ruling that would unblock the rest
+### The narrow ruling — accepted
 
 Ruling 1 does not have to be settled in general for erasure to proceed.
 
@@ -1137,8 +1129,38 @@ principle that follows is narrower than Ruling 1 and settles this one:
 
 This is consistent with `Policy.md`'s own floor, which already voids any policy
 that would *"make an irreversible action ambient"* or *"make an authorization
-blanket"*. **Proposed, not ruled** — the general question of timing stays open,
-and this only claims that erasure does not depend on how it lands.
+blanket"*.
+
+**Ruled by the operator, 2026-09-26.** `CLAIMS.md` §5 Ruling 1 stays open in
+general; erasure no longer waits on it.
+
+### What the ruling forced, which the binding could not
+
+A window has to exist, and until the ruling there was no basis for one.
+
+**On a quiet device the plan digest does not change.** A grant left lying around
+still binds perfectly, and the binding alone would let it through — route A5
+arriving by patience rather than by trickery. Only a window closes that, which is
+why *"or not at all"* is doing real work rather than restating the binding.
+
+`grantCovers` now refuses two ways and keeps them apart, because *the plan
+changed, look again* and *you took too long, confirm again* have different
+remedies and collapsing them would make the second read as the first. A grant
+that is both is reported as **changed**, since that is the fact the owner needs.
+A grant from the future — a clock correction, a timezone edit, a lie — is
+refused rather than read as comfortably inside the window.
+
+**`maxAgeMs` is required, never defaulted.** A grant with no stated window is
+exactly the blanket authorization `Policy.md` §1 voids, and a default is how one
+arrives by accident. `CONTEMPORANEOUS_MS` is exported as a recommendation with
+its reasoning attached, and the caller still has to pass it.
+
+**Five minutes, and both directions are a real harm.** Too long and a forgotten
+grant waits to be spent. Too short and a careful reader working through eight
+decision points — several of which say *this cannot be computed* — is refused
+mid-decision, which trains people to hurry through the one screen in this system
+that most deserves to be read slowly. The number is a recommendation precisely
+because it is a judgement about people rather than about cryptography.
 
 ---
 

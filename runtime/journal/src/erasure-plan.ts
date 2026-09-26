@@ -329,10 +329,38 @@ export interface ErasureGrant {
   readonly grantedAt: number;
 }
 
-/** Why a grant does not cover a plan, or that it does — plus what the open ruling needs. */
+/**
+ * Why a grant does not cover a plan, or that it does.
+ *
+ * The two refusals are kept apart because they tell the owner different things
+ * and have different remedies: *the plan changed, look at it again* is not *you
+ * took too long, confirm again*. Collapsing them would make the second read as
+ * the first and teach people that erasure is flaky.
+ */
 export type GrantCheck =
   | { readonly ok: true; readonly ageMs: number }
-  | { readonly ok: false; readonly reason: string; readonly ageMs: number };
+  | { readonly ok: false; readonly why: "plan-changed" | "expired"; readonly reason: string; readonly ageMs: number };
+
+/**
+ * How long "contemporaneously" lasts, recommended rather than imposed.
+ *
+ * Ruled 2026-09-26 (`ERASURE.md` §4a): erasure is authorized contemporaneously,
+ * bound to the plan shown, or not at all. The ruling settles that a window
+ * exists and is short; it does not pick a number, so this is a constant with its
+ * reasoning attached and `grantCovers` still requires the caller to pass one.
+ *
+ * **Both directions are a real harm.** Too long and a grant sits around waiting
+ * to be spent on a quiet device, where the plan digest does not change and the
+ * binding alone would let it through — which is route A5 arriving by patience
+ * rather than by trickery. Too short and a careful reader working through eight
+ * decision points, several of which say *this cannot be computed*, is refused
+ * mid-decision; that trains people to hurry through the one screen in this
+ * system that most deserves to be read slowly.
+ *
+ * Five minutes is generous to the careful reader and short enough that a
+ * forgotten grant is gone.
+ */
+export const CONTEMPORANEOUS_MS = 5 * 60 * 1000;
 
 /**
  * A hash over exactly what the owner decided on.
@@ -400,16 +428,36 @@ export function grantCovers(
   plan: ErasurePlan,
   grant: ErasureGrant,
   now: number,
+  maxAgeMs: number,
 ): GrantCheck {
   const ageMs = now - grant.grantedAt;
-  const current = planDigest(plan);
-  if (current === grant.planDigest) return { ok: true, ageMs };
-  return {
-    ok: false,
-    ageMs,
-    reason:
-      "this authorization was given for a different plan: what would be torn down, " +
-      "who must be told, or which questions could not be answered has changed since " +
-      "it was shown. Ask again with the plan as it stands.",
-  };
+
+  if (planDigest(plan) !== grant.planDigest) {
+    return {
+      ok: false,
+      why: "plan-changed",
+      ageMs,
+      reason:
+        "this authorization was given for a different plan: what would be torn down, " +
+        "who must be told, or which questions could not be answered has changed since " +
+        "it was shown. Ask again with the plan as it stands.",
+    };
+  }
+
+  // Checked second on purpose. A grant that is both stale and for a changed
+  // plan is reported as changed, because that is the fact the owner needs: the
+  // remedy is to look again, not merely to confirm faster.
+  if (ageMs < 0 || ageMs > maxAgeMs) {
+    return {
+      ok: false,
+      why: "expired",
+      ageMs,
+      reason:
+        "this authorization is no longer contemporaneous with the decision it was " +
+        "given for. Erasure is irreversible and is authorized in the moment or not " +
+        "at all (`ERASURE.md` §4a). Show the plan again and ask.",
+    };
+  }
+
+  return { ok: true, ageMs };
 }

@@ -310,14 +310,16 @@ under one reading batch approval is a feature and under the other it is the
 hole. This awaits the operator's explicit ruling, as `PARTIAL_REPLICATION.md`
 §10 awaited one.
 
-**A narrower form is proposed, 2026-09-26** (`ERASURE.md` §4a), which would
-unblock erasure without settling this. `Policy.md` §1 argues for standing
+**A narrower form was accepted, 2026-09-26** (`ERASURE.md` §4a), and it unblocks
+erasure without settling this. `Policy.md` §1 argues for standing
 authorization from one case — *a person who has fallen cannot confirm a prompt*
 — and that case has a shape: the action is urgent and the human cannot answer in
 time. The proposal is that standing authorization is available **only** where
 waiting would defeat the action's purpose. Erasure has no such case, so it is
-authorized contemporaneously or not at all, however Ruling 1 lands. Still the
-operator's to accept.
+authorized contemporaneously or not at all, however Ruling 1 lands. **Ruled.**
+The general question stays open; erasure no longer waits on it, and A5 is closed
+for erasure specifically — a grant left lying around on a quiet device still
+binds to an unchanged plan, so only a window refuses it.
 
 **Ruling 2 — how narrowly C1 is stated.** Either the claim is made only for the
 mediated set (defensible today), or it also claims detection of out-of-band

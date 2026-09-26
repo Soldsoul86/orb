@@ -66,6 +66,7 @@ export {
   planDigest,
   grantFor,
   grantCovers,
+  CONTEMPORANEOUS_MS,
 } from "./erasure-plan.js";
 export type {
   ErasurePlan,
