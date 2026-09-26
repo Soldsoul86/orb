@@ -78,7 +78,7 @@ fingerprint is printed above the results and travels in the exported file.
 | --- | --- |
 | **P13** | **CONFIRMED.** 555 chars, five entries, no permission — all Google (Auto, the Auto dashboard, System Intelligence, the launcher, `odad`) |
 | **P12** | **CONFIRMED on the second run** — both routes, one entry, with the master toggle agreeing. Inconclusive on the first: nothing was enabled to read |
-| **P14** | **OPEN** after four runs. Now scored from the device alone: `isAdminActive` per installed receiver, checked against `getActiveAdmins()`. The checkbox no longer decides it |
+| **P14** | **CONFIRMED on the fifth run** — one active admin (`gms/.mdm.receivers.MdmDeviceAdminReceiver`) returned with no permission. Runs 1–4 had none active, and `null` is how this platform spells *none* |
 | control | **HELD.** The direct file read failed with `EACCES` |
 
 That first run also scored P12 **wrong**, and the fix is the interesting part.

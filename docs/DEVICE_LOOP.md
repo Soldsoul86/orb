@@ -27,7 +27,7 @@ needs, including the author in three months.*
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
-| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — four runs; the tick is now out of the loop and the device scores it |
+| **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1413,6 +1413,38 @@ device before asking the person, and where the device can answer, do not ask the
 person at all.** A human claim is a legitimate input only where nothing on the
 device speaks to the same fact — and for all three of P12, P13 and P14, something
 does.
+
+### P14 — confirmed, 14:12 IST
+
+With Find Hub's device-admin toggle on, `DevicePolicyManager.getActiveAdmins()`
+returned **`com.google.android.gms/.mdm.receivers.MdmDeviceAdminReceiver`** — one
+entry, 60 characters, to an app declaring no permission. `read at` and
+`exported at` are the same second, and the control still held.
+
+**All three predictions are now answered on this device**, and pass 2's three
+kinds are all readable with nothing granted:
+
+| | | |
+| --- | --- | --- |
+| **P12** | accessibility services enabled | confirmed, two independent APIs |
+| **P13** | notification listeners enabled | confirmed, 5 entries |
+| **P14** | device admins active | confirmed, 1 entry |
+
+**And the earlier `null`s are explained rather than excused.** Runs 1–4 had no
+admin active and returned `null`; run 5 had one and returned a list. So on this
+device `getActiveAdmins()` spells *none* as `null` rather than as an empty list —
+which is exactly the reading the INCONCLUSIVE rule refused to commit to at the
+time, and it was right to refuse: the same `null` would have been produced by a
+platform that withheld the list, and nothing in runs 1–4 could tell the two
+apart. Being unable to say was the correct answer until run 5 made it decidable.
+
+That confirmation came from a build where P14 was still scored by the generic
+rule rather than by `isAdminActive`, and it is sound anyway: *entries actually
+handed over* confirm under either operator claim, which is the invariant the
+desktop suite pins hardest. The per-component cross-check stays in the probe
+regardless — it is what turns a future `null` from an ambiguity back into a fact,
+and `Grants` needs that, because **on this platform a missing admin list and a
+withheld one are the same value.**
 
 ---
 
