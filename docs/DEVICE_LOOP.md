@@ -27,7 +27,7 @@ needs, including the author in three months.*
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
-| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — `null` on a device with no admin active settles nothing |
+| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — three runs, none of them usable; see below |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1348,6 +1348,37 @@ equivalent, and it is the one that slipped again. The lesson is not that the
 operator is unreliable — it is that **a claim with a corroborant gets checked and
 a claim without one gets believed**, so a probe that must ask a human something
 should be built around what the device can independently confirm.
+
+**Third run, 13:21 IST — the admin was switched on, and the run is still
+unusable.** The operator enabled Find Hub's device-admin toggle, and the
+screenshots show it on. The readout says `read at 13:21:38` and the exported file
+is named `132354` — **two minutes and sixteen seconds apart**, because the screen
+rendered once on launch and the export wrote whatever that render had produced.
+The Settings trip happened in between. So the `null` in that file was read at a
+moment whose admin state cannot now be established, and the FALSIFIED line it
+carries is not a finding about Android.
+
+That is the third consecutive verdict produced by the instrument rather than the
+platform, and the first two have a shape the third completes:
+
+1. A claim with no corroborant was believed (the accessibility mis-tick).
+2. A label invited a wrong claim (the Device admin screen lists apps that are off).
+3. **A readout was allowed to be older than the device it describes.**
+
+Each one presented an artefact of how the probe was *operated* as a measurement
+of what was *read*. The fix for the third is the same kind as the other two —
+remove the way to get it wrong rather than ask the operator to be careful: the
+screen now re-reads in `onResume`, so returning from Settings always shows
+current state, the export re-reads before writing, and the file carries an
+`exported at` line beside `read at` so any gap is visible in the artifact itself.
+
+**One thing the third run did establish**, independent of the timing:
+`PackageManager.queryBroadcastReceivers(DEVICE_ADMIN_ENABLED)` returned **two**
+entries — `com.google.android.repairmode` and
+`com.google.android.gms/…MdmDeviceAdminReceiver`. Package visibility is not the
+obstacle: the probe can see the candidate admin receivers. Whatever `null` means
+for `getActiveAdmins()`, it is about the *active set* and not about the packages
+being hidden. That narrows P14 without settling it.
 
 ---
 

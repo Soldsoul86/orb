@@ -78,7 +78,7 @@ fingerprint is printed above the results and travels in the exported file.
 | --- | --- |
 | **P13** | **CONFIRMED.** 555 chars, five entries, no permission — all Google (Auto, the Auto dashboard, System Intelligence, the launcher, `odad`) |
 | **P12** | **CONFIRMED on the second run** — both routes, one entry, with the master toggle agreeing. Inconclusive on the first: nothing was enabled to read |
-| **P14** | **OPEN.** `getActiveAdmins()` returned `null` on a device whose Device admin screen has every toggle off — "none active" and "withheld" are the same `null` |
+| **P14** | **OPEN** after three runs. Run 3 had an admin enabled, but the readout was rendered 2m16s before it was exported and the toggle moved in between — the `null` it carries was read at an unknown device state |
 | control | **HELD.** The direct file read failed with `EACCES` |
 
 That first run also scored P12 **wrong**, and the fix is the interesting part.

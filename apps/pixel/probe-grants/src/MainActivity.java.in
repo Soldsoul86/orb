@@ -108,6 +108,22 @@ public final class MainActivity extends Activity {
         render();
     }
 
+    /**
+     * Read again every time this screen comes back to the front.
+     *
+     * The whole point of this probe is that the operator goes to Settings,
+     * changes a grant, and comes back — and on 2026-09-26 at 13:21 a readout
+     * rendered before that trip was exported two minutes after it, with the
+     * device admin toggle moved in between. The file said 13:21:38 and nothing
+     * said the device had changed since. A readout that can silently be older
+     * than the device is not a measurement of the device.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
     private CheckBox addClaim(LinearLayout root, String label) {
         CheckBox box = new CheckBox(this);
         box.setText(label);
@@ -275,6 +291,10 @@ public final class MainActivity extends Activity {
      */
     private void export() {
         try {
+            // Read now, not whenever the screen last rendered. An export is the
+            // artifact that gets quoted; it has to be current by construction
+            // rather than by the operator happening not to have changed anything.
+            render();
             String name = "orb-probeg-"
                 + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date())
                 + ".txt";
@@ -290,8 +310,11 @@ public final class MainActivity extends Activity {
                 body.setText("export failed: no destination\n\n" + latest);
                 return;
             }
+            String stamped = latest + "\nexported at: "
+                + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(new Date())
+                + "\n  (re-read immediately before this; compare with 'read at' above)\n";
             try (OutputStream out = resolver.openOutputStream(target)) {
-                out.write(latest.getBytes(StandardCharsets.UTF_8));
+                out.write(stamped.getBytes(StandardCharsets.UTF_8));
             }
 
             Intent send = new Intent(Intent.ACTION_SEND);
