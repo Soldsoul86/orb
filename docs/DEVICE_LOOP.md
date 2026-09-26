@@ -19,9 +19,9 @@ needs, including the author in three months.*
 | --- | --- | --- |
 | **P0** | A self-signed APK installs today | **Held.** No developer-verification block on this build (§5a) |
 | **P0a** | `adb install` bypasses the Play Protect novel-app scan | **Held.** Development builds stay private; only sideloading discloses (§5b) |
-| **P1** | `dataSync` is stopped at ~6 cumulative hours | **Refuted.** Ran **6h31m untouched**, battery set to *Optimised* — the default, no exemption (§5h) |
+| **P1** | `dataSync` is stopped at ~6 cumulative hours | **Refuted.** Ran **6h31m untouched** under *Optimised*, the default (§5h). `specialUse` then ran **13.5 h continuous** after a reboot, and `dataSync` never came back (§5l) |
 | **P2** | Nothing resumes after reboot until the app is opened | **Refuted.** `specialUse` reached the foreground **133 s after boot** and recorded 15 clean beats with nobody present (§5k) |
-| **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** 391 minutes = 332 beats + 59 declared skips. **Zero unexplained** (§5h) |
+| **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** Now across a full day: 21.1 h, two services, three reboots, eight process restarts, **zero unexplained** — and the beat counter never skips (§5l) |
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
@@ -621,6 +621,11 @@ slipped identically, confirming the shared main looper.
 This run predates the fixed-rate build, so **the fix is shipped but unverified.**
 The next run's `lateByMs` and `skippedBeats` are its test.
 
+**Answered 2026-09-26 (§5l): verified.** Median `lateByMs` is 60 ms, the same
+per-beat cost as here — but it no longer accumulates. The beat returns to its
+slot after a disturbance instead of walking permanently. Read the median, not
+the mean: the mean is doze time, which is declared, dragging an average.
+
 ---
 
 ## 5g. Finding — the instrument was untested, and one comment was false
@@ -1038,6 +1043,107 @@ to it.** P4 has not failed once.
 
 ---
 
+## 5l. A full day — 2303 events, and the honesty property across a reboot
+
+**2026-09-26, 01:52 UTC.** `orb-pass1-20260926-072249.txt`, 2303 events spanning
+**21.1 hours** from 09-25 04:47 to 09-26 01:52. Re-derived off-device against
+`runtime/journal`.
+
+### Integrity
+
+**2303 of 2303 envelope hashes and 2303 of 2303 payload hashes re-derive.** One
+linkage break, between lines 4 and 5 — the §5d fork, unchanged and permanent.
+HLC strictly increasing across every event, through **three reboots and eight
+process restarts**. No HLC regression anywhere, which is the property a reboot
+is most likely to break.
+
+### P4 across a whole day — zero unexplained
+
+**The beat counter never skips.** Zero jumps on either service: every beat a
+service intended to write, it wrote. That is the strongest form of the claim,
+and it is stronger than the accounting below, because a counter jump would mean
+a beat was lost without anything noticing.
+
+| | span | beats | declared skips | delta |
+| --- | --- | --- | --- | --- |
+| `dataSync` | 419 min | 361 | 59 | **−1** |
+| `specialUse` | 1262 min | 940 | 294 | +28 |
+
+`dataSync` has **zero** intervals losing a whole beat undeclared. `specialUse`
+has exactly one: the 31.4-minute reboot window at 11:48:30, where the process
+died, so `skippedBeats` could not carry it — the counter had reset. It is
+declared by the other mechanism instead: **five `gap.inferred` events totalling
+31.0 of those 31.4 minutes.** The residue is the boot itself.
+
+So the honesty property now holds across a clean six-hour run (§5h), a crash
+loop (§5i), a reboot (§5k), and a full day of ordinary use. Two mechanisms,
+covering each other exactly where the other cannot reach: `skippedBeats` while
+the process lives, `gap.inferred` when it does not.
+
+### The new result — 13.5 hours continuous, and `dataSync` never came back
+
+The 11:51 reboot reproduced §5k exactly: `dataSync` refused with
+`ForegroundServiceStartNotAllowedException` (`foregroundType=1`), `specialUse`
+accepted (`foregroundType=1073741824`).
+
+What is new is what followed. **`dataSync` never returned.** From 12:19 the
+journal runs on `specialUse` alone for **13.5 hours**, with one process restart
+at 18:49. More than double the 6h31m of §5h, on the one service type that
+survives boot. The system did not merely permit the always-on path — left alone,
+it converged on it and stayed there.
+
+### Drift — the fixed-rate fix is verified, and an earlier figure here was wrong
+
+§5f asked for this directly: *"the fix is shipped but unverified. The next run's
+`lateByMs` and `skippedBeats` are its test."*
+
+**Median `lateByMs` is 60 ms on `specialUse` and 59 ms on `dataSync`** (excluding
+windows over 60 s, which are doze, not drift). That is the same per-beat cost
+§5f measured before the fix — but under fixed-rate it **does not accumulate**.
+Across the last 7.6-hour stretch the beat stays pinned at `:52` for runs of ten
+and more, and the 25 distinct second-values over 337 beats are re-pinnings after
+a doze window, not a walk. Pre-fix, one 65.86 s beat shifted every subsequent
+beat permanently from `:54` to `:00`. Post-fix, the beat returns to its slot.
+
+The *mean* `lateByMs` is 26 s, and quoting that would be wrong: it is doze time,
+which is declared, dragging an average. The median is the statistic that answers
+the question asked.
+
+### The signals — 950 of them, and the first thing here about a person
+
+| count | signal |
+| --- | --- |
+| 357 | `SCREEN_OFF` |
+| 357 | `SCREEN_ON` |
+| 223 | `USER_PRESENT` |
+| 11 | power connected / disconnected |
+| 2 | `BOOT_COMPLETED` |
+
+**223 unlocks in 21 hours.** That is not a fact about the instrument. It is the
+first thing in this journal that is a fact about a day, and §7 R4 is explicit
+that pass 2 fails without one. The raw material is already arriving on the
+always-on path, recorded event-driven while the phone is awake — which is the
+§5h principle holding: *don't ask the phone to wake up; record when it is
+already awake.*
+
+### Method — two analyses that produced a false alarm
+
+Recorded because both are easy to repeat and both looked like a serious P4
+failure before they were checked.
+
+1. **Counting only `gap.inferred`.** Skips are declared *in the beat payload*
+   (`skippedBeats`, `lateByMs`), not as separate events. Counting events alone
+   reported 129 undeclared holes where there was one.
+2. **Treating both services as one beat series.** Two services beating once a
+   minute each, interleaved, invent a hole wherever they alternate. The series
+   must be split by `payload.service` before any interval is measured.
+
+A third, subtler: **summing sub-beat lateness as "drift"** smears declared doze
+time across every beat and produced a figure ~75× the real one. Lateness is a
+per-beat measurement with a long tail; it is read with a median, never a sum.
+
+---
+
 ## 6. What a finding does
 
 | Outcome | What happens |
@@ -1065,6 +1171,15 @@ contract is not — but two implementations can disagree. Mitigation: the phone'
 journal does append and sync only, never projections, so there is no second
 interpretation to diverge. Shared test vectors across both should arrive with
 pass 3.
+
+**Arrived two passes early, 2026-09-26.** `apps/pixel/pass1/tests/vectors.json`
+pins both envelope formats from both sides — v1, and v2 in its two branches,
+computed by the TypeScript encoder so that Java agreeing with them means
+something. The fixture states no coarse type: each side derives it with its own
+rule, so one check pins the rule and the bytes together. A negative control
+found the hole that made an earlier version of those tests worthless — they
+canonicalised the fixture's own objects, so an encoder consistent with itself
+and wrong against the other passed everything.
 
 **R3 — Validating on one device proves one device.** A Pixel 10a on Android 16 is
 not Android. Findings are recorded against *this* device and version, and never
