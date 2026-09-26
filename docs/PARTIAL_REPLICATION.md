@@ -333,9 +333,16 @@ commits to the payload's hash.
 - **Transport, discovery, device identity, encryption.** All behind `SyncPeer`,
   which is injected exactly as `JournalStore` is. `SECURITY.md` §10 defers cipher
   suites to implementation time; adding them changes no semantics in `sync.ts`.
-- **Retention policy read *from* the journal.** The policy is recorded when it
-  changes; nothing yet reads it back to decide behaviour. That matters once a
-  policy is set remotely or varies over time.
+- ~~**Retention policy read *from* the journal.**~~ **Closed 2026-09-26.**
+  `effectivePolicy` reads a device's own recorded policy back, and
+  `evaluatePruneFromHistory` prunes under it or refuses. The shortfall was that
+  inv. 6 journaled a policy nothing consulted, which made it a record of an
+  intention rather than a rule — and made a window like `DECISIONS.md` DR-7's
+  seven days a constant in a build rather than something auditable or
+  changeable. Two states of *we do not know* are kept apart and both refuse:
+  never recorded, and recorded but no longer readable. What is still open is the
+  **sync** payload policy (`orb.sync.policy`), which is recorded by `policyDraft`
+  and likewise not yet read back.
 
 ---
 

@@ -61,6 +61,32 @@ custody receipts; at least one of them is in `policy.ownedDevices`; and, when th
 device produced the event, one holder more than that.
 
 ```ts
+effectivePolicy(events, device): EffectivePolicy
+retentionPolicyDraft(events, device, policy): readonly EventDraft[]
+evaluatePruneFromHistory(request: HistoricalPruneRequest): PruneDecision
+```
+The policy a device prunes under, read from its own history rather than passed
+in — `PARTIAL_REPLICATION.md` inv. 6. `EffectivePolicy` is three states, and two
+of them are *we do not know*: `none` (never recorded), `unreadable` (recorded,
+payload gone), `policy` (read, with the id of the event it came from, so a
+decision can cite the rule it applied).
+
+`effectivePolicy` reads **only** events authored by `device` — inv. 7, no device
+decides what another may hold — and stops at the newest policy event whether or
+not it is readable, because the question is what governs *now* and an earlier
+readable policy is a superseded one.
+
+`evaluatePruneFromHistory` **fails closed**: `none` and `unreadable` both refuse,
+with reasons that name which, since one wants a policy set and the other wants
+one restated. A permissive default would drop payloads on the strength of a
+missing record. `retentionPolicyDraft` records only a genuine change, compared
+over the canonical encoding so reordered keys are not a change.
+
+`RETENTION_POLICY_TYPE` is content, not bookkeeping: nothing outside the device
+reads it, and a legible type would tell a witness when someone changed their mind
+about what to keep.
+
+```ts
 custodyReceiptFor(lane, events): CustodyReceipt | null
 custodyReceiptDraft(receipt): EventDraft<CustodyReceipt>
 latestCustody(events, lane): readonly HeldCustody[]

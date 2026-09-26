@@ -93,6 +93,18 @@ export type { LineageIndex, Traversal } from "./lineage.js";
 
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";
+export {
+  RETENTION_POLICY_TYPE,
+  RETENTION_POLICY_SCHEMA,
+  effectivePolicy,
+  retentionPolicyDraft,
+  evaluatePruneFromHistory,
+} from "./retention-policy.js";
+export type {
+  EffectivePolicy,
+  RetentionPolicyRecord,
+  HistoricalPruneRequest,
+} from "./retention-policy.js";
 
 export {
   SYNC_POLICY_TYPE,
