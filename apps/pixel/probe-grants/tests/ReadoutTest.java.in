@@ -21,6 +21,7 @@ final class ReadoutTest {
         rendering();
         corroboration();
         scalars();
+        contextLists();
     }
 
     private static void outcomes() {
@@ -186,6 +187,23 @@ final class ReadoutTest {
         Harness.check("a failed scalar prints its failure",
             Readout.failed("s", new SecurityException("denied")).renderScalar()
                 .contains("SecurityException"));
+    }
+
+    private static void contextLists() {
+        Harness.suite("Readout — a context list carries no verdict");
+
+        String two = Readout.ofEntries("src",
+            Arrays.asList("com.x/.Admin", "com.y/.Admin")).renderList();
+        Harness.check("a context list counts its entries", two.contains("2 entries"));
+        Harness.check("a context list names them", two.contains("- com.x/.Admin"));
+        Harness.check("a context list scores nothing",
+            !two.contains("CONFIRMED") && !two.contains("INCONCLUSIVE")
+                && !two.contains("FALSIFIED"));
+        Harness.check("an empty context list says readable, not none",
+            Readout.ofEntries("s", new ArrayList<String>()).renderList()
+                .contains("readable, nothing returned"));
+        Harness.check("an absent context list keeps the ambiguity",
+            Readout.ofEntries("s", null).renderList().contains("never set, or withheld"));
     }
 
     private static void rendering() {

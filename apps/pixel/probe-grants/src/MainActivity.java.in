@@ -7,6 +7,8 @@ import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -78,9 +80,13 @@ public final class MainActivity extends Activity {
         note.setTextSize(13);
         root.addView(note);
 
-        knownAccessibility = addClaim(root, "Settings shows an accessibility service On");
-        knownListener = addClaim(root, "Settings shows a notification listener On");
-        knownAdmin = addClaim(root, "Settings shows a device admin app active");
+        knownAccessibility = addClaim(root, "Accessibility: a downloaded service reads On");
+        knownListener = addClaim(root, "Notification access: an app is allowed");
+        // Named the way it is because the Device admin screen lists Find Hub and
+        // Repair mode whether or not either is switched on, and reading "there
+        // are apps on this screen" as "an admin is active" is how this box got
+        // ticked wrongly on a device that had none.
+        knownAdmin = addClaim(root, "Device admin: a toggle is ON (the screen lists apps even when all are off)");
 
         Button export = new Button(this);
         export.setText("Export and share readout");
@@ -155,7 +161,13 @@ public final class MainActivity extends Activity {
 
         out.append("\n=== context (not a prediction) ===\n\n");
         out.append(master.renderScalar());
-        out.append("  (1 = some accessibility service is On, 0 = none)\n");
+        out.append("  (1 = some accessibility service is On, 0 = none)\n\n");
+        // Which admin receivers are installed is a different fact from which are
+        // active, and the two failures look alike from outside. If the candidates
+        // are visible while getActiveAdmins() returns null, the withheld thing is
+        // the active set and not the packages; if neither is visible, it is
+        // package visibility and P14 was never the right question.
+        out.append(installedAdminReceivers().renderList());
 
         out.append("\n=== control: a read that must fail ===\n\n");
         out.append(control());
@@ -202,6 +214,24 @@ public final class MainActivity extends Activity {
             if (admins == null) return Readout.ofEntries(source, null);
             List<String> names = new ArrayList<>();
             for (ComponentName admin : admins) names.add(admin.flattenToShortString());
+            return Readout.ofEntries(source, names);
+        } catch (Throwable error) {
+            return Readout.failed(source, error);
+        }
+    }
+
+    /** Admin receivers present on the device — installed, not necessarily active. */
+    private Readout installedAdminReceivers() {
+        String source = "PackageManager.queryBroadcastReceivers(DEVICE_ADMIN_ENABLED)";
+        try {
+            Intent intent = new Intent("android.app.action.DEVICE_ADMIN_ENABLED");
+            List<ResolveInfo> found =
+                getPackageManager().queryBroadcastReceivers(intent, PackageManager.MATCH_ALL);
+            if (found == null) return Readout.ofEntries(source, null);
+            List<String> names = new ArrayList<>();
+            for (ResolveInfo info : found) {
+                names.add(info.activityInfo.packageName + "/" + info.activityInfo.name);
+            }
             return Readout.ofEntries(source, names);
         } catch (Throwable error) {
             return Readout.failed(source, error);

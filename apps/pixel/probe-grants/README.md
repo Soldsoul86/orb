@@ -77,8 +77,8 @@ fingerprint is printed above the results and travels in the exported file.
 | | Result |
 | --- | --- |
 | **P13** | **CONFIRMED.** 555 chars, five entries, no permission — all Google (Auto, the Auto dashboard, System Intelligence, the launcher, `odad`) |
-| **P12** | **INCONCLUSIVE.** Both reads empty, and `accessibility_enabled` read `0`: nothing was enabled to read |
-| **P14** | **OPEN.** `getActiveAdmins()` returned `null` — not an empty list, not a throw |
+| **P12** | **CONFIRMED on the second run** — both routes, one entry, with the master toggle agreeing. Inconclusive on the first: nothing was enabled to read |
+| **P14** | **OPEN.** `getActiveAdmins()` returned `null` on a device whose Device admin screen has every toggle off — "none active" and "withheld" are the same `null` |
 | control | **HELD.** The direct file read failed with `EACCES` |
 
 That first run also scored P12 **wrong**, and the fix is the interesting part.
@@ -96,8 +96,21 @@ settled: deciding in the device's favour would be a guess dressed as a
 measurement.
 
 P14's `null` is undecidable from inside the app — *no admin active* and *the list
-is withheld* are the same value — so it needs the Device admin apps screen read
-by a human before the same `null` means anything.
+is withheld* are the same value. The Device admin screen was read, and it lists
+Find Hub and Repair mode with **both toggles off**: nothing to enumerate, so the
+`null` is correct and uninformative. The box got ticked anyway, because the
+screen was not empty — a trap in the instrument, not the operator. The label now
+says *a toggle is ON (the screen lists apps even when all are off)*, and the
+installed admin receivers are read as context, which separates *which packages
+are visible* from *which are active*. Settling P14 needs one admin actually
+enabled.
+
+Twice the human claim has been the weakest input, and both times the device was
+already carrying the contradiction. The accessibility claim has a corroborant and
+was caught; the admin claim had none and was believed. **A claim with a
+corroborant gets checked; a claim without one gets believed** — so a probe that
+must ask a human something should be built around what the device can confirm by
+itself.
 
 ## What each answer would mean for pass 2
 

@@ -168,6 +168,30 @@ final class Readout {
     }
 
     /**
+     * A list printed for context, with no verdict attached.
+     *
+     * Context is not a prediction, and a CONFIRMED line next to a reading nobody
+     * is scoring is a sentence someone will later quote as a result.
+     */
+    String renderList() {
+        StringBuilder out = new StringBuilder();
+        out.append(source).append('\n');
+        out.append("  outcome: ").append(outcome).append('\n');
+        if (THREW.equals(outcome)) {
+            out.append("  failure: ").append(raw).append('\n');
+        } else if (ABSENT.equals(outcome)) {
+            out.append("  (null — never set, or withheld)").append('\n');
+        } else if (entries.isEmpty()) {
+            out.append("  (readable, nothing returned)").append('\n');
+        } else {
+            out.append("  ").append(entries.size())
+               .append(entries.size() == 1 ? " entry" : " entries").append('\n');
+            for (String entry : entries) out.append("  - ").append(entry).append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
      * A single value, not a list — printed without a verdict or an entry list.
      *
      * The master toggle went through the list renderer on the first run and came

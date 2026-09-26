@@ -25,9 +25,9 @@ needs, including the author in three months.*
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
-| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Inconclusive 2026-09-26** — nothing was enabled to read |
+| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
-| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — returned `null`, which cannot say none from withheld |
+| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — `null` on a device with no admin active settles nothing |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1307,6 +1307,47 @@ artefacts of a checkbox rather than findings, and both were caught by evidence
 the probe had already printed. The rule that an empty answer scores INCONCLUSIVE
 did its job — it is the reason P12 was not quietly written up as a confirmation
 when the device returned nothing.
+
+**Second run, 12:12 IST, with the accessibility service switched back on.**
+
+**P12 — confirmed, by both routes.** `Settings.Secure` and
+`AccessibilityManager.getEnabledAccessibilityServiceList` each returned the same
+44 characters, one entry, `app.orb/app.actionlock.guard.PayGuardService`, to an
+app holding no permission — and this time `accessibility_enabled` read `1`, so
+the operator's claim and the device agreed and the reading was scored rather than
+held. Pass 2's first signal is buildable as designed: **an app can see which
+accessibility services are enabled on the phone it is running on, with nothing
+granted to it.** Which is the finding in both directions — it is what lets Orb
+notice a silent install, and it is what let a payment app notice Orb's own guard
+within hours on 2026-09-26.
+
+Two independent APIs agreeing also settles the fallback question the first run
+left open: `Grants` can read either, so the choice is free rather than forced.
+
+**P13 — unchanged, confirmed.** The same five Google listeners.
+
+**P14 — still open, and the checkbox was wrong a second time.** The Device admin
+screen on this phone lists **Find Hub** and **Repair mode** with *both toggles
+off*. No admin is active, so `getActiveAdmins()` returning `null` is the correct
+answer and tells us nothing: on a device with nothing to enumerate, "none active"
+and "withheld from you" are the same `null`. The operator ticked the box because
+the screen was not empty.
+
+That is a trap in the instrument, not in the operator. A screen that lists
+candidates whether or not any is switched on invites exactly that reading, so the
+checkbox now says **"a toggle is ON (the screen lists apps even when all are
+off)"**, and the probe reads the installed admin receivers as context —
+separating *which packages are visible* from *which are active*, since from
+outside the two failures look alike. Settling P14 needs one admin actually
+enabled; until then it stays open rather than being written up from a `null`.
+
+**Twice now the human claim has been the weakest input.** Both times the device
+was already carrying the contradiction and the probe was not using it. The
+accessibility case is guarded by the master toggle; the admin case had no
+equivalent, and it is the one that slipped again. The lesson is not that the
+operator is unreliable — it is that **a claim with a corroborant gets checked and
+a claim without one gets believed**, so a probe that must ask a human something
+should be built around what the device can independently confirm.
 
 ---
 
