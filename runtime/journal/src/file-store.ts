@@ -21,7 +21,7 @@ import type { FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { JournalStore, PayloadRecord } from "./store.js";
 import type { AbsenceReason, LaneId, OrbEvent, StoredEvent } from "./types.js";
-import { hasPayload } from "./types.js";
+import { detached, hasPayload } from "./types.js";
 
 const LANE_FILE_SUFFIX = ".lane.jsonl";
 
@@ -102,6 +102,7 @@ export class FileJournalStore implements JournalStore {
     lane: LaneId,
     eventIds: readonly string[],
     absence: AbsenceReason,
+    prunedBecause?: string,
   ): Promise<number> {
     if (eventIds.length === 0) return 0;
     const wanted = new Set(eventIds);
@@ -112,11 +113,14 @@ export class FileJournalStore implements JournalStore {
         // Already gone. Only a raise to `erased` changes anything, and reasons
         // never move back — see `JournalStore.detach`.
         if (absence !== "erased" || event.absence === "erased") return event;
-        return { ...event, absence };
+        // The prune motive described a prune; this payload is now erased, which
+        // is a different act with its own declaration.
+        const { prunedBecause: _was, ...rest } = event;
+        return { ...rest, absence };
       }
 
       const { payload: _payload, ...envelope } = event as OrbEvent;
-      return { ...envelope, absence };
+      return detached(envelope, absence, prunedBecause);
     });
   }
 
@@ -124,9 +128,18 @@ export class FileJournalStore implements JournalStore {
     if (payloads.length === 0) return 0;
     const incoming = new Map(payloads.map((record) => [record.eventId, record.payload]));
     return this.#rewrite(lane, (event) => {
-      if (event.payload !== undefined) return event;
+      // `hasPayload` rather than an inline check, so the rest of this branch is
+      // narrowed to a detached event and its absence fields are visible.
+      if (hasPayload(event)) return event;
       const payload = incoming.get(event.id);
-      return payload === undefined ? event : { ...event, payload };
+      if (payload === undefined) return event;
+      // Drop the absence and its motive rather than spreading them. A restored
+      // event holds its payload, so a reason for not holding it would be a
+      // stale contradiction inside the same object — which the memory store
+      // already avoided and this one did not, so the two disagreed about the
+      // shape of a reattached event.
+      const { absence: _absence, prunedBecause: _because, ...envelope } = event;
+      return { ...envelope, payload };
     });
   }
 

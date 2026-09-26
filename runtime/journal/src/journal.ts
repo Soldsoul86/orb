@@ -371,12 +371,21 @@ export class Journal {
    * remain in history, chained and ordered, and only this device's copy of the
    * content goes away (`docs/PARTIAL_REPLICATION.md` §10).
    *
+   * `prunedBecause` is required, and says what wanted these payloads gone — a
+   * policy's `describe`, or a motive like `space`. It is required because the
+   * alternative is a prune that records nothing about its own cause, and then
+   * `absence: "pruned"` cannot tell a retention window that expired from a
+   * device that ran short of room. Those are opposite facts: one is the system
+   * doing what it was told, the other is a horizon quietly shortened by
+   * circumstance, and only the caller is in a position to say which.
+   *
    * @throws {RetentionError} naming the first event that may not be dropped.
    */
   async detach(
     lane: LaneId,
     eventIds: readonly string[],
     policy: RetentionPolicy,
+    prunedBecause: string,
   ): Promise<number> {
     if (!this.#opened) throw new Error("journal is not open");
     if (eventIds.length === 0) return 0;
@@ -412,7 +421,7 @@ export class Journal {
     // declaration and reaches the store by its own path (`erasure.ts`); routing
     // both through one call is how a store ends up unable to tell a payload it
     // may fetch back from one it must never see again.
-    return this.#store.detach(lane, eventIds, "pruned");
+    return this.#store.detach(lane, eventIds, "pruned", prunedBecause);
   }
 
   /**

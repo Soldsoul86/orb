@@ -6,7 +6,7 @@
  * runtime), or any future encrypted store without changing its semantics.
  */
 import type { AbsenceReason, LaneId, OrbEvent, StoredEvent } from "./types.js";
-import { hasPayload } from "./types.js";
+import { detached, hasPayload } from "./types.js";
 
 /** Durable, append-only storage for one device's journal. */
 export interface JournalStore {
@@ -59,7 +59,19 @@ export interface JournalStore {
    * @returns how many events changed state — a payload dropped, or an absence
    * raised to `erased`.
    */
-  detach(lane: LaneId, eventIds: readonly string[], absence: AbsenceReason): Promise<number>;
+  detach(
+    lane: LaneId,
+    eventIds: readonly string[],
+    absence: AbsenceReason,
+    /**
+     * What wanted these payloads gone, recorded on each as `prunedBecause`.
+     *
+     * Only meaningful for `pruned`: an erasure is explained by its declaration,
+     * and a payload never fetched was never dropped. Omitted leaves the reason
+     * unknown rather than assumed.
+     */
+    prunedBecause?: string,
+  ): Promise<number>;
   /**
    * Restores payloads this device had dropped, or never fetched.
    *
@@ -114,6 +126,7 @@ export class MemoryJournalStore implements JournalStore {
     lane: LaneId,
     eventIds: readonly string[],
     absence: AbsenceReason,
+    prunedBecause?: string,
   ): Promise<number> {
     if (this.#closed) throw new Error("journal store is closed");
     const events = this.#lanes.get(lane);
@@ -128,7 +141,11 @@ export class MemoryJournalStore implements JournalStore {
       if (!hasPayload(event)) {
         // Already gone; only a raise to `erased` is a change worth making.
         if (absence !== "erased" || event.absence === "erased") continue;
-        events[index] = { ...event, absence };
+        // The reason described a prune. The payload is now erased, which is a
+        // different act with its own declaration, so carrying the old motive
+        // beside it would describe the wrong disappearance.
+        const { prunedBecause: _was, ...rest } = event;
+        events[index] = { ...rest, absence };
         dropped += 1;
         continue;
       }
@@ -136,7 +153,7 @@ export class MemoryJournalStore implements JournalStore {
       // Rebuild without the key rather than setting it undefined, so the stored
       // shape matches what a file store round-trips through JSON.
       const { payload: _payload, ...envelope } = event as OrbEvent;
-      events[index] = { ...envelope, absence };
+      events[index] = detached(envelope, absence, prunedBecause);
       dropped += 1;
     }
 
@@ -159,8 +176,9 @@ export class MemoryJournalStore implements JournalStore {
       if (payload === undefined) continue;
       // Drop `absence` rather than spreading it: a restored event holds its
       // payload, so a reason for not holding it would be a stale contradiction
-      // sitting inside the same object.
-      const { absence: _absence, ...envelope } = event;
+      // sitting inside the same object. `prunedBecause` goes with it — it
+      // explains an absence, and there is no longer one to explain.
+      const { absence: _absence, prunedBecause: _because, ...envelope } = event;
       events[index] = { ...envelope, payload };
       restored += 1;
     }

@@ -149,6 +149,48 @@ export interface DetachedEvent extends EventEnvelope {
   readonly payload?: undefined;
   /** Why the payload is gone. Required: absence without a reason is the gap. */
   readonly absence: AbsenceReason;
+  /**
+   * What wanted this payload gone, when it was **pruned**.
+   *
+   * A policy's own account of itself — `hold:since:604800000ms` — or a one-off
+   * motive such as `space` or `operator`. `absence: "pruned"` alone cannot tell
+   * a retention window that expired from a device that was short of room, and
+   * those are opposite facts: the first is the system doing what it was told,
+   * the second is a horizon silently shortened by circumstance. A window like
+   * `DECISIONS.md` DR-7's seven days is only auditable if a prune says whether
+   * seven days is what ended it.
+   *
+   * **Absent means nobody recorded why**, and never a default. A prune from
+   * before this field existed, or from a caller that supplied nothing, is an
+   * unknown — inventing `space` for it would answer the question this field was
+   * added to ask.
+   *
+   * Local state, like `absence` itself: the Event is unchanged in history and
+   * only this device's copy of the content went away, so this never enters an
+   * envelope and never replicates.
+   */
+  readonly prunedBecause?: string;
+}
+
+/**
+ * Builds a detached event, recording *why* only where a why is meaningful.
+ *
+ * `prunedBecause` is set for a prune that supplied one and **omitted entirely**
+ * otherwise — not set to `undefined`. The difference matters: a file store round
+ * trips through JSON, where an absent key and an explicit `undefined` are the
+ * same thing on the way out and not on the way in, and a reader asking *was a
+ * reason recorded* must get the same answer from both stores.
+ *
+ * An erasure never carries one. It is a different act with its own declaration,
+ * and a prune motive beside it would explain the wrong disappearance.
+ */
+export function detached(
+  envelope: EventEnvelope,
+  absence: AbsenceReason,
+  prunedBecause?: string,
+): DetachedEvent {
+  if (absence !== "pruned" || prunedBecause === undefined) return { ...envelope, absence };
+  return { ...envelope, absence, prunedBecause };
 }
 
 /** What a store hands back: an event with its payload, or the envelope alone. */

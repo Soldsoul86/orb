@@ -40,11 +40,25 @@ See `docs/PARTIAL_REPLICATION.md`. An event is an **envelope** plus a
 payloads. `hasPayload(event)` narrows `StoredEvent` to `OrbEvent`.
 
 ```ts
-detach(lane: LaneId, eventIds: readonly string[], policy: RetentionPolicy): Promise<number>
+detach(lane, eventIds, policy: RetentionPolicy, prunedBecause: string): Promise<number>
 ```
 Drops payloads, keeping envelopes. Every id is checked against `evaluatePrune`
 first and the whole call is refused if any fails, so a caller is never left
 unsure which payloads still exist. Throws `RetentionError`.
+
+`prunedBecause` is **required** and says what wanted the payloads gone — a
+policy's `describe` (`hold:since:604800000ms`) or a motive like `space`. It lands
+on each detached event and is what lets a reader tell a retention window that
+expired from a device that ran short of room: opposite facts, and `absence:
+"pruned"` alone says neither. Only the caller knows which, so there is no default
+to fall back on.
+
+On the event, `prunedBecause` is **omitted when nobody recorded one** — never
+present-and-undefined, so `"prunedBecause" in event` answers the same way from a
+memory store and from JSON on disk. An erasure never carries one, and raising a
+prune to an erasure drops it: an erasure is explained by its declaration, and a
+prune motive beside it would explain the wrong disappearance. Reattaching a
+payload clears both it and `absence`.
 
 ```ts
 horizon(): Promise<Horizon>

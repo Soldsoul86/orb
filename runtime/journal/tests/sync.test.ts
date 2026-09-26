@@ -349,7 +349,7 @@ describe("sync makes the prune guard live", () => {
     // Before anyone has fetched anything, the guard refuses — the phone wrote
     // this lane and is its backstop.
     await assert.rejects(
-      () => pixel.detach("pixel", [first.id], policy),
+      () => pixel.detach("pixel", [first.id], policy, "space"),
       /refusing to drop payload/,
     );
 
@@ -365,7 +365,7 @@ describe("sync makes the prune guard live", () => {
 
     // Three holders now carry custody, one of them owned, so the backstop's
     // extra-holder requirement is met.
-    assert.equal(await pixel.detach("pixel", [first.id], policy), 1);
+    assert.equal(await pixel.detach("pixel", [first.id], policy, "space"), 1);
 
     const lane = await pixel.readLane("pixel");
     const [head] = lane;
@@ -393,10 +393,12 @@ describe("sync makes the prune guard live", () => {
 
     await assert.rejects(
       () =>
-        pixel.detach("pixel", [first.id], {
-          ownedDevices: ["mac-01", "home-01"],
-          pruneOrder: ["pixel-01"],
-        }),
+        pixel.detach(
+          "pixel",
+          [first.id],
+          { ownedDevices: ["mac-01", "home-01"], pruneOrder: ["pixel-01"] },
+          "space",
+        ),
       /refusing to drop payload/,
     );
     assert.equal((await pixel.horizon()).complete, true, "the payload is still here");
@@ -420,10 +422,12 @@ describe("sync makes the prune guard live", () => {
       holders.push(peer);
     }
 
-    await pixel.detach("pixel", [first.id], {
-      ownedDevices: ["mac-01", "home-01"],
-      pruneOrder: ["pixel-01", "mac-01"],
-    });
+    await pixel.detach(
+      "pixel",
+      [first.id],
+      { ownedDevices: ["mac-01", "home-01"], pruneOrder: ["pixel-01", "mac-01"] },
+      "space",
+    );
     assert.equal((await pixel.horizon()).missing, 1);
 
     const home = holders[1];

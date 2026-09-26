@@ -92,6 +92,7 @@ export function sealedStore(inner: JournalStore, keyring: PayloadKeyring): Journ
       lane: LaneId,
       eventIds: readonly string[],
       absence: AbsenceReason,
+      prunedBecause?: string,
     ): Promise<number> {
       // Erasure *is* the key destruction. Dropping the bytes as well is belt and
       // braces and is what `inner.detach` does anyway; the key going is what
@@ -99,7 +100,7 @@ export function sealedStore(inner: JournalStore, keyring: PayloadKeyring): Journ
       if (absence === "erased") {
         for (const id of eventIds) await keyring.destroy(id);
       }
-      return inner.detach(lane, eventIds, absence);
+      return inner.detach(lane, eventIds, absence, prunedBecause);
     },
 
     async attach(lane: LaneId, payloads: readonly PayloadRecord[]): Promise<number> {

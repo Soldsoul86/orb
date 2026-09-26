@@ -350,7 +350,7 @@ describe("the journal enforces the guard", () => {
     assert.ok(first);
 
     await assert.rejects(
-      () => pixel.detach("pixel", [first.id], policy()),
+      () => pixel.detach("pixel", [first.id], policy(), "space"),
       (error: unknown) => {
         assert.ok(error instanceof RetentionError);
         assert.match(error.message, /refusing to drop payload/);
@@ -367,7 +367,7 @@ describe("the journal enforces the guard", () => {
     const [first] = events;
     assert.ok(first);
 
-    const dropped = await pixel.detach("pixel", [first.id], policy());
+    const dropped = await pixel.detach("pixel", [first.id], policy(), "space");
     assert.equal(dropped, 1);
 
     const after = await pixel.readLane("pixel");
@@ -385,7 +385,7 @@ describe("the journal enforces the guard", () => {
     assert.ok(first && second);
 
     assert.equal((await pixel.horizon()).complete, true);
-    await pixel.detach("pixel", [first.id, second.id], policy());
+    await pixel.detach("pixel", [first.id, second.id], policy(), "space");
 
     const horizon = await pixel.horizon();
     assert.equal(horizon.complete, false);
@@ -404,7 +404,7 @@ describe("the journal enforces the guard", () => {
     const before = await replay(pixel, 0, (n) => n + 1);
     assert.equal(before.complete, true);
 
-    await pixel.detach("pixel", [first.id], policy());
+    await pixel.detach("pixel", [first.id], policy(), "space");
 
     const after = await replay(pixel, 0, (n) => n + 1);
     assert.equal(after.complete, false, "a partial fold must never claim completeness");
@@ -415,7 +415,7 @@ describe("the journal enforces the guard", () => {
   test("refuses an event that is not in the named lane", async () => {
     const { pixel } = await pixelWithCustody(["mac-01", "home-01", "relay-a"]);
     await assert.rejects(
-      () => pixel.detach("pixel", ["no-such-event"], policy()),
+      () => pixel.detach("pixel", ["no-such-event"], policy(), "space"),
       /event is not in this lane/,
     );
   });
@@ -425,8 +425,8 @@ describe("the journal enforces the guard", () => {
     const [first] = events;
     assert.ok(first);
 
-    assert.equal(await pixel.detach("pixel", [first.id], policy()), 1);
-    assert.equal(await pixel.detach("pixel", [first.id], policy()), 0);
+    assert.equal(await pixel.detach("pixel", [first.id], policy(), "space"), 1);
+    assert.equal(await pixel.detach("pixel", [first.id], policy(), "space"), 0);
   });
 });
 
@@ -454,7 +454,7 @@ describe("durability of a compacted lane", () => {
         await pixel.replicate(`lane-${holder}`, [claim]);
       }
 
-      assert.equal(await pixel.detach("pixel", [first.id], policy()), 1);
+      assert.equal(await pixel.detach("pixel", [first.id], policy(), "space"), 1);
       await pixel.close();
 
       const reopenedStore = await FileJournalStore.open(directory);
