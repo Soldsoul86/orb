@@ -442,6 +442,73 @@ exists, and both are in the code rather than in this paragraph:
 
 ---
 
+## DR-8 — The first loop is an alert loop, and it records rather than learns
+
+- **Status:** Decided · **Decided:** 2026-09-26, operator
+- **Bears on:** `packages/device-watch`, `MASTER.md`'s pipeline, DR-1
+
+**The shape.** Journal → Observation → a small state projection → rules → a
+human-facing workflow → one Capability → the outcome back into the journal.
+
+That is a **vertical slice**, not a new architecture. Five layers `MASTER.md`
+names are occupied by two small things — the Evidence Graph collapses into
+`causes`, the Knowledge Engine into a projection, the Reasoning Pipeline into one
+rule, and the Digital Twin and Agent Runtime are absent — and every one of them
+can be inserted later without rewriting what is below it. Nothing is amended.
+
+**The first instance is the device-authority alert**, because it needs no
+permission, no connector, no model and no network: every input is already being
+recorded by `apps/pixel/pass2`.
+
+### An alert loop before an act loop, and not as a stepping stone
+
+An act loop needs review → confirm → release (DR-1) and its outcome is what the
+act did. An alert loop has nothing to confirm — noticing is not irreversible —
+and looks like the lesser of the two.
+
+It is not, and the reason decides the order: **a rule that cannot be measured for
+false positives should not be allowed to act.** §7 R6 — *false positives cost
+trust, and trust is the product.* The dismissals this loop collects are what would
+justify letting a rule act later; building the act loop first would grant that
+authority on the strength of nobody having complained yet.
+
+### The answer is recorded and does not teach the rule — yet
+
+`acknowledged` and `dismissed` are kept apart in the record and **treated
+identically by everything downstream.**
+
+**Why not learn now.** A rule that changes behaviour from a person's answers is
+Orb beginning to hold opinions nobody wrote down. That may well be right later —
+it is Continuous Learning, principle 6 — but it should be a decision taken
+deliberately rather than one discovered in a diff. Until then the record
+accumulates, and it is the evidence that decision would be made on.
+
+**Made mechanical, not stated.** A test runs the whole loop twice, once with each
+answer, and asserts the two end in the same state. The day a dismissal starts
+changing what the rule does, that test fails.
+
+### Two consequences in the code rather than in this paragraph
+
+- **The projection is disposable.** Rebuild from the same events, get the same
+  answer. Anything writable there would be a second source of truth (Art. IX §33)
+  outliving an erasure of the events describing it.
+- **Alert identity is `observation|kind`, never content.** Content-keyed identity
+  would be *do not raise this again because you dismissed it before*, which is
+  learning wearing idempotence as a disguise. Keying on the reading gives
+  idempotence with none of it.
+
+**The rule refuses to judge by publisher.** *"A non-Google name appeared"* was
+the obvious heuristic and is the wrong one: it bakes in an opinion about who is
+safe, it is wrong the first time a legitimate third-party service is granted
+access, and it is the judgement that belongs to the person being told.
+
+**Open.** The transport. Pass 2 writes these readings on the phone, in Java, in
+its own lane; carrying that lane into this runtime is an import or a sync, and
+neither is built. The loop is written against the reading's shape rather than
+against the pipe.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

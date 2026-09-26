@@ -8,6 +8,9 @@
       "path": "./runtime/observation"
     },
     {
+      "path": "./packages/device-watch"
+    },
+    {
       "path": "./packages/connector"
     },
     {

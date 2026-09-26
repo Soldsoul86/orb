@@ -60,6 +60,7 @@ lint clean; every package compiles independently.
 | `runtime/journal` | ~8,900 | the Event Journal: hash chains, HLC ordering, envelopes v1/v2, erasure, partial replication, sync, Attachments |
 | `runtime/observation` | ~400 | occurrence, not truth — inv. 3, 5 and 7 enforced at the boundary |
 | `packages/connector` | ~550 | connector Sensors: the call, the synthesis, the outcome ladder |
+| `packages/device-watch` | ~450 | the first closed loop: projection, one rule, an alert, an answer |
 
 **Amendment one — the Hyperliquid trade executor.** *Entry may come from the
 signal provider; exit authority belongs to the executor.* Signal-agnostic: once a
@@ -280,7 +281,13 @@ citation holds the whole Attachment however old the others are. `Attachment.md`
 inv. 8 now names that second ground. A window must be asked for by name, and a
 recent unreadable event still blocks it.
 
-**What remains is the device.** Pass 2 has been recording since this morning and
-P6 and P16 are unread; the connector has no real driver behind it yet; and
-`Capability.md`, `Action.md` and `Policy.md` are still Draft, which is where
-DR-5's intent chain and DR-7's seven days belong.
+**The first loop exists** — DR-8, `packages/device-watch`: journal, Observation,
+projection, one rule, an alert, an answer, and the answer back in the journal
+where the next projection reads it. It records rather than learns, and a test
+asserts that by running the loop twice with each answer and comparing.
+
+**What remains is the device and the pipe.** Pass 2 has been recording since this
+morning and P6 and P16 are unread. Nothing yet carries pass 2's lane from the
+phone into this runtime, so the loop runs on constructed readings. The connector
+has no real driver. And `Capability.md`, `Action.md` and `Policy.md` are still
+Draft, which is where DR-5's intent chain and DR-7's seven days belong.

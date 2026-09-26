@@ -1,0 +1,18 @@
+{
+  "name": "@orb/device-watch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The first closed loop: what holds power over this device, and telling you when it changes.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
+  "files": ["dist/src", "README.md", "DESIGN.md", "API.md", "TESTS.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "npm run build && node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
+  },
+  "dependencies": { "@orb/journal": "0.1.0", "@orb/observation": "0.1.0" },
+  "license": "Apache-2.0"
+}
