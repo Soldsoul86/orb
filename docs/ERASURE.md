@@ -1246,6 +1246,11 @@ Stronger than most systems offer. Smaller than "it's gone." True.
 
 Not now. The pass-1 run is in progress and `DEVICE_LOOP.md` §7 R4 stands.
 
+**Partly overtaken, 2026-09-26.** Items 1, 1a, 1b and the computation half of 4
+landed while the run continued, because none of them touched the instrument —
+`DEVICE_LOOP.md` §7 R4 forbids changing the phone mid-run, not changing the
+runtime. What remains below is what genuinely waits.
+
 After it, and after AD-6:
 
 1. ~~**A reason on absence** (§7).~~ **Done 2026-09-25**, with the erasure
@@ -1254,15 +1259,28 @@ After it, and after AD-6:
    confirmation oracle is closed for payloads by the nonce, and ruled for
    Attachments by inv. 7. What remains is putting the keyring itself behind
    hardware (device predictions P8 and P11).
-1b. **The coarse vocabulary, then the envelope change** (§2b). The vocabulary
-   is ruled; the envelope edit that follows touches `Event.md`, `EVENT_MODEL.md`,
-   the TypeScript envelope and the phone's encoder together. **Four things move
-   in this one migration** — `type` becomes coarse, and `schema`, `causes` and
-   the payload nonce (§2a) go inside — because each changes the hash preimage,
-   and together they cost one break in the vectors instead of four. It is also the **last
-   cheap moment**: every event already written carries a fine type, and changing
-   the rule later leaves a permanent, legible prefix of history that no erasure
-   may remove — because §2 forbids removing it.
+1b. ~~**The coarse vocabulary, then the envelope change** (§2b).~~ **Done
+   2026-09-25/26.** All four surfaces this named are migrated: `Event.md`,
+   `EVENT_MODEL.md`, the TypeScript envelope, and the phone's encoder. The four
+   changes moved together as planned — `type` became coarse, `schema`, `causes`
+   and the nonce went inside.
+
+   **It cost zero breaks in the vectors, not the one predicted.** Bundling them
+   was the right call for a different reason than the one given: because `v` is
+   inside the preimage and *absent means 1*, v2 was added **alongside** v1 rather
+   than replacing it, which is the mechanism `Event.md` §5 already required for
+   any envelope change. v1's vector still pins the hash it always did, and v2 is
+   pinned in both its branches from both implementations.
+
+   **The "last cheap moment" argument was half spent and half deliberately
+   deferred.** The phone *implements* v2 and still *writes* v1, by choice: pass 1
+   is a measuring instrument whose journal is evidence about the phone, and a
+   heartbeat's fine type discloses that a heartbeat happened. Migrating mid-run
+   would put a version seam through a measurement for no gain in what it
+   measures. `DEFAULT_ENVELOPE_VERSION` is the one line that changes it, and a
+   test fails if it changes by accident. So the legible prefix this entry warned
+   about does exist and is growing — and it is a probe log, which is the case
+   where the warning does not bite.
 2. **Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
    `InferenceRecord.md` are still Draft and cheap to change.
 3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
