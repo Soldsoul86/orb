@@ -35,19 +35,52 @@ interface is frozen in Phase 3, `contracts/Event`):
 
 | Field | Meaning | Notes |
 | --- | --- | --- |
+| `v` | Envelope format version | **Absent means 1.** Inside the hash preimage, so it cannot be flipped to make a verifier apply the wrong rule; in the envelope rather than the payload, so a device holding no keys can still tell which rule to use. |
 | `id` | Globally unique identifier | Content-addressed or ULID-class; never reused. |
 | `lane` | Originating device's lane id | Identifies the writer. |
 | `device` | Originating device descriptor | Stable device identity. |
 | `hlc` | Hybrid Logical Clock timestamp | Defines public ordering (§5). |
 | `wallClock` | Best-effort physical timestamp | Human-facing only; never used for ordering. |
-| `type` | Event type | e.g. `observation`, `evidence`, `model_output`, `action`. |
-| `causes` | Optional causal parents | Event ids this event was derived from / reacted to. |
-| `payload` | Type-specific immutable body | Opaque to the journal. |
-| `schema` | Payload schema id + version | Enables forward-compatible evolution. |
+| `type` | Event type | **v1:** the real type. **v2:** `orb.content`, or a bookkeeping type. |
+| `causes` | Optional causal parents | Event ids this event was derived from / reacted to. **v2: not in the envelope at all** — and absent is *cannot say*, never *built on nothing*. |
+| `payload` | Type-specific immutable body | Opaque to the journal. **v2:** a wrapper carrying the real type, schema and causes, the caller's data, and a nonce. |
+| `schema` | Payload schema id + version | Enables forward-compatible evolution. **v2:** one describing *an encrypted payload*; the real schema is inside. |
 | `integrity` | Cryptographic hash of the above | Tamper-evidence; chains within a lane. |
 
 The journal treats `payload` as opaque. Meaning is assigned by higher layers
 (Evidence Graph, Knowledge Engine).
+
+### Two envelope formats, and why
+
+**v1 is frozen and stays valid forever** (`contracts/Event.md` §5). **v2** is the
+coarse envelope ruled in `docs/ERASURE.md` §2a and §2b, implemented in
+`runtime/journal` and in `apps/pixel/pass1` (which still writes v1 by choice).
+
+A v2 envelope says *an event happened, of a coarse kind, at a time* — and nothing
+else. Three fields moved into the payload and one was added:
+
+- **`type`, `schema` and `causes`**, so a witness holding envelopes learns
+  nothing about the shape of the owner's reasoning, and so that **erasing a
+  payload erases that event's kind and its stated lineage with it.**
+- **a nonce**, because `payloadHash` commits to the plaintext and lives in a
+  plaintext envelope: without it a guessable payload is a confirmation oracle —
+  hash `{"beat":1}`, `{"beat":2}`, … until one matches, and read the event with
+  no key at all.
+
+Bookkeeping types keep their real names, because sync machinery on a device that
+holds no keys reads them and can never decrypt to find out.
+
+`append` and `readLane` present an event with its real type, schema, causes and
+payload restored, plus the wrapper's nonce so the stored form can be rebuilt and
+the event stays verifiable in the hand. **A projection sees exactly the event that
+was written**, which is what keeps inv. 8 (replayability) true — and is why the
+alternative, making every caller unwrap, was rejected.
+
+Two costs, recorded rather than discovered later: `payloadHash` is no longer a
+content address, so payloads cannot be deduplicated by hash (`ERASURE.md` §2a);
+and a payload policy reads envelopes before it has the payload, so selective
+retention by kind of content is gone — `holdTypes` holds nothing and
+`holdContent` is the honest replacement.
 
 ---
 

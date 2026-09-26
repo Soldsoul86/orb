@@ -110,6 +110,45 @@ Under Article X, the Event contract evolves by **addition only**:
   replacing it. v1 Events remain valid and replayable forever.
 - No field is ever removed or repurposed; no existing field's semantics change.
 
+### Event v2 exists, as of 2026-09-25
+
+This rule has been used, not amended. `Event v2` was added *alongside* v1 under
+the clause above; v1 is untouched, and its cross-implementation vector still pins
+the same hash it always did.
+
+Ruled in `docs/ERASURE.md` §2a and §2b and described in `docs/EVENT_MODEL.md` §3.
+What changed, and only this:
+
+| | v1 | v2 |
+| --- | --- | --- |
+| `v` | absent | `2`, inside the hash preimage |
+| `type` | the real type | `orb.content`, or a bookkeeping type |
+| `schema` | the real schema | one describing *an encrypted payload* |
+| `causes` | in the envelope | **not in the envelope**; absent means *cannot say* |
+| `payload` | the caller's object | a wrapper: real type, schema, causes, data, nonce |
+
+**Every invariant in §4 still holds**, and that is the test of whether this was an
+addition or a breach. Identity, provenance, causal placement and chained
+integrity read the same fields they always did; a lane of v2 envelopes verifies
+with every payload absent, exactly as before, which is what keeps §6's *"integrity
+verification of a lane is always possible from the Events alone"* true.
+
+Two readings shift, and are stated here rather than left to be inferred:
+
+- **Inv. 7 (opaque, versioned payload).** Still true — an Event still carries a
+  payload tagged with a schema id and version, and the Event layer still never
+  interprets it. But under v2 the *envelope's* tag names an encrypted payload and
+  the real schema is inside. A reader that needs the real schema must hold the
+  payload. That is the point, not a defect: the tag was disclosure.
+- **§1's "self-describing".** A v2 envelope is deliberately *less*
+  self-describing. It still states that something happened, here, then; it no
+  longer states what kind of thing. A reader holding the payload sees the whole
+  Event exactly as written (`EVENT_MODEL.md` §3), so inv. 8's replayability is
+  unaffected.
+
+**Absent `v` means 1, permanently.** A reader must not require the field, or every
+v1 Event ever written becomes unreadable — which the clause above forbids.
+
 ---
 
 ## 6. Compatibility guarantees
