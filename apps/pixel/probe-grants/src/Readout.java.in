@@ -103,14 +103,59 @@ final class Readout {
             + (entries.size() == 1 ? " entry" : " entries") + " returned";
     }
 
+    /**
+     * Whether the operator's claim is contradicted by something the device
+     * itself says, in which case the reading scores nothing at all.
+     *
+     * `accessibility_enabled` is the master toggle: `1` when some accessibility
+     * service is on, `0` when none is. It is an independent witness to the same
+     * fact the checkbox asserts, and when the two disagree the honest move is to
+     * score neither. Resolving it in favour of the device would be a guess
+     * dressed as a measurement, and resolving it in favour of the checkbox is
+     * how the first run of this probe reported a falsification that was really a
+     * mis-tick. Surfaced, not settled — settling it is the operator's to do by
+     * looking at the screen again.
+     *
+     * Returns null when there is nothing to complain about, which includes the
+     * case where the corroborant could not be read: no witness is not a
+     * disagreeing witness.
+     */
+    static String contradiction(boolean claimed, Readout master) {
+        if (master == null || !VALUE.equals(master.outcome)) return null;
+        String value = master.raw.trim();
+        if (claimed && value.equals("0")) {
+            return "UNSCORED — you ticked that an accessibility service is On, but this"
+                + " device's own master toggle (accessibility_enabled) reads 0, meaning"
+                + " none is. Settle that in Settings and read again; until then this"
+                + " proves nothing either way.";
+        }
+        if (!claimed && value.equals("1")) {
+            return "UNSCORED — you left the accessibility box unticked, but this device's"
+                + " own master toggle (accessibility_enabled) reads 1, meaning something"
+                + " is On. Settle that in Settings and read again.";
+        }
+        return null;
+    }
+
     /** The reading as text, for the screen and for the exported file. */
     String render(boolean knownPopulated) {
+        return render(knownPopulated, null);
+    }
+
+    /**
+     * As `render`, but a non-null `unscored` replaces the verdict entirely.
+     *
+     * Replaces rather than accompanies: a CONFIRMED or FALSIFIED line printed
+     * next to a warning would be the line that got quoted, and the warning is
+     * precisely the statement that no verdict is available.
+     */
+    String render(boolean knownPopulated, String unscored) {
         StringBuilder out = new StringBuilder();
         out.append(source).append('\n');
         out.append("  outcome: ").append(outcome);
         if (VALUE.equals(outcome)) out.append(" (").append(raw.length()).append(" chars)");
         out.append('\n');
-        out.append("  ").append(verdict(knownPopulated)).append('\n');
+        out.append("  ").append(unscored == null ? verdict(knownPopulated) : unscored).append('\n');
         if (THREW.equals(outcome)) {
             out.append("  failure: ").append(raw).append('\n');
         } else if (VALUE.equals(outcome)) {
@@ -118,6 +163,29 @@ final class Readout {
             // something would be invisible if only the entries were shown.
             out.append("  raw: ").append(raw.isEmpty() ? "(empty string)" : raw).append('\n');
             for (String entry : entries) out.append("  - ").append(entry).append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
+     * A single value, not a list — printed without a verdict or an entry list.
+     *
+     * The master toggle went through the list renderer on the first run and came
+     * out as "readable without permission, 1 entry returned" over a raw value of
+     * `0`, which reads as a confirmation of something that is in fact switched
+     * off. A scalar is not a list of one, and a reading nobody is scoring should
+     * not print a score.
+     */
+    String renderScalar() {
+        StringBuilder out = new StringBuilder();
+        out.append(source).append('\n');
+        out.append("  outcome: ").append(outcome).append('\n');
+        if (THREW.equals(outcome)) {
+            out.append("  failure: ").append(raw).append('\n');
+        } else if (ABSENT.equals(outcome)) {
+            out.append("  value: (null — never set, or withheld)").append('\n');
+        } else {
+            out.append("  value: ").append(raw.isEmpty() ? "(empty string)" : raw).append('\n');
         }
         return out.toString();
     }

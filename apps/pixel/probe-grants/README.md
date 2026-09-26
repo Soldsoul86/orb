@@ -72,6 +72,33 @@ test. §7 R3 still applies to whatever comes back: a finding is recorded against
 *this* device and *this* build, never generalised — which is why the build
 fingerprint is printed above the results and travels in the exported file.
 
+## First run — Pixel 10a, Android 16, 2026-09-26
+
+| | Result |
+| --- | --- |
+| **P13** | **CONFIRMED.** 555 chars, five entries, no permission — all Google (Auto, the Auto dashboard, System Intelligence, the launcher, `odad`) |
+| **P12** | **INCONCLUSIVE.** Both reads empty, and `accessibility_enabled` read `0`: nothing was enabled to read |
+| **P14** | **OPEN.** `getActiveAdmins()` returned `null` — not an empty list, not a throw |
+| control | **HELD.** The direct file read failed with `EACCES` |
+
+That first run also scored P12 **wrong**, and the fix is the interesting part.
+The operator ticked *an accessibility service is On* — the morning's experiment,
+since switched off — so the probe printed FALSIFIED twice, while its own context
+read three lines below said `accessibility_enabled = 0`. The checkbox was the
+outlier and the probe believed it anyway.
+
+The design was at fault, not the operator: it treated a human claim as ground
+truth while reading an independent witness to the same fact and doing nothing
+with it. Now a claim the device contradicts scores **UNSCORED** — the verdict
+replaced rather than accompanied, since a FALSIFIED line printed next to a
+warning is the line that gets quoted. The disagreement is surfaced, never
+settled: deciding in the device's favour would be a guess dressed as a
+measurement.
+
+P14's `null` is undecidable from inside the app — *no admin active* and *the list
+is withheld* are the same value — so it needs the Device admin apps screen read
+by a human before the same `null` means anything.
+
 ## What each answer would mean for pass 2
 
 * **All three CONFIRMED.** `Grants` stands as written; the glue can be built.

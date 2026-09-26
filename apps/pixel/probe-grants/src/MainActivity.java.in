@@ -128,14 +128,22 @@ public final class MainActivity extends Activity {
            .append('\n');
         out.append("package:  @PKG@  (no permissions declared)\n");
 
+        // Read first, score second. The master toggle is an independent witness
+        // to what the accessibility checkbox asserts, so a disagreement between
+        // them has to be known before either P12 read is scored.
+        Readout master = secure(Settings.Secure.ACCESSIBILITY_ENABLED);
+        String unscored = Readout.contradiction(knownAccessibility.isChecked(), master);
+
         out.append("\n=== P12  accessibility services enabled on this device ===\n\n");
+        if (unscored != null) out.append("  ").append(unscored).append("\n\n");
         out.append(secure(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            .render(knownAccessibility.isChecked()));
+            .render(knownAccessibility.isChecked(), unscored));
         out.append('\n');
         // A second, independent path to the same fact. If the setting is
         // withheld but this works, P12 holds by another route; if both fail, it
         // is the platform and not one API.
-        out.append(enabledAccessibilityServices().render(knownAccessibility.isChecked()));
+        out.append(enabledAccessibilityServices()
+            .render(knownAccessibility.isChecked(), unscored));
 
         out.append("\n=== P13  notification listeners enabled on this device ===\n\n");
         // The constant is @hide, so the key is spelled out. Reading a key by
@@ -146,7 +154,8 @@ public final class MainActivity extends Activity {
         out.append(activeAdmins().render(knownAdmin.isChecked()));
 
         out.append("\n=== context (not a prediction) ===\n\n");
-        out.append(secure(Settings.Secure.ACCESSIBILITY_ENABLED).render(false));
+        out.append(master.renderScalar());
+        out.append("  (1 = some accessibility service is On, 0 = none)\n");
 
         out.append("\n=== control: a read that must fail ===\n\n");
         out.append(control());

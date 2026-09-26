@@ -25,9 +25,9 @@ needs, including the author in three months.*
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
-| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Built, not yet run** — `apps/pixel/probe-grants` |
-| **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Built, not yet run** — same probe |
-| **P14** | Active device admins are enumerable without being one | **Built, not yet run** — same probe |
+| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Inconclusive 2026-09-26** — nothing was enabled to read |
+| **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
+| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — returned `null`, which cannot say none from withheld |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1253,6 +1253,63 @@ be named as such rather than quietly swapped in.
 
 33 desktop checks, three negative controls verified to bite. Still nothing has run
 on the device.
+
+### P12–P14 on the device — 2026-09-26
+
+Pixel 10a (`stallion`), Android 16, API 36, security patch 2026-04-05, build
+`CP1A.260405.005`, read at 11:53 IST by `dev.orb.probeg`, a package declaring no
+permissions. §7 R3: a finding against *this* device and *this* build.
+
+**The control held.** A direct read of `/data/system/users/0/settings_secure.xml`
+failed with `EACCES (Permission denied)`. The successful reads below went through
+the framework and not around it, so they are facts about what Android hands a
+sandboxed app rather than about a sandbox that was not there.
+
+**P13 — confirmed.** `Settings.Secure.getString("enabled_notification_listeners")`
+returned 555 characters, five entries, to an app holding no permission:
+Android Auto (`gearhead`), the Auto dashboard (`dreamliner`), Android System
+Intelligence (`com.google.android.as`), the launcher (`nexuslauncher`), and
+`com.google.android.odad` — Google's own on-device defence service. Two things
+follow. The read works, so the signal is buildable; and the baseline on an
+untouched phone is five entries, all Google, which is what makes a sixth worth
+an event. The stalkerware case `MOBILE_SENSING.md` §4.4 describes is exactly a
+non-Google name appearing in that list.
+
+**P12 — inconclusive, and the first run scored it wrong.** Both reads came back
+empty: the setting, and `AccessibilityManager.getEnabledAccessibilityServiceList`.
+The operator had ticked *an accessibility service is On*, so the probe printed
+FALSIFIED twice — but the context read directly underneath showed
+`accessibility_enabled = 0`, meaning none was. The accessibility experiment of
+that morning had been switched off. Three independent indicators agreed with each
+other and the checkbox was the outlier.
+
+So the probe was wrong about the operator, not about the platform, and the fault
+was the design's: it took a human claim as ground truth while reading an
+independent witness to the same fact and doing nothing with it. **Fixed by
+surfacing the disagreement, not by resolving it.** When the claim and the master
+toggle disagree the reading now scores `UNSCORED` — the verdict replaced, not
+accompanied, since a FALSIFIED line printed beside a warning is the line that
+gets quoted. Deciding in the device's favour would have been a guess dressed as a
+measurement; the operator settles it by looking at the screen again.
+
+P12 needs one more run with an accessibility service actually enabled. Until then
+it is not a fact about Android, only a fact about a phone with nothing to report.
+
+**P14 — open.** `DevicePolicyManager.getActiveAdmins()` returned **`null`** —
+not an empty list, not a `SecurityException`. That is the `absent` outcome, and
+it is genuinely undecidable from inside the app: *no admin is active* and *the
+list is withheld from you* arrive as the same value. It needs the operator to
+read the Device admin apps screen; that answer turns the same `null` into a
+confirmation of "none" or a falsification.
+
+**What it cost to be careful.** Two of the three verdicts in the first run were
+artefacts of a checkbox rather than findings, and both were caught by evidence
+the probe had already printed. The rule that an empty answer scores INCONCLUSIVE
+did its job — it is the reason P12 was not quietly written up as a confirmation
+when the device returned nothing.
+
+---
+
 
 ---
 

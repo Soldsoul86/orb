@@ -19,6 +19,8 @@ final class ReadoutTest {
         scoring();
         invariant();
         rendering();
+        corroboration();
+        scalars();
     }
 
     private static void outcomes() {
@@ -122,6 +124,68 @@ final class ReadoutTest {
         // invent a service that does not exist.
         Harness.check("a lone separator holds nothing", !Readout.of("s", ":").populated());
         Harness.check("whitespace holds nothing", !Readout.of("s", "  ").populated());
+    }
+
+    private static void corroboration() {
+        Harness.suite("Readout — a claim the device contradicts scores nothing");
+
+        Readout off = Readout.of("accessibility_enabled", "0");
+        Readout on = Readout.of("accessibility_enabled", "1");
+
+        // The mistake this exists to catch. The first device run ticked the box
+        // on a phone whose master toggle read 0; both accessibility reads came
+        // back empty, correctly, and were written up as FALSIFIED. The device
+        // had been telling us the truth in the next section down.
+        Harness.check("claiming On against a toggle reading 0 is unscored",
+            Readout.contradiction(true, off) != null);
+        Harness.check("claiming nothing against a toggle reading 1 is unscored",
+            Readout.contradiction(false, on) != null);
+        Harness.check("claiming On against a toggle reading 1 is fine",
+            Readout.contradiction(true, on) == null);
+        Harness.check("claiming nothing against a toggle reading 0 is fine",
+            Readout.contradiction(false, off) == null);
+
+        // No witness is not a disagreeing witness: a corroborant we could not
+        // read must not block a reading, or an unreadable toggle would silently
+        // unscore every P12 result on some future device.
+        Harness.check("an unreadable corroborant blocks nothing",
+            Readout.contradiction(true, Readout.failed("s", new SecurityException())) == null);
+        Harness.check("an absent corroborant blocks nothing",
+            Readout.contradiction(true, Readout.of("s", null)) == null);
+        Harness.check("a missing corroborant blocks nothing",
+            Readout.contradiction(true, null) == null);
+        Harness.check("an unexpected corroborant value blocks nothing",
+            Readout.contradiction(true, Readout.of("s", "2")) == null);
+        Harness.check("whitespace does not hide the toggle",
+            Readout.contradiction(true, Readout.of("s", " 0 ")) != null);
+
+        // The verdict must be gone, not merely accompanied: a FALSIFIED line
+        // printed beside a warning is the line that gets quoted.
+        String text = Readout.of("src", "").render(true, Readout.contradiction(true, off));
+        Harness.check("an unscored reading says so", text.contains("UNSCORED"));
+        Harness.check("an unscored reading carries no verdict",
+            !text.contains("FALSIFIED") && !text.contains("CONFIRMED")
+                && !text.contains("INCONCLUSIVE"));
+        Harness.check("an unscored reading still shows what was read",
+            text.contains("(empty string)"));
+    }
+
+    private static void scalars() {
+        Harness.suite("Readout — a scalar is not a list of one");
+
+        // `accessibility_enabled` read `0` and printed "readable without
+        // permission, 1 entry returned", which reads as a confirmation of a
+        // thing that is switched off.
+        String zero = Readout.of("accessibility_enabled", "0").renderScalar();
+        Harness.check("a scalar prints its value", zero.contains("value: 0"));
+        Harness.check("a scalar claims no entries", !zero.contains("entry"));
+        Harness.check("a scalar carries no verdict",
+            !zero.contains("CONFIRMED") && !zero.contains("INCONCLUSIVE"));
+        Harness.check("a null scalar says which kind of nothing it is",
+            Readout.of("s", null).renderScalar().contains("never set, or withheld"));
+        Harness.check("a failed scalar prints its failure",
+            Readout.failed("s", new SecurityException("denied")).renderScalar()
+                .contains("SecurityException"));
     }
 
     private static void rendering() {
