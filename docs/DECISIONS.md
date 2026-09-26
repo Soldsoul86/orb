@@ -11,6 +11,9 @@
 > open. The consequences are the point — a decision recorded without them is a
 > preference, and preferences do not survive a handoff.
 >
+> A dated snapshot of the whole project — what is decided, measured, and neither
+> — is `STATE.md`. It cites this file rather than restating it.
+>
 > Decisions are the operator's. This file records them; it does not make them
 > (`CLAUDE.md`: *the architecture is permanent, the implementation is
 > replaceable*).
