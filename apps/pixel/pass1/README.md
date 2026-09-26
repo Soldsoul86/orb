@@ -52,6 +52,19 @@ from both sides (`runtime/journal/tests/vectors.test.ts`, and `tests/run.sh`
 below). Two implementations that disagree would not produce a wrong answer; they
 would produce two devices that can never agree they hold the same history.
 
+**Numbers are safe integers, in both encoders.** Measured 2026-09-26: Java's
+`Double.toString` and JavaScript's `JSON.stringify` disagree on three of six
+ordinary values — `1.0`/`1`, `100.0`/`100`, `1.0E21`/`1e+21` — so a fraction
+cannot be written by both implementations, and one disagreement inside a hash
+preimage is two devices that can never agree they hold the same history. The
+same bound also rules out integers past 2^53, which a JavaScript number cannot
+hold and a Java `long` can. Carry a fraction scaled: `confidence: 0.95` as
+`confidenceMilli: 950`, with the scale named in the payload schema.
+
+A fixture cannot pin this — `gen-vectors.py` refuses to put a float in
+`vectors.json`, so the guard that would have caught the divergence is the one
+that hid it. Both sides therefore assert the *same rejections* instead.
+
 Both envelope formats are implemented and both are pinned. **This build still
 writes v1** — pass 1 is a measuring instrument, and a heartbeat's fine type
 discloses that a heartbeat happened, so migrating mid-run would put a version

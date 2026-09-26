@@ -47,11 +47,24 @@ export type LifecycleStage =
   | "EXECUTOR_STARTED"
   | "EXECUTOR_STOPPED";
 
-/** What the sentinel measured when it made a decision. Kept for post-mortems. */
+/**
+ * What the sentinel measured when it made a decision. Kept for post-mortems.
+ *
+ * `measured` and `threshold` are strings for the same reason `markPrice`,
+ * `entryPrice` and `unrealizedPnl` beside them are: this is a permanent record
+ * of a quantity, and a binary float is the wrong way to keep one. They were
+ * `number` until 2026-09-26, when the journal's canonical encoding was
+ * restricted to safe integers and refused to write them — three prices in this
+ * one struct were already strings and two were not.
+ *
+ * Carried as the exact value the comparison used, not rounded: the record must
+ * say what the sentinel actually compared, including a value that is ugly
+ * because binary floating point made it so.
+ */
 export interface RiskMeasurement {
   readonly rule: string;
-  readonly measured: number;
-  readonly threshold: number;
+  readonly measured: string;
+  readonly threshold: string;
   readonly basis: string;
   readonly markPrice: string;
   readonly entryPrice: string;

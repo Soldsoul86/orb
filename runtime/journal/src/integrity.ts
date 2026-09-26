@@ -29,7 +29,41 @@ export function canonicalJson(value: unknown): string {
 
   switch (typeof value) {
     case "number":
-      if (!Number.isFinite(value)) throw new TypeError(`non-finite number in event: ${value}`);
+      // Safe integers only, and the restriction is the whole point: it makes the
+      // two implementations agree **by construction** rather than by matching
+      // two difficult algorithms.
+      //
+      // Measured 2026-09-26. Java's `Double.toString` and JavaScript's
+      // `JSON.stringify` disagree on three of six ordinary values — `1.0` vs
+      // `1`, `100.0` vs `100`, `1.0E21` vs `1e+21` — because JS emits the
+      // shortest round-trip form with its own exponent thresholds and Java does
+      // not. Making the phone match would mean reimplementing ECMAScript
+      // `Number::toString` byte-exactly in Java, and one disagreement on one
+      // rare value inside a hash preimage means two devices that can never
+      // agree they hold the same history (`DEVICE_LOOP.md` §7 R2).
+      //
+      // `isSafeInteger` closes all of it at once. It rejects fractions, rejects
+      // NaN and Infinity, and rejects anything large enough for JS to switch to
+      // exponent notation — the largest safe integer is sixteen digits. Every
+      // value that survives stringifies to plain digits, which is exactly what
+      // Java's `Long.toString` produces.
+      //
+      // It also closes a second divergence that is about the *value* rather
+      // than its spelling: beyond 2^53 a JavaScript number cannot hold every
+      // integer a Java `long` can, so a journal written on the phone would read
+      // back as a different number here.
+      //
+      // **Fractions are carried scaled.** `confidence: 0.95` becomes
+      // `confidenceMilli: 950`; an accuracy radius becomes centimetres. The
+      // scale belongs to the payload schema, which is where a reader can see it.
+      if (!Number.isSafeInteger(value)) {
+        throw new TypeError(
+          `unrepresentable number in event: ${value}. Canonical encoding takes safe ` +
+            "integers only, because Java and JavaScript spell other numbers differently " +
+            "and the two journals must agree byte for byte. Carry a fraction scaled — " +
+            "0.95 as 950 with the scale named in the schema.",
+        );
+      }
       return JSON.stringify(value);
     case "string":
     case "boolean":

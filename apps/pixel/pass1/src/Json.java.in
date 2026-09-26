@@ -40,12 +40,31 @@ final class Json {
         } else if (value instanceof Boolean) {
             out.append(value.toString());
         } else if (value instanceof Long || value instanceof Integer) {
-            out.append(value.toString());
+            // The same bound the TypeScript encoder applies, from the other side.
+            //
+            // A `long` reaches 2^63; a JavaScript number is a double and holds
+            // every integer only up to 2^53-1. Writing a larger one here would
+            // produce a journal the Mac reads back as a *different number* — not
+            // a formatting disagreement but a value disagreement, and silent.
+            //
+            // Doubles are rejected below, by omission, and deliberately:
+            // `Double.toString` and `JSON.stringify` disagree on `1.0` vs `1`,
+            // `100.0` vs `100` and `1.0E21` vs `1e+21`, so a fraction cannot be
+            // written by both implementations. Carry it scaled — `confidence:
+            // 0.95` as `confidenceMilli: 950`.
+            long n = ((Number) value).longValue();
+            if (n > 9007199254740991L || n < -9007199254740991L) {
+                throw new IllegalArgumentException(
+                    "integer outside the range both journals represent: " + n);
+            }
+            out.append(Long.toString(n));
         } else if (value instanceof Map) {
             writeObject(out, (Map<?, ?>) value);
         } else if (value instanceof List) {
             writeArray(out, (List<?>) value);
         } else {
+            // Reached by `Double` and `Float` among others, and that is the
+            // intended behaviour rather than a gap — see the integer branch.
             throw new IllegalArgumentException("unsupported value in event: " + value.getClass());
         }
     }

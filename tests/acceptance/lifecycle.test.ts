@@ -336,8 +336,10 @@ describe("acceptance: hard exit", () => {
     const crossing = lifecycle.find((event) => event.stage === "HARD_THRESHOLD_CROSSED");
     assert.ok(crossing, "the crossing must be recorded");
     assert.equal(crossing.risk?.rule, "MAX_LOSS_FRACTION");
-    assert.equal(crossing.risk?.threshold, 0.1);
-    assert.ok((crossing.risk?.measured ?? 0) >= 0.1);
+    // Strings since 2026-09-26: a permanent record of a quantity is not a
+    // binary float, and the journal's encoder now refuses to write one.
+    assert.equal(crossing.risk?.threshold, "0.1");
+    assert.ok(Number(crossing.risk?.measured ?? 0) >= 0.1);
     assert.equal(crossing.risk?.markPrice, "1979");
 
     await h.executor.stop();
@@ -920,7 +922,7 @@ describe("acceptance: audit", () => {
 
     const crossing = lifecycle.find((event) => event.stage === "HARD_THRESHOLD_CROSSED")!;
     assert.ok(crossing.risk, "the measurement behind the decision must be recorded");
-    assert.equal(crossing.risk.threshold, 0.1);
+    assert.equal(crossing.risk.threshold, "0.1");
     assert.equal(crossing.risk.basis, "MARGIN");
 
     // Ordering is causal, not incidental.

@@ -64,6 +64,30 @@ final class JsonTest {
             Journal.coarseType(Journal.CONTENT_TYPE), Journal.CONTENT_TYPE);
         Harness.equal("a bookkeeping type is not", Journal.coarseType("orb.erasure"), "orb.erasure");
 
+        Harness.suite("numbers both journals can represent, and only those");
+
+        // A fixture cannot express this. `gen-vectors.py` refuses to put a float
+        // in `vectors.json` at all, so the vectors structurally cannot exercise
+        // the case — the guard that would have caught the divergence is the same
+        // one that hid it for as long as it was hidden. The agreement has to be
+        // asserted as *both sides rejecting the same values*.
+        //
+        // Measured 2026-09-26: `Double.toString` and `JSON.stringify` disagree
+        // on 1.0 vs 1, 100.0 vs 100, and 1.0E21 vs 1e+21.
+        rejects("a fraction", 0.95d);
+        rejects("a whole number typed as a double", 1.0d);
+        rejects("a float", 0.95f);
+        rejects("an integer past 2^53, which JavaScript cannot hold", 9007199254740993L);
+        rejects("and the same below zero", -9007199254740993L);
+
+        Map<String, Object> ok = Json.obj();
+        ok.put("beat", 7L);
+        ok.put("confidenceMilli", 950L);
+        ok.put("largest", 9007199254740991L);
+        Harness.equal("a scaled fraction and the largest shared integer encode",
+            Json.canonical(ok),
+            "{\"beat\":7,\"confidenceMilli\":950,\"largest\":9007199254740991}");
+
         Harness.suite("encoding edge cases the fixture does not reach");
 
         Map<String, Object> sorted = Json.obj();
@@ -156,5 +180,18 @@ final class JsonTest {
             Json.canonical(preimage), preimageCanonical);
         Harness.equal(label + ": and hashes to the pinned digest",
             Journal.sha256(Json.canonical(preimage)), hash);
+    }
+
+    /** Asserts the encoder refuses a value the other implementation spells differently. */
+    private static void rejects(String what, Object value) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("v", value);
+        boolean refused = false;
+        try {
+            Json.canonical(payload);
+        } catch (IllegalArgumentException expected) {
+            refused = true;
+        }
+        Harness.check("refuses " + what, refused);
     }
 }

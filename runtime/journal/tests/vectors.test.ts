@@ -149,3 +149,53 @@ describe("cross-implementation encoding", () => {
     }
   });
 });
+
+/**
+ * The half of the cross-implementation agreement a fixture cannot carry.
+ *
+ * `gen-vectors.py` refuses to put a float in `vectors.json` — so the vectors
+ * structurally cannot exercise the case, and the guard that would have surfaced
+ * this divergence is the same one that concealed it. Both encoders passed every
+ * test while disagreeing about `1.0`.
+ *
+ * So agreement is asserted as *both sides refusing the same values*. The Java
+ * mirror of this block is `apps/pixel/pass1/tests/JsonTest.java.in`, under
+ * "numbers both journals can represent, and only those".
+ */
+describe("numbers both journals can represent, and only those", () => {
+  test("a fraction is refused, because the two languages spell it differently", () => {
+    // Measured 2026-09-26: Java `Double.toString` vs JS `JSON.stringify` give
+    // 1.0/1, 100.0/100 and 1.0E21/1e+21. Three of six ordinary values.
+    for (const value of [0.95, 0.1, -0.5, 1e-7]) {
+      assert.throws(() => canonicalJson({ v: value }), /safe\s+integers only/);
+    }
+  });
+
+  test("a whole number is fine however it was written", () => {
+    // `1.0` in JavaScript *is* `1` — there is no separate float type — so the
+    // rule is about the value, not about how the literal was typed.
+    assert.equal(canonicalJson({ v: 1.0 }), '{"v":1}');
+    assert.equal(canonicalJson({ v: 100.0 }), '{"v":100}');
+  });
+
+  test("an integer past 2^53 is refused, and that is a different bug", () => {
+    // Not a spelling disagreement but a value one: a Java `long` reaches 2^63,
+    // a JavaScript number holds every integer only to 2^53-1. Writing a larger
+    // one on the phone would read back here as a different number, silently.
+    assert.equal(canonicalJson({ v: 9007199254740991 }), '{"v":9007199254740991}');
+    assert.throws(() => canonicalJson({ v: 9007199254740993 }), /safe\s+integers only/);
+  });
+
+  test("the rejection also covers what it used to cover", () => {
+    assert.throws(() => canonicalJson({ v: Number.NaN }));
+    assert.throws(() => canonicalJson({ v: Number.POSITIVE_INFINITY }));
+  });
+
+  test("no safe integer ever stringifies to exponent notation", () => {
+    // Why `isSafeInteger` is the whole check: the largest is sixteen digits, so
+    // JavaScript never switches to the `1e+21` form that Java spells `1.0E21`.
+    for (const value of [Number.MAX_SAFE_INTEGER, -Number.MAX_SAFE_INTEGER, 0, 1, -1]) {
+      assert.doesNotMatch(canonicalJson({ v: value }), /[eE]/);
+    }
+  });
+});

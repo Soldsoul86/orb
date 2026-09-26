@@ -357,13 +357,16 @@ export class TradeExecutor {
       size: decision.size,
       price: String(referencePrice),
       detail: {
-        notionalUsd: decision.notionalUsd,
-        leverage: decision.leverage,
+        // Quantities as strings, like every other quantity this package
+        // records. `detail` still takes numbers, for genuinely whole ones such
+        // as `attempts`; a price or a size is not one of those.
+        notionalUsd: String(decision.notionalUsd),
+        leverage: String(decision.leverage),
         setupId: signal.setupId,
         // Recorded so the trade can be analysed against the provider's intent.
         // Never read by any decision path.
-        advisoryStop: signal.advisoryStop ?? null,
-        advisoryTarget: signal.advisoryTarget ?? null,
+        advisoryStop: signal.advisoryStop === undefined ? null : String(signal.advisoryStop),
+        advisoryTarget: signal.advisoryTarget === undefined ? null : String(signal.advisoryTarget),
       },
     });
 
@@ -712,8 +715,8 @@ export class TradeExecutor {
       exitReason: "HARD_RISK_EXIT",
       risk: {
         rule: assessment.rule,
-        measured: assessment.measured,
-        threshold: assessment.threshold,
+        measured: String(assessment.measured),
+        threshold: String(assessment.threshold),
         basis: assessment.measurements.basis,
         markPrice: tick.markPrice,
         entryPrice: position.entryPrice,
@@ -794,11 +797,21 @@ export class TradeExecutor {
             detail: {
               attempts: outcome.attempts,
               // The identity a reconciliation should satisfy against the account.
+              //
+              // Computed in binary floating point from values that were exact
+              // decimals, then recorded as the string of that result — so the
+              // record says what was actually computed, drift included, rather
+              // than implying an exactness the arithmetic did not have. The
+              // three operands are recorded separately above; this is a
+              // convenience, and a reconciliation that disagrees with it should
+              // trust them.
               net:
                 outcome.realizedPnl !== undefined
-                  ? Number.parseFloat(outcome.realizedPnl) -
-                    Number.parseFloat(outcome.fees ?? "0") -
-                    Number.parseFloat(outcome.fundingPaid ?? "0")
+                  ? String(
+                      Number.parseFloat(outcome.realizedPnl) -
+                        Number.parseFloat(outcome.fees ?? "0") -
+                        Number.parseFloat(outcome.fundingPaid ?? "0"),
+                    )
                   : null,
             },
           });

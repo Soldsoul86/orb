@@ -119,6 +119,27 @@ class FileJournalStore implements JournalStore {
 
 `append` must be atomic per call and durable before it resolves.
 
+### What a payload may contain
+
+`canonicalJson` accepts `null`, booleans, strings, arrays, plain objects, and
+**safe integers only**. It rejects `undefined`, NaN, Infinity, fractions,
+integers beyond 2^53, and anything else — no dates, no binary, no class
+instances. A timestamp is a number of milliseconds; bytes are an `Attachment`
+referenced by hash.
+
+The integer restriction is cross-implementation agreement by construction rather
+than by matching two difficult algorithms. Java's `Double.toString` and
+JavaScript's `JSON.stringify` disagree on `1.0` vs `1`, `100.0` vs `100` and
+`1.0E21` vs `1e+21`; making the phone match would mean reimplementing
+ECMAScript `Number::toString` byte-exactly, and one disagreement on one rare
+value means two devices that can never agree they hold the same history.
+`isSafeInteger` closes the spelling problem and the precision problem together:
+the largest safe integer is sixteen digits, so no accepted value ever reaches
+exponent notation, and none exceeds what both languages represent exactly.
+
+**Fractions are carried scaled**, with the scale named in the payload schema —
+`confidence: 0.95` as `confidenceMilli: 950`, an accuracy radius in centimetres.
+
 ## Types
 
 ```ts
