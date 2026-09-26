@@ -168,6 +168,55 @@ final class Readout {
     }
 
     /**
+     * P14's verdict, taken from two reads of the same fact and no human claim.
+     *
+     * `enumerated` is `getActiveAdmins()`, the list under test. `byComponent` is
+     * `isAdminActive()` asked once per installed admin receiver — a public call
+     * that needs no permission and does not require being that admin. Together
+     * they decide what a `null` enumeration means, which is the thing a checkbox
+     * was being asked to decide and kept getting wrong:
+     *
+     *   per-component says some admin is active, enumeration says nothing
+     *       → the list is withheld. Not empty, not "none". FALSIFIED.
+     *   per-component says none is active, enumeration says nothing
+     *       → the null is correct and carries no information. INCONCLUSIVE, and
+     *         it will stay that way until an admin is actually enabled.
+     *   both say the same admins
+     *       → CONFIRMED.
+     *
+     * The operator can still be wrong about their own phone; the phone cannot be
+     * wrong about it. Every earlier P14 verdict in this probe's history came from
+     * a tick, and every one of them was an artefact.
+     */
+    static String adminVerdict(Readout enumerated, Readout byComponent) {
+        if (byComponent == null || !VALUE.equals(byComponent.outcome)) {
+            return "INCONCLUSIVE — the per-component query did not answer, so there is"
+                + " nothing to check the enumeration against";
+        }
+        boolean someActive = byComponent.populated();
+        if (THREW.equals(enumerated.outcome)) {
+            return "FALSIFIED — the enumeration threw; the active set is not readable this way";
+        }
+        boolean enumeratedAny = enumerated.populated();
+        if (someActive && !enumeratedAny) {
+            return "FALSIFIED — isAdminActive answers yes for " + byComponent.entries.size()
+                + (byComponent.entries.size() == 1 ? " admin" : " admins")
+                + " while getActiveAdmins() returns nothing: the list is withheld, not empty";
+        }
+        if (someActive) {
+            return "CONFIRMED — enumeration returned " + enumerated.entries.size()
+                + ", and the per-component query agrees that "
+                + byComponent.entries.size() + " active";
+        }
+        if (enumeratedAny) {
+            return "UNEXPLAINED — the enumeration returned entries that isAdminActive denies;"
+                + " neither read can be trusted until this is understood";
+        }
+        return "INCONCLUSIVE — no admin is active on this device, so an empty answer is"
+            + " correct and proves nothing about whether an active one would be shown";
+    }
+
+    /**
      * A list printed for context, with no verdict attached.
      *
      * Context is not a prediction, and a CONFIRMED line next to a reading nobody

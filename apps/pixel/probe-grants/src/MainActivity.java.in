@@ -172,8 +172,26 @@ public final class MainActivity extends Activity {
         // name is exactly what a third-party app can do, which is the point.
         out.append(secure("enabled_notification_listeners").render(knownListener.isChecked()));
 
+        // P14 is scored from the device alone. The installed receivers give the
+        // components to ask about, isAdminActive answers per component without
+        // any permission, and the two together decide what a null enumeration
+        // means. The checkbox below is printed for comparison and no longer
+        // decides anything: every P14 verdict this probe produced from a tick
+        // turned out to be an artefact of how it was operated.
+        Readout installed = installedAdminReceivers();
+        Readout enumerated = activeAdmins();
+        Readout byComponent = adminsByComponentQuery(installed);
+
         out.append("\n=== P14  device admins active on this device ===\n\n");
-        out.append(activeAdmins().render(knownAdmin.isChecked()));
+        out.append(enumerated.render(knownAdmin.isChecked(),
+            Readout.adminVerdict(enumerated, byComponent)));
+        out.append('\n');
+        out.append(byComponent.renderList());
+        if (Readout.VALUE.equals(byComponent.outcome)
+                && byComponent.populated() != knownAdmin.isChecked()) {
+            out.append("  note: this disagrees with your checkbox, which is not used to")
+               .append(" score P14. The device is the authority here.\n");
+        }
 
         out.append("\n=== context (not a prediction) ===\n\n");
         out.append(master.renderScalar());
@@ -183,7 +201,7 @@ public final class MainActivity extends Activity {
         // are visible while getActiveAdmins() returns null, the withheld thing is
         // the active set and not the packages; if neither is visible, it is
         // package visibility and P14 was never the right question.
-        out.append(installedAdminReceivers().renderList());
+        out.append(installed.renderList());
 
         out.append("\n=== control: a read that must fail ===\n\n");
         out.append(control());
@@ -249,6 +267,33 @@ public final class MainActivity extends Activity {
                 names.add(info.activityInfo.packageName + "/" + info.activityInfo.name);
             }
             return Readout.ofEntries(source, names);
+        } catch (Throwable error) {
+            return Readout.failed(source, error);
+        }
+    }
+
+    /**
+     * Whether each installed admin receiver is active, asked one at a time.
+     *
+     * `isAdminActive` is public, takes any component, and does not require being
+     * that admin — so it is a second, permissionless route to the fact
+     * `getActiveAdmins()` reports in bulk. If the bulk call is withheld and this
+     * one is not, that difference is the finding.
+     */
+    private Readout adminsByComponentQuery(Readout installed) {
+        String source = "DevicePolicyManager.isAdminActive(each installed receiver)";
+        try {
+            DevicePolicyManager policy =
+                (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
+            if (policy == null) return Readout.ofEntries(source, null);
+            List<String> active = new ArrayList<>();
+            for (String flattened : installed.entries) {
+                ComponentName component = ComponentName.unflattenFromString(flattened);
+                if (component != null && policy.isAdminActive(component)) {
+                    active.add(flattened);
+                }
+            }
+            return Readout.ofEntries(source, active);
         } catch (Throwable error) {
             return Readout.failed(source, error);
         }

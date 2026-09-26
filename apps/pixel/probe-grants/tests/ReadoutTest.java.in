@@ -22,6 +22,7 @@ final class ReadoutTest {
         corroboration();
         scalars();
         contextLists();
+        adminScoring();
     }
 
     private static void outcomes() {
@@ -204,6 +205,48 @@ final class ReadoutTest {
                 .contains("readable, nothing returned"));
         Harness.check("an absent context list keeps the ambiguity",
             Readout.ofEntries("s", null).renderList().contains("never set, or withheld"));
+    }
+
+    private static void adminScoring() {
+        Harness.suite("Readout — P14 scored from the device, not from a tick");
+
+        Readout none = Readout.ofEntries("byComponent", new ArrayList<String>());
+        Readout one = Readout.ofEntries("byComponent", Arrays.asList("com.x/.Admin"));
+        Readout nullEnum = Readout.ofEntries("enum", null);
+        Readout emptyEnum = Readout.ofEntries("enum", new ArrayList<String>());
+        Readout oneEnum = Readout.ofEntries("enum", Arrays.asList("com.x/.Admin"));
+
+        // The finding worth having: per-component answers, bulk does not.
+        Harness.check("an active admin plus a null enumeration is a falsification",
+            Readout.adminVerdict(nullEnum, one).startsWith("FALSIFIED"));
+        Harness.check("an active admin plus an empty enumeration is a falsification",
+            Readout.adminVerdict(emptyEnum, one).startsWith("FALSIFIED"));
+        Harness.check("the falsification counts the admins it found",
+            Readout.adminVerdict(nullEnum, one).contains("1 admin"));
+
+        // The answer that looks like a result and is not.
+        Harness.check("no admin active plus nothing enumerated proves nothing",
+            Readout.adminVerdict(nullEnum, none).startsWith("INCONCLUSIVE"));
+        Harness.check("and it says why",
+            Readout.adminVerdict(nullEnum, none).contains("no admin is active"));
+
+        Harness.check("both agreeing confirms",
+            Readout.adminVerdict(oneEnum, one).startsWith("CONFIRMED"));
+        Harness.check("an enumeration the component query denies is unexplained",
+            Readout.adminVerdict(oneEnum, none).startsWith("UNEXPLAINED"));
+        Harness.check("a throwing enumeration is a falsification",
+            Readout.adminVerdict(Readout.failed("e", new SecurityException()), one)
+                .startsWith("FALSIFIED"));
+
+        // No corroborant, no verdict — the same rule as the accessibility guard.
+        Harness.check("no corroborant means no verdict",
+            Readout.adminVerdict(nullEnum,
+                Readout.failed("b", new SecurityException())).startsWith("INCONCLUSIVE"));
+        Harness.check("a missing corroborant means no verdict",
+            Readout.adminVerdict(nullEnum, null).startsWith("INCONCLUSIVE"));
+        Harness.check("an absent corroborant means no verdict",
+            Readout.adminVerdict(nullEnum, Readout.ofEntries("b", null))
+                .startsWith("INCONCLUSIVE"));
     }
 
     private static void rendering() {

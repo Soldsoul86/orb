@@ -27,7 +27,7 @@ needs, including the author in three months.*
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
-| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — three runs, none of them usable; see below |
+| **P14** | Active device admins are enumerable without being one | **Open 2026-09-26** — four runs; the tick is now out of the loop and the device scores it |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1379,6 +1379,40 @@ entries — `com.google.android.repairmode` and
 obstacle: the probe can see the candidate admin receivers. Whatever `null` means
 for `getActiveAdmins()`, it is about the *active set* and not about the packages
 being hidden. That narrows P14 without settling it.
+
+**Fourth run, 14:08 IST — the staleness fix holds and the checkbox finally fails
+visibly.** `read at` and `exported at` are the same second, so that defect is
+closed. And the readout shows the accessibility box *unticked* on a device whose
+`accessibility_enabled` reads `1` with `PayGuardService` in the list — the guard
+caught it and printed UNSCORED three times instead of a verdict. Working as
+built. But it is the fourth run in which what the operator ticked and what the
+device held were different things, and P14 was still being scored from the tick.
+
+**So the tick comes out of P14 entirely.** `DevicePolicyManager.isAdminActive` is
+public, takes any component, needs no permission, and does not require being that
+admin. Asked once per installed admin receiver, it is a second permissionless
+route to the fact `getActiveAdmins()` reports in bulk — and the two together
+decide what a `null` enumeration means with no human in the loop:
+
+| per-component | enumeration | verdict |
+| --- | --- | --- |
+| some admin active | nothing | **FALSIFIED** — the list is withheld, not empty |
+| some admin active | the same admins | **CONFIRMED** |
+| none active | nothing | **INCONCLUSIVE** — correct, and proves nothing |
+| none active | entries | **UNEXPLAINED** — neither read can be trusted |
+| did not answer | any | **INCONCLUSIVE** — nothing to check against |
+
+The checkbox is still printed, and the probe notes when it disagrees with the
+device, but it no longer decides anything.
+
+**That is the fourth instrument fix in four runs, and they are one fix.** A claim
+with no corroborant was believed; a label invited a wrong claim; a readout was
+allowed to go stale; and a verdict rested on a tick when the device could answer
+for itself. The general rule is the one §5d has been circling all along: **ask the
+device before asking the person, and where the device can answer, do not ask the
+person at all.** A human claim is a legitimate input only where nothing on the
+device speaks to the same fact — and for all three of P12, P13 and P14, something
+does.
 
 ---
 
