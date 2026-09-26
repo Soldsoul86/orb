@@ -93,6 +93,29 @@ export type { LineageIndex, Traversal } from "./lineage.js";
 
 export { evaluatePrune } from "./retention.js";
 export type { RetentionPolicy, PruneDecision, PruneRequest } from "./retention.js";
+export {
+  IDENTITY_SCHEME,
+  AttachmentCorrupt,
+  MemoryAttachmentStore,
+  attachmentIdentity,
+  blindedAddress,
+  destroyAttachment,
+  evaluateDestruction,
+  putAttachment,
+  resolveAttachment,
+  rotateAddresses,
+} from "./attachment.js";
+export type {
+  AttachmentPorts,
+  AttachmentReferences,
+  AttachmentStore,
+  DestructionResult,
+  DestructionVerdict,
+  ResolvedAttachment,
+  StoredAttachment,
+} from "./attachment.js";
+export { MemoryAttachmentKeyring } from "./attachment-keyring.js";
+export type { AttachmentKeyring, KeyState, SealedAttachment } from "./attachment-keyring.js";
 export { latestOwnRecord, ownRecordHistory } from "./own-record.js";
 export type { OwnRecord } from "./own-record.js";
 export {

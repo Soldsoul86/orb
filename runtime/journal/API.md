@@ -130,6 +130,59 @@ Receipts are ordinary events on the holder's own lane, so the holder is
 `event.device` and is never a field. A receipt watermarks the contiguous prefix
 actually held — a gap ends the claim.
 
+## Attachments
+
+See `contracts/Attachment.md`. Raw bytes, immutable and content-addressed, held
+beside history rather than inside it.
+
+```ts
+attachmentIdentity(bytes: Buffer): string        // "sha256:<hex>" — scheme-tagged
+blindedAddress(addressSecret, identity): string  // HMAC(secret, identity)
+```
+Identity is the content hash (inv. 1, 2); the **storage address is not** (inv. 7).
+A store addressed by identity is a list of identities, so anyone reading it can
+test any file they already hold against it — encrypting the bytes hides the
+content, never *which* content. The address is recomputable, so nothing extra is
+persisted, and rotatable, which is the point: rotation voids every address an
+adversary collected and breaks nothing, because only the local store layout
+depends on it.
+
+```ts
+putAttachment(ports, bytes): Promise<string>              // → identity
+resolveAttachment(ports, identity): Promise<ResolvedAttachment>
+rotateAddresses(ports, nextSecret, identities): Promise<number>
+```
+`put` is idempotent by content — a second put of the same bytes finds the
+existing entry and stops, because resealing would mint a second key for one
+identity and inv. 8 counts keys, not copies. `resolve` re-hashes what it gets and
+throws `AttachmentCorrupt` on a mismatch (inv. 5), which is what makes the source
+not matter.
+
+`ResolvedAttachment` is `held` or `absent` with a reason, and the three reasons
+are not interchangeable (inv. 6):
+
+| | |
+| --- | --- |
+| key `destroyed` | `erased` — even with the ciphertext still on disk |
+| key never held | `unfetched` — **not** an erasure; the key can still be sent |
+| bytes gone | whatever the store recorded: `unfetched` or `pruned` |
+
+```ts
+evaluateDestruction(events, identity, references): DestructionVerdict
+destroyAttachment(ports, identity, events, references): Promise<DestructionResult>
+```
+inv. 8, erasable with its last reader. Three verdicts: `referenced` (a readable
+event cites it), `unreferenced` (nothing does and nothing might), `unknown` (an
+`unfetched` or `pruned` event could, and **blocks destruction until it can be
+read**). An `erased` event never blocks — its payload is gone, so the reference
+is gone, and otherwise an erasure would pin the bytes it was meant to release.
+
+`destroyAttachment` computes the verdict itself rather than accepting one, so the
+guard cannot be stepped around. `AttachmentKeyring` keys are **stored, never
+derived**, and a destroyed identity is tombstoned: `seal` refuses for it, because
+a keyring that re-minted a key on the next put would let the identical bytes
+arriving again quietly undo an erasure.
+
 ## Ordering and replay
 
 ```ts

@@ -196,8 +196,8 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | | |
 | --- | --- |
 | **P6 and P16** | pass 2 was installed 2026-09-26 and has not yet been read back. Until then it is not known whether a broadcast reaches it with no service running, or how coarse the detection is |
-| **Attachment** | two operator rulings, **zero code**. It blocks DR-7 tiers 2 and 3 |
-| **Observation** | zero code. `Observation.md` inv. 5 forbids inlining raw content, so it needs Attachment first — which reorders DR-7's own list |
+| ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
+| **Observation** | zero code. inv. 5 forbade inlining raw content, so it needed Attachment first; that is now unblocked |
 | `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
 | `CLAIMS.md` §5 Ruling 2 | the general timing of consent, unresolved |
 | `AIRWALL.md` | an unapproved proposal |
@@ -205,5 +205,6 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | the pass-1 self-test fix | built, never installed; the running build reports `chain.linksEndToEnd` FAILED for ever |
 | the device's security patch | roughly six months old |
 
-**The next piece is Attachment.** It is the only thing between here and a
-connector that does more than record that it called.
+**The next piece is Observation**, now that Attachment exists. It is what turns
+a connector from something that records having called into something that records
+what it learned.
