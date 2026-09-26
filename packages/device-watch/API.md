@@ -36,6 +36,22 @@ CHANGE_RULE         = "device-watch.authority-changed"
 ```
 
 ```ts
+parseExport(text: string): readonly StoredEvent[]
+importExport(journal, text): Promise<ImportResult>
+```
+A pass-2 export becomes a replica of the phone's lane plus Observations in this
+device's lane. `parseExport` throws `ImportError` naming the line on anything that
+is not an event envelope — a partly-imported chain is a gap that looks like
+history. `importExport` is idempotent: `replicate` skips by event id, translation
+skips readings already cited.
+
+The Observation's `source` is `pass2@<device>` — inv. 3 asks what *perceived* it,
+which was pass 2 on the phone, not the importer that carried it.
+`confidencePercent` is 100: there is no inference, the value is what the OS
+returned, and a read that failed is carried as `readable: false` rather than
+smeared into a lower number.
+
+```ts
 interface DeviceAuthorityReading {
   kinds: { kind, readable, holding?, baseline, gained?, lost? }[];
   because: string;

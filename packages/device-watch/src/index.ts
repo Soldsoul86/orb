@@ -18,6 +18,8 @@ export {
   ALERT_RAISED_TYPE,
 } from "./alert.js";
 export type { AlertAnswer, AlertAnswered, AlertRaised } from "./alert.js";
+export { GRANTS_OBSERVED_TYPE, ImportError, importExport, parseExport } from "./import.js";
+export type { ImportResult } from "./import.js";
 export { changeKey, project } from "./projection.js";
 export type { AuthorityChange, DeviceAuthority, Holding } from "./projection.js";
 export { CHANGE_RULE, alertsFor } from "./rules.js";

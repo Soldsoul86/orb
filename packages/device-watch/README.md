@@ -89,9 +89,37 @@ trust, and trust is the product.* A rule nobody can measure for false positives 
 a rule nobody can improve — so they are counted, and the counting is the point
 even while nothing acts on it.
 
-## What is missing
+## The transport
 
-**The transport.** Pass 2 writes these readings on the phone, in Java, in its own
-lane. Getting that lane into this runtime is an import or a sync, and neither is
-built. This package is written against the reading's *shape* rather than against
-the pipe, so the pipe can be either.
+`importExport` takes a pass-2 export — the file the phone's share sheet produces
+— and makes it readings here.
+
+**It is replication, not parsing-and-reconstructing.** That file *is* a journal
+lane, so every event keeps its own id, hlc, chain and hashes, and this device
+ends up holding a replica of the phone's history rather than a retelling of it.
+`Journal.replicate` does the work: it verifies the chain, refuses this device's
+own lane, and skips events already held.
+
+**The import is the first cross-implementation verification on real data.**
+`verifyLane` re-derives every envelope hash *and* every payload hash, so the Java
+encoder's output is checked by the TypeScript one over a device's actual history
+rather than over a fixture. The phone cannot do this for itself — re-derivation
+needs a JSON parser the probe deliberately does not have, so it checks linkage
+only. An edited payload passes the phone's check and fails this one.
+
+Only then does each reading become an Observation in *this* device's lane, citing
+the replicated event. The phone's event is never rewritten.
+
+**Idempotent twice over, by different mechanisms.** `replicate` skips by event id;
+translation skips readings an Observation already cites. So re-importing the same
+file is a no-op, and importing a *longer* export of the same lane adds only its
+tail — which is what actually happens, since every pass-2 export contains the
+whole journal from the beginning.
+
+**A bad line fails the whole import.** A partly-imported chain is the known-absence
+problem at its worst: a gap that looks like history. The error names the line.
+
+### Still missing
+
+Sync. The export is a file the operator carries; nothing yet moves a lane between
+devices on its own.

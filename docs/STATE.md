@@ -60,7 +60,7 @@ lint clean; every package compiles independently.
 | `runtime/journal` | ~8,900 | the Event Journal: hash chains, HLC ordering, envelopes v1/v2, erasure, partial replication, sync, Attachments |
 | `runtime/observation` | ~400 | occurrence, not truth — inv. 3, 5 and 7 enforced at the boundary |
 | `packages/connector` | ~550 | connector Sensors: the call, the synthesis, the outcome ladder |
-| `packages/device-watch` | ~450 | the first closed loop: projection, one rule, an alert, an answer |
+| `packages/device-watch` | ~700 | the first closed loop: import, projection, one rule, an alert, an answer |
 
 **Amendment one — the Hyperliquid trade executor.** *Entry may come from the
 signal provider; exit authority belongs to the executor.* Signal-agnostic: once a
@@ -286,8 +286,15 @@ projection, one rule, an alert, an answer, and the answer back in the journal
 where the next projection reads it. It records rather than learns, and a test
 asserts that by running the loop twice with each answer and comparing.
 
-**What remains is the device and the pipe.** Pass 2 has been recording since this
-morning and P6 and P16 are unread. Nothing yet carries pass 2's lane from the
-phone into this runtime, so the loop runs on constructed readings. The connector
-has no real driver. And `Capability.md`, `Action.md` and `Policy.md` are still
-Draft, which is where DR-5's intent chain and DR-7's seven days belong.
+**The transport exists.** `importExport` replicates a pass-2 export into this
+journal — the phone's lane verbatim, chain and hashes intact — and turns each
+reading into an Observation citing it. That import is also the first
+cross-implementation verification on real data: `verifyLane` re-derives every
+envelope and payload hash, which the phone cannot do for itself, since
+re-derivation needs a JSON parser the probe deliberately does not have.
+
+**What remains is the device.** Pass 2 has been recording since this morning and
+P6 and P16 are unread — the loop is built and has never run on a real export. The
+connector has no driver. Sync does not exist, so the export is a file the operator
+carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is
+where DR-5's intent chain and DR-7's seven days belong.
