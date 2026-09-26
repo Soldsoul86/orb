@@ -969,6 +969,35 @@ visible when it was made.** It does not overturn it — the privacy gain is larg
 — but it is recorded as a consequence rather than discovered by someone later
 wondering why nothing validates this.
 
+### Closed as far as it can be, 2026-09-26
+
+Two halves, neither of which alone is enough.
+
+**The contracts now say where lineage lives.** `Belief.md`, `Fact.md` and
+`InferenceRecord.md` each said a derivation *references* what it rests on, and
+none said **where**. A Belief carrying `{factIds: [...]}` in its payload with
+`causes: []` satisfied every invariant they had and was invisible to every walk —
+exactly the derivation this section says makes erasure a lie. Each now carries
+*"lineage is `causes`, not only prose"*, frozen at v1 so a later version cannot
+quietly relax it, and `EVIDENCE_GRAPH.md` inv. 2's *"payload/causality"* is
+sharpened the same way.
+
+**The preview now refuses to pretend.** `planErasure` takes a `derived`
+predicate from a layer that can read payloads, and reports `ungrounded`:
+derivations that cite nothing. This matters because a forward walk **closes**
+over such a history — there is nothing to walk to — and returns a radius that is
+short and looks complete. Short is the dangerous direction. Given no predicate at
+all, D3 now says *the check did not run* rather than returning a clean-looking
+answer.
+
+**What is still not prevented.** Nothing stops the append. The contracts state
+the obligation, and the preview detects a breach after the fact; neither is
+enforcement, and §0a's distinction applies — this is followed, not enforced,
+until payload schema validation exists. `ungrounded` is deliberately kept apart
+from `unresolved` for the same reason the two must not be confused: a dangling
+cause is a partial replica and syncing repairs it, while a derivation that
+recorded nothing will sit on erased content forever.
+
 ---
 
 ## 4. Where the system must stop and ask
@@ -1281,8 +1310,14 @@ After it, and after AD-6:
    test fails if it changes by accident. So the legible prefix this entry warned
    about does exist and is growing — and it is a probe log, which is the case
    where the warning does not bite.
-2. **Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
-   `InferenceRecord.md` are still Draft and cheap to change.
+2. ~~**Lineage completeness** (§3) — while `Belief.md`, `Fact.md` and
+   `InferenceRecord.md` are still Draft and cheap to change.~~ **Done
+   2026-09-26**, and it was cheap exactly because they were still Draft. The
+   three contracts now say lineage lives in `causes`, frozen at v1;
+   `EVIDENCE_GRAPH.md` inv. 2 is sharpened to match; and `planErasure` reports a
+   derivation that cites nothing rather than returning a short radius that looks
+   complete. Still **followed, not enforced** — nothing stops the append until
+   payload schema validation exists. See §3.
 3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
    local, needing no external service, and impossible to undo. That makes it the
    natural first test of `CLAIMS.md` C1's consent gate — the six routes an agent

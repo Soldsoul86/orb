@@ -108,6 +108,24 @@ justified it.
 7. **Knowledge plane only.** A Belief holds no power to act and no source-of-truth
    state.
 
+8. **Lineage is `causes`, not only prose.** Every Event this Belief was
+   computed from appears in that Event's `causes` — not only in its payload. A
+   grounding reference carried anywhere else **does not exist for erasure**:
+   `ERASURE.md` §3 walks `causes` forward to find everything built on an erased
+   event, and a derivation missing from that walk goes on answering questions
+   from destroyed content while the owner is told it was torn down. Inv. 2's
+   *"references the Facts and Evidence it rests on"* is satisfied by `causes`; a payload field alone
+   does not satisfy it.
+
+**Followed, not enforced.** The journal cannot check this. A v2 envelope says
+only that an event is content, so it cannot tell an observation — which
+legitimately cites nothing — from a conclusion, which must cite something
+(`ERASURE.md` §2b). The check belongs in whatever appends, or in payload schema
+validation, and neither exists yet. `planErasure` reports a derivation citing
+nothing as `ungrounded` and refuses to call its blast radius an answer, which
+catches a breach after the fact and does not prevent one. Recorded as policy
+rather than claimed as an invariant, the way `ERASURE.md` §0a requires.
+
 Upholds Constitution Articles II (Truth and Interpretation), III (Models and
 Reasoning), and I (History).
 
@@ -122,6 +140,12 @@ Reasoning), and I (History).
   Inference Record, never reclassified into a Fact* — is frozen at v1.
 - The derivation methods that form Beliefs are implementation; they may evolve and
   reach different conclusions over time, but never rewrite recorded Beliefs.
+
+- **Lineage in `causes` is frozen at v1.** If a later version could relax it,
+  erasure could silently become a lie again for everything written under that
+  version, and §2 forbids removing the history that would prove it. Adding
+  *further* places a derivation records its inputs is an addition; dropping
+  `causes` as one of them never is.
 
 ---
 

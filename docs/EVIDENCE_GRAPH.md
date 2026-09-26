@@ -126,7 +126,11 @@ Queries are read-only and side-effect-free.
 ## 8. Invariants
 
 1. Every node is backed by exactly one immutable event.
-2. Every edge is grounded in event payload/causality; none are invented.
+2. Every edge is grounded in event payload/causality; none are invented. Where
+   an edge records a derivation, its grounding is the source event's `causes`:
+   an edge derivable only from a payload field is invisible to the forward walk
+   erasure uses (`ERASURE.md` §3), so the graph would keep answering from
+   content that no longer exists.
 3. The graph contains observations and evidence only — never resolved truth.
 4. Provenance (source, device, HLC, support) is always reconstructible.
 5. The graph is a deterministic projection, rebuildable by replay.

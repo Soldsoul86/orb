@@ -110,6 +110,24 @@ Replay reconstructs every record exactly; it never re-runs the model that produc
    only the Evidence it consumed. It never depends on a Service or on its own products,
    keeping the kernel a DAG (Art. X §40).
 
+7. **Lineage is `causes`, not only prose.** Every Event this record was
+   computed from appears in that Event's `causes` — not only in its payload. A
+   grounding reference carried anywhere else **does not exist for erasure**:
+   `ERASURE.md` §3 walks `causes` forward to find everything built on an erased
+   event, and a derivation missing from that walk goes on answering questions
+   from destroyed content while the owner is told it was torn down. Inv. 2's
+   *"references only the Evidence it consumed"* is satisfied by `causes`; a payload field alone
+   does not satisfy it.
+
+**Followed, not enforced.** The journal cannot check this. A v2 envelope says
+only that an event is content, so it cannot tell an observation — which
+legitimately cites nothing — from a conclusion, which must cite something
+(`ERASURE.md` §2b). The check belongs in whatever appends, or in payload schema
+validation, and neither exists yet. `planErasure` reports a derivation citing
+nothing as `ungrounded` and refuses to call its blast radius an answer, which
+catches a breach after the fact and does not prevent one. Recorded as policy
+rather than claimed as an invariant, the way `ERASURE.md` §0a requires.
+
 Upholds Constitution Articles III (Models and Reasoning), I (History), II (Truth and
 Interpretation), and IX (Engineering — no duplicate sources of truth).
 
@@ -124,6 +142,12 @@ Interpretation), and IX (Engineering — no duplicate sources of truth).
   recorded under the same contract; the obligation to record provenance is uniform.
 - The core obligation — *an immutable, evidence-grounded witness of one model run, that
   is provenance not truth* — is frozen at v1.
+
+- **Lineage in `causes` is frozen at v1.** If a later version could relax it,
+  erasure could silently become a lie again for everything written under that
+  version, and §2 forbids removing the history that would prove it. Adding
+  *further* places a derivation records its inputs is an addition; dropping
+  `causes` as one of them never is.
 
 ---
 
