@@ -93,9 +93,18 @@ export function planErasure(input: {
   readonly events: readonly StoredEvent[];
   readonly lane: LaneId;
   readonly targets: readonly string[];
+  /**
+   * Which events are derivations rather than observations.
+   *
+   * Supplied by a layer that can read payloads, because the journal cannot tell
+   * the difference — a v2 envelope says only *content* (`ERASURE.md` §2b). Omit
+   * it and the plan still computes, but it cannot report a derivation that
+   * recorded no inputs, and D3 says so rather than implying there are none.
+   */
+  readonly derived?: (event: StoredEvent) => boolean;
 }): ErasurePlan {
-  const { events, lane, targets } = input;
-  const index = indexLineage(events);
+  const { events, lane, targets, derived } = input;
+  const index = indexLineage(events, derived ? { derived } : undefined);
   const fallout = descendantsOf(index, targets);
 
   const going = new Set(targets);
@@ -187,7 +196,16 @@ export function planErasure(input: {
   // history, and therefore that derivations may exist elsewhere which also cite
   // these targets and which nothing here can see.
   const fragmentary = index.unresolvedCauses.size > 0;
-  if (!fallout.closed || fragmentary) {
+  // A third way, and the only one that no amount of syncing repairs: a
+  // derivation that recorded no inputs. `ERASURE.md` §3 — it sits on erased
+  // content forever and no walk reaches it, so the radius below is a lower
+  // bound rather than an answer.
+  const ungrounded = index.ungrounded.size > 0;
+  // Saying nothing because nobody said what is derived is not the same as
+  // saying there are none, and the plan must not let the owner read it that way.
+  const cannotTell = derived === undefined;
+
+  if (!fallout.closed || fragmentary || ungrounded || cannotTell) {
     const reasons: string[] = [];
     if (!fallout.closed) {
       reasons.push(
@@ -198,6 +216,19 @@ export function planErasure(input: {
       reasons.push(
         `${index.unresolvedCauses.size} cause(s) named by events here are not held here, ` +
           "so this is part of history and derivations may exist on other devices",
+      );
+    }
+    if (ungrounded) {
+      reasons.push(
+        `${index.ungrounded.size} derived event(s) here record no inputs at all, so any ` +
+          "of them may rest on a target without saying so; nothing can walk to them, " +
+          "and syncing does not repair it",
+      );
+    }
+    if (cannotTell) {
+      reasons.push(
+        "no caller said which events are derivations, so this plan cannot check whether " +
+          "any of them recorded their inputs — read the radius as a lower bound",
       );
     }
     unavailable.push({

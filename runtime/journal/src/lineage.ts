@@ -55,6 +55,22 @@ export interface LineageIndex {
    * reported open instead of closed.
    */
   statesCauses(id: string): boolean;
+  /**
+   * Events that are derived and cite nothing.
+   *
+   * Empty unless the caller supplied `derived` — the journal cannot populate
+   * this alone, and that is a consequence of §2b rather than an omission: a v2
+   * envelope says only that an event is content, so the journal cannot tell an
+   * observation, which legitimately cites nothing, from a conclusion, which
+   * must cite something. Only a layer holding the payload knows which is which.
+   *
+   * Non-empty means **a forward walk's answer is a lower bound**. Such an event
+   * may have been computed from any target and nothing records that it was, so
+   * a blast radius that excludes it is too small — and too small is the
+   * dangerous direction, because an erasure planned on it tears down less than
+   * the owner is told it did (`ERASURE.md` §3).
+   */
+  readonly ungrounded: ReadonlySet<string>;
   /** How many events the index was built over. */
   readonly scope: number;
   /**
@@ -80,12 +96,23 @@ export interface Traversal {
   readonly closed: boolean;
   /** Roots or causes the index does not hold — why `closed` is false. */
   readonly unresolved: readonly string[];
+  /**
+   * Derived events in scope that cite nothing, so this answer is a lower bound.
+   *
+   * Deliberately separate from `unresolved`, which means *an edge led somewhere
+   * this index does not hold*. This means *an edge was never recorded at all*.
+   * The first is a partial replica, normal and fixable by syncing; the second is
+   * a derivation that will sit on erased content forever, and no amount of
+   * walking reaches it. Collapsing them would hide the one that cannot be fixed.
+   */
+  readonly ungrounded: readonly string[];
   /** How many events the answer was computed over. */
   readonly scope: number;
 }
 
 class Index implements LineageIndex {
   readonly #dependents = new Map<string, string[]>();
+  readonly #ungrounded = new Set<string>();
   readonly #causes = new Map<string, readonly string[]>();
   /** Every indexed id, including those whose lineage is unreadable here. */
   readonly #held = new Set<string>();
@@ -93,7 +120,7 @@ class Index implements LineageIndex {
   readonly #order: string[] = [];
   readonly #unresolved = new Set<string>();
 
-  constructor(events: Iterable<StoredEvent>) {
+  constructor(events: Iterable<StoredEvent>, derived?: (event: StoredEvent) => boolean) {
     for (const event of events) {
       this.#order.push(event.id);
       this.#held.add(event.id);
@@ -101,6 +128,12 @@ class Index implements LineageIndex {
       // states no lineage, and recording `[]` for it would make the index claim
       // the event was built on nothing.
       if (event.causes !== undefined) this.#causes.set(event.id, event.causes);
+      // Derived and citing nothing. Checked only where the caller can say what
+      // is derived; `event.causes === undefined` is *cannot say* and is already
+      // carried by `statesCauses`, so it is not counted here as *cites nothing*.
+      if (derived?.(event) === true && event.causes?.length === 0) {
+        this.#ungrounded.add(event.id);
+      }
       this.#byHash.set(event.integrity.hash, event.id);
     }
 
@@ -146,11 +179,25 @@ class Index implements LineageIndex {
   get unresolvedCauses(): ReadonlySet<string> {
     return this.#unresolved;
   }
+
+  get ungrounded(): ReadonlySet<string> {
+    return this.#ungrounded;
+  }
 }
 
-/** Builds a forward view. Call it, use it, drop it. */
-export function indexLineage(events: Iterable<StoredEvent>): LineageIndex {
-  return new Index(events);
+/**
+ * Builds a forward view. Call it, use it, drop it.
+ *
+ * `derived` is supplied by a layer that can read payloads and therefore knows a
+ * conclusion from an observation. Without it the index still walks edges
+ * correctly; it simply cannot report that an edge was never recorded, and says
+ * so by leaving `ungrounded` empty rather than by implying there are none.
+ */
+export function indexLineage(
+  events: Iterable<StoredEvent>,
+  options?: { readonly derived?: (event: StoredEvent) => boolean },
+): LineageIndex {
+  return new Index(events, options?.derived);
 }
 
 /**
@@ -227,6 +274,10 @@ function walk(
     ids: reached,
     closed: unresolved.size === 0,
     unresolved: [...unresolved],
+    // Scope-wide rather than path-specific, and deliberately so: an event that
+    // records no inputs could have been computed from anything, so it weakens
+    // every answer over this set, not one branch of it.
+    ungrounded: [...index.ungrounded],
     scope: index.scope,
   };
 }

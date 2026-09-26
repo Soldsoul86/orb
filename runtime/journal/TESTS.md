@@ -137,3 +137,40 @@ in the direction that hides the erasure.
 Keeping the fine type in the envelope fails 4 tests; keeping `causes` in the
 envelope fails 3; a constant nonce fails 2; indexing unreadable lineage as `[]`
 fails exactly the provenance test. None passed with the property removed.
+
+## Lineage completeness — `tests/erasure-plan.test.ts`
+
+`ERASURE.md` §3: *"if one derivation exists whose inputs were not recorded,
+erasure is a lie."* A forward walk cannot catch that by itself — it **closes**,
+because there is nothing to walk to, and returns a short radius that looks
+complete. Short is the dangerous direction: the owner erases believing they tore
+everything down.
+
+So `planErasure` takes an optional `derived` predicate, supplied by a layer that
+can read payloads. The journal cannot supply it: a v2 envelope says only
+*content*, so it cannot tell an observation — which legitimately cites nothing —
+from a conclusion, which must cite something (§2b).
+
+Four cases, and the distinctions are the whole point:
+
+- **A derivation citing nothing** makes the radius a lower bound. The walk still
+  closes and finds nothing; `fallout.ungrounded` is what says so, and D3 is
+  raised.
+- **An observation citing nothing is not a defect.** Counting both would make
+  the warning meaningless, and a meaningless warning is an ignored one.
+- **A closed radius over checked lineage raises no D3** — the negative control,
+  without which the other cases would pass while proving nothing.
+- **A plan given no `derived` says so**, rather than implying a clean radius.
+  Saying nothing because nobody asked is not the same as saying there is
+  nothing: the fifth time that distinction has decided a design here.
+
+`ungrounded` is deliberately separate from `unresolved`. The latter means an
+edge led somewhere this device does not hold — a partial replica, normal, fixed
+by syncing. The former means an edge was never recorded at all: it will sit on
+erased content forever and no amount of walking or syncing reaches it.
+Collapsing them would hide the one that cannot be repaired.
+
+**Negative controls, run 2026-09-26.** Counting every event that cites nothing,
+rather than only derivations, fails 3; hiding `ungrounded` in the traversal
+fails 1; treating a missing `derived` as "nothing is wrong" fails 1. None passed
+with the property removed.

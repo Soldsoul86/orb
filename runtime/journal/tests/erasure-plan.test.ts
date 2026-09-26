@@ -23,12 +23,24 @@ import {
 
 const SCHEMA = { id: "test.note", version: 1 } as const;
 const note = (text: string): EventDraft => ({ type: "note", schema: SCHEMA, payload: { text } });
+const CONCLUSION = { id: "test.conclusion", version: 1 } as const;
 const derived = (text: string, causes: readonly string[]): EventDraft => ({
-  type: "note",
-  schema: SCHEMA,
+  type: "conclusion",
+  schema: CONCLUSION,
   payload: { text },
   causes,
 });
+
+/**
+ * What a caller that can read payloads knows and the journal cannot.
+ *
+ * A v2 envelope says only *content* (`ERASURE.md` §2b), so the journal cannot
+ * tell an observation — which legitimately cites nothing — from a conclusion,
+ * which must cite something. This is the layer that can, modelled as the real
+ * one would be: it reads the presented event's real type.
+ */
+const isDerived = (event: { readonly type: string }): boolean =>
+  event.type === "conclusion";
 
 describe("what falls over, and what survives", () => {
   test("a conclusion resting only on the target will disappear", async () => {
@@ -156,7 +168,80 @@ describe("the plan never looks more certain than it is", () => {
     );
   });
 
-  test("a closed radius does not raise D3", async () => {
+  test("a closed radius over checked lineage does not raise D3", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    await journal.appendOne(derived("clean", [target.id]));
+
+    const plan = planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets: [target.id],
+      derived: isDerived,
+    });
+
+    // The negative control: if D3 were raised unconditionally, the tests above
+    // would pass while proving nothing.
+    assert.equal(plan.fallout.closed, true);
+    assert.deepEqual(plan.fallout.ungrounded, []);
+    assert.ok(!plan.unavailable.some((gap) => gap.point === "D3"));
+  });
+
+  /**
+   * `ERASURE.md` §3: *"if one derivation exists whose inputs were not recorded,
+   * erasure is a lie."*
+   *
+   * The walk still closes — there is nothing to walk to — so closure cannot
+   * catch this, and the radius comes back short while looking complete. That is
+   * the dangerous direction: an owner erases believing they tore everything
+   * down. Unlike a dangling cause, syncing never repairs it.
+   */
+  test("a derivation that recorded no inputs makes the radius a lower bound", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    await journal.appendOne(derived("cites nothing at all", []));
+
+    const plan = planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets: [target.id],
+      derived: isDerived,
+    });
+
+    assert.equal(plan.fallout.closed, true, "the walk closes; that is the trap");
+    assert.equal(plan.fallout.ids.length, 0, "and finds nothing built on the target");
+    assert.equal(plan.fallout.ungrounded.length, 1, "but one derivation records no inputs");
+
+    const d3 = plan.unavailable.find((gap) => gap.point === "D3");
+    assert.ok(d3, "so the radius must not be presented as an answer");
+    assert.match(d3.reason, /record no inputs/);
+    assert.ok(decisionsRequired(plan).includes("D3"));
+  });
+
+  test("an observation that cites nothing is not a defect", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    await journal.appendOne(note("an unrelated observation, citing nothing"));
+
+    const plan = planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets: [target.id],
+      derived: isDerived,
+    });
+
+    // The distinction the whole check rests on. An observation legitimately
+    // cites nothing; a conclusion citing nothing is a broken lineage. Counting
+    // both would make the warning meaningless and it would be ignored.
+    assert.deepEqual(plan.fallout.ungrounded, []);
+    assert.ok(!plan.unavailable.some((gap) => gap.point === "D3"));
+  });
+
+  /**
+   * Saying nothing because nobody asked is not the same as saying there is
+   * nothing — the fifth time that distinction has decided a design here.
+   */
+  test("a plan given no way to tell says so rather than implying a clean radius", async () => {
     const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
     const target = await journal.appendOne(note("a"));
     await journal.appendOne(derived("clean", [target.id]));
@@ -167,10 +252,10 @@ describe("the plan never looks more certain than it is", () => {
       targets: [target.id],
     });
 
-    // The negative control: if D3 were raised unconditionally, the test above
-    // would pass while proving nothing.
     assert.equal(plan.fallout.closed, true);
-    assert.ok(!plan.unavailable.some((gap) => gap.point === "D3"));
+    const d3 = plan.unavailable.find((gap) => gap.point === "D3");
+    assert.ok(d3, "no `derived` means the check did not run, and that must be said");
+    assert.match(d3.reason, /no caller said which events are derivations/);
   });
 });
 
