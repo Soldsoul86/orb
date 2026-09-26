@@ -19,6 +19,7 @@
 import type { LaneId, StoredEvent } from "./types.js";
 import { indexLineage, descendantsOf, type Traversal } from "./lineage.js";
 import { latestCustody, type HeldCustody } from "./custody.js";
+import { hashPayload } from "./integrity.js";
 
 /** The nine points at which erasure must stop and ask. */
 export type DecisionPoint =
@@ -299,4 +300,116 @@ export function decisionsRequired(plan: ErasurePlan): readonly DecisionPoint[] {
     "D9",
   ];
   return order.filter((point) => required.has(point));
+}
+
+/**
+ * An authorization bound to one exact plan.
+ *
+ * `CLAIMS.md` C1 route **A4** — *get approval for a dry run, then change an
+ * argument* — and the answer it names: **the grant must bind to the argument
+ * hash.** For erasure the argument is not a target list, it is the whole plan
+ * the owner was shown: what is torn down, what loses its sole support, who must
+ * be told, what the residue says, and which decision points could not be
+ * computed. Approving that is approving a picture, and a grant that survives the
+ * picture changing is not consent to what actually happens.
+ *
+ * Deliberately **not** an authorization *system*. There is no Capability plane
+ * in this repository — `Capability.md`, `Action.md` and `Policy.md` are Draft
+ * and `CAPABILITY_MODEL.md` is Phase-1 architecture — and two rulings in
+ * `CLAIMS.md` §5 block C1. This is the one piece that needs neither: whatever
+ * gate is built later, it has to bind to something, and this is what erasure
+ * gives it to bind to.
+ */
+export interface ErasureGrant {
+  /** The plan this grant was given for. */
+  readonly planDigest: string;
+  /** Carried for a legible refusal, never as the thing checked. */
+  readonly targets: readonly string[];
+  /** When the owner gave it. Wall clock, because this is a human fact. */
+  readonly grantedAt: number;
+}
+
+/** Why a grant does not cover a plan, or that it does — plus what the open ruling needs. */
+export type GrantCheck =
+  | { readonly ok: true; readonly ageMs: number }
+  | { readonly ok: false; readonly reason: string; readonly ageMs: number };
+
+/**
+ * A hash over exactly what the owner decided on.
+ *
+ * **What it covers and what it deliberately does not** is the whole design.
+ *
+ * Covered: the targets, the blast radius and its three honesty flags, what
+ * loses its sole or partial support, the residue, the holders who must be told,
+ * whether witnesses are affected, and *which* decision points could not be
+ * computed. Any of these changing means the owner is being asked to have
+ * consented to a different act.
+ *
+ * Not covered, and each for a reason:
+ *
+ * - **`scope`** — the number of events the plan was computed over. Including it
+ *   would void a grant on every unrelated append, and on a device writing a
+ *   heartbeat a minute that is every sixty seconds. It protects nothing that
+ *   `fallout` does not already protect: a new derivation that cites a target
+ *   changes the radius, and that is covered.
+ * - **The prose of `unavailable`** — the `reason` strings. Editing the wording
+ *   of an explanation must not invalidate a live grant; the *set of points* is
+ *   what the owner answered, and that is covered.
+ */
+export function planDigest(plan: ErasurePlan): string {
+  return hashPayload({
+    targets: [...plan.targets].sort(),
+    fallout: {
+      ids: [...plan.fallout.ids].sort(),
+      closed: plan.fallout.closed,
+      unresolved: [...plan.fallout.unresolved].sort(),
+      ungrounded: [...plan.fallout.ungrounded].sort(),
+    },
+    soleSupport: [...plan.soleSupport].sort(),
+    partialSupport: [...plan.partialSupport].sort(),
+    residue: [...plan.residue]
+      .map((entry) => ({ eventId: entry.eventId, fields: [...entry.fields].sort() }))
+      .sort((a, b) => (a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0)),
+    holders: [...plan.holders]
+      .map((held) => ({ holder: held.holder, through: held.receipt.throughHash }))
+      .sort((a, b) => (a.holder < b.holder ? -1 : a.holder > b.holder ? 1 : 0)),
+    witnessesAffected: plan.witnessesAffected,
+    unavailable: [...plan.unavailable.map((gap) => gap.point)].sort(),
+  });
+}
+
+/** The grant an owner's approval of `plan` produces. */
+export function grantFor(plan: ErasurePlan, grantedAt: number): ErasureGrant {
+  return { planDigest: planDigest(plan), targets: [...plan.targets], grantedAt };
+}
+
+/**
+ * Whether `grant` authorizes `plan` as it stands now.
+ *
+ * Re-derives the digest rather than trusting the one carried, so history moving
+ * between the preview and the act voids the grant — which is the case A4 exists
+ * for, arriving from the world rather than from an adversary.
+ *
+ * **It does not decide staleness**, and that is not an omission. Whether an
+ * authorization is valid only at the moment of issue or persists for a declared
+ * window is `CLAIMS.md` §5 Ruling 1, reserved for the operator and not settled.
+ * So this returns `ageMs` and lets the caller apply whatever the ruling says,
+ * rather than baking in an answer and making the ruling look already made.
+ */
+export function grantCovers(
+  plan: ErasurePlan,
+  grant: ErasureGrant,
+  now: number,
+): GrantCheck {
+  const ageMs = now - grant.grantedAt;
+  const current = planDigest(plan);
+  if (current === grant.planDigest) return { ok: true, ageMs };
+  return {
+    ok: false,
+    ageMs,
+    reason:
+      "this authorization was given for a different plan: what would be torn down, " +
+      "who must be told, or which questions could not be answered has changed since " +
+      "it was shown. Ask again with the plan as it stands.",
+  };
 }

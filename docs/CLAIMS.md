@@ -84,7 +84,7 @@ silent refusals either).
 | A1 | Spend one authorization twice | Grants must be single-use or bounded |
 | A2 | Ask broadly, act narrowly-but-differently | Scope is not a category, it is a binding |
 | A3 | Split one irreversible act into steps that each look reversible | Composition, not the individual call |
-| A4 | Get approval for a dry run, then change an argument | The grant must bind to the argument hash |
+| A4 | Get approval for a dry run, then change an argument | The grant must bind to the argument hash. **Mechanised for erasure 2026-09-26** (`ERASURE.md` §4a): the grant binds to a digest of the whole plan, not the target list, and is re-derived at the act |
 | A5 | Batch the request into a moment of inattention | Timing of consent — see §5 |
 | A6 | Use a path Orb does not mediate at all | The boundary |
 
@@ -309,6 +309,15 @@ a declared window. A5 above cannot be specified until this is decided, because
 under one reading batch approval is a feature and under the other it is the
 hole. This awaits the operator's explicit ruling, as `PARTIAL_REPLICATION.md`
 §10 awaited one.
+
+**A narrower form is proposed, 2026-09-26** (`ERASURE.md` §4a), which would
+unblock erasure without settling this. `Policy.md` §1 argues for standing
+authorization from one case — *a person who has fallen cannot confirm a prompt*
+— and that case has a shape: the action is urgent and the human cannot answer in
+time. The proposal is that standing authorization is available **only** where
+waiting would defeat the action's purpose. Erasure has no such case, so it is
+authorized contemporaneously or not at all, however Ruling 1 lands. Still the
+operator's to accept.
 
 **Ruling 2 — how narrowly C1 is stated.** Either the claim is made only for the
 mediated set (defensible today), or it also claims detection of out-of-band

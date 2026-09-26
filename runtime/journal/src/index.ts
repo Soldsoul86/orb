@@ -60,12 +60,20 @@ export { MemoryPayloadKeyring, isSealed } from "./keyring.js";
 export type { PayloadKeyring, SealedPayload } from "./keyring.js";
 export { sealedStore } from "./sealed-store.js";
 
-export { planErasure, decisionsRequired } from "./erasure-plan.js";
+export {
+  planErasure,
+  decisionsRequired,
+  planDigest,
+  grantFor,
+  grantCovers,
+} from "./erasure-plan.js";
 export type {
   ErasurePlan,
   DecisionPoint,
   Unavailable,
   EnvelopeResidue,
+  ErasureGrant,
+  GrantCheck,
 } from "./erasure-plan.js";
 
 export { wrapPayload, unwrapPayload, isWrapped, storedPayload, newNonce } from "./payload.js";

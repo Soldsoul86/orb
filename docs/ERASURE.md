@@ -1065,6 +1065,83 @@ trustworthy.
 
 ---
 
+## 4a. The authorization binds to the plan, not to the targets
+
+**Built 2026-09-26.** `planDigest`, `grantFor`, `grantCovers`.
+
+`CLAIMS.md` C1 route **A4** — *get approval for a dry run, then change an
+argument* — and the answer it already names: **the grant must bind to the
+argument hash.** For erasure the argument is not a target list. It is the whole
+picture §4 shows the owner: what is torn down, what loses its sole support, who
+must be told, what the residue still says, and which decision points could not
+be computed at all. Approving that is approving a picture, and **a grant that
+survives the picture changing is not consent to what actually happens.**
+
+The case this catches arrives from the world rather than from an adversary. A
+derivation is appended between the preview and the act, citing a target. Nothing
+was tampered with; the blast radius is simply larger than the one the owner saw,
+so their approval was consent to a smaller act than the one about to occur. The
+grant is void and the owner is asked again.
+
+### What the digest covers, and what it deliberately does not
+
+Covered: targets, the blast radius and its three honesty flags, sole and partial
+support, residue, holders, whether witnesses are affected, and **which** decision
+points could not be computed.
+
+Not covered, each for a reason:
+
+- **`scope`** — how many events the plan was read over. Including it would void a
+  grant on every unrelated append, and on a phone writing a heartbeat a minute
+  that is every sixty seconds. It protects nothing `fallout` does not: a new
+  derivation citing a target moves the radius, and that *is* covered.
+- **The prose of `unavailable`** — the owner answered a set of questions, not a
+  set of sentences. Editing an explanation must not invalidate a live grant.
+
+Both are asserted, because a digest that covered everything would be unusable
+and one that covered too little would be theatre.
+
+**The coverage is tested field by field, and that was not the first attempt.**
+The obvious tests — append a derivation, watch the grant break — passed with the
+radius removed from the digest entirely, because appending changes several
+covered fields at once and any one shifts the hash. They passed for a reason
+other than the one they named. Two negative controls found it. The tests now
+mutate one field at a time, and four controls bite where two did not.
+
+### What it does not decide, and why not
+
+**Staleness.** Whether an authorization is valid only at the moment of issue or
+persists for a declared window is `CLAIMS.md` §5 Ruling 1, and it is the
+operator's. So `grantCovers` checks the binding, returns the grant's `ageMs`,
+and lets the caller apply whatever the ruling says — rather than baking in an
+answer and making a reserved ruling look already made.
+
+### The narrow ruling that would unblock the rest
+
+Ruling 1 does not have to be settled in general for erasure to proceed.
+
+`Policy.md` §1 argues for standing authorization from one case: *"a person who
+has fallen cannot confirm a prompt"* — ask, then act on silence. That argument
+has a shape. The action is **urgent** and the human is **unable to answer in
+time**.
+
+Erasure has neither property. There is no erasure that cannot wait for a prompt,
+and nobody needs their journal destroyed while unconscious. So erasure is the
+case where standing authorization has **no motivating example at all**, and the
+principle that follows is narrower than Ruling 1 and settles this one:
+
+> **A standing authorization is available only where waiting for consent would
+> defeat the action's purpose.** Erasure's purpose is never defeated by waiting,
+> so erasure is authorized contemporaneously, bound to the plan shown, or not at
+> all.
+
+This is consistent with `Policy.md`'s own floor, which already voids any policy
+that would *"make an irreversible action ambient"* or *"make an authorization
+blanket"*. **Proposed, not ruled** — the general question of timing stays open,
+and this only claims that erasure does not depend on how it lands.
+
+---
+
 ## 5. Three things that cannot be bought
 
 Stated plainly, because a deletion feature that oversells itself is worse than
@@ -1323,6 +1400,14 @@ After it, and after AD-6:
    natural first test of `CLAIMS.md` C1's consent gate — the six routes an agent
    might use to avoid asking are all testable against an operation that never
    leaves the device.
+
+   **Partly done 2026-09-26, and the rest is genuinely blocked.** There is no
+   Capability plane in this repository: `Capability.md`, `Action.md` and
+   `Policy.md` are Draft, `CAPABILITY_MODEL.md` is Phase-1 architecture, and
+   `CLAIMS.md` §5 reserves two rulings for the operator that C1 waits on. A gate
+   cannot be tested before it exists, and building one on this entry's authority
+   would be inventing architecture. See §4a for what was built, what it settles,
+   and the one narrow ruling that would unblock the rest.
 4. ~~**The two-phase preview** (§1, §4).~~ **Computation done 2026-09-25** —
    `erasure-plan.ts`, 12 cases. What remains is the surface the owner touches,
    and the act itself, which is gated on §10.3.

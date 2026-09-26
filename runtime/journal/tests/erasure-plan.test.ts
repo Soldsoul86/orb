@@ -14,6 +14,10 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  type ErasurePlan,
+  grantCovers,
+  grantFor,
+  planDigest,
   Journal,
   custodyReceiptDraft,
   decisionsRequired,
@@ -354,5 +358,173 @@ describe("the decisions the owner is asked for", () => {
     // takes events rather than a journal, so journaling the preview is not
     // something a caller can do by accident.
     assert.equal((await journal.readLane("pixel")).length, before);
+  });
+});
+
+/**
+ * `CLAIMS.md` C1 route A4 — *get approval for a dry run, then change an
+ * argument* — for the one action where the argument is a whole picture.
+ *
+ * Not an authorization system. There is no Capability plane in this repository
+ * and two rulings in `CLAIMS.md` §5 block C1; this is the piece that needs
+ * neither, because whatever gate is built later has to bind to something.
+ */
+describe("an authorization binds to the exact plan it was given for", () => {
+  const plan = async (journal: Journal, targets: readonly string[]) =>
+    planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets,
+      derived: isDerived,
+    });
+
+  test("the same plan is covered", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const shown = await plan(journal, [target.id]);
+
+    const grant = grantFor(shown, 1_000);
+    const check = grantCovers(await plan(journal, [target.id]), grant, 5_000);
+    assert.equal(check.ok, true);
+    assert.equal(check.ageMs, 4_000, "the age is reported for the open ruling to use");
+  });
+
+  test("a different target is a different plan", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const [a, b] = await journal.append([note("a"), note("b")]);
+    assert.ok(a && b);
+
+    const grant = grantFor(await plan(journal, [a.id]), 1_000);
+    const check = grantCovers(await plan(journal, [b.id]), grant, 1_000);
+    assert.equal(check.ok, false);
+    assert.match(check.reason ?? "", /given for a different plan/);
+  });
+
+  /**
+   * The case A4 exists for, arriving from the world rather than an adversary.
+   *
+   * Nothing was tampered with: a derivation was appended between the preview and
+   * the act, and it cites the target. The blast radius is now larger than the one
+   * the owner saw, so their approval was consent to a smaller act than the one
+   * about to happen.
+   */
+  test("a derivation appearing after approval voids the grant", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const shown = await plan(journal, [target.id]);
+    const grant = grantFor(shown, 1_000);
+    assert.equal(shown.fallout.ids.length, 0, "nothing was built on it when shown");
+
+    await journal.appendOne(derived("appeared after the owner looked", [target.id]));
+
+    const now = await plan(journal, [target.id]);
+    assert.equal(now.fallout.ids.length, 1, "and something is now");
+    assert.equal(grantCovers(now, grant, 2_000).ok, false);
+  });
+
+  test("an unrelated append does not void a grant", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const grant = grantFor(await plan(journal, [target.id]), 1_000);
+
+    // The negative control, and the reason `scope` is not in the digest: a
+    // device writing a heartbeat a minute would otherwise void every grant
+    // within sixty seconds, protecting nothing `fallout` does not already cover.
+    await journal.appendOne(note("an unrelated observation"));
+
+    assert.equal(grantCovers(await plan(journal, [target.id]), grant, 2_000).ok, true);
+  });
+
+  test("a question the owner could not answer appearing is a different plan", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    const grant = grantFor(await plan(journal, [target.id]), 1_000);
+
+    // D3 was absent when shown; an ungrounded derivation raises it. The owner
+    // approved a plan that claimed a trustworthy radius, and this one does not.
+    await journal.appendOne(derived("cites nothing", []));
+
+    const now = await plan(journal, [target.id]);
+    assert.ok(now.unavailable.some((gap) => gap.point === "D3"));
+    assert.equal(grantCovers(now, grant, 2_000).ok, false);
+  });
+
+  test("the digest is stable across reordering, so it pins content and not order", async () => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const [a, b] = await journal.append([note("a"), note("b")]);
+    assert.ok(a && b);
+
+    assert.equal(
+      planDigest(await plan(journal, [a.id, b.id])),
+      planDigest(await plan(journal, [b.id, a.id])),
+    );
+  });
+});
+
+/**
+ * Which fields the digest covers, one at a time.
+ *
+ * The tests above were written first and two negative controls walked straight
+ * through them: blanking `fallout.ids` in the digest, and blanking the set of
+ * unanswerable points, broke nothing. Both passed for a reason other than the
+ * one they name, because appending a derivation changes several covered fields
+ * at once and any one of them is enough to shift the hash.
+ *
+ * So the coverage is asserted directly instead: take one plan, change exactly
+ * one field, and require the digest to move. A field that can be blanked
+ * without failing anything is a field the grant does not really bind to.
+ */
+describe("the digest covers each part of the decision independently", () => {
+  const base = async (): Promise<ErasurePlan> => {
+    const journal = await Journal.open({ lane: "pixel", device: "pixel-01" });
+    const target = await journal.appendOne(note("a"));
+    await journal.appendOne(derived("built on it", [target.id]));
+    return planErasure({
+      events: await journal.readLane("pixel"),
+      lane: "pixel",
+      targets: [target.id],
+      derived: isDerived,
+    });
+  };
+
+  const mutations: ReadonlyArray<readonly [string, (p: ErasurePlan) => ErasurePlan]> = [
+    ["targets", (p) => ({ ...p, targets: [...p.targets, "01OTHER"] })],
+    ["fallout.ids", (p) => ({ ...p, fallout: { ...p.fallout, ids: [] } })],
+    ["fallout.closed", (p) => ({ ...p, fallout: { ...p.fallout, closed: !p.fallout.closed } })],
+    ["fallout.unresolved", (p) => ({ ...p, fallout: { ...p.fallout, unresolved: ["01GONE"] } })],
+    ["fallout.ungrounded", (p) => ({ ...p, fallout: { ...p.fallout, ungrounded: ["01BLIND"] } })],
+    ["soleSupport", (p) => ({ ...p, soleSupport: [] })],
+    ["partialSupport", (p) => ({ ...p, partialSupport: ["01PARTIAL"] })],
+    ["residue", (p) => ({ ...p, residue: [] })],
+    ["holders", (p) => ({ ...p, holders: [{ holder: "mac-01", receipt: { lane: "pixel", throughHash: "h", count: 1 } }] })],
+    ["witnessesAffected", (p) => ({ ...p, witnessesAffected: !p.witnessesAffected })],
+    ["unavailable", (p) => ({ ...p, unavailable: [] })],
+  ];
+
+  for (const [field, mutate] of mutations) {
+    test(`changing ${field} changes the digest`, async () => {
+      const plan = await base();
+      assert.notEqual(planDigest(mutate(plan)), planDigest(plan));
+    });
+  }
+
+  test("changing scope alone does not, and that is deliberate", async () => {
+    const plan = await base();
+    // A device writing a heartbeat a minute would otherwise void every grant
+    // within sixty seconds. `fallout` already covers the change that matters:
+    // a new derivation citing a target moves the radius.
+    const wider = { ...plan, scope: plan.scope + 500 };
+    assert.equal(planDigest(wider), planDigest(plan));
+  });
+
+  test("rewording an explanation does not, and that is deliberate too", async () => {
+    const plan = await base();
+    const reworded = {
+      ...plan,
+      unavailable: plan.unavailable.map((gap) => ({ ...gap, reason: "reworded entirely" })),
+    };
+    // The owner answered a set of questions, not a set of sentences. Editing an
+    // explanation must not invalidate a live grant.
+    assert.equal(planDigest(reworded), planDigest(plan));
   });
 });
