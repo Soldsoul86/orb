@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb grants probe — DEVICE_LOOP.md predictions P12, P13, P14.
+
+  Requests nothing. Not as an economy: the predictions under test are each of
+  the form "readable by a sideloaded app with *no permission*", so a single
+  <uses-permission> line would answer a different question than the one asked.
+  An empty manifest is the experiment's control.
+
+  No services and no receivers either. Pass 1 is still recording on this device
+  (§7 R4) and a second package that started anything would put a second
+  variable into a run already in progress.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@PKG@"
+    android:versionCode="@VERSION_CODE@"
+    android:versionName="0.1-probeg">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <application
+        android:label="@LABEL@"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

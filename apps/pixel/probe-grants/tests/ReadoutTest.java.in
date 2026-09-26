@@ -1,0 +1,146 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * The probe's scoring, checked on a desktop before it is trusted on a phone.
+ *
+ * Only the pure part is testable here — the platform reads are the thing being
+ * measured and cannot be simulated without begging the question. But the pure
+ * part is where the mistake would live: a probe that scored "readable and
+ * empty" as CONFIRMED would report P12 as holding on a device that had told it
+ * nothing, and the finding would be wrong in the direction of a false yes.
+ */
+final class ReadoutTest {
+    static void run() {
+        outcomes();
+        scoring();
+        invariant();
+        rendering();
+    }
+
+    private static void outcomes() {
+        Harness.suite("Readout — three outcomes, never merged");
+
+        Readout absent = Readout.of("s", null);
+        Harness.equal("null is absent", absent.outcome, Readout.ABSENT);
+        Harness.equal("absent keeps no raw", absent.raw, null);
+        Harness.check("absent has no entries", absent.entries.isEmpty());
+
+        Readout empty = Readout.of("s", "");
+        Harness.equal("empty string is a value", empty.outcome, Readout.VALUE);
+        Harness.equal("empty string is kept verbatim", empty.raw, "");
+        Harness.check("empty string parses to nothing", empty.entries.isEmpty());
+
+        // The distinction the whole file exists for. If these two ever scored
+        // alike, the probe could not tell "nothing is enabled" from "we were
+        // not told", and every result it printed would be worth nothing.
+        Harness.check("absent and empty do not score alike",
+            !absent.verdict(false).equals(empty.verdict(false)));
+
+        Readout one = Readout.of("s", "com.x/.Svc");
+        Harness.equal("a single entry parses", one.entries, Arrays.asList("com.x/.Svc"));
+        Readout two = Readout.of("s", "com.x/.Svc:com.y/.Other");
+        Harness.equal("a colon list parses", two.entries,
+            Arrays.asList("com.x/.Svc", "com.y/.Other"));
+
+        Readout threw = Readout.failed("s", new SecurityException("denied"));
+        Harness.equal("a failure is a failure", threw.outcome, Readout.THREW);
+        Harness.check("the failure carries its own words",
+            threw.raw.contains("SecurityException") && threw.raw.contains("denied"));
+        Harness.check("a failure has no entries", threw.entries.isEmpty());
+
+        Harness.equal("a null list is absent, not empty",
+            Readout.ofEntries("s", null).outcome, Readout.ABSENT);
+        Readout emptyList = Readout.ofEntries("s", new ArrayList<String>());
+        Harness.equal("an empty list is a value", emptyList.outcome, Readout.VALUE);
+        Harness.check("an empty list renders as an empty string", emptyList.raw.isEmpty());
+    }
+
+    private static void scoring() {
+        Harness.suite("Readout — what settles a prediction and what does not");
+
+        Readout threw = Readout.failed("s", new SecurityException("denied"));
+        Readout absent = Readout.of("s", null);
+        Readout empty = Readout.of("s", "");
+        Readout held = Readout.of("s", "com.x/.Svc");
+
+        Harness.check("a throw falsifies whatever we know",
+            threw.verdict(false).startsWith("FALSIFIED")
+                && threw.verdict(true).startsWith("FALSIFIED"));
+        Harness.check("null with nothing known is inconclusive",
+            absent.verdict(false).startsWith("INCONCLUSIVE"));
+        Harness.check("null with an entry known is a falsification",
+            absent.verdict(true).startsWith("FALSIFIED"));
+        Harness.check("empty with nothing known is inconclusive",
+            empty.verdict(false).startsWith("INCONCLUSIVE"));
+        Harness.check("empty with an entry known is a falsification",
+            empty.verdict(true).startsWith("FALSIFIED"));
+        Harness.check("a populated read confirms either way",
+            held.verdict(false).startsWith("CONFIRMED")
+                && held.verdict(true).startsWith("CONFIRMED"));
+        Harness.check("the count is reported, not just the fact",
+            held.verdict(false).contains("1 entry"));
+        Harness.check("plural is spelled",
+            Readout.of("s", "a:b").verdict(false).contains("2 entries"));
+    }
+
+    private static void invariant() {
+        Harness.suite("Readout — one rule, over every shape at once");
+
+        List<Readout> all = Arrays.asList(
+            Readout.failed("s", new SecurityException("denied")),
+            Readout.failed("s", new RuntimeException()),
+            Readout.of("s", null),
+            Readout.of("s", ""),
+            Readout.of("s", "  "),
+            Readout.of("s", ":"),
+            Readout.of("s", "com.x/.Svc"),
+            Readout.of("s", "com.x/.Svc:com.y/.Other"),
+            Readout.ofEntries("s", null),
+            Readout.ofEntries("s", new ArrayList<String>()),
+            Readout.ofEntries("s", Arrays.asList("com.x/.Admin")));
+
+        // The whole scoring rule in one sentence: nothing is ever confirmed
+        // except by entries actually handed over. A change anywhere in the
+        // verdict ladder that made a blank answer count as a yes breaks here,
+        // whichever of the blank shapes it came in as.
+        boolean sound = true;
+        for (Readout reading : all) {
+            for (boolean known : new boolean[] {false, true}) {
+                if (reading.verdict(known).startsWith("CONFIRMED") != reading.populated()) {
+                    sound = false;
+                }
+            }
+        }
+        Harness.check("only entries confirm — over all 11 shapes, both claims", sound);
+
+        // Whitespace and separators are blank, not content: a device that
+        // returned ":" has enabled nothing, and reading it as one entry would
+        // invent a service that does not exist.
+        Harness.check("a lone separator holds nothing", !Readout.of("s", ":").populated());
+        Harness.check("whitespace holds nothing", !Readout.of("s", "  ").populated());
+    }
+
+    private static void rendering() {
+        Harness.suite("Readout — the text keeps the evidence");
+
+        String failure = Readout.failed("src", new SecurityException("denied")).render(false);
+        Harness.check("a failure prints its exception", failure.contains("SecurityException"));
+        Harness.check("a failure prints no entry lines", !failure.contains("\n  - "));
+
+        String empty = Readout.of("src", "").render(false);
+        Harness.check("an empty string says so rather than looking absent",
+            empty.contains("(empty string)"));
+
+        String held = Readout.of("src", "com.x/.Svc").render(false);
+        Harness.check("the raw string survives the parse", held.contains("raw: com.x/.Svc"));
+        Harness.check("each entry is listed", held.contains("\n  - com.x/.Svc"));
+        Harness.check("the source is named so the read can be repeated",
+            held.startsWith("src\n"));
+        Harness.check("the length is shown, so a long value is not silently cut",
+            held.contains("(10 chars)"));
+    }
+}

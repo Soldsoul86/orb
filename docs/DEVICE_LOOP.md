@@ -25,9 +25,9 @@ needs, including the author in three months.*
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Untested.** A service ran throughout, which is the condition it excludes |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
-| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Untested** — pass 2's first signal (`apps/pixel/pass2`) |
-| **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Untested** |
-| **P14** | Active device admins are enumerable without being one | **Untested** |
+| **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Built, not yet run** — `apps/pixel/probe-grants` |
+| **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Built, not yet run** — same probe |
+| **P14** | Active device admins are enumerable without being one | **Built, not yet run** — same probe |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Untested** |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Untested** — decides whether this is a signal or a poll |
 
@@ -1217,6 +1217,42 @@ R2's one encoder stays one encoder.
 
 Logic tested on the desktop, 27 checks, three negative controls. **Nothing has
 run on the device**, so P12–P16 are predictions and §7 R3 stands.
+
+**P12–P14 answered first, by a throwaway — `apps/pixel/probe-grants`.** Pass 2's
+signal is worthless if any of the three reads is impossible, and its Android glue
+would then have been written against an assumption. So the glue waits: a separate
+zero-permission APK (its own package id, its own key, no services, no journal)
+reads the three sources once and prints what it got. It declares no
+`<uses-permission>` at all, because each prediction is of the form *readable with
+no permission* and a single permission line would answer a different question;
+`aapt2 dump badging` printing no permission rows is the experiment's control. A
+second control reads the settings database file directly and **must fail** —
+without it, three CONFIRMED lines would be unfalsifiable, since a probe that
+reported success regardless would look exactly the same.
+
+**The scoring rule is fixed before the result, because one chosen afterwards is
+not a test.** Three outcomes are kept apart: *threw*, *absent* (`null` — never
+set, or withheld, and the call cannot say which), and *value* (possibly empty).
+**An empty answer confirms nothing.** An empty list handed to a permissionless app
+is byte-identical to a full list being filtered out of it, so it scores
+INCONCLUSIVE. Only entries actually handed over confirm. What turns an empty
+answer into a *falsification* is the operator's independent knowledge that an
+entry exists — three checkboxes, unchecked by default, ticked against what the
+Settings screens show, rather than a hardcoded claim that would go stale the
+moment a service was switched off and would then read a correct empty answer as
+an alarm. This is §5d's distinction once more: *cannot check* is not *failed the
+check*.
+
+The probe also reads accessibility through `AccessibilityManager` as well as
+through `Settings.Secure`, so a falsification can be attributed to one API or to
+the platform. If the setting is withheld but the framework list works, the signal
+survives and `Grants` changes source; if both fail, pass 2's first signal as
+designed is impossible, and the nearest honest substitute — *installed*
+accessibility services via `PackageManager` — is a weaker fact that would have to
+be named as such rather than quietly swapped in.
+
+33 desktop checks, three negative controls verified to bite. Still nothing has run
+on the device.
 
 ---
 

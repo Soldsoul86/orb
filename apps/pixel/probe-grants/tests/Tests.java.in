@@ -1,0 +1,9 @@
+package @PKG@;
+
+/** Entry point for the grants-probe desktop suite. */
+public final class Tests {
+    public static void main(String[] args) {
+        ReadoutTest.run();
+        System.exit(Harness.report());
+    }
+}

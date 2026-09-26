@@ -110,6 +110,18 @@ version, never generalised.
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime-registered receiver inside a `specialUse` foreground service, as the screen signals already do (§5h) |
 | **P16** | A grant enabled while the app is not running is still detected at the next process start, from the journal's own last record |
 
+**P12–P14 are being answered first, and the Android glue waits on them.**
+`apps/pixel/probe-grants` is a throwaway zero-permission APK that performs the
+three reads once and prints what came back — its own package and key, no
+services, nothing stored, so it cannot disturb pass 1's run. Writing the manifest
+and service wiring here before those answers would be writing it against an
+assumption. Its scoring rule is fixed in advance and is stricter than it looks:
+an empty answer is INCONCLUSIVE, never a confirmation, because an empty list
+handed to a permissionless app is byte-identical to a full list being filtered
+out of it. What each possible answer changes in `Grants` is set out in that
+probe's README — including the case where P12 fails and `KINDS` loses a kind
+rather than gaining a permanent `"unreadable"`.
+
 P16 is the one that decides whether this is a *signal* or a *poll*: if the
 platform delivers nothing for a settings change, the design still works because
 the comparison is against history rather than against a live callback — but it

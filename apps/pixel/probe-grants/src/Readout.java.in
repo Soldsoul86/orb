@@ -1,0 +1,124 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * What one read of one platform source actually told us.
+ *
+ * Three outcomes, kept strictly apart, because collapsing them is the mistake
+ * this whole probe exists to avoid:
+ *
+ *   threw   the read failed — we learned nothing about the contents
+ *   absent  the read succeeded and returned null — either never set, or
+ *           withheld from us; the call cannot tell us which
+ *   value   the read succeeded and returned a string, possibly empty
+ *
+ * `Grants.split` already refuses to turn a null into an empty list. This goes
+ * one step further and refuses to turn *either* into a finding: an empty list
+ * handed to a permissionless app looks exactly like a full list being filtered
+ * out of it, so an empty result is not evidence that reads work. That is the
+ * difference between "cannot check" and "checked, and the answer is none",
+ * and every prediction below is scored against it.
+ */
+final class Readout {
+    static final String THREW = "threw";
+    static final String ABSENT = "absent";
+    static final String VALUE = "value";
+
+    /** Exactly what was read, named so the result can be reproduced. */
+    final String source;
+    final String outcome;
+    /** The string as returned, or the failure's text. Never invented. */
+    final String raw;
+    /** Parsed entries. Empty when absent or threw — see `populated`. */
+    final List<String> entries;
+
+    private Readout(String source, String outcome, String raw, List<String> entries) {
+        this.source = source;
+        this.outcome = outcome;
+        this.raw = raw;
+        this.entries = Collections.unmodifiableList(entries);
+    }
+
+    /**
+     * A read that completed. `raw` may be null, which is `ABSENT` and not empty.
+     *
+     * Parsing goes through pass 2's `Grants.split`, not a private copy, so this
+     * probe tests the parser that would actually ship against the string the
+     * device actually returns. A copy here could agree with the device while
+     * the real one disagreed, which is the one failure a probe must not have.
+     */
+    static Readout of(String source, String raw) {
+        if (raw == null) return new Readout(source, ABSENT, null, new ArrayList<String>());
+        return new Readout(source, VALUE, raw, Grants.split(raw));
+    }
+
+    /** A read that already produced its entries, e.g. a framework list API. */
+    static Readout ofEntries(String source, List<String> entries) {
+        if (entries == null) return new Readout(source, ABSENT, null, new ArrayList<String>());
+        return new Readout(source, VALUE, String.join(":", entries), new ArrayList<>(entries));
+    }
+
+    /** A read that failed. The exception's own words, not a summary of them. */
+    static Readout failed(String source, Throwable error) {
+        String text = error.getClass().getName()
+            + (error.getMessage() == null ? "" : ": " + error.getMessage());
+        return new Readout(source, THREW, text, new ArrayList<String>());
+    }
+
+    boolean populated() {
+        return VALUE.equals(outcome) && !entries.isEmpty();
+    }
+
+    /**
+     * Whether this read settles the prediction that the source is readable
+     * without permission.
+     *
+     * `knownPopulated` is the operator's independent knowledge that at least one
+     * entry exists — the Settings screen showing a service On, say. Without it,
+     * a readable-but-empty answer is INCONCLUSIVE rather than confirming: the
+     * call worked, but nothing proves contents would have come through if there
+     * had been any. With it, an empty answer is a falsification, because we know
+     * what the correct answer was and this is not it.
+     */
+    String verdict(boolean knownPopulated) {
+        if (THREW.equals(outcome)) {
+            return "FALSIFIED — the read threw; the source is not readable this way";
+        }
+        if (ABSENT.equals(outcome)) {
+            return knownPopulated
+                ? "FALSIFIED — null, although an entry is known to exist: withheld, not empty"
+                : "INCONCLUSIVE — null, and no entry is known to exist: unset and withheld"
+                  + " look the same from here";
+        }
+        if (entries.isEmpty()) {
+            return knownPopulated
+                ? "FALSIFIED — readable but empty, although an entry is known to exist"
+                : "INCONCLUSIVE — readable and empty: the call works, but an empty list"
+                  + " and a filtered list are the same bytes";
+        }
+        return "CONFIRMED — readable without permission, " + entries.size()
+            + (entries.size() == 1 ? " entry" : " entries") + " returned";
+    }
+
+    /** The reading as text, for the screen and for the exported file. */
+    String render(boolean knownPopulated) {
+        StringBuilder out = new StringBuilder();
+        out.append(source).append('\n');
+        out.append("  outcome: ").append(outcome);
+        if (VALUE.equals(outcome)) out.append(" (").append(raw.length()).append(" chars)");
+        out.append('\n');
+        out.append("  ").append(verdict(knownPopulated)).append('\n');
+        if (THREW.equals(outcome)) {
+            out.append("  failure: ").append(raw).append('\n');
+        } else if (VALUE.equals(outcome)) {
+            // The raw string as well as the parse. A parse that quietly dropped
+            // something would be invisible if only the entries were shown.
+            out.append("  raw: ").append(raw.isEmpty() ? "(empty string)" : raw).append('\n');
+            for (String entry : entries) out.append("  - ").append(entry).append('\n');
+        }
+        return out.toString();
+    }
+}
