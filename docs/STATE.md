@@ -205,11 +205,13 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | the pass-1 self-test fix | built, never installed; the running build reports `chain.linksEndToEnd` FAILED for ever |
 | the device's security patch | roughly six months old |
 
-**The next ruling is DR-7 tier 3**, and it is a ruling rather than a task.
-`DECISIONS.md` DR-7 says the raw is *released* after seven days and becomes
-unreadable everywhere; `Attachment.md` inv. 8 destroys a key only when **no
-readable event references it**, and after seven days the Observation still does.
-So an expiry either drops the local bytes alone — leaving the content recoverable
-from any peer that kept them — or destroys a key while a live reference exists,
-which is a second ground for destruction that inv. 8 does not name. Implementing
-either without deciding would be choosing by accident.
+**DR-7 is complete.** Tier 3's ambiguity was ruled on 2026-09-26: the key is
+destroyed at expiry, and the **newest** referencing event decides, so one recent
+citation holds the whole Attachment however old the others are. `Attachment.md`
+inv. 8 now names that second ground. A window must be asked for by name, and a
+recent unreadable event still blocks it.
+
+**What remains is the device.** Pass 2 has been recording since this morning and
+P6 and P16 are unread; the connector has no real driver behind it yet; and
+`Capability.md`, `Action.md` and `Policy.md` are still Draft, which is where
+DR-5's intent chain and DR-7's seven days belong.

@@ -246,30 +246,71 @@ export type AttachmentReferences = (event: StoredEvent) => readonly string[];
 export type DestructionVerdict =
   | { readonly state: "referenced"; readonly by: readonly string[] }
   | { readonly state: "unreferenced" }
-  | { readonly state: "unknown"; readonly blockedBy: readonly string[] };
+  | { readonly state: "unknown"; readonly blockedBy: readonly string[] }
+  /**
+   * Still referenced, and every reference is older than the window.
+   *
+   * The **second ground** for destruction — operator ruling 2026-09-26,
+   * `DECISIONS.md` DR-7. inv. 8 as written destroys a key when nothing readable
+   * references it, which a seven-day window never reaches: after seven days the
+   * Observation still cites the Attachment. So a window that only dropped local
+   * bytes would leave the content recoverable from any peer that kept them, and
+   * the seven days would buy nothing.
+   */
+  | {
+      readonly state: "expired";
+      readonly by: readonly string[];
+      /** Wall clock of the newest event referencing it. */
+      readonly newestAt: number;
+    };
+
+/** A window after which a still-referenced Attachment may be destroyed. */
+export interface ExpiryWindow {
+  readonly windowMs: number;
+  readonly now: number;
+}
 
 export function evaluateDestruction(
   events: readonly StoredEvent[],
   identity: string,
   references: AttachmentReferences,
+  expiry?: ExpiryWindow,
 ): DestructionVerdict {
   const by: string[] = [];
   const blockedBy: string[] = [];
+  let newestAt = Number.NEGATIVE_INFINITY;
 
   for (const event of events) {
     if (hasPayload(event)) {
-      if (references(event).includes(identity)) by.push(event.id);
+      if (references(event).includes(identity)) {
+        by.push(event.id);
+        newestAt = Math.max(newestAt, event.wallClock);
+      }
       continue;
     }
     // Erased: the reference died with the payload and does not keep this alive.
     if (event.absence === "erased") continue;
     // Unfetched or pruned: we cannot read what it cited, so we cannot say.
+    //
+    // Under a window, that is only a problem when the event is *recent*: an
+    // unreadable event older than the window could not be a recent reference
+    // whatever it cites. Its wall clock is on the envelope, which every device
+    // holds, so this stays answerable on a partial replica.
+    if (expiry !== undefined && event.wallClock <= expiry.now - expiry.windowMs) continue;
     blockedBy.push(event.id);
   }
 
-  if (by.length > 0) return { state: "referenced", by };
-  if (blockedBy.length > 0) return { state: "unknown", blockedBy };
-  return { state: "unreferenced" };
+  if (blockedBy.length > 0 && by.length === 0) return { state: "unknown", blockedBy };
+  if (blockedBy.length > 0) return { state: "referenced", by };
+  if (by.length === 0) return { state: "unreferenced" };
+
+  // Referenced, and the operator's rule is the **newest** reference: one recent
+  // citation holds the whole Attachment, however old the others are. Anything
+  // else would release content something still points at from last week.
+  if (expiry !== undefined && newestAt <= expiry.now - expiry.windowMs) {
+    return { state: "expired", by, newestAt };
+  }
+  return { state: "referenced", by };
 }
 
 export interface DestructionResult {
@@ -277,8 +318,17 @@ export interface DestructionResult {
   readonly verdict: DestructionVerdict;
 }
 
+/** The two grounds on which a key may be destroyed. */
+export type DestructionGround = "unreferenced" | "expired";
+
 /**
- * Destroys an Attachment's key when, and only when, nothing readable cites it.
+ * Destroys an Attachment's key on one of its two grounds, and refuses otherwise.
+ *
+ * **Ground one, inv. 8:** nothing readable cites it any more.
+ * **Ground two, DR-7:** everything that cites it is older than `expiry.windowMs`
+ * — the *newest* reference, so one recent citation holds the whole Attachment
+ * however old the others are. Reachable only when a caller passes a window, so a
+ * destruction while a live reference exists is always asked for by name.
  *
  * The verdict is computed here rather than accepted as an argument, so the guard
  * cannot be stepped around — the same reason `Journal.detach` runs
@@ -295,9 +345,16 @@ export async function destroyAttachment(
   identity: string,
   events: readonly StoredEvent[],
   references: AttachmentReferences,
+  expiry?: ExpiryWindow,
 ): Promise<DestructionResult> {
-  const verdict = evaluateDestruction(events, identity, references);
-  if (verdict.state !== "unreferenced") return { destroyed: false, verdict };
+  const verdict = evaluateDestruction(events, identity, references, expiry);
+  const permitted: readonly DestructionGround[] = ["unreferenced", "expired"];
+  // `expired` is only reachable when a caller passed a window, so the second
+  // ground can never fire by default. Destruction while a live reference exists
+  // is the more dangerous of the two and has to be asked for by name.
+  if (!permitted.includes(verdict.state as DestructionGround)) {
+    return { destroyed: false, verdict };
+  }
 
   const destroyed = await ports.keyring.destroy(identity);
   await ports.store.drop(blindedAddress(ports.addressSecret, identity), "erased");

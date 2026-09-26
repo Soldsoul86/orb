@@ -168,14 +168,27 @@ are not interchangeable (inv. 6):
 | bytes gone | whatever the store recorded: `unfetched` or `pruned` |
 
 ```ts
-evaluateDestruction(events, identity, references): DestructionVerdict
-destroyAttachment(ports, identity, events, references): Promise<DestructionResult>
+evaluateDestruction(events, identity, references, expiry?): DestructionVerdict
+destroyAttachment(ports, identity, events, references, expiry?): Promise<DestructionResult>
 ```
-inv. 8, erasable with its last reader. Three verdicts: `referenced` (a readable
-event cites it), `unreferenced` (nothing does and nothing might), `unknown` (an
-`unfetched` or `pruned` event could, and **blocks destruction until it can be
-read**). An `erased` event never blocks — its payload is gone, so the reference
-is gone, and otherwise an erasure would pin the bytes it was meant to release.
+inv. 8, erasable with its last reader — or with its window. Four verdicts:
+
+| | |
+| --- | --- |
+| `referenced` | a readable event cites it, and recently enough if a window was given |
+| `unreferenced` | nothing cites it and nothing might |
+| `unknown` | an `unfetched` or `pruned` event could, and **blocks until it can be read** |
+| `expired` | everything citing it is older than `expiry.windowMs`, by its **newest** reference |
+
+An `erased` event never blocks: its payload is gone, so the reference is gone,
+and otherwise an erasure would pin the bytes it was meant to release.
+
+`expired` is the second ground, added by operator ruling 2026-09-26
+(`DECISIONS.md` DR-7), and is **reachable only when a caller passes a window** —
+destruction while a live reference exists is always asked for by name. Under a
+window, a recent `unfetched` or `pruned` event still blocks, but an old one does
+not: its wall clock is on the envelope, so *whether it is recent* is answerable
+even where *what it cites* is not.
 
 `destroyAttachment` computes the verdict itself rather than accepting one, so the
 guard cannot be stepped around. `AttachmentKeyring` keys are **stored, never

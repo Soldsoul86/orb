@@ -109,8 +109,10 @@ export type {
   AttachmentPorts,
   AttachmentReferences,
   AttachmentStore,
+  DestructionGround,
   DestructionResult,
   DestructionVerdict,
+  ExpiryWindow,
   ResolvedAttachment,
   StoredAttachment,
 } from "./attachment.js";

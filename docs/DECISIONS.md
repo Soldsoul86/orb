@@ -405,6 +405,32 @@ it real rather than advisory:
 is stated because it is the kind of thing that gets added "temporarily" for
 debugging and then lives in an append-only log for ever.
 
+### What release means — ruled 2026-09-26, after implementation raised it
+
+Tiers 2 and 3 disagreed, and the disagreement only surfaced when the code was
+written. This paragraph says *"unreadable everywhere rather than merely deleted
+here"*; `Attachment.md` inv. 8 destroyed a key only when **no readable event
+references it** — and after seven days the Observation still does. So the window
+could never reach the key on inv. 8's own terms.
+
+**Ruled: destroy the key at expiry, and the newest referencing event decides.**
+inv. 8 now names a second ground, and one recent citation holds the whole
+Attachment however old the others are. The alternative — dropping local bytes
+only — would leave the content recoverable from any peer that kept it, and seven
+days would buy nothing.
+
+Two consequences follow from making destruction reachable while a live reference
+exists, and both are in the code rather than in this paragraph:
+
+- **A window must be asked for by name.** `evaluateDestruction` cannot return
+  `expired` unless a caller passes one, so the more dangerous of the two grounds
+  never fires by default.
+- **A recent unreadable event blocks expiry.** Its payload cannot be read, so
+  whether it cites the Attachment is unknown — but its wall clock is on the
+  envelope, which every device holds, so *whether it is recent* is answerable on
+  a partial replica. An unreadable event older than the window could not be a
+  recent reference whatever it cites, and does not block.
+
 **Open.**
 
 - Whether expiry should emit its own event. The absence reason travels on the

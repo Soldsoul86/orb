@@ -93,9 +93,20 @@ currently holds them* may change. No transition alters the bytes or the identity
    persisted, and rotatable, because nothing depends on it but local store
    layout. Rotation voids every address an adversary has collected. This secret
    is derived-by-design and is **not** an erasure key — inv. 8 destroys those.
-8. **Erasable with its last reader.** An Attachment is encrypted under its own
-   key, and that key is destroyed when no *readable* event references it any
-   more. An erased event does not keep an Attachment alive: its payload is gone,
+8. **Erasable with its last reader — or with its window.** An Attachment is
+   encrypted under its own key, and that key is destroyed on either of two
+   grounds. The first: when no *readable* event references it any more. The
+   second, **added 2026-09-26 by operator ruling** (`../docs/DECISIONS.md`
+   DR-7): when every event that references it is older than a stated retention
+   window, measured on the **newest** reference — one recent citation holds the
+   whole Attachment however old the others are.
+
+   The second ground exists because the first can never reach a window. After
+   seven days the Observation still cites the Attachment, so a window that only
+   dropped local bytes would leave the content recoverable from any peer that
+   kept them and the window would buy nothing. A window is reachable only when a
+   caller names one, so destruction while a live reference exists is always
+   asked for rather than reached by default. An erased event does not keep an Attachment alive: its payload is gone,
    so the reference is gone, and it can never resolve the content again. An
    event whose payload is merely unfetched or pruned is **unknown, not absent**,
    and blocks destruction until it can be read. Keys are stored, never derived —

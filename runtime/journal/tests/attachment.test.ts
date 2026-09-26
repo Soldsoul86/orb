@@ -322,3 +322,141 @@ describe("erasable with its last reader", () => {
     assert.equal(verdict.state, "referenced");
   });
 });
+
+describe("expiry, the second ground for destruction", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const WEEK = 7 * DAY;
+
+  /** An event citing `identity`, dated `ageMs` ago. */
+  async function dated(identity: string, ageMs: number, now = Date.now()) {
+    const at = now - ageMs;
+    const journal = await Journal.open({
+      lane: "pixel",
+      device: "pixel-01",
+      store: new MemoryJournalStore(),
+      now: () => at,
+    });
+    const [event] = await journal.append([citing(identity)]);
+    assert.ok(event);
+    return event;
+  }
+
+  test("without a window, an old reference still holds it", async () => {
+    // The second ground is only reachable when a caller asks for it by name.
+    // Destruction while a live reference exists is the dangerous one.
+    const identity = attachmentIdentity(photo);
+    const old = await dated(identity, 30 * DAY);
+
+    assert.equal(evaluateDestruction([old], identity, references).state, "referenced");
+  });
+
+  test("everything older than the window is expired", async () => {
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+    const old = await dated(identity, 8 * DAY, now);
+
+    const verdict = evaluateDestruction([old], identity, references, { windowMs: WEEK, now });
+    assert.equal(verdict.state, "expired");
+    if (verdict.state !== "expired") return;
+    assert.deepEqual(verdict.by, [old.id]);
+    assert.equal(verdict.newestAt, old.wallClock);
+  });
+
+  test("the newest reference decides, not the oldest", async () => {
+    // The operator's rule. One recent citation holds the whole Attachment,
+    // however old the others are — otherwise content something pointed at last
+    // week would be released because something else pointed at it last year.
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+    const ancient = await dated(identity, 400 * DAY, now);
+    const recent = await dated(identity, 1 * DAY, now);
+
+    const verdict = evaluateDestruction([ancient, recent], identity, references, {
+      windowMs: WEEK,
+      now,
+    });
+    assert.equal(verdict.state, "referenced", "the recent one holds it");
+  });
+
+  test("a reference exactly at the boundary is expired, one millisecond newer is not", async () => {
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+
+    const onIt = await dated(identity, WEEK, now);
+    assert.equal(
+      evaluateDestruction([onIt], identity, references, { windowMs: WEEK, now }).state,
+      "expired",
+    );
+
+    const inside = await dated(identity, WEEK - 1, now);
+    assert.equal(
+      evaluateDestruction([inside], identity, references, { windowMs: WEEK, now }).state,
+      "referenced",
+    );
+  });
+
+  test("a recent unreadable event blocks expiry; an old one does not", async () => {
+    // Its wall clock is on the envelope, which every device holds, so this stays
+    // answerable on a partial replica. An unreadable event older than the window
+    // could not be a recent reference whatever it cites.
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+    const old = await dated(identity, 8 * DAY, now);
+    const recentUnknown = await dated(identity, 1 * DAY, now);
+    const ancientUnknown = await dated(identity, 400 * DAY, now);
+
+    const blocked = evaluateDestruction(
+      [old, detach(recentUnknown, "pruned")],
+      identity,
+      references,
+      { windowMs: WEEK, now },
+    );
+    assert.equal(blocked.state, "referenced", "something recent might cite it");
+
+    const clear = evaluateDestruction(
+      [old, detach(ancientUnknown, "unfetched")],
+      identity,
+      references,
+      { windowMs: WEEK, now },
+    );
+    assert.equal(clear.state, "expired");
+  });
+
+  test("an expired Attachment is destroyed, and becomes unreadable everywhere", async () => {
+    // Which is what the seven days is for. Dropping the local bytes alone would
+    // leave the content recoverable from any peer that kept them, and the window
+    // would buy nothing.
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+    const p = ports();
+    await putAttachment(p, photo);
+    const old = await dated(identity, 8 * DAY, now);
+
+    const result = await destroyAttachment(p, identity, [old], references, {
+      windowMs: WEEK,
+      now,
+    });
+    assert.equal(result.destroyed, true);
+    assert.equal(result.verdict.state, "expired");
+    assert.equal(await p.keyring.state(identity), "destroyed");
+
+    const resolved = await resolveAttachment(p, identity);
+    assert.equal(resolved.state, "absent");
+    if (resolved.state === "absent") assert.equal(resolved.reason, "erased");
+  });
+
+  test("a window never destroys something still recently cited", async () => {
+    const now = Date.now();
+    const identity = attachmentIdentity(photo);
+    const p = ports();
+    await putAttachment(p, photo);
+    const recent = await dated(identity, 1 * DAY, now);
+
+    const result = await destroyAttachment(p, identity, [recent], references, {
+      windowMs: WEEK,
+      now,
+    });
+    assert.equal(result.destroyed, false);
+    assert.equal(await p.keyring.state(identity), "held");
+  });
+});
