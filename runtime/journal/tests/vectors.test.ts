@@ -20,7 +20,14 @@ import { readFile, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, parse } from "node:path";
 
-import { canonicalJson, hashPayload, eventPreimage, hashEvent } from "../src/index.js";
+import {
+  canonicalJson,
+  coarseSchema,
+  coarseType,
+  eventPreimage,
+  hashEvent,
+  hashPayload,
+} from "../src/index.js";
 
 const RELATIVE = join("apps", "pixel", "pass1", "tests", "vectors.json");
 
@@ -50,6 +57,34 @@ interface Vectors {
   readonly payloadHash: string;
   readonly preimageInput: Record<string, unknown>;
   readonly hash: string;
+  readonly v2: V2Section;
+  readonly v2Bookkeeping: V2Section;
+}
+
+/**
+ * A v2 section of the fixture.
+ *
+ * `fineType` rather than the coarse one on purpose: each implementation derives
+ * the envelope's type with its own `coarseType`, so one check pins the rule and
+ * the bytes together. A Java rule that disagreed with this one would fail even
+ * though both encoders were byte-perfect.
+ */
+interface V2Section {
+  readonly fineType: string;
+  readonly payload: Record<string, unknown>;
+  readonly payloadCanonical: string;
+  readonly payloadHash: string;
+  /** Typed rather than a bare record, so a missing identity field fails the build. */
+  readonly preimageInput: {
+    readonly id: string;
+    readonly lane: string;
+    readonly device: string;
+    readonly hlc: { readonly physical: number; readonly counter: number };
+    readonly wallClock: number;
+    readonly previous: string | null;
+  };
+  readonly preimageCanonical: string;
+  readonly hash: string;
 }
 
 describe("cross-implementation encoding", () => {
@@ -67,12 +102,50 @@ describe("cross-implementation encoding", () => {
     assert.equal(hashEvent(input), vectors.hash);
   });
 
+  test("both v2 branches match, with the coarse type derived here rather than read", async () => {
+    const vectors = JSON.parse(await readFile(await findVectors(), "utf8")) as Vectors;
+
+    for (const [label, section] of [
+      ["content", vectors.v2],
+      ["bookkeeping", vectors.v2Bookkeeping],
+    ] as const) {
+      assert.equal(canonicalJson(section.payload), section.payloadCanonical, `${label}: payload`);
+      assert.equal(hashPayload(section.payload), section.payloadHash, `${label}: payloadHash`);
+
+      const schema = { id: section.fineType, version: 1 };
+      const input = {
+        ...section.preimageInput,
+        v: 2,
+        type: section.fineType,
+        schema: coarseSchema(section.fineType, schema),
+        causes: [],
+        payloadHash: section.payloadHash,
+      } satisfies Parameters<typeof eventPreimage>[0];
+
+      // `eventPreimage` coarsens the type itself under v2, and drops `causes`
+      // and `schema`. Passing the fine ones in is the point: what comes out must
+      // be the coarse form the Java side independently produced.
+      assert.equal(eventPreimage(input), section.preimageCanonical, `${label}: preimage`);
+      assert.equal(hashEvent(input), section.hash, `${label}: hash`);
+    }
+
+    // The rule itself, on both branches, against the same literals the Java
+    // suite checks. This is the piece that would diverge unnoticed.
+    assert.equal(coarseType(vectors.v2.fineType), "orb.content");
+    assert.equal(coarseType(vectors.v2Bookkeeping.fineType), vectors.v2Bookkeeping.fineType);
+  });
+
   test("the vector's own canonical form round-trips to the same hash", async () => {
     const vectors = JSON.parse(await readFile(await findVectors(), "utf8")) as Vectors;
     // Guards the fixture itself: a vector whose stated canonical form and stated
     // hash disagree would pin nothing, and would look like a passing test.
     const { createHash } = await import("node:crypto");
-    const digest = createHash("sha256").update(vectors.payloadCanonical, "utf8").digest("hex");
-    assert.equal(digest, vectors.payloadHash);
+    const digest = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
+    assert.equal(digest(vectors.payloadCanonical), vectors.payloadHash);
+
+    for (const section of [vectors.v2, vectors.v2Bookkeeping]) {
+      assert.equal(digest(section.payloadCanonical), section.payloadHash);
+      assert.equal(digest(section.preimageCanonical), section.hash);
+    }
   });
 });

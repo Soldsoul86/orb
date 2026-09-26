@@ -1,5 +1,5 @@
 {
-  "note": "Cross-implementation vectors. The Kotlin/Java phone journal and the TypeScript runtime must derive identical hashes for the same event, or two devices can never agree that they hold the same history (DEVICE_LOOP.md §7 R2). Chosen to exercise the encoding's edge cases: sorted keys, a nested object, an empty array, an escaped quote and backslash, a control character, and a non-ASCII codepoint that JSON.stringify leaves raw.",
+  "note": "Cross-implementation vectors. The top-level keys are v1; `v2` and `v2Bookkeeping` are envelope v2 (ERASURE.md 2a/2b) and were computed by the TypeScript encoder, so the Java side agreeing is a real cross-implementation check rather than one encoder agreeing with itself. The Kotlin/Java phone journal and the TypeScript runtime must derive identical hashes for the same event, or two devices can never agree that they hold the same history (DEVICE_LOOP.md §7 R2). Chosen to exercise the encoding's edge cases: sorted keys, a nested object, an empty array, an escaped quote and backslash, a control character, and a non-ASCII codepoint that JSON.stringify leaves raw.",
   "payload": {
     "service": "dataSync",
     "beat": 7,
@@ -11,12 +11,84 @@
     "id": "01M3B90CADNB1PH0FQS6ZHQV5S",
     "lane": "pixel",
     "device": "Pixel 10a/stallion",
-    "hlc": { "physical": 1790300066000, "counter": 3 },
+    "hlc": {
+      "physical": 1790300066000,
+      "counter": 3
+    },
     "wallClock": 1790300066000,
     "type": "probe.heartbeat",
     "causes": [],
-    "schema": { "id": "probe.heartbeat", "version": 1 },
+    "schema": {
+      "id": "probe.heartbeat",
+      "version": 1
+    },
     "previous": null
   },
-  "hash": "dce6c5bbf93be24367d7839fe897b99874f99899a286d5299745d3ba64549803"
+  "hash": "dce6c5bbf93be24367d7839fe897b99874f99899a286d5299745d3ba64549803",
+  "v2": {
+    "note": "Envelope v2 (ERASURE.md 2a/2b): the real type, schema and causes live in the payload with a nonce; the envelope carries a coarse type and no causes or schema. `preimageInput` deliberately omits `type` — each implementation must derive it with its own coarseType(fineType), so the fixture pins the rule and the bytes together. The nonce is fixed here because a fixture must be reproducible; nowhere else.",
+    "fineType": "probe.heartbeat",
+    "payload": {
+      "causes": [],
+      "data": {
+        "service": "dataSync",
+        "beat": 7,
+        "note": "quote \" backslash \\ newline \n unicode é"
+      },
+      "nonce": "32763e5c57c0efb54368794d9d6928c0",
+      "schema": {
+        "id": "probe.heartbeat",
+        "version": 1
+      },
+      "type": "probe.heartbeat"
+    },
+    "payloadCanonical": "{\"causes\":[],\"data\":{\"beat\":7,\"note\":\"quote \\\" backslash \\\\ newline \\n unicode é\",\"service\":\"dataSync\"},\"nonce\":\"32763e5c57c0efb54368794d9d6928c0\",\"schema\":{\"id\":\"probe.heartbeat\",\"version\":1},\"type\":\"probe.heartbeat\"}",
+    "payloadHash": "33086a10a2e52899460ac36708f6c2f62f5d4b2ff5a705ead911dccf2f181868",
+    "preimageInput": {
+      "id": "01M3B90CADNB1PH0FQS6ZHQV5S",
+      "lane": "pixel",
+      "device": "Pixel 10a/stallion",
+      "hlc": {
+        "physical": 1790300066000,
+        "counter": 3
+      },
+      "wallClock": 1790300066000,
+      "previous": null
+    },
+    "preimageCanonical": "{\"device\":\"Pixel 10a/stallion\",\"hlc\":{\"counter\":3,\"physical\":1790300066000},\"id\":\"01M3B90CADNB1PH0FQS6ZHQV5S\",\"lane\":\"pixel\",\"payloadHash\":\"33086a10a2e52899460ac36708f6c2f62f5d4b2ff5a705ead911dccf2f181868\",\"previous\":null,\"type\":\"orb.content\",\"v\":2,\"wallClock\":1790300066000}",
+    "hash": "99de7bfd5ae9736ab858c76dc91bad06d6bfe48bd716e3d0b20db08b463bc816"
+  },
+  "v2Bookkeeping": {
+    "note": "The other branch of the same rule: a bookkeeping type keeps its real name in a v2 envelope, because sync machinery on a device holding no keys reads it. Coarsening this would take the sync layer with it, and it is the branch that would diverge unnoticed.",
+    "fineType": "orb.custody.receipt",
+    "payload": {
+      "causes": [],
+      "data": {
+        "lane": "mac",
+        "throughHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "count": 3
+      },
+      "nonce": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "schema": {
+        "id": "orb.custody.receipt",
+        "version": 1
+      },
+      "type": "orb.custody.receipt"
+    },
+    "payloadCanonical": "{\"causes\":[],\"data\":{\"count\":3,\"lane\":\"mac\",\"throughHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"nonce\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"schema\":{\"id\":\"orb.custody.receipt\",\"version\":1},\"type\":\"orb.custody.receipt\"}",
+    "payloadHash": "5d64ed93a831ac18ef47039a66c7a513643a805fb663616db2b2b5d77b5bebbf",
+    "preimageInput": {
+      "id": "01M3B90CADNB1PH0FQS6ZHQV5S",
+      "lane": "pixel",
+      "device": "Pixel 10a/stallion",
+      "hlc": {
+        "physical": 1790300066000,
+        "counter": 3
+      },
+      "wallClock": 1790300066000,
+      "previous": null
+    },
+    "preimageCanonical": "{\"device\":\"Pixel 10a/stallion\",\"hlc\":{\"counter\":3,\"physical\":1790300066000},\"id\":\"01M3B90CADNB1PH0FQS6ZHQV5S\",\"lane\":\"pixel\",\"payloadHash\":\"5d64ed93a831ac18ef47039a66c7a513643a805fb663616db2b2b5d77b5bebbf\",\"previous\":null,\"type\":\"orb.custody.receipt\",\"v\":2,\"wallClock\":1790300066000}",
+    "hash": "10508d2a3d079249ca549e294b72c40123a540f76e368202230dd0c205b67521"
+  }
 }

@@ -52,6 +52,13 @@ from both sides (`runtime/journal/tests/vectors.test.ts`, and `tests/run.sh`
 below). Two implementations that disagree would not produce a wrong answer; they
 would produce two devices that can never agree they hold the same history.
 
+Both envelope formats are implemented and both are pinned. **This build still
+writes v1** — pass 1 is a measuring instrument, and a heartbeat's fine type
+discloses that a heartbeat happened, so migrating mid-run would put a version
+seam through a measurement for no gain in what it measures. `Journal`'s
+`DEFAULT_ENVELOPE_VERSION` is the one line that changes it, and
+`v1IsWhatThisBuildWrites` fails if it changes by accident.
+
 ## Tests
 
 ```sh
@@ -76,6 +83,9 @@ What it covers, and why each is there:
 | **An edited payload is NOT detected** | A recorded limit, asserted rather than assumed. `verify()` checks linkage only; it never re-derives a hash. |
 | Every break is reported | An earlier break must not hide a later one. |
 | Canonical JSON edge cases | The half of the cross-implementation agreement that runs on the device, executed for the first time. |
+| Envelope v2, both branches | The `v2` and `v2Bookkeeping` vectors were computed by the **TypeScript** encoder, so Java agreeing is a real cross-implementation check and not one encoder agreeing with itself. The fixture states no coarse type — each side derives it — so one check pins the rule and the bytes together. Two sections because the rule has two branches, and bookkeeping keeping its real name is the one that would diverge unnoticed. |
+| What `append` writes under v2 | Coarse type, no `causes`, `v: 2`, the real type and schema and a nonce inside the payload, `payloadHash` over the wrapper rather than the caller's object. The encoding tests call `Journal.wrapPayload` and `Journal.preimage` for the same reason: an earlier version canonicalised the fixture's own objects, and a negative control caught it — keeping `causes` in the v2 preimage failed nothing at all. |
+| This build still writes v1 | A guard on the default, not a comment. |
 
 ### Why the negative control's failure count moves
 

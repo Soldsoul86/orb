@@ -38,6 +38,32 @@ final class JsonTest {
         Harness.equal("the event preimage hashes to the pinned digest",
             Journal.sha256(Json.canonical(preimage)), Vectors.HASH);
 
+        Harness.suite("envelope v2 matches the shared vectors");
+
+        // The v2 sections were computed by the TypeScript encoder and written
+        // into the fixture, so these are a genuine cross-implementation check
+        // rather than this encoder agreeing with itself.
+        //
+        // `preimageInput` deliberately carries no `type`. Each side derives it
+        // with its own coarsening rule, so one check pins the rule and the bytes
+        // together: a Java `coarseType` that disagreed with the TypeScript one
+        // would fail here even though both encoders were byte-perfect.
+        v2Case("content", Vectors.V2_FINE_TYPE, Vectors.v2Payload(), Vectors.V2_PAYLOAD_CANONICAL,
+            Vectors.V2_PAYLOAD_HASH, Vectors.v2PreimageInput(), Vectors.V2_PREIMAGE_CANONICAL,
+            Vectors.V2_HASH);
+
+        // The other branch. A bookkeeping type keeps its real name, because a
+        // device holding no keys reads it and can never decrypt to find out.
+        v2Case("bookkeeping", Vectors.V2BK_FINE_TYPE, Vectors.v2bkPayload(),
+            Vectors.V2BK_PAYLOAD_CANONICAL, Vectors.V2BK_PAYLOAD_HASH,
+            Vectors.v2bkPreimageInput(), Vectors.V2BK_PREIMAGE_CANONICAL, Vectors.V2BK_HASH);
+
+        Harness.equal("a content type is coarsened", Journal.coarseType("probe.heartbeat"),
+            Journal.CONTENT_TYPE);
+        Harness.equal("coarsening is idempotent, so the preimage rule is form-independent",
+            Journal.coarseType(Journal.CONTENT_TYPE), Journal.CONTENT_TYPE);
+        Harness.equal("a bookkeeping type is not", Journal.coarseType("orb.erasure"), "orb.erasure");
+
         Harness.suite("encoding edge cases the fixture does not reach");
 
         Map<String, Object> sorted = Json.obj();
@@ -76,5 +102,59 @@ final class JsonTest {
         map.put("object", Json.obj());
         map.put("array", new java.util.ArrayList<>());
         return map;
+    }
+
+    /**
+     * One v2 vector, checked end to end against the **journal's own**
+     * construction.
+     *
+     * Deliberately not `Json.canonical(fixtureObject)`. That form pins the
+     * encoding of data the test assembled, so a Java encoder that built the
+     * wrapper or the preimage differently would agree with itself, pass, and
+     * diverge from the TypeScript runtime in production. A negative control
+     * found exactly that hole: keeping `causes` in the v2 preimage failed
+     * nothing. So `wrapPayload` and `preimage` are called here, with the fine
+     * type, and the bytes they produce are what the fixture pins.
+     */
+    private static void v2Case(
+        String label, String fineType, Map<String, Object> fixturePayload, String payloadCanonical,
+        String payloadHash, Map<String, Object> preimageInput, String preimageCanonical,
+        String hash) {
+        Map<String, Object> schema = Json.obj();
+        schema.put("id", fineType);
+        schema.put("version", 1L);
+
+        // The caller's data and the fixed nonce, taken out of the pinned wrapper
+        // so the fixture stays the single source of truth for both sides.
+        Object data = fixturePayload.get("data");
+        String nonce = (String) fixturePayload.get("nonce");
+
+        Map<String, Object> wrapped =
+            Journal.wrapPayload(fineType, schema, java.util.Collections.<String>emptyList(), data, nonce);
+        Harness.equal(label + ": the journal's wrapper encodes to the pinned canonical form",
+            Json.canonical(wrapped), payloadCanonical);
+        Harness.equal(label + ": and hashes to the pinned digest",
+            Journal.sha256(Json.canonical(wrapped)), payloadHash);
+        Harness.equal(label + ": the fixture's own canonical form hashes to its digest",
+            Journal.sha256(payloadCanonical), payloadHash);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> hlc = (Map<String, Object>) preimageInput.get("hlc");
+        Map<String, Object> preimage = Journal.preimage(
+            2,
+            (String) preimageInput.get("id"),
+            (String) preimageInput.get("lane"),
+            (String) preimageInput.get("device"),
+            hlc,
+            (Long) preimageInput.get("wallClock"),
+            fineType,
+            schema,
+            java.util.Collections.<String>emptyList(),
+            payloadHash,
+            (String) preimageInput.get("previous"));
+        Harness.equal(label + ": the journal's preimage encodes to the pinned canonical form",
+            Json.canonical(preimage), preimageCanonical);
+        Harness.equal(label + ": and hashes to the pinned digest",
+            Journal.sha256(Json.canonical(preimage)), hash);
     }
 }

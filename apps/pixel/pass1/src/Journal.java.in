@@ -27,12 +27,46 @@ import java.util.Map;
 final class Journal {
     private static final int SCHEMA_VERSION = 1;
 
+    /**
+     * Envelope format this build writes. **Absent means 1** on the wire.
+     *
+     * v2 is the coarse envelope (`docs/ERASURE.md` §2a, §2b): the real type,
+     * schema and causes move inside the payload together with a nonce, and the
+     * envelope carries only a coarse label. Both encodings are implemented here
+     * and both are pinned against the TypeScript runtime by
+     * `tests/vectors.json`, so the two implementations cannot drift apart on
+     * either rule.
+     *
+     * **Deliberately still 1.** Pass 1 is a measuring instrument and its journal
+     * is evidence about the phone, not about a life — a heartbeat's fine type
+     * discloses that a heartbeat happened. Migrating mid-run would put a version
+     * seam through a measurement for no gain in what the measurement says.
+     * Flipping this to 2 is the pass-2 decision, and it is one line so that it
+     * is a deliberate act rather than a drift.
+     */
+    static final int DEFAULT_ENVELOPE_VERSION = 1;
+
+    /** The only type a v2 content envelope carries. `vocabulary.ts`. */
+    static final String CONTENT_TYPE = "orb.content";
+
+    /**
+     * Types that stay legible in a v2 envelope, because machinery on devices
+     * holding no keys reads them (`ERASURE.md` §2b).
+     *
+     * This phone writes none of them. They are here so the two implementations
+     * agree on the **rule** rather than on this probe's subset of it — the
+     * exception is exactly the branch that would diverge unnoticed.
+     */
+    private static final List<String> BOOKKEEPING = Collections.unmodifiableList(
+        java.util.Arrays.asList("orb.custody.receipt", "orb.sync.policy", "orb.erasure"));
+
     private final File file;
     private final String lane;
     private final String device;
 
     private String head;
     private Hlc clock;
+    private int envelopeVersion = DEFAULT_ENVELOPE_VERSION;
 
     private Journal(File file, String lane, String device) {
         this.file = file;
@@ -50,6 +84,99 @@ final class Journal {
 
     File file() {
         return file;
+    }
+
+    /** Test seam: writes the named envelope version instead of the default. */
+    void useEnvelopeVersion(int version) {
+        if (version != 1 && version != 2) throw new IllegalArgumentException("unknown envelope version");
+        this.envelopeVersion = version;
+    }
+
+    static boolean isBookkeeping(String type) {
+        return BOOKKEEPING.contains(type);
+    }
+
+    /** What a v2 envelope says, given what the event actually is. */
+    static String coarseType(String type) {
+        return isBookkeeping(type) ? type : CONTENT_TYPE;
+    }
+
+    /** What a v2 envelope's schema says. Content gets one describing *an encrypted payload*. */
+    static Map<String, Object> coarseSchema(String type, Map<String, Object> schema) {
+        if (isBookkeeping(type)) return schema;
+        Map<String, Object> coarse = Json.obj();
+        coarse.put("id", CONTENT_TYPE);
+        coarse.put("version", 1L);
+        return coarse;
+    }
+
+    /**
+     * The v2 payload: the caller's data plus everything the envelope stopped
+     * saying, and a nonce.
+     *
+     * The nonce is inside what `payloadHash` covers, which is the whole point —
+     * `payloadHash` sits in a plaintext envelope, so a guessable payload with a
+     * bare hash is a confirmation oracle. A nonce the hash does not cover
+     * defeats nothing (`ERASURE.md` §2a).
+     */
+    static Map<String, Object> wrapPayload(
+        String type, Map<String, Object> schema, List<String> causes, Object data, String nonce) {
+        Map<String, Object> wrapped = Json.obj();
+        wrapped.put("causes", causes);
+        wrapped.put("data", data);
+        wrapped.put("nonce", nonce);
+        wrapped.put("schema", schema);
+        wrapped.put("type", type);
+        return wrapped;
+    }
+
+    /**
+     * The exact object a version's hash is taken over.
+     *
+     * Extracted from `append` so `tests/vectors.json` pins **this** rather than
+     * the encoding of a fixture the test assembled itself. A Java encoder that
+     * was internally consistent and disagreed with the TypeScript runtime would
+     * otherwise pass every check and diverge in production — which is the whole
+     * failure the vectors exist to prevent, and it slipped through until a
+     * negative control found it.
+     *
+     * Takes the **fine** type and schema and coarsens them here, so a caller
+     * cannot pass the coarse form and accidentally test nothing.
+     */
+    static Map<String, Object> preimage(
+        int version, String id, String lane, String device, Map<String, Object> hlc,
+        long wallClock, String fineType, Map<String, Object> schema, List<String> causes,
+        String payloadHash, String previous) {
+        boolean v2 = version == 2;
+        Map<String, Object> preimage = Json.obj();
+        // `v` is inside the preimage so it cannot be flipped to make a verifier
+        // apply the wrong rule, and in the envelope rather than the payload so a
+        // device holding no keys can still tell which rule to use.
+        if (v2) preimage.put("v", 2L);
+        preimage.put("id", id);
+        preimage.put("lane", lane);
+        preimage.put("device", device);
+        preimage.put("hlc", hlc);
+        preimage.put("wallClock", wallClock);
+        preimage.put("type", v2 ? coarseType(fineType) : fineType);
+        // v2 drops both: they are payload now, so erasing a payload erases the
+        // event's kind and its stated lineage with it.
+        if (!v2) {
+            preimage.put("causes", causes);
+            preimage.put("schema", schema);
+        }
+        preimage.put("payloadHash", payloadHash);
+        preimage.put("previous", previous);
+        return preimage;
+    }
+
+    /** 128 bits, so a payload's plaintext cannot be enumerated. */
+    static String newNonce() {
+        byte[] bytes = new byte[16];
+        new java.security.SecureRandom().nextBytes(bytes);
+        StringBuilder out = new StringBuilder(32);
+        for (byte b : bytes) out.append(String.format("%02x", b));
+        return out.toString();
     }
 
     /**
@@ -127,21 +254,21 @@ final class Journal {
         schema.put("id", type);
         schema.put("version", (long) SCHEMA_VERSION);
 
-        String payloadHash = sha256(Json.canonical(payload));
+        List<String> causes = Collections.emptyList();
+        String id = Ids.newEventId(wallClock);
+        boolean v2 = envelopeVersion == 2;
 
-        Map<String, Object> preimage = Json.obj();
-        preimage.put("id", Ids.newEventId(wallClock));
-        preimage.put("lane", lane);
-        preimage.put("device", device);
-        preimage.put("hlc", clock.toMap());
-        preimage.put("wallClock", wallClock);
-        preimage.put("type", type);
-        preimage.put("causes", Collections.emptyList());
-        preimage.put("schema", schema);
-        preimage.put("payloadHash", payloadHash);
-        preimage.put("previous", head);
+        // v2 hashes the wrapped payload, not the caller's object. The nonce must
+        // be inside the hash or the oracle it closes stays open.
+        Object stored = v2 ? wrapPayload(type, schema, causes, payload, newNonce()) : payload;
+        String payloadHash = sha256(Json.canonical(stored));
 
-        String hash = sha256(Json.canonical(preimage));
+        String envelopeType = v2 ? coarseType(type) : type;
+        Map<String, Object> envelopeSchema = v2 ? coarseSchema(type, schema) : schema;
+
+        String hash = sha256(Json.canonical(preimage(
+            envelopeVersion, id, lane, device, clock.toMap(), wallClock,
+            type, schema, causes, payloadHash, head)));
 
         Map<String, Object> integrity = Json.obj();
         integrity.put("previous", head);
@@ -149,15 +276,16 @@ final class Journal {
         integrity.put("payloadHash", payloadHash);
 
         Map<String, Object> event = Json.obj();
-        event.put("id", preimage.get("id"));
+        if (v2) event.put("v", 2L);
+        event.put("id", id);
         event.put("lane", lane);
         event.put("device", device);
         event.put("hlc", clock.toMap());
         event.put("wallClock", wallClock);
-        event.put("type", type);
-        event.put("causes", Collections.emptyList());
-        event.put("schema", schema);
-        event.put("payload", payload);
+        event.put("type", envelopeType);
+        if (!v2) event.put("causes", causes);
+        event.put("schema", envelopeSchema);
+        event.put("payload", stored);
         event.put("integrity", integrity);
 
         try {

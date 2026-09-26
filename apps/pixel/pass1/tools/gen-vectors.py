@@ -90,6 +90,22 @@ def main() -> None:
     print(method("payload", vectors["payload"]))
     print()
     print(method("preimageInput", vectors["preimageInput"]))
+
+    # The v2 sections. `fineType` rather than a coarse one on purpose: each
+    # implementation must derive the envelope's type with its own coarsening
+    # rule, so the fixture pins the rule and the bytes in one check.
+    for key, prefix in (("v2", "V2"), ("v2Bookkeeping", "V2BK")):
+        section = vectors[key]
+        print()
+        print(f"    static final String {prefix}_FINE_TYPE = {literal(section['fineType'])};")
+        print(f"    static final String {prefix}_PAYLOAD_CANONICAL = {literal(section['payloadCanonical'])};")
+        print(f"    static final String {prefix}_PAYLOAD_HASH = {literal(section['payloadHash'])};")
+        print(f"    static final String {prefix}_PREIMAGE_CANONICAL = {literal(section['preimageCanonical'])};")
+        print(f"    static final String {prefix}_HASH = {literal(section['hash'])};")
+        print()
+        print(method(f"{prefix.lower()}Payload", section["payload"]))
+        print()
+        print(method(f"{prefix.lower()}PreimageInput", section["preimageInput"]))
     print("}")
 
 

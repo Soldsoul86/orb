@@ -35,6 +35,82 @@ final class JournalTest {
         editingAPayloadIsNotDetected();
         everyBreakIsReported();
         anUnreadableHeadIsDeclaredDiscontinuous();
+        v2WritesACoarseEnvelope();
+        v1IsWhatThisBuildWrites();
+    }
+
+    /**
+     * What `append` puts on disk under v2.
+     *
+     * `JsonTest` pins the *encoding* against the TypeScript vectors. This pins
+     * the *journal*: that it coarsens the type, drops `causes`, wraps the
+     * payload, and still chains. An encoder that agreed with the vectors while
+     * the journal fed it the wrong object would pass there and fail here.
+     */
+    private static void v2WritesACoarseEnvelope() throws IOException {
+        Harness.suite("under v2 the envelope says an event happened, and no more");
+        File dir = temp("v2");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        journal.useEnvelopeVersion(2);
+
+        Map<String, Object> event = journal.append("probe.heartbeat", beat(1));
+        Harness.check("the append succeeded", event != null);
+
+        Harness.equal("the envelope carries the coarse type", event.get("type"), Journal.CONTENT_TYPE);
+        Harness.equal("and a schema describing an encrypted payload",
+            Json.canonical(event.get("schema")), "{\"id\":\"orb.content\",\"version\":1}");
+        Harness.check("and states no lineage at all", !event.containsKey("causes"));
+        Harness.equal("and names its format, so a reader knows which rule to apply",
+            event.get("v"), 2L);
+
+        // The real type is inside the payload, with the nonce and the real
+        // schema. Erasing the payload takes all three with it.
+        String payload = Json.canonical(event.get("payload"));
+        Harness.check("the real type is in the payload", payload.contains("\"type\":\"probe.heartbeat\""));
+        Harness.check("with a 128-bit nonce", payload.matches(".*\"nonce\":\"[0-9a-f]{32}\".*"));
+        Harness.check("and the real schema", payload.contains("\"id\":\"probe.heartbeat\""));
+        Harness.check("the envelope names nothing about the subject",
+            !Json.canonical(withoutPayload(event)).contains("heartbeat"));
+
+        // The nonce means a caller's own object no longer hashes to the
+        // commitment. That is the confirmation oracle closing, not a defect.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        Harness.equal("payloadHash commits to the wrapper",
+            Journal.sha256(payload), integrity.get("payloadHash"));
+        Harness.check("and not to the caller's payload",
+            !Journal.sha256(Json.canonical(beat(1))).equals(integrity.get("payloadHash")));
+
+        journal.append("probe.heartbeat", beat(2));
+        Harness.equal("a v2 lane still verifies", journal.verify(), "ok (2 events)");
+    }
+
+    /**
+     * The negative control on the default, and the reason it is a test rather
+     * than a comment: a build that quietly started writing v2 would put a
+     * version seam through a running measurement.
+     */
+    private static void v1IsWhatThisBuildWrites() throws IOException {
+        Harness.suite("this build still writes v1, deliberately");
+        File dir = temp("v1-default");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        Map<String, Object> event = journal.append("probe.heartbeat", beat(1));
+        Harness.check("the append succeeded", event != null);
+
+        Harness.equal("the default is 1", Journal.DEFAULT_ENVELOPE_VERSION, 1);
+        Harness.check("so no version field is written", !event.containsKey("v"));
+        Harness.equal("and the fine type is on the envelope", event.get("type"), "probe.heartbeat");
+        Harness.check("and the payload is the caller's own object",
+            !Json.canonical(event.get("payload")).contains("nonce"));
+    }
+
+    /** An event with its payload removed, for asking what the envelope alone says. */
+    private static Map<String, Object> withoutPayload(Map<String, Object> event) {
+        Map<String, Object> envelope = Json.obj();
+        for (Map.Entry<String, Object> entry : event.entrySet()) {
+            if (!entry.getKey().equals("payload")) envelope.put(entry.getKey(), entry.getValue());
+        }
+        return envelope;
     }
 
     /**
