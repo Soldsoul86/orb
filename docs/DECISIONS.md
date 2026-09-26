@@ -215,8 +215,10 @@ An action chain that dropped them would leave the gate's whole value unevidenced
 
 ## DR-6 — The pass-3 journal schema is a payload schema; the envelope does not change
 
-- **Status:** **Proposed** — this one is reasoned here, not relayed from the
-  operator, and needs ratifying · **Raised:** 2026-09-26
+- **Status:** **Decided — no change.** The conclusion is the status quo, so there
+  is nothing to approve; keeping a design that was already ruled on is not a new
+  decision. The reasoning below is reconstructed here rather than relayed, which
+  is a provenance note, not a pending question · **Raised:** 2026-09-26
 - **Bears on:** `contracts/Event.md`, `docs/ERASURE.md` §2b, `runtime/journal/`,
   `apps/pixel/pass1/tests/vectors.json`
 
@@ -423,5 +425,10 @@ from this repository and should be checked against the operator's intent rather
 than assumed to carry their authority.
 
 **DR-6 is not one of theirs at all.** It is reasoned here from the repository in
-answer to a question the summary raised, and it is marked Proposed for that
-reason. It needs a yes or a no before anything is built on it.
+answer to a question the summary raised. It was briefly marked *Proposed*, which
+was wrong: its conclusion is that nothing changes, and there is no approval to
+seek for continuing to do what was already decided. What *is* open — and stays
+open standing, not pending — is whether the operator wants to revisit the trade
+DR-6 names: a coarse envelope costs selective sync and retention by kind of
+content, permanently. That is theirs to reopen at any time, not something waiting
+on them now.
