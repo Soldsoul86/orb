@@ -23,13 +23,13 @@ needs, including the author in three months.*
 | **P2** | Nothing resumes after reboot until the app is opened | **Refuted.** `specialUse` reached the foreground **133 s after boot** and recorded 15 clean beats with nobody present (§5k) |
 | **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** Now across a full day: 21.1 h, two services, three reboots, eight process restarts, **zero unexplained** — and the beat counter never skips (§5l) |
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
-| **P6** | Cheap signals arrive with no foreground service | **Under test** — `apps/pixel/pass2` runs no service at all |
+| **P6** | Cheap signals arrive with no foreground service | **Held 2026-09-27** — `BOOT_COMPLETED` reached a manifest receiver with no service running, 5 min before the app was opened. One signal, and **31m59s after boot** (§7b1) |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Superseded** — pass 2 has no service, so the question became P6 |
-| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Under test** — the `because` field names which route caught it |
+| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Open** — nothing changed in the first export, so the question was never put. The mechanism it needs is confirmed: the post-reboot reading compared against history rather than re-baselining (§7b1) |
 
 ### What it establishes
 
@@ -1511,6 +1511,67 @@ start. That is P16 answered from the record instead of argued about.
 
 ---
 
+
+---
+
+### 7b1. The first export read back — 2026-09-27
+
+The phone's journal came off the device as
+`orb-pass2-20260927-213805.txt` and went through `importExport` into a
+file-backed journal. **Eight events, one chain, no gaps:** two
+`grants.process.start`, five `grants.observed`, one `grants.export`.
+
+| wallClock (UTC) | uptime | `because` | changed | baseline | a11y / listeners / admin |
+| --- | --- | --- | --- | --- | --- |
+| 09-26 11:30:34.806 | 2h05m45s | *(process.start)* | | | boot ≈ 09-26 09:24:49 |
+| 09-26 11:30:34.813 | 2h05m45s | `process.start` | false | **true** | 1 / 5 / 1 |
+| 09-26 11:30:34.833 | 2h05m45s | `app.opened` | false | false | 1 / 5 / 1 |
+| 09-27 16:02:59.403 | 0h31m59s | *(process.start)* | | | boot ≈ 09-27 15:31:00 |
+| 09-27 16:02:59.436 | 0h31m59s | `process.start` | false | false | 1 / 5 / 1 |
+| 09-27 16:02:59.588 | 0h31m59s | `signal:…BOOT_COMPLETED` | false | false | 1 / 5 / 1 |
+| 09-27 16:08:03.867 | 0h37m03s | `app.opened` | false | false | 1 / 5 / 1 |
+
+**The cross-implementation check ran on real history.** `verifyLane` re-derived
+every envelope hash and every payload hash over the phone's own chain — the
+check the probe structurally cannot perform on itself, since re-derivation needs
+a JSON parser `Journal.java.in` does not have. It passed. Re-importing the same
+file replicated 0 and observed 0, so idempotence holds on real data and not only
+on the generated fixture.
+
+**P6 — held, on one signal, on this date, against this build.**
+`signal:android.intent.action.BOOT_COMPLETED` was delivered to a manifest
+receiver with **no service of any kind running**, and the reading it produced
+landed five minutes before the operator opened the app. That is the experiment
+pass 1 could not run, because a foreground service ran throughout. It is a
+demonstration that the route works, not a measurement of how often it does.
+
+**And it is late.** `wallClock − elapsedRealtimeMs` puts boot at ≈15:31:00 UTC
+and the broadcast at 16:02:59 — **31m59s after boot**. The process started 152 ms
+before the signal event, so the broadcast is what created the process; the delay
+is in delivery, not in us. The likely cause is that a receiver which is not
+direct-boot aware waits for the first unlock — *that is a hypothesis, not a
+reading.* Either way the operational fact stands: a watchdog on this route can
+learn nothing for half an hour after a reboot.
+
+**P16 — the mechanism is confirmed; the subject never occurred.** Nothing
+changed in this window: five readings, `changed: false` on every one, identical
+holdings across ~28.5 hours and one reboot. So the question P16 asks — *is a
+grant that moved while the app was dead caught at the next start?* — was never
+put to the device, and it stays open. What the run does establish is the part
+P16 depends on: the 09-27 post-reboot reading carries **`baseline: false`**. A
+fresh process on a freshly booted phone compared against history instead of
+re-baselining. Had a grant moved, there was something to move against.
+
+**Zero alerts, correctly.** `project` folded five Observations into three
+holdings, `alertsFor` returned nothing, `raiseAlerts` wrote nothing. Silence here
+means *watched and unchanged*, which the journal can say because every reading is
+recorded whether or not it changed.
+
+**One gap, and the file is honest about it.** The chain's first event carries
+`previous: null` and the first reading `baseline: true`, so **this lane starts on
+09-26 at 11:30 UTC** — the three events from the morning's install are not in it.
+A fresh journal, not a truncated one; the distinction is visible rather than
+inferred.
 
 ---
 

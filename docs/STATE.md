@@ -265,7 +265,7 @@ The section that matters most, and the one a summary is most tempted to shorten.
 
 | | |
 | --- | --- |
-| **P6 and P16** | pass 2 was installed 2026-09-26 and has not yet been read back. Until then it is not known whether a broadcast reaches it with no service running, or how coarse the detection is |
+| **P16** | the first export (2026-09-27) carried no change at all, so it is still unknown how coarse the detection is. P6 is answered: a `BOOT_COMPLETED` broadcast did reach pass 2 with no service running — 32 minutes after boot |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
 | `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
@@ -293,8 +293,12 @@ cross-implementation verification on real data: `verifyLane` re-derives every
 envelope and payload hash, which the phone cannot do for itself, since
 re-derivation needs a JSON parser the probe deliberately does not have.
 
-**What remains is the device.** Pass 2 has been recording since this morning and
-P6 and P16 are unread — the loop is built and has never run on a real export. The
-connector has no driver. Sync does not exist, so the export is a file the operator
-carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is
+**The loop has now run on a real export** (2026-09-27, §7b1 of `DEVICE_LOOP.md`):
+eight events, `verifyLane` clean over the phone's own chain, five Observations,
+zero alerts — because nothing had changed. **P6 held** on one signal; **P16 is
+still open**, since no grant moved for the next process start to catch, though
+the post-reboot reading did compare against history rather than re-baseline.
+
+**What remains is the device.** The connector has no driver. Sync does not exist,
+so the export is a file the operator carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is
 where DR-5's intent chain and DR-7's seven days belong.

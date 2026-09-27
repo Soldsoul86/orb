@@ -6,10 +6,11 @@
  * once — and `Observation.md` §1 makes an Observation the record *that a
  * perception happened*, not a record per thing perceived.
  *
- * **The transport does not exist yet.** Pass 2 writes these on the phone, in its
- * own lane, in Java. Getting that lane into this runtime is an import or a sync,
- * and neither is built. This package is written against the shape rather than
- * against the pipe, so the pipe can be either.
+ * **The transport is `import.ts`, and sync is still absent.** Pass 2 writes these
+ * on the phone, in its own lane, in Java; `importExport` replicates that lane
+ * from a file the operator carries. A live sync is not built. This package is
+ * written against the shape rather than against the pipe, so the pipe can be
+ * either.
  */
 export interface KindReading {
   readonly kind: string;

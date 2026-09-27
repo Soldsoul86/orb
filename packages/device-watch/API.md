@@ -58,5 +58,5 @@ interface DeviceAuthorityReading {
 }
 ```
 The `data` of the Observation this reads. Mirrors what `apps/pixel/pass2`
-records. The transport that carries it from the phone into this runtime does not
-exist yet.
+records. `importExport` above carries it from the phone as a file; a live sync
+does not exist yet.
