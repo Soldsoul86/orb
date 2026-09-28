@@ -213,6 +213,17 @@ reporting that reality changed; recording an unknown outcome as a known one.
 - **A composite that escalates.** "Summarise my week and send it" reaches a
   send. It is authorized as a send — irreversible — not as a summary. Composition
   never launders a tier.
+- **A remote model call — settled by DR-9.** A `Reasoner` wants a remote model to
+  interpret a week of the user's history. `ModelRouter.md` originally gated that
+  disclosure by reaching `Policy` itself, which would have made **two egress paths
+  where inv. 1 says there is one**, and only one of them described as egress. It is
+  a Capability: an external effect, at tier *Act (irreversible)* because you cannot
+  un-disclose, declared **per route** because the destination is part of the
+  consequence. The router resolves and minimizes; it never emits. §1's *reads are
+  capabilities too* is the same clause doing the work, one plane out — the payload
+  here is not a message to a person but the user's own history, which is the
+  stronger case rather than the weaker one. A *local* model route reaches no
+  Capability at all, because nothing leaves (`../docs/DECISIONS.md` DR-9).
 - **Enumerating every installed package — a read this contract would have caught.**
   On 2026-09-28 `apps/pixel/pass2` was given `QUERY_ALL_PACKAGES` to read the
   device's full package list (`../docs/DEVICE_LOOP.md` §7b6–§7b8). The decision was

@@ -59,7 +59,11 @@ the `InferenceRecord`s it writes.
 2. **Gathering** — a task arrives; the Reasoner takes the relevant history from the
    `Retriever` and the grounding (Evidence, Beliefs, Twin) it needs.
 3. **Routing** — it resolves a concrete model through the `ModelRouter` (local or
-   remote, per policy).
+   remote). A local route it uses directly. A remote one comes back as a *proposed
+   disclosure*, which reaches the model only through that route's `Capability`
+   (`../docs/DECISIONS.md` DR-9). **Whether the Reasoner itself carries the
+   proposal through, or an `Agent` above it does, DR-9 leaves open** — this
+   contract should not be read as having settled it.
 4. **Inferring** — the model interprets the inputs; the Reasoner shapes the output into
    interpretation, belief revisions, or a decision.
 5. **Recording** — it writes an `InferenceRecord` with full provenance, and emits its

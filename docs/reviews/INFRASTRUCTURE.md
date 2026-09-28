@@ -210,7 +210,7 @@ to be read.
 
 ### Gaps found
 
-#### 4. Is a remote model call a `Capability`?
+#### 4. Is a remote model call a `Capability`? — ~~open~~ **settled 2026-09-28, DR-9: yes**
 
 `Capability.md` §4.1 says the runtime affects the world only through a Capability,
 and §8 says **reads are capabilities too**. A remote model call is an outbound
@@ -226,18 +226,41 @@ Both readings are defensible and they are not the same architecture:
 - *The router is its own egress* — model disclosure is a distinct kind of effect,
   gated distinctly, and `Capability.md` §8 does not reach it.
 
-Nothing in the kernel currently says which. **This should be settled before either
-contract is accepted**, because accepting them both as written freezes the
-ambiguity into v1.
+Nothing in the kernel said which, and accepting both as written would have frozen
+the ambiguity into v1.
 
-#### 5. `ModelRouter` is the only Infrastructure contract depending on `Policy`
+**Settled (`../DECISIONS.md` DR-9): resolving is not emitting.** A remote route is
+a Capability — tier *Act (irreversible)*, because you cannot un-disclose, declared
+per route because the destination is part of the consequence. The `ModelRouter` is
+not one and never becomes one: a Capability declares a *specific* effect, and the
+router's whole job is choosing among effects, so it could not declare honestly and
+completely (inv. 2). It resolves and minimizes and yields a **proposed
+disclosure**; its caller carries that through the Capability; the Capability emits
+and produces the `Action`.
+
+The immediate price, charged rather than deferred: **remote reasoning stops being
+free at the point of use.** At irreversible tier it defaults to human confirmation,
+so routine remote calls run on an explicit standing, per-scope authorization
+(`Policy` §1, Ruling 1) — not on the absence of a gate. The counter-reading, and
+why it lost, is recorded in DR-9 rather than dropped.
+
+#### 5. `ModelRouter` was the only Infrastructure contract depending on `Policy` — ~~intended~~ **it was the symptom**
 
 Every other one depends on `Journal`, `Storage`, `Event` or `Encryption` —
-mechanism. `ModelRouter` depends on a **decision-maker**, and the dependency
-direction check in `KERNEL.md` should say explicitly that this is intended. The
-reason it is intended is disclosure: the router cannot authorize itself
-(Art. VIII §32), so it must reach something that can. Recorded here so a later
-reader does not read it as a layering violation and "fix" it.
+mechanism. `ModelRouter` depended on a **decision-maker**, and this section first
+recorded that as intended, reasoning that the router cannot authorize itself
+(Art. VIII §32) and so must reach something that can.
+
+**That explanation was wrong, and gap 4 is why.** The anomaly was real; it was the
+symptom of the same mistake. The router reached a decision-maker because it was
+doing the deciding — holding its own gate, on its own egress path. Under DR-9 it
+emits nothing, therefore authorizes nothing, therefore needs no edge to `Policy`:
+`KERNEL.md`'s entry now reads **`Encryption` alone**, and Infrastructure depends on
+no decision-maker anywhere.
+
+Worth keeping as a worked example rather than quietly deleting: *an edge that needs
+a paragraph of justification is usually a design error wearing one.* The paragraph
+was written, was plausible, and was defending the wrong thing.
 
 #### 6. `AttachmentKeyring`'s rules lived only in code comments
 
@@ -260,7 +283,10 @@ that should be recorded so the next writer does not re-open it.
 
 ### What a reviewer should challenge
 
-1. **Gap 4 first.** One egress or two. Everything else here is smaller.
+1. ~~**Gap 4 first.** One egress or two.~~ **Settled, DR-9** — one. What remains
+   reviewable is the *price*: irreversible tier means routine remote reasoning
+   depends on a standing per-scope authorization, and a reviewer who thinks that is
+   too heavy is disagreeing with the tier, not with the ruling.
 2. **"Capability is discovered, never assumed" is an obligation with a cost.**
    Rechecking is a round trip. The contract says capability is rechecked rather
    than remembered and does not say how often, which may be the right silence or

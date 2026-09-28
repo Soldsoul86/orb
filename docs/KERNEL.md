@@ -850,15 +850,20 @@ authority.
 
 **Responsibilities**
 - Resolve a reasoner's request to a concrete model, local or remote.
-- Enforce minimization and policy on any disclosure.
+- Minimize what a remote route would disclose, and propose it for authorization.
 - Record routing and disclosure provenance.
 
 **Invariants**
 - No provider is hardcoded; a local route is always available.
 - Model swaps affect only future interpretation.
 - Every routing and disclosure is recorded.
+- It resolves; it never emits on a remote route. *(DR-9.)*
 
-**Dependencies** — Policy, Encryption.
+**Dependencies** — Encryption. *(Corrected 2026-09-28, DR-9. This previously read
+"Policy, Encryption" — the router reached a decision-maker because it was doing
+the deciding. A remote route is reached through a `Capability` like every other
+effect on the world, so the router authorizes nothing and needs no edge to
+`Policy`.)*
 
 ## Encryption
 *Kind — Service.*

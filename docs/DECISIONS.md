@@ -517,6 +517,113 @@ against the pipe.
 
 ---
 
+## DR-9 — A remote model call is a Capability; the ModelRouter is not
+
+- **Status:** Decided · **Decided:** 2026-09-28 · **Bears on:** `contracts/ModelRouter.md`,
+  `contracts/Capability.md`, `KERNEL.md`, `reviews/INFRASTRUCTURE.md` gaps 4 and 5
+
+**The question.** `Capability.md` inv. 1 says *the runtime affects the world only
+through a Capability*, and §8 says *reads are capabilities too — pretending
+otherwise is how read access becomes invisible*. A remote model call is an
+outbound network effect carrying the user's own history. On the plain reading of
+those two clauses it is a Capability. Yet `ModelRouter.md` as drafted gates its
+own disclosures by reaching `Policy` directly. **That is two egress paths, only
+one of which the architecture describes as egress** — and it makes inv. 1 false as
+written, which is a contradiction between two Draft contracts rather than an
+ambiguity. One of them had to yield.
+
+### The ruling
+
+> **Resolving is not emitting.** The `ModelRouter` resolves; a `Capability` emits.
+> A remote route is reached through a declared Capability like every other effect
+> on the world. The router itself is not one, and never becomes one.
+
+The router is not a Capability because a Capability **declares a specific
+effect** and the router's entire job is *choosing among* effects. A component
+whose destination is a parameter cannot declare honestly and completely (inv. 2).
+
+So the work splits along the line that was already there in `ModelRouter.md` §1 —
+the router chooses *where*, it never acts on what it carries:
+
+1. **Resolve.** The router turns a request into a **proposed disclosure**: a
+   concrete route plus the minimized content. Pure, no bytes move. Only the router
+   can do this, because minimization and route choice are the same decision.
+2. **Authorize.** The proposal goes through the egress Capability's ordinary
+   authorization — `Policy`, per scope, at its tier. Nothing bespoke.
+3. **Emit.** The Capability sends, and produces the `Action`. The router never
+   emitted anything, so it never authorized anything, so inv. 4 holds structurally
+   rather than by promise.
+
+### What follows, whether we like it or not
+
+1. **A remote route is tier `Act (irreversible)`.** You cannot un-disclose.
+   Under `CAPABILITY_MODEL.md` §5 that means human confirmation by default, and
+   routine remote reasoning therefore runs on an explicit **standing, per-scope**
+   authorization (`Policy` §1, Ruling 1 of `CLAIMS.md` §5) — not on the absence of
+   a gate. **Remote reasoning stops being free at the point of use.** That is the
+   price of this ruling and it is charged immediately.
+2. **One Capability per route, not one for "remote models".** The destination is
+   part of the consequence. A Capability declared as *send text to a provider*
+   declares nearly nothing, and an authorization granted against it would be an
+   authorization against everything. Routes are declared individually; what may go
+   is carried by the scope, exactly as it is for *send a message*.
+3. **`ModelRouter` loses its `Policy` dependency, and gains no `Capability` one.**
+   It depends on neither Service, because it never emits — its caller carries the
+   proposal onward. **The addendum's gap 5 was a real anomaly with a wrong
+   explanation**: the router reached a decision-maker because it was doing the
+   deciding, which it must not. It now depends on `Encryption` alone.
+4. **The no-reroute rule stops being the router's own.** `ModelRouter.md` §7
+   forbids retrying a denied disclosure through a different remote route. Under
+   this ruling that is simply invoking a second Capability after the first was
+   denied — which `Agent.md` §4.5 already forbids as decomposition. A ruling that
+   lets an existing rule do the work is doing less damage than one that adds a
+   rule.
+5. **The fallback becomes visible.** A remote route's unreachability is discovered
+   by the Capability and reported; the caller re-resolves and the second resolution
+   is its own record. §7 already insisted the fallback was provenance rather than
+   an implementation detail — now it cannot be anything else.
+6. **A local route reaches no Capability at all**, because nothing leaves. This is
+   *cannot* versus *did not* one more time: a local route is not an unauthorized
+   disclosure, it is **not a disclosure**. Recording it stays mandatory for
+   provenance; authorizing it would be authorizing nothing.
+
+### What this does not change
+
+- **No Constitution amendment.** Art. VI §25 and Art. VII §27 are read literally,
+  which is what forced the ruling; Art. VIII §32 is satisfied by the Capability's
+  ordinary record rather than by a second mechanism.
+- **Nothing in `Encryption.md`**, whose dependency edge was already none.
+- **No other `ModelRouter` invariant.** No hardcoded provider, a local route always
+  available, capability discovered never assumed, `degraded` never `unavailable`,
+  history untouched by swaps — all stand unaltered.
+- **AD-7 is unaffected.** `device-watch`'s package read is a separate crossing of
+  the same boundary and stays open on its own terms.
+
+### What stays open
+
+- **Who holds the authorization** — the `Reasoner` that wanted the interpretation,
+  or an `Agent` above it. That is a Runtime Loop question about the caller, not a
+  kernel question about the contracts, and both contracts are indifferent to the
+  answer. It should not be left indefinite once the loop is written.
+- **Whether a route's Capability is declared per provider or per model version.**
+  §5 of `ModelRouter.md` requires a recorded routing to name the exact model
+  version; whether *authorization* must be that narrow is not settled here, and
+  the honest answer may be that a model swap within a provider changes what is
+  disclosed to nobody and so needs no re-authorization.
+
+### The counter-argument, recorded rather than buried
+
+The other reading was available and is not absurd: **model disclosure is a
+distinct kind of effect** — it is the only effect whose payload is the user's
+interpretation of their own life rather than a message to a person — and gating it
+distinctly would let it be reasoned about distinctly. It was rejected because the
+benefit is a property of how the Capability is *declared and scoped*, which this
+ruling keeps, while the cost is a second egress path that nobody auditing the
+system would know to look for. **An invisible second door is worse than a
+coarse-grained first one.**
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

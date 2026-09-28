@@ -6,11 +6,17 @@ Domain:     Infrastructure
 Kind:       Service
 Version:    v1
 Status:     Draft
-Depends on: Policy, Encryption
+Depends on: Encryption
 ```
 
 > The ModelRouter decides **where a thought is computed**. It never decides what
 > the thought means. See `../docs/AGENT_RUNTIME.md` §4 and `../docs/SECURITY.md` §7.
+
+> **Settled 2026-09-28 (DR-9): resolving is not emitting.** The router resolves a
+> request to a concrete route and minimizes what a remote one would carry. It does
+> not send. A remote route is reached through a declared `Capability` at tier
+> *Act (irreversible)*, like every other effect on the world, so there is **one
+> egress path and not two**. Every mention of disclosure below is read that way.
 
 **Why a permanent kernel contract?** Because *"models are replaceable; no provider
 is hardcoded"* (Art. III §11) is a claim that decays the moment any component may
@@ -41,10 +47,16 @@ Sending a prompt to a model that is not on this device puts the user's data in
 someone else's hands. That is the event the contract exists to govern:
 
 - **Minimized** — the least the request needs, never the convenient superset.
-- **Permissioned** — `Policy` decides, per Art. VIII §32. The router does not
-  authorize itself, exactly as a `Capability` may not (`Capability.md` §4.4).
+  This is the router's own work: route choice and minimization are one decision,
+  and nothing above the router can make it, because nothing above knows the route.
+- **Permissioned** — through the route's `Capability`, per Art. VIII §32 and
+  Art. VII §27. The router does not authorize itself, and under DR-9 it *cannot*:
+  it produces a **proposed disclosure** — concrete route plus minimized content —
+  and its caller carries that through the Capability. A component that never emits
+  never authorizes.
 - **Recorded** — what went out, to which model, under which authorization, as
-  history.
+  history. The `Action` is the Capability's (`Capability.md` §4.6); the routing
+  and the provenance are the router's.
 
 **A local route discloses nothing and is therefore not exempt from recording.** The
 route is recorded either way, because *which* model produced an interpretation is
@@ -76,11 +88,13 @@ with the interpretation that depended on it.
    (on-device or remote), and what it costs in disclosure.
 2. **Resolution.** A `Reasoner`'s request is resolved to a concrete route, by
    suitability and by policy — never by hardcoded preference for a named provider.
-3. **Gating.** A remote route's disclosure is submitted to `Policy` before
-   anything leaves. A denial ends the attempt; it is never retried through a
+3. **Proposal.** For a remote route the router emits nothing and instead yields a
+   proposed disclosure. Authorization happens outside it, through that route's
+   `Capability`. A denial ends the attempt; it is never retried through a
    different remote route (see §7).
-4. **Invocation and recording.** The route is called, and the routing decision,
-   the disclosure and the provenance are recorded.
+4. **Invocation and recording.** A local route the router may call itself, because
+   nothing leaves. A remote route is called by its `Capability`. Either way the
+   routing decision and the provenance are recorded.
 5. **Retirement.** A route may disappear at any time — a provider withdraws a
    model, a device loses a local one. Past interpretations remain readable and
    remain attributed to the model that produced them.
@@ -90,10 +104,10 @@ with the interpretation that depended on it.
 ## 3. State transitions
 
 ```
-registered ──▶ available ──resolve──▶ routing ──▶ available
+registered ──▶ available ──resolve──▶ proposed ──▶ available
                    │                     │
-                   │                     ├──policy denies──▶ recorded as denied, not rerouted
-                   │                     └──remote unreachable──▶ local route, or refused
+                   │                     ├──authorization denied──▶ recorded, not rerouted
+                   │                     └──remote unreachable──▶ re-resolve local, or refused
                    │
                    ├──(remote route unreachable)──▶ degraded  (local still available)
                    └──retire──▶ retired   (past interpretations keep their attribution)
@@ -114,11 +128,13 @@ exists to prevent.
    without it.
 2. **A local route is always available.** Orb remains useful with no network
    (Art. VIII §31).
-3. **Never authorizes its own disclosure.** `Policy` decides, always.
+3. **Never emits on a remote route, and therefore never authorizes one.** The
+   route's `Capability` emits; authorization is obtained against it (DR-9).
 4. **Disclosure is minimized** — the least the request needs.
 5. **Every routing is recorded**, local and remote alike, with its provenance.
 6. **Every disclosure is recorded** — what left, where it went, under which
-   authorization.
+   authorization. A remote route that carries no authorization reference is
+   refused by the router, not merely unauthorized.
 7. **Model swaps affect only future interpretation.** History is untouched by a
    route changing; a past interpretation keeps the model that produced it
    (Art. III §13).
@@ -127,9 +143,9 @@ exists to prevent.
 10. **An output is an observation**, carrying provenance, never truth (Art. III §12,
     Art. XI §43).
 
-Upholds Constitution Articles III (Models and Reasoning), VI §26 (the Execution
-Plane holds no truth) and VIII §30–§32 (root of trust, local-first, minimized
-disclosure).
+Upholds Constitution Articles III (Models and Reasoning), VI §25–§26 (only the
+Execution Plane acts on Reality, and it holds no truth) and VIII §30–§32 (root of
+trust, local-first, minimized disclosure).
 
 ---
 
@@ -171,14 +187,17 @@ Not guaranteed:
 
 ## 7. Failure modes
 
-- **Remote route unreachable.** Fall back to a local route and record that the
-  fallback happened. **The fallback is provenance, not an implementation detail**:
+- **Remote route unreachable.** Discovered by the route's `Capability`, reported,
+  and the request re-resolved to a local route — a second resolution with its own
+  record, never a silent substitution inside one call.
+  **The fallback is provenance, not an implementation detail**:
   an interpretation produced locally because the network was down is a different
   artifact from one produced remotely, and a reader must be able to tell.
-- **Policy denies a disclosure.** Recorded with the reason, and **the router does
-  not try a different remote route.** Rerouting around a denial is the same
-  violation as an `Agent` decomposing a denied effect (`Agent.md` §4.5) — the
-  denial was about the disclosure, not about the destination.
+- **A disclosure is denied.** Recorded with the reason, and **the router does not
+  propose a different remote route.** Under DR-9 rerouting around a denial is
+  invoking a second `Capability` after the first was refused, which `Agent.md`
+  §4.5 already forbids as decomposition — the denial was about the data leaving,
+  not about the destination.
 - **No route at all.** The request fails and says so. It never fabricates an answer,
   and it never silently returns a lower-quality one as though it were what was
   asked for.
@@ -191,9 +210,9 @@ Not guaranteed:
   attribution and remain readable. Nothing is re-run to "refresh" them, because
   that would replace recorded history with new intelligence.
 
-Never permitted: an unrecorded disclosure; disclosure without authorization;
-routing around a denial; a hardcoded provider; presenting a model's output as truth;
-re-running history to change it.
+Never permitted: an unrecorded disclosure; the router emitting on a remote route
+itself; disclosure without authorization; routing around a denial; a hardcoded
+provider; presenting a model's output as truth; re-running history to change it.
 
 ---
 
@@ -204,13 +223,19 @@ re-running history to change it.
   was produced locally. Nothing about the loop stops, which is Art. VIII §31 as a
   behaviour rather than a slogan.
 - **A disclosure that is asked about.** A reasoner wants a remote model to
-  summarise a week of history. The router minimizes to what the request needs,
-  `Policy` gates it, the user authorizes it, and what left the device is in the
-  journal. Three months later it is answerable *exactly* what was disclosed.
+  summarise a week of history. The router minimizes to what the request needs and
+  proposes route R; the Capability for R is authorized per scope; what left the
+  device is in the journal. Three months later it is answerable *exactly* what was
+  disclosed.
 - **A denial that is not rerouted.** The same disclosure is denied. The router
-  records the denial and stops. It does not try a second provider, split the
-  content, or fall back to a route with a weaker policy — the objection was to the
+  records the denial and stops. It does not propose a second provider, split the
+  content, or fall back to a route with a weaker scope — the objection was to the
   data leaving, not to where it was going.
+- **A local route needs no authorization, and that is not a loophole.** Nothing
+  leaves, so there is no disclosure to permit; the routing is still recorded,
+  because provenance is about where thinking happened and not about who consented.
+  Authorizing a local route would be authorizing nothing, which is how a gate
+  becomes a formality.
 - **A model retired underneath a record.** A provider withdraws the model that
   produced an interpretation last year. The interpretation is unchanged, still
   attributed, still readable. Re-running it today would produce a *new*

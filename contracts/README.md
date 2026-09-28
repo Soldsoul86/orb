@@ -102,11 +102,11 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 5. Execution
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [Capability](Capability.md) | Service | Draft |
-| [Action](Action.md) | State | Draft |
-| [Policy](Policy.md) | State | Draft |
-| Scheduler | Service | _pending_ |
-| Agent | Service | _pending_ |
+| [Capability](Capability.md) | Service | Accepted |
+| [Action](Action.md) | State | Accepted |
+| [Policy](Policy.md) | State | Accepted |
+| [Scheduler](Scheduler.md) | Service | Draft |
+| [Agent](Agent.md) | Service | Draft |
 
 > `Action` and `Policy` declare narrower dependencies than `KERNEL.md` lists for
 > them: both name Capabilities by **value** rather than depending on the
@@ -116,8 +116,8 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 6. Infrastructure
 | Contract | Kind | Status |
 | --- | --- | --- |
-| Journal | Service | _pending_ |
-| Storage | Service | _pending_ |
-| Synchronization | Service | _pending_ |
-| ModelRouter | Service | _pending_ |
-| Encryption | Service | _pending_ |
+| [Journal](Journal.md) | Service | Draft |
+| [Storage](Storage.md) | Service | Draft |
+| [Synchronization](Synchronization.md) | Service | Draft |
+| [ModelRouter](ModelRouter.md) | Service | Draft |
+| [Encryption](Encryption.md) | Service | Draft |
