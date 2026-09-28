@@ -456,3 +456,39 @@ and three of them will stay archive files.
 
 **Discharged when** one Orb install on one phone is one peer with an identity of
 its own, and two installs are two peers rather than a collision.
+
+---
+
+## AD-9 — the device and the replication path disagree about a historical chain break
+
+**Opened 2026-09-28** (`DEVICE_LOOP.md` §7b26). **Debt, not a defect**: both
+behaviours are defensible, and nothing is silently wrong.
+
+**The finding.** Pass 1's lane carries §5d's permanent break at index 4
+(`previous: "35"`). Two parts of Orb treat it differently:
+
+| | Policy | Where |
+| --- | --- | --- |
+| On device | **Tolerate and record.** `chain.noNewBreaks` compares break *positions* against the previous self-test and fails only on a **new** break; the lane is reported as `chainBreaks: 4` and passes | §5j, `SelfTest.java.in` |
+| On import | **Refuse everything.** `verifyLane` walks the whole lane and throws on the first break, so `replicate` adopts none of the 5,757 events | `integrity.ts`, `journal.ts` |
+
+**Why it is not obviously a bug.** `verifyLane` cannot distinguish a historical
+defect from tampering — a break is a break, and if a declared break were
+accepted, declaring one would be the attack. Refusing is the conservative
+reading of Art. I.
+
+**Why it is not obviously right either.** The break is recorded, dated,
+explained, and the device has appended past it for four days. Refusing means a
+real device's honest history **can never be replicated**, which sits badly with an
+architecture whose claim is that history is replayable and that peers converge by
+union. The device already implements the more careful policy; the replication
+path simply never learned it.
+
+**The shape of a resolution, not chosen here.** §5j's mechanism — compare break
+*positions* against a previously attested baseline — is exactly what would let
+`replicate` accept *this* break and refuse a new one. That needs a place to
+attest the baseline from, which is the hard part: a peer must not be able to
+assert its own breaks into legitimacy.
+
+**Discharged when** one policy governs both, or the two are deliberately
+different with the reason written down.

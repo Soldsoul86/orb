@@ -3630,3 +3630,63 @@ intact. Four days of P20 work, paying off as an operations decision.
 The residual cost of the revised plan is **nothing**, against three permanently
 unadoptable histories in the original. The error was assuming one journal because
 the script defaults to one.
+
+### 7b26. The import dry run — pass 2 adopts, pass 1 **cannot** — 2026-09-28
+
+Run before asking for the four files, on exports already in hand.
+
+**Pass 2 B (`grants-b`) adopts cleanly.** 69 events replicated, projection built,
+two alerts raised from the `com.ixigo` / `com.nhn.android.band` changes. The
+route works end to end.
+
+**Pass 1 (`pixel`) is refused outright:**
+
+```
+JournalIntegrityError: lane hash chain is broken
+  index: 4   expectedPrevious: c23c88bb…   actualPrevious: '35'
+```
+
+That is `SETTLED.md`'s **first row** — §5d's defect, a numeric extractor that read
+a hash's digit prefix, written on 2026-09-25 by a build that still had the bug.
+**Historical, permanent, correctly reported, and unrepairable**, because Art. I §2
+forbids editing the event that carries it.
+
+#### This is a bigger constraint than the lane collision
+
+`Journal.replicate` calls `verifyLane` over the **whole lane** before adopting
+anything, so one break at index 4 refuses all 5,757 events. **It is not that only
+one of the four `pixel` chains can be adopted — it is that none of them can**, if
+they all carry the §5d break, and the four all descend from builds of that era.
+
+§7b25's *"import each → then uninstall freely"* therefore does not hold for
+pass 1. Correcting it twice in a day is the price of having said it before
+running it.
+
+#### What actually makes the uninstall safe
+
+Not the import. **The export files themselves.** Two reasons:
+
+1. **Adoption is unavailable to pass 1** for the reason above.
+2. **This container is ephemeral.** `~/.orb/journal` lives in the session's
+   filesystem, not the operator's — so importing here preserves nothing that
+   outlives the session. An earlier note in this project already corrected
+   *"outside the repo"* to *"still inside the container"*; this is the same fact
+   with consequences.
+
+> **So: the `.txt` exports are the durable artefact. Uninstalling is safe once
+> they are stored somewhere the operator controls** — and analysis needs no
+> journal at all, since every finding in §7b13–§7b23 was read straight out of
+> these files.
+
+#### The asymmetry worth naming: two chain policies for one fact
+
+The device **tolerates** the break and has appended past it for four days. Its
+self-test reports `chainBreaks: 4` with `chainBaseline: true` and **passes**,
+because §5j's `chain.noNewBreaks` compares break *positions* against the previous
+self-test and fails only on a **new** one.
+
+`verifyLane` never learned that. It sees a break and refuses everything.
+
+So Orb-on-device says *"a known, recorded, historical break — carry on"*, and
+Orb-on-import says *"reject all of it"*. Both are defensible in isolation and
+they cannot both be the policy. Opened as **AD-9**.
