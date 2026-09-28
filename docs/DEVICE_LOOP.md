@@ -4001,3 +4001,84 @@ its own.
 key was minted and the build said so. It is gitignored — a signing key in version
 control is a worse failure than the one it prevents — and it is **the only key
 that can ever upgrade this install**. §7b8 is what losing one costs.
+
+### 7b32. Orb v1 on the device — AD-8 confirmed, and a problem the declaration missed — 2026-09-28
+
+Three events, and every one of them carries something that was argued for before
+it was built.
+
+#### AD-8, confirmed on the phone
+
+```
+device : orb-d7d5f6ec2ea184ae5b990ab7      ← minted, 96 bits
+lane   : orb-d7d5f6ec2ea184ae5b990ab7      ← derived from it, not a literal
+payload: model "Pixel 10a", device "stallion", sdkInt 36, …
+```
+
+**The envelope names a writer and nothing else.** The handset is in the
+`orb.process.start` payload, where a W2 witness holding envelopes cannot reach
+it. Both halves of the fix are visible in one event.
+
+`orb.export` carries `package: dev.orb.app` and **does not repeat the install
+identity** — it is on the envelope already (Art. IX §33). A file that arrives
+alone can now say which app wrote it, which is what four indistinguishable
+`pixel` exports cost us.
+
+The derived boot instant is `1790603340662` — **the same 13:49 reboot** the older
+lanes derive, from an app that did not exist then. Two independently-written
+journals agreeing about when the phone started is `wallClock − elapsedRealtimeMs`
+working exactly as §7b2 established.
+
+#### The share sensor held its boundary
+
+```json
+{"because":"user.shared","action":"android.intent.action.SEND",
+ "mimeType":"image/jpeg","itemCount":1,
+ "references":"content://com.google.android.apps.photos.contentprovider/0/1/…/REQUIRE_ORIGINAL/…",
+ "referrer":"android-app://com.google.android.apps.photos",
+ "resolved":false,"absenceReason":"unfetched","shareReadable":true}
+```
+
+A pointer, not bytes. No stream opened, no link fetched, no permission held.
+
+**`referrer` was supplied** — Android named Photos — so the `unknown` fallback is
+**untested rather than confirmed**. Worth saying plainly: the field exists and
+was never exercised.
+
+#### The problem: the reference may already be dead
+
+The URI is a Photos content provider reference granted to `ShareActivity` by the
+intent. **That grant lasts until the receiving activity's task finishes**, and
+this activity is `noHistory` and calls `finish()` immediately. So by the time
+anything could resolve it, **the permission is gone.**
+
+`SENSOR_SHARE.md` §3 drew a clean line — *record the reference now, resolve later
+under a declared Capability* — and that line **does not survive contact with
+Android's URI grant model.** Deferred resolution needs
+`takePersistableUriPermission`, which needs the *sender* to have offered a
+persistable grant, and share intents generally do not.
+
+So the sensor currently records **that a photo was shared, from Photos, at
+21:56** — which is a complete and honest observation — while **the photo itself
+is not retrievable from that record, ever.**
+
+Three ways out, and the choice is not mine:
+
+1. **Resolve during the share**, copying bytes into an `Attachment` while the
+   grant is live. Complete, and it moves the Capability act *into* the sensor —
+   the separation §3 wanted, abandoned.
+2. **Accept reference-only.** The record says what happened and not what was in
+   it. Cheapest, honest, and enough if the value is the *event* rather than the
+   *content*.
+3. **Ask at share time.** Preserves the separation with real consent, and a
+   sensor that is annoying to feed stops being fed.
+
+**Unverified**: that the grant is gone is expected from the platform's model and
+has not been shown on this device. The cheap test is to attempt a read of that
+reference now and see whether it throws — worth doing before choosing, because
+option 2 is only forced if it does.
+
+> The declaration was still worth writing first. It got the Capability boundary
+> right, kept a URL fetch from being smuggled in as a preview, and produced a
+> sensor that needs no permission. What it could not do was know how long a
+> permission it deliberately declined to use would last.
