@@ -30,9 +30,10 @@ needs, including the author in three months.*
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Superseded** — pass 2 has no service, so the question became P6 |
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28, both directions.** First on the mirror case — two listeners turned off while the process was dead, next `process.start` read `changed: true`, named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2). Then as literally written — two listeners turned **on** while dead, named in `notificationListenerGained`, 3 → 5 (§7b3) |
-| **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond; three of the four land within milliseconds of a user launch. `elapsedRealtimeMs` is the only field that can date a boot; the re-delivery's cause is unknown (§7b2, §7b3) |
+| **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, with the reason** — no reading of any kind appears in any export so far. Nothing records that an install was attempted, so *not performed* and *route silent* are indistinguishable from the journal alone (§7b3) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. It is a side effect of platform behaviour, not an API, and the control half needs its own export (§7b4) |
 
 ### What it establishes
 
@@ -1797,6 +1798,86 @@ not an implementation one. It is recorded here and not made.
 
 The practical consequence today: the four alerts are **unanswered**, and the
 operator answers them once rather than being told they were already handled.
+
+### 7b4. P17's mechanism, from the operator — and a force-stop marker — 2026-09-28
+
+The operator's account, given after §7b3 was written: **they force-stopped Orb and
+then opened it 2–4 times.** That is the missing half of P17, and it makes the
+record read differently. Grouping every event in the third export by the process
+that wrote it:
+
+| process start, uptime | `BOOT_COMPLETED` after start | `app.opened` after start |
+| --- | --- | --- |
+| 2h05m45s *(previous boot)* | — | +27 ms |
+| **0h31m58s** | **+184 ms** | **+304,463 ms** |
+| 10h15m04s | +30 ms | +59 ms |
+| 11h43m45s | **—** | +54 ms |
+| 11h44m32s | +46 ms | +78 ms |
+| 11h47m45s | +55 ms | +95 ms |
+
+**Three launches carry a re-delivered `BOOT_COMPLETED`; one does not.** Each of
+the three arrives *between* `process.start` and `app.opened` — 30, 46 and 55 ms
+in, and 29, 32 and 40 ms before the Activity resumed — so the broadcast is
+dispatched during the launch itself. Three re-deliveries against an account of
+two to four opens is a fit, not a coincidence.
+
+**The launch that carries nothing is the load-bearing row.** At 11h43m45s a fresh
+process started, read the journal, caught the two re-enabled listeners (§7b3) and
+resumed the Activity, and **no `BOOT_COMPLETED` was delivered.** So re-delivery is
+not a property of launching, and not a property of starting a process. Something
+about the *previous* shutdown decides it. The operator's account names what:
+being force-stopped rather than merely dying.
+
+That also discriminates, weakly, between the two platform mechanisms that would
+produce this shape. A broadcast queued against a **frozen or cached** process
+would be released whenever that process came back — including at 11h43m45s, where
+the app had been closed for 1h28m. A broadcast withheld from a **stopped package**
+and released when the user launches it would not, because an ordinary reclaim does
+not set that state. The record shows the second pattern. It is one absence
+against three presences, which is evidence and not proof, and the platform's
+internal queueing was not read.
+
+#### The consequence: the first thing in the record that can mark a force-stop
+
+A force-stop is **how a person stops this watch.** Until now the journal had no
+way to separate *I was force-stopped*, *I was killed and reclaimed* and *I was
+never installed* — the third time this same distinction has decided a design
+here, after `unreadable` versus empty and `baseline` versus unchanged. If the
+re-delivery is really the stopped-state release, then a `signal:…BOOT_COMPLETED`
+reading at a **non-zero uptime, coincident with a launch** is a marker that the
+app was force-stopped since it last ran, and its absence at 11h43m45s is the
+control that gives the marker meaning.
+
+That is a side effect of platform behaviour, not an API, so it is weak by
+construction: it can disappear in an OS update without warning, and it cannot
+distinguish a force-stop from a *Clear cache*-style stop that clears the same
+flag. It is written down because a weak marker recorded with its own limits is
+worth more than a strong one assumed, and because the alternative today is
+nothing at all.
+
+**P20**, written as a prediction rather than claimed: *force-stop, then open →
+a `BOOT_COMPLETED` reading at non-zero uptime; let the process die on its own,
+then open → none.* Two exports settle it, and the second half is the one that
+matters, because a marker that fires on every launch marks nothing.
+
+#### P6 is untouched, and the 31m59s narrows slightly
+
+The 0h31m58s delivery had **no launch within five hours** — `app.opened` is
++304,463 ms, 5h04m later — so nothing cleared a stopped state at that moment and
+it is not a re-delivery of this kind. P6 rests on that row exactly as before.
+
+One thing it does settle: a force-stopped package does not receive
+`BOOT_COMPLETED` at boot on this platform (documented behaviour, not measured
+here), and this delivery arrived with nobody present. So whatever delayed it by
+**31m59s**, a stopped-state exclusion was not it. The delay itself is still
+unexplained.
+
+#### Still open, unchanged by any of this
+
+**P19.** The operator's account is about force-stopping, which was not the
+question asked — no package install or uninstall is confirmed or denied, and no
+`signal:…PACKAGE_*` reading exists in any export. It stays untested with the
+reason.
 
 ---
 
