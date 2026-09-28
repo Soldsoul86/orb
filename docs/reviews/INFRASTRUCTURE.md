@@ -2,8 +2,8 @@
 
 > Phase 3b architectural review. The Infrastructure domain answers: **what does
 > every runtime depend on, and what must never change beneath it?** **Status:
-> partial — `Journal.md` and `Storage.md` drafted 2026-09-28, unreviewed.**
-> `Synchronization`, `ModelRouter` and `Encryption` have no specification.
+> partial — `Journal.md`, `Storage.md` and `Synchronization.md` drafted 2026-09-28,
+> all unreviewed.** `ModelRouter` and `Encryption` have no specification.
 > Every contract in this domain is a Service.
 
 ---
@@ -120,3 +120,64 @@ implementer will meet it before writing the migration rather than after.
 Twelve contracts Accepted, fifteen Draft, **three with no specification**:
 `Synchronization`, `ModelRouter`, `Encryption`. Phase 3b's gate is every
 specification accepted, so nothing here opens Phase 3c.
+
+
+---
+
+## Addendum — `Synchronization` drafted, 2026-09-28
+
+The third of five, and the first in this domain written for something that **does
+not exist**. `STATE.md` has said so throughout: sync is unbuilt and the export is a
+file the operator carries.
+
+That turned out to matter less than expected, because **`importExport` already
+implements the contract's semantics with a human as the transport.** It groups an
+export by lane, verifies the chain, skips every event already held, and adopts the
+rest; re-importing changes nothing and a longer export adds only its tail. That is
+anti-entropy, idempotence and resumption, demonstrated on real device data. What is
+missing is automation and a peer — not the semantics.
+
+**The spine** is that sync decides nothing. Not what is true, not what wins, not
+what a peer may keep. Merge is the union of single-writer lanes, so there is no
+conflict to resolve and no component here permitted to resolve one. Order is
+computed on read and never transmitted, because **whoever wrote the order would be
+deciding it for everyone** (Art. IV §17).
+
+The distinction the contract works hardest to keep is **emission versus retention**:
+a device always replicates its own lane *in full* — it is never the sole holder of
+anything it produced — while what it *keeps* of other lanes is local policy that no
+peer may override.
+
+### The finding: the retention machinery is complete and currently unreachable
+
+`evaluatePrune` refuses to drop a payload without **custody receipts from at least
+two other devices**, one of them user-owned. It explicitly excludes the device's own
+receipt (`held.holder === selfDevice` returns false).
+
+Custody receipts are ordinary events on the holder's own lane. **Without sync,
+another device's lane never arrives.** So on the operator's phone today, the prune
+path can never be authorized — not because it is broken, but because the only
+transport that could satisfy it is unbuilt.
+
+Nothing is wrong, and nothing needs fixing. It is worth recording because it names
+precisely what sync unblocks, and because the machinery passing its tests while
+being unreachable in practice is exactly the shape of thing this project keeps
+finding only on a real device.
+
+### What a reviewer should challenge
+
+1. **Who starts a sync?** Art. V §21 says the runtime owns scheduling and nothing
+   wakes itself — so sync should be dispatched by the `Scheduler`. `KERNEL.md`'s
+   Synchronization entry does not say so, and `Scheduler.md` does not list sync
+   among the work it dispatches. **The draft is silent on this and should not be.**
+   One of the two contracts needs to name it.
+2. **What bounds a session?** The contract claims resumable, and the unit of
+   resumption is never defined. Per lane? Per tail? Per byte? A claim of
+   resumability that does not say what resumes is thinner than it reads.
+3. **Erasure confirmation has no record type.** §7 requires recording *which peers
+   confirmed* an erasure, and no contract defines that record. It is the same gap
+   `Action`'s authorization reference had before `Policy.md` §1 was written.
+4. **`Encryption` is on this contract's dependency edge** and the draft delegates
+   everything cryptographic to it. If the only use is "the transport is encrypted",
+   the edge may belong to the transport rather than to sync — the same question
+   already open against `Journal`'s edge.
