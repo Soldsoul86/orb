@@ -9,17 +9,29 @@ whose payload is not held contributes nothing and is not an error — a partial
 replica sees less, which is not the same as there being less.
 
 ```ts
-interface Holding { kind: string; holding?: string[]; unreadable: boolean }
+interface Holding { kind: string; holding?: string[]; unreadable: boolean; scope?: string }
 ```
 `holding` is absent when the last reading of that kind could not be taken.
 Never `[]` — *cannot check* is not *nothing is enabled*.
 
+`scope` is what kind of look produced the set, for a kind where the platform
+offers more than one. Only `installedPackage` has one: `all` when pass 2 holds
+`QUERY_ALL_PACKAGES`, `visible` when the list was filtered, `unknown` when the
+check itself threw. Absent for the grant kinds, which are whole or unreadable with
+nothing between. A reader must not compare sets across scopes, and pass 2 does not
+— `Grants.previous` re-baselines instead, so a `gained` or `lost` that reaches
+here was taken under one scope.
+
 ```ts
 alertsFor(state: DeviceAuthority): readonly PendingAlert[]
+ruleFor(kind: string): string
 ```
-The one rule: a change in what holds power is worth surfacing. Baselines and
-unreadable kinds never reach it. Reads `state.raised`; deliberately does not read
-`state.answers` (DR-8).
+Two rules, one mechanism. A change in what holds power is
+`device-watch.authority-changed`; a change in the installed-package set is
+`device-watch.packages-changed`, because an app appearing is **not** an app being
+granted power and an alert must not say it is. `ruleFor` is the mapping. Baselines
+and unreadable kinds never reach either. Reads `state.raised`; deliberately does
+not read `state.answers` (DR-8).
 
 ```ts
 raiseAlerts(journal): Promise<readonly OrbEvent<AlertRaised>[]>
@@ -33,6 +45,7 @@ their alert.
 ALERT_RAISED_TYPE   = "orb.alert.raised"
 ALERT_ANSWERED_TYPE = "orb.alert.answered"
 CHANGE_RULE         = "device-watch.authority-changed"
+PACKAGE_RULE        = "device-watch.packages-changed"
 ```
 
 ```ts

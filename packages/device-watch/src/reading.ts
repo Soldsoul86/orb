@@ -23,6 +23,17 @@ export interface KindReading {
   readonly readable: boolean;
   /** Present only when `readable`. */
   readonly holding?: readonly string[];
+  /**
+   * What kind of look produced the set, for a kind where the platform offers
+   * more than one.
+   *
+   * `installedPackage` carries `all` or `visible`; the grant kinds carry nothing,
+   * because they are whole or unreadable with no middle. Two sets read under
+   * different scopes are not two readings of one thing, and the Java side
+   * re-baselines across a change rather than diffing — so a `gained` or `lost`
+   * that arrives here was always taken under one scope.
+   */
+  readonly scope?: string;
   /** First record of this kind — nothing to compare against, so never news. */
   readonly baseline: boolean;
   readonly gained?: readonly string[];

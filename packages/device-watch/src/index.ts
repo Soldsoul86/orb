@@ -22,7 +22,7 @@ export { GRANTS_OBSERVED_TYPE, ImportError, importExport, parseExport } from "./
 export type { ImportResult } from "./import.js";
 export { changeKey, project } from "./projection.js";
 export type { AuthorityChange, DeviceAuthority, Holding } from "./projection.js";
-export { CHANGE_RULE, alertsFor } from "./rules.js";
+export { CHANGE_RULE, PACKAGE_RULE, ruleFor, alertsFor } from "./rules.js";
 export type { PendingAlert } from "./rules.js";
 export { answerAlert, raiseAlerts } from "./watch.js";
 export type { DeviceAuthorityReading, KindReading } from "./reading.js";

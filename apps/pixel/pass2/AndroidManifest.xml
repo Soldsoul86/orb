@@ -2,9 +2,10 @@
 <!--
   Orb pass 2 — the first signal (DEVICE_LOOP.md §7 R4).
 
-  One permission, and it is not for reading anything: BOOT_COMPLETED, so the app
-  is woken after a restart. The three reads this app exists to perform each cost
-  nothing, confirmed on the device as P12, P13 and P14 rather than assumed.
+  Two permissions. BOOT_COMPLETED, so the app is woken after a restart, and it
+  reads nothing. QUERY_ALL_PACKAGES, which does: see below. The three *grant*
+  reads still cost nothing, confirmed on the device as P12, P13 and P14 rather
+  than assumed.
 
   No foreground service. This signal compares against history rather than
   watching continuously, so it does not need a live process to be correct — only
@@ -19,6 +20,25 @@
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+      The installed-package set, and the one permission here that is not free.
+
+      Without this, `getInstalledPackages` is filtered to what `<queries>` below
+      asks about, and an app that hides itself is exactly what it would not
+      return - the target of MOBILE_SENSING.md 4.4 made invisible to the signal
+      watching for it. It is a normal, install-time permission: nobody is
+      prompted, and nothing leaves the device.
+
+      It is stated rather than hidden because it is the permission a surveillance
+      app would want, held here by an app whose purpose is to notice one. Reverse
+      it by deleting these four lines: `GrantReader.packageScope` then records
+      `visible`, and `Grants.previous` re-baselines the set once instead of
+      reporting the difference as two hundred uninstalls. The signal degrades
+      honestly rather than breaking or lying - which is the reason the scope is on
+      every reading in the first place.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <!--
       Package visibility. Without this, `queryBroadcastReceivers` for admin

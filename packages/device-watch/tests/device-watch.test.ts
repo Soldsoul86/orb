@@ -14,6 +14,8 @@ import { observationDraft } from "@orb/observation";
 import {
   ALERT_RAISED_TYPE,
   CHANGE_RULE,
+  PACKAGE_RULE,
+  ruleFor,
   alertsFor,
   answerAlert,
   changeKey,
@@ -247,5 +249,93 @@ describe("DR-8 — recorded, not taught", () => {
     await answerAlert(j, alert.id, "acknowledged");
 
     assert.equal(project(await j.readAll()).answers.get(alert.id), "acknowledged");
+  });
+});
+
+describe("a package appearing is not a grant appearing", () => {
+  // `DEVICE_LOOP.md` §7b5. The installed-package set exists because a broadcast
+  // reports an event and is lost if it is missed, while a set can be compared
+  // against history at any later process start. Sharing the mechanism must not
+  // mean sharing the claim.
+  test("it is raised under its own rule, never as an authority change", async () => {
+    const j = await journal();
+    await j.append([
+      observe(
+        reading([
+          { kind: "installedPackage", readable: true, holding: ["com.a"], baseline: true, scope: "all" },
+        ]),
+      ),
+      observe(
+        reading([
+          {
+            kind: "installedPackage",
+            readable: true,
+            holding: ["com.a", "com.new"],
+            baseline: false,
+            gained: ["com.new"],
+            lost: [],
+            scope: "all",
+          },
+        ]),
+      ),
+    ]);
+
+    const raised = await raiseAlerts(j);
+    assert.equal(raised.length, 1);
+    const alert = raised[0]?.payload as AlertRaised;
+    assert.equal(alert.rule, PACKAGE_RULE);
+    // The distinction is the point: an alert that called this an authority change
+    // would be telling a person something false in the field they read first.
+    assert.notEqual(alert.rule, CHANGE_RULE);
+    assert.deepEqual(alert.gained, ["com.new"]);
+  });
+
+  test("and a grant change still speaks for itself", async () => {
+    const j = await journal();
+    await j.append([
+      observe(reading([{ kind: "accessibility", readable: true, holding: [], baseline: true }])),
+      observe(
+        reading([
+          {
+            kind: "accessibility",
+            readable: true,
+            holding: [SPY],
+            baseline: false,
+            gained: [SPY],
+            lost: [],
+          },
+        ]),
+      ),
+    ]);
+
+    const alert = (await raiseAlerts(j))[0]?.payload as AlertRaised;
+    assert.equal(alert.rule, CHANGE_RULE);
+    assert.equal(ruleFor("accessibility"), CHANGE_RULE);
+    assert.equal(ruleFor("deviceAdmin"), CHANGE_RULE);
+    assert.equal(ruleFor("installedPackage"), PACKAGE_RULE);
+  });
+
+  test("the scope reaches the projection, so a filtered set is never read as complete", async () => {
+    // A `visible` set is a real answer to a different question. Carrying the
+    // scope is what stops a reader treating the two as one — the same refusal as
+    // `unreadable` never being an empty holding set, one level along.
+    const j = await journal();
+    await j.append([
+      observe(
+        reading([
+          { kind: "installedPackage", readable: true, holding: ["com.a"], baseline: true, scope: "visible" },
+        ]),
+      ),
+    ]);
+
+    const state = project(await j.readAll());
+    const packages = state.holdings.find((h) => h.kind === "installedPackage");
+    assert.equal(packages?.scope, "visible");
+    // And a grant kind carries none, because it has only one completeness.
+    await j.append([
+      observe(reading([{ kind: "deviceAdmin", readable: true, holding: [], baseline: true }])),
+    ]);
+    const admins = project(await j.readAll()).holdings.find((h) => h.kind === "deviceAdmin");
+    assert.equal(admins?.scope, undefined);
   });
 });

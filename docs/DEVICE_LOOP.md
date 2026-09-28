@@ -34,7 +34,8 @@ needs, including the author in three months.*
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, and the silence is explained.** An app was uninstalled, but **after a force-stop**, and a stopped package is excluded from broadcasts until launched — the route was switched off by the platform while it was being tested. Re-test by opening Orb *first*, then installing or uninstalling (§7b3, §7b5) |
 | **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
-| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The broadcast routes were the only mitigation and are the lossy ones. Two candidate fixes, neither implemented (§7b5) |
+| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now carried and compared (§7b6), so a missed package *broadcast* is recoverable — but an install undone before the next observation still is not (§7b5, §7b6) |
+| **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next process start | **Written 2026-09-28, untested on the device.** Built, 59 desktop checks and 657 TypeScript tests. Two readings settle it: `installedPackageBaseline: true` on the new build's first observation, then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6) |
 
 ### What it establishes
 
@@ -1976,6 +1977,87 @@ promptness-only — which is the posture the design already claims for
 where the loop was not watching rather than inferring safety from silence. The
 first is the architecturally consistent one. Both are design changes and need
 approval.
+
+### 7b6. The package set, built — 2026-09-28
+
+P21's first candidate fix, implemented and approved: **each observation now carries
+the installed-package set**, compared against history exactly like the three
+grants. Pass 2's Java, `packages/device-watch`, and the fixture that pins the two
+against each other. 59 desktop checks on the Java side, 657 on the TypeScript, lint
+clean.
+
+**What it buys.** A broadcast reports an event, so missing the moment loses it for
+ever; a set compares, so the next process start catches what the missed broadcast
+would have said, whenever that start comes. §7b5's uninstall would be caught today
+— not at the moment it happened, but at all, which is the difference between a
+signal and a gap. It demotes `signal:…PACKAGE_*` from load-bearing to prompt, which
+is the posture `watchSettings` already had and the one this design says every route
+should have.
+
+**What it does not buy, stated in the code and again here.** It does not close the
+interval gap. An app installed, granted a listener, used and uninstalled between two
+observations returns both sets to where they began, and both readings still say
+`changed: false`. P21 stays open as a **limit**, narrowed and not closed.
+
+#### It is not a fourth grant, and two things enforce that
+
+`installedPackage` is in `Grants.KINDS` and deliberately **not** in the new
+`Grants.GRANT_KINDS`, and `ruleFor` routes it to a second rule,
+`device-watch.packages-changed`. An app appearing is not an app being given power
+over the device, and the rule name is the field a person reads first when deciding
+whether to care. The mechanism is shared because the mechanism is what was worth
+having; the claim is not.
+
+They also differ in expected rate by orders of magnitude — a grant moves when
+somebody decides something, the package set moves on every system update — so they
+have to be tunable apart, or §7 R6 turns one into noise and takes the other with it.
+The test asserts the routing **both ways**: it is `packages-changed` and it is *not*
+`authority-changed`, because the failure worth guarding against is a true-looking
+alert that misnames what happened.
+
+#### The second permission, and the field that makes it reversible
+
+`getInstalledPackages` is filtered on API 30+ without `QUERY_ALL_PACKAGES`, and the
+apps it omits are the ones that declared no matching intent — which is to say, the
+target of §4.4 made invisible to the signal watching for it. So the manifest now
+declares it. **It is the second permission this app has ever asked for, and it is
+the permission a surveillance app would want**, held here by an app whose purpose is
+to notice one. It is normal and install-time: nobody is prompted, nothing leaves the
+device, and it is stated in the manifest comment rather than buried.
+
+It is also reversible in one line, and that is the point of the other half:
+
+**every reading records the scope it was taken under** — `installedPackageScope` is
+`all`, `visible`, or `unknown` when the check itself threw. `Grants.previous`
+**refuses to compare across a change in it** and re-baselines instead. Without that
+refusal, dropping the permission would make the next reading report every package
+the filtered look cannot see as *lost*: two hundred uninstalls that never happened,
+in the one signal whose value is that it does not cry wolf. It is the
+`unreadable`-is-not-empty rule one level along, and the same shape as the
+v2-envelope note on `Pass2.lastObservation` — **a change in the instrument must
+never read as a change in the world.**
+
+A kind with no scope records no scope field, so the three grants and every reading
+taken before today are unaffected. There is a test for that specifically, because the
+alternative was re-baselining the whole device's history on the next process start.
+
+#### Costs, stated before they are measured
+
+| | |
+| --- | --- |
+| journal size | the holding set is stored whole, so each observation grows by roughly the package count × the average name length — on the order of **5 KB**, against ~300 bytes today. To be **measured on the next export**, not guessed |
+| noise | a system update changes the package set, so this rule will fire where the grant rule would not. That is the second reason it is a separate rule |
+| the screen | a set over 25 entries shows as a count. The set itself is in the journal whole; the screen is not the record |
+
+#### What settles it
+
+The next export, and two readings in it. `installedPackageBaseline: true` on the
+first observation from the new build — nothing to compare against yet, which is
+correct and must not be an alarm. Then, after installing or uninstalling anything
+with **Orb opened first** so it is not in the stopped state, a `process.start`
+reading with the package named in `installedPackageGained` or `…Lost` and
+`installedPackageScope: "all"`. That also gives P19 its clean re-test, since a
+launch before the install is exactly what §7b5 says was missing.
 
 ---
 

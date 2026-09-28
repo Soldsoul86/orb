@@ -33,8 +33,35 @@ import java.util.TreeSet;
  */
 final class Grants {
 
-    /** The three grants read here, in the order a reader should think about them. */
-    static final String[] KINDS = {"accessibility", "notificationListener", "deviceAdmin"};
+    /** The three grants proper — things that hold power, as §4.4 means it. */
+    static final String[] GRANT_KINDS = {"accessibility", "notificationListener", "deviceAdmin"};
+
+    /**
+     * Every set this app compares against history, grants first.
+     *
+     * `installedPackage` is **not a grant** and is kept out of `GRANT_KINDS` for
+     * that reason: an app appearing is not an app being given power over the
+     * device, and a reader who is told otherwise has been told something false.
+     * What it shares with the three is the *mechanism* — a named set, compared
+     * against what the journal last recorded — and that is the whole reason it is
+     * here.
+     *
+     * It is here because a broadcast is not a record. `PACKAGE_ADDED` reports an
+     * **event**: miss the moment and there is nothing to come back to, which is
+     * what happened on 2026-09-28 when an app was uninstalled while this one was
+     * force-stopped and the platform withheld the broadcast (`DEVICE_LOOP.md`
+     * §7b5, P19). A set compares, so the next process start catches what any
+     * missed broadcast would have said, whenever that start comes — which
+     * demotes the broadcast from load-bearing to prompt, the same posture
+     * `watchSettings` already has.
+     *
+     * It does **not** close the interval gap (P21). An app installed, granted
+     * something and removed between two observations still returns both sets to
+     * where they began, and both readings still say `changed: false`. This makes
+     * the window smaller and never zero, and saying so is the point.
+     */
+    static final String[] KINDS =
+        {"accessibility", "notificationListener", "deviceAdmin", "installedPackage"};
 
     private Grants() {}
 
@@ -148,6 +175,22 @@ final class Grants {
             String because,
             Map<String, List<String>> observed,
             Map<String, List<String>> previous) {
+        return report(because, observed, previous, null);
+    }
+
+    /**
+     * The same report, with a **scope** recorded for the kinds that have one.
+     *
+     * A scope is *what kind of look this was* — see `scopeChanged`. Only
+     * `installedPackage` has one today, because it is the only set the platform
+     * will hand over in more than one completeness. A kind with no scope records
+     * no scope field, which is what every reading before this change looks like.
+     */
+    static Map<String, Object> report(
+            String because,
+            Map<String, List<String>> observed,
+            Map<String, List<String>> previous,
+            Map<String, String> scopes) {
         Map<String, Object> out = Json.obj();
         out.put("because", because);
 
@@ -161,6 +204,11 @@ final class Grants {
                 continue;
             }
             out.put(kind + "Readable", Boolean.TRUE);
+            String scope = scopes == null ? null : scopes.get(kind);
+            // Recorded before the holding set, because it says what the holding
+            // set *is*. A set read under one scope and a set read under another
+            // are not two observations of one thing.
+            if (scope != null) out.put(kind + "Scope", scope);
             out.put(kind + "Holding", join(held));
             out.put(kind + "HoldingCount", (long) new TreeSet<>(held).size());
 
@@ -197,8 +245,34 @@ final class Grants {
      * the line recovers the value exactly.
      */
     static List<String> previous(String line, String kind) {
+        return previous(line, kind, null);
+    }
+
+    /**
+     * The same read, refused when the recorded scope is not the one asked for.
+     *
+     * **This is the field's whole purpose.** A complete package list compared
+     * against a filtered one reports every package the filtered look could not
+     * see as *lost* — two hundred removals that never happened, in the one
+     * signal whose value is that it does not cry wolf (§7 R6: false positives
+     * cost trust, and trust is the product). The reverse direction invents two
+     * hundred installs. Neither is a change in the device; both are a change in
+     * how it was looked at.
+     *
+     * So a scope mismatch makes the kind a **baseline** — the same outcome as an
+     * unreadable prior line, reached for the same reason and by the same path. One
+     * silent observation is the cost, and `baseline: true` is on the record where a
+     * reader can see it. It is structurally the v2-envelope note on
+     * `Pass2.lastObservation` again: a change in the instrument must never read as
+     * a change in the world.
+     *
+     * A `null` scope asks for a line that recorded no scope, which is what the
+     * three grant kinds write and what every reading before 2026-09-28 looks like.
+     */
+    static List<String> previous(String line, String kind, String scope) {
         if (line == null) return null;
         if (line.contains("\"" + kind + "Readable\":false")) return null;
+        if (scopeChanged(line, kind, scope)) return null;
 
         String key = "\"" + kind + "Holding\":\"";
         int at = line.indexOf(key);
@@ -207,5 +281,29 @@ final class Grants {
         int to = line.indexOf('"', from);
         if (to < 0) return null;
         return split(line.substring(from, to));
+    }
+
+    /** Whether a stored line's scope for a kind differs from the one now in hand. */
+    static boolean scopeChanged(String line, String kind, String scope) {
+        String recorded = previousScope(line, kind);
+        return scope == null ? recorded != null : !scope.equals(recorded);
+    }
+
+    /**
+     * The scope a stored line recorded for a kind, or `null` if it recorded none.
+     *
+     * The same single-field extraction as `previous`, and `null` is *no scope
+     * field on that line* rather than *unknown scope* — a line written before
+     * scopes existed genuinely has none, and that is a fact about the line rather
+     * than a gap in it.
+     */
+    static String previousScope(String line, String kind) {
+        if (line == null) return null;
+        String key = "\"" + kind + "Scope\":\"";
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int from = at + key.length();
+        int to = line.indexOf('"', from);
+        return to < 0 ? null : line.substring(from, to);
     }
 }

@@ -27,8 +27,20 @@ import type { DeviceAuthorityReading, KindReading } from "./reading.js";
 /** The pass-2 event that carries a reading. */
 export const GRANTS_OBSERVED_TYPE = "grants.observed";
 
-/** The kinds pass 2 records, in the order a reader should think about them. */
-const KINDS = ["accessibility", "notificationListener", "deviceAdmin"] as const;
+/**
+ * The sets pass 2 records, in the order a reader should think about them.
+ *
+ * Mirrors `Grants.KINDS`. `installedPackage` is the fourth and is **not a
+ * grant** — it is here because a set can be compared against history and a
+ * broadcast cannot (`DEVICE_LOOP.md` §7b5). `ruleFor` in `rules.ts` is what
+ * keeps the distinction visible to whoever reads an alert.
+ */
+const KINDS = [
+  "accessibility",
+  "notificationListener",
+  "deviceAdmin",
+  "installedPackage",
+] as const;
 
 export class ImportError extends Error {
   override readonly name = "ImportError";
@@ -162,6 +174,9 @@ function readingFrom(payload: unknown): DeviceAuthorityReading | null {
       readable,
       baseline: flat[`${kind}Baseline`] === true,
       ...(readable && typeof holding === "string" ? { holding: splitHolding(holding) } : {}),
+      ...(typeof flat[`${kind}Scope`] === "string"
+        ? { scope: flat[`${kind}Scope`] as string }
+        : {}),
       ...(Array.isArray(flat[`${kind}Gained`]) ? { gained: flat[`${kind}Gained`] as string[] } : {}),
       ...(Array.isArray(flat[`${kind}Lost`]) ? { lost: flat[`${kind}Lost`] as string[] } : {}),
     });

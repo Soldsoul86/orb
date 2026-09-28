@@ -133,11 +133,35 @@ is happening — the operator named battery as the constraint — and it makes t
 app pass 1's missing **P6** experiment, since a service ran throughout pass 1,
 which is the condition P6 excludes.
 
-One permission: `RECEIVE_BOOT_COMPLETED`. All three reads cost nothing, which was
-confirmed on the device rather than assumed. The manifest also declares a
-`<queries>` element for `DEVICE_ADMIN_ENABLED`, because without it package
-visibility can hide third-party admin receivers while leaving Google's visible —
-and third-party is exactly the case this signal exists for.
+**A fourth set, which is not a grant.** Since 2026-09-28 each observation also
+records the **installed-package set**, compared against history exactly like the
+three grants. The reason is `DEVICE_LOOP.md` §7b5: `PACKAGE_ADDED` reports an
+*event*, so missing the moment loses it for ever — which is what happened when an
+app was uninstalled while this one was force-stopped and the platform withheld the
+broadcast. A set compares, so the next process start catches what the missed
+broadcast would have said. That demotes the package broadcast from load-bearing to
+prompt, the posture `watchSettings` already had. It does **not** close the interval
+gap (P21): an app installed and removed between two observations still leaves both
+sets where they began.
+
+Two permissions. `RECEIVE_BOOT_COMPLETED`, which reads nothing, and
+`QUERY_ALL_PACKAGES`, which is the one cost here that is not free — without it
+`getInstalledPackages` is filtered, and an app that hides itself is exactly what it
+would omit. It is normal and install-time, so nobody is prompted, and nothing
+leaves the device. It is named plainly because it is the permission a surveillance
+app would want, held by an app whose purpose is to notice one.
+
+**Every reading records which look it was.** `installedPackageScope` is `all`,
+`visible` or `unknown`, and `Grants.previous` refuses to compare across a change in
+it — re-baselining once instead of reporting a filtered list's absences as two
+hundred uninstalls. So the permission is reversible in one line of manifest without
+this signal lying on either side of the change, and that is what the field is for.
+
+The three *grant* reads still cost nothing, which was confirmed on the device
+rather than assumed. The manifest also declares a `<queries>` element for
+`DEVICE_ADMIN_ENABLED`, because without it package visibility can hide third-party
+admin receivers while leaving Google's visible — and third-party is exactly the
+case this signal exists for.
 
 ## What the device already settled
 

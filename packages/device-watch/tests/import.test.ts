@@ -208,3 +208,47 @@ describe("the loop, end to end, on the phone's own bytes", () => {
     assert.equal(alertsFor(project(await j.readAll())).length, 0);
   });
 });
+
+describe("the fourth set crosses the language boundary", () => {
+  test("the scope the phone recorded arrives as a scope, not as part of the set", async () => {
+    // The fixture is written by `Grants.report` with a scopes map, the same call
+    // `Pass2.observe` makes on the device. What is under test is the pair: a
+    // field the Java side writes beside a holding set, read back here as the
+    // thing it is. A filtered set read as a complete one is the failure this
+    // whole field exists to prevent, and it would first appear right here.
+    const j = await journal();
+    await importExport(j, await fixture());
+
+    const readings = (await j.readLane(j.lane))
+      .map((event) => readObservation<DeviceAuthorityReading>(event))
+      .filter((o): o is NonNullable<typeof o> => o !== null)
+      .map((o) => o.data);
+    assert.ok(readings.length > 0);
+
+    for (const data of readings) {
+      const packages = data.kinds.find((k) => k.kind === "installedPackage");
+      assert.ok(packages, "every reading carries the package set");
+      assert.equal(packages.scope, "all");
+      assert.deepEqual(packages.holding, [
+        "com.android.settings",
+        "com.google.android.gms",
+        "dev.orb.pass2",
+      ]);
+      // And the kinds that have one completeness carry no scope at all, rather
+      // than a made-up one that would compare equal to nothing.
+      assert.equal(data.kinds.find((k) => k.kind === "deviceAdmin")?.scope, undefined);
+    }
+
+    // It held still across the fixture, so it is news in none of them.
+    const state = project(await j.readAll());
+    assert.equal(
+      state.changes.filter((c) => c.kind === "installedPackage").length,
+      0,
+      "a set that did not move raises nothing",
+    );
+    assert.equal(
+      state.holdings.find((h) => h.kind === "installedPackage")?.scope,
+      "all",
+    );
+  });
+});

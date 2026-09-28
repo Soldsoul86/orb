@@ -34,6 +34,11 @@ export interface Holding {
   readonly kind: string;
   /** Absent when the last readable reading could not read this kind. */
   readonly holding?: readonly string[];
+  /**
+   * What kind of look the holding set came from, for a kind that has more than
+   * one. Carried so a reader is never handed a filtered set as a complete one.
+   */
+  readonly scope?: string;
   /** True when the most recent reading of this kind failed. Never an empty set. */
   readonly unreadable: boolean;
 }
@@ -95,6 +100,7 @@ export function project(events: readonly StoredEvent[]): DeviceAuthority {
         ...(reading.readable && reading.holding !== undefined
           ? { holding: [...reading.holding] }
           : {}),
+        ...(reading.scope !== undefined ? { scope: reading.scope } : {}),
       });
 
       if (reading.baseline || !reading.readable) continue;

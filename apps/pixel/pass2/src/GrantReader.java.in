@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.provider.Settings;
@@ -13,11 +14,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The three platform reads, and nothing else.
+ * The platform reads, and nothing else.
  *
- * Everything here is a read with **no permission of any kind** — confirmed on
- * this device on 2026-09-26 by `apps/pixel/probe-grants` (`DEVICE_LOOP.md` §7,
+ * The three grant reads cost **no permission of any kind** — confirmed on this
+ * device on 2026-09-26 by `apps/pixel/probe-grants` (`DEVICE_LOOP.md` §7,
  * P12–P14, all three answered). None of it was assumed.
+ *
+ * The fourth read, the installed-package set, is the one exception and it is
+ * declared as such: it wants `QUERY_ALL_PACKAGES` to be complete, and it records
+ * which completeness it got instead of hoping. See `packages`.
  *
  * The contract with `Grants` is one value: a `null` list means *we could not
  * find out*, and an empty list means *we found out, and it is none*. Nothing
@@ -27,7 +32,7 @@ final class GrantReader {
 
     private GrantReader() {}
 
-    /** Reads all three kinds once. `null` for a kind means the read did not settle it. */
+    /** Reads every kind once. `null` for a kind means the read did not settle it. */
     static Map<String, List<String>> read(Context context) {
         Map<String, List<String>> out = new HashMap<>();
         out.put("accessibility",
@@ -36,7 +41,75 @@ final class GrantReader {
         // exactly what a third-party app may do, which is the whole basis of this.
         out.put("notificationListener", secure(context, "enabled_notification_listeners"));
         out.put("deviceAdmin", admins(context));
+        out.put("installedPackage", packages(context));
         return out;
+    }
+
+    /**
+     * The scope of each set that has one, for `Grants.report`.
+     *
+     * Only the package set: the three grant lists are whole or unreadable, with
+     * no middle. This is read in the same breath as the set itself so the two
+     * cannot disagree.
+     */
+    static Map<String, String> scopes(Context context) {
+        Map<String, String> out = new HashMap<>();
+        out.put("installedPackage", packageScope(context));
+        return out;
+    }
+
+    /**
+     * Every installed package, and why this one read is not like the others.
+     *
+     * `getInstalledPackages` is **filtered** on API 30 and up: without
+     * `QUERY_ALL_PACKAGES` an app sees only what it has declared a `<queries>`
+     * interest in, plus a handful the platform always shows. A filtered list is
+     * not a wrong answer — it is an answer to a different question, and the
+     * damage is done by treating the two as one. So the list is read, and
+     * `packageScope` records which question was answered.
+     *
+     * `null` on a throw, never an empty list: on a device that returned nothing,
+     * *every app has been uninstalled* is the reading that would follow, and it
+     * would be the loudest false alarm this app is capable of.
+     */
+    private static List<String> packages(Context context) {
+        try {
+            PackageManager manager = context.getPackageManager();
+            if (manager == null) return null;
+            List<PackageInfo> installed = manager.getInstalledPackages(0);
+            if (installed == null) return null;
+            List<String> names = new ArrayList<>();
+            for (PackageInfo info : installed) {
+                if (info != null && info.packageName != null) names.add(info.packageName);
+            }
+            return names;
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    /**
+     * Which look the package list was: `all` or `visible`.
+     *
+     * `QUERY_ALL_PACKAGES` is a normal, install-time permission, so on a build
+     * that declares it this is granted without anyone being asked — and on a
+     * build that drops it, this returns `visible` and the comparison re-baselines
+     * once rather than reporting the difference as two hundred uninstalls
+     * (`Grants.previous`). That is why the field exists: so the permission is a
+     * decision someone can reverse in one line of manifest without this signal
+     * lying on either side of the change.
+     *
+     * `unknown` is kept distinct from both. A check that threw is not a filtered
+     * look, and recording it as one would compare two sets that may not be
+     * comparable.
+     */
+    private static String packageScope(Context context) {
+        try {
+            int state = context.checkSelfPermission("android.permission.QUERY_ALL_PACKAGES");
+            return state == PackageManager.PERMISSION_GRANTED ? "all" : "visible";
+        } catch (Throwable error) {
+            return "unknown";
+        }
     }
 
     /** One `Settings.Secure` list. A throw is unknown; a null setting is none. */

@@ -268,7 +268,8 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | **P17** | why `BOOT_COMPLETED` was delivered **four times** inside one boot session (2026-09-28) is **accounted for but not proven**: the operator force-stopped the app and reopened it, three deliveries land mid-launch, and the one launch following an ordinary process death carries none. The platform's queueing was not read, so the marker in P20 rests on one absence against three presences. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6, P16 and P18 are answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; grants changed while the process was dead were caught at the next process start, in **both** directions; and the settings watch caught a change with the process alive |
 | **P20** | whether a `BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran. If it does, it is the first thing in the record that can separate *force-stopped* from *killed and reclaimed* from *never installed* — and a force-stop is how a person stops this watch. It is a side effect of platform behaviour rather than an API, so it can vanish in an OS update; the control half (an ordinary death, then a launch, expecting no reading) needs its own export |
 | **P19** | whether a package broadcast reaches the manifest receiver at all. An app *was* uninstalled (2026-09-28) and nothing was recorded — but **after a force-stop**, and a stopped package is excluded from broadcasts until launched, so the route was off while it was tested. Re-test by opening Orb first, then installing or uninstalling |
-| **P21** | **a recorded limit, not a question.** Comparison against history reports on endpoints, not intervals: a grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The broadcast routes were the only mitigation and are the ones that lose events permanently. Two candidate fixes — carry an installed-package set so package changes become comparisons too, or record the blind window explicitly — neither implemented, both design changes |
+| **P21** | **a recorded limit, narrowed on 2026-09-28 and not closed.** Comparison reports on endpoints, not intervals: a grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now carried and compared, so a **missed broadcast** is recoverable — an install *undone* before the next observation still is not. The second candidate, recording the blind window explicitly, is not implemented |
+| **P22** | whether the package set reads as designed **on the device**: complete under `QUERY_ALL_PACKAGES`, baseline on the first observation of the new build, and a named entry in `installedPackageGained` after an install taken with Orb opened first. Built and tested off-device only |
 | **An answer's identity** | alert ids are minted at raise time, not derived from the change. Replaying the same device lane into a fresh journal mints new ids, so an existing answer's citation dangles. An answer is therefore replayable only alongside the lane that raised what it answers — a design change, recorded 2026-09-28 and not made |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
@@ -336,6 +337,21 @@ it was being tested, and the test was null by construction. It also **withdraws
 released a `BOOT_COMPLETED` but no `PACKAGE_REMOVED`, so it is not a queue of missed
 broadcasts being replayed. P20's correlation is untouched; only the explanation was
 wrong.
+
+**P21's first fix is built** (§7b6). Each observation now carries the
+**installed-package set**, compared against history exactly like the three grants,
+so a package *broadcast* that never arrives is recoverable at the next process
+start — which demotes `signal:…PACKAGE_*` from load-bearing to prompt, the posture
+`settings.changed` already had. It is deliberately **not** a fourth grant:
+`installedPackage` is outside `Grants.GRANT_KINDS` and `ruleFor` routes it to a
+second rule, `device-watch.packages-changed`, because an app appearing is not an app
+being given power and the rule name is what a person reads first. It cost a second
+permission, `QUERY_ALL_PACKAGES` — stated plainly, since it is the permission a
+surveillance app would want — and every reading records the **scope** it was taken
+under, with a refusal to compare across a change in it, so dropping the permission
+re-baselines once instead of reporting two hundred uninstalls that never happened.
+**P22** is that, untested on the device. P21 stays open: an install *undone* between
+two observations is still invisible.
 
 **The asymmetry those two accounts expose is the more important finding** and is
 recorded as **P21**. Routes that compare a set against history self-heal — the next

@@ -86,12 +86,18 @@ public final class Pass2 extends Application {
         if (journal == null) return null;
 
         Map<String, List<String>> now = GrantReader.read(this);
+        Map<String, String> scopes = GrantReader.scopes(this);
 
         String line = lastObservation();
         Map<String, List<String>> before = new HashMap<>();
-        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+        // The scope goes into the lookup, not just into the output: a set read
+        // under a different scope is not a prior reading of this set, and
+        // `Grants.previous` refuses it rather than diffing across the change.
+        for (String kind : Grants.KINDS) {
+            before.put(kind, Grants.previous(line, kind, scopes.get(kind)));
+        }
 
-        Map<String, Object> report = Grants.report(because, now, before);
+        Map<String, Object> report = Grants.report(because, now, before, scopes);
         report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(OBSERVED, report);
         return report;

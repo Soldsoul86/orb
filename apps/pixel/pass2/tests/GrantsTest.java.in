@@ -22,6 +22,8 @@ final class GrantsTest {
         aBaselineIsNotAnAlarm();
         unreadableIsNotEmpty();
         readsBackOutOfAStoredLine();
+        packagesAreASetLikeAnyOther();
+        aChangeOfLookIsNotAChangeOfDevice();
     }
 
     private static void detectsWhatAppeared() {
@@ -208,6 +210,97 @@ final class GrantsTest {
             Grants.previous("{\"type\":\"probe.process.start\",\"payload\":{}}",
                 "accessibility") == null);
         Harness.check("and so does no line at all", Grants.previous(null, "accessibility") == null);
+    }
+
+    private static void packagesAreASetLikeAnyOther() {
+        Harness.suite("an installed package is compared against history like a grant");
+        // The whole point of DEVICE_LOOP.md §7b5: a broadcast reports an event and
+        // is lost if it is missed, a set compares and is not. Nothing here is
+        // special-cased for packages — it is the same `report` over a fourth kind,
+        // which is what makes the missed broadcast recoverable.
+        Map<String, List<String>> observed = new HashMap<>();
+        observed.put("installedPackage", Arrays.asList("com.b.app", "com.a.app"));
+        Map<String, String> scopes = new HashMap<>();
+        scopes.put("installedPackage", "all");
+        String line = line(Grants.report("process.start", observed, null, scopes));
+
+        Harness.equal("the scope is recorded with the set",
+            Grants.previousScope(line, "installedPackage"), "all");
+        Harness.equal("and the set reads back sorted",
+            Json.canonical(Grants.previous(line, "installedPackage", "all")),
+            "[\"com.a.app\",\"com.b.app\"]");
+
+        Map<String, List<String>> before = new HashMap<>();
+        before.put("installedPackage", Grants.previous(line, "installedPackage", "all"));
+        Map<String, List<String>> now = new HashMap<>();
+        now.put("installedPackage", Arrays.asList("com.a.app", "com.new.app"));
+        Map<String, Object> next = Grants.report("process.start", now, before, scopes);
+
+        Harness.equal("an install nobody was awake for is still caught",
+            Json.canonical(next.get("installedPackageGained")), "[\"com.new.app\"]");
+        Harness.equal("and so is the uninstall of 2026-09-28",
+            Json.canonical(next.get("installedPackageLost")), "[\"com.b.app\"]");
+        Harness.equal("it is a change", next.get("changed"), Boolean.TRUE);
+
+        // GRANT_KINDS is what "grant" means. An app appearing is not an app being
+        // given power, and the two lists exist so that nothing downstream can say
+        // it is by accident.
+        Harness.check("and it is not counted among the grants",
+            !Arrays.asList(Grants.GRANT_KINDS).contains("installedPackage"));
+        Harness.check("though it is a set this app compares",
+            Arrays.asList(Grants.KINDS).contains("installedPackage"));
+    }
+
+    private static void aChangeOfLookIsNotAChangeOfDevice() {
+        Harness.suite("a scope change re-baselines instead of reporting a mass change");
+        // The failure this prevents: a complete list compared against a filtered
+        // one reports every package the filtered look could not see as *lost*.
+        // Two hundred uninstalls that never happened, in the signal whose only
+        // value is that it does not cry wolf (§7 R6).
+        Map<String, List<String>> observed = new HashMap<>();
+        observed.put("installedPackage", Arrays.asList("com.a.app", "com.b.app", "com.c.app"));
+        Map<String, String> all = new HashMap<>();
+        all.put("installedPackage", "all");
+        String line = line(Grants.report("process.start", observed, null, all));
+
+        Harness.check("a set read under a different scope is not a prior reading of it",
+            Grants.previous(line, "installedPackage", "visible") == null);
+        Harness.check("nor is one read with no scope at all",
+            Grants.previous(line, "installedPackage", null) == null);
+        Harness.check("a check that threw is its own answer, not a filtered look",
+            Grants.previous(line, "installedPackage", "unknown") == null);
+        Harness.check("and the matching scope still compares",
+            Grants.previous(line, "installedPackage", "all") != null);
+
+        // End to end: the permission is dropped from the manifest, so the next
+        // reading is filtered. It must be silent, not loud.
+        Map<String, String> visible = new HashMap<>();
+        visible.put("installedPackage", "visible");
+        Map<String, List<String>> before = new HashMap<>();
+        before.put("installedPackage",
+            Grants.previous(line, "installedPackage", "visible"));
+        Map<String, List<String>> now = new HashMap<>();
+        now.put("installedPackage", Arrays.asList("com.a.app"));
+        Map<String, Object> next = Grants.report("process.start", now, before, visible);
+
+        Harness.equal("the narrowed look is a baseline",
+            next.get("installedPackageBaseline"), Boolean.TRUE);
+        Harness.equal("so nothing is reported as lost",
+            next.get("installedPackageLost"), null);
+        Harness.equal("and the event is not a change", next.get("changed"), Boolean.FALSE);
+        Harness.equal("while the scope it was taken under is on the record",
+            next.get("installedPackageScope"), "visible");
+
+        // A kind with no scope must look exactly as it did before scopes existed,
+        // or every reading taken before 2026-09-28 re-baselines on the next start.
+        Harness.suite("a kind with no scope is unchanged by any of this");
+        Map<String, List<String>> grants = new HashMap<>();
+        grants.put("accessibility", Arrays.asList("com.a/.Svc"));
+        String plain = line(Grants.report("process.start", grants, null, all));
+        Harness.check("it records no scope field",
+            Grants.previousScope(plain, "accessibility") == null);
+        Harness.equal("and reads back by the old two-argument call",
+            Json.canonical(Grants.previous(plain, "accessibility")), "[\"com.a/.Svc\"]");
     }
 
     /** A payload as it is actually stored: canonical JSON, nested in an event. */

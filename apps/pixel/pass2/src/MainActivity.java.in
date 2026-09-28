@@ -73,6 +73,9 @@ public final class MainActivity extends Activity {
         render(Pass2.get() == null ? null : Pass2.get().observe("app.opened"));
     }
 
+    /** Above this many entries a set is shown as a count. See `render`. */
+    private static final int LIST_IN_FULL = 25;
+
     private void render(Map<String, Object> report) {
         if (report == null) {
             status.setText("\njournal unavailable");
@@ -87,10 +90,18 @@ public final class MainActivity extends Activity {
                 out.append("  could not be read\n\n");
                 continue;
             }
+            String scope = (String) report.get(kind + "Scope");
+            if (scope != null) out.append("  (").append(scope).append(")\n");
             String holding = (String) report.get(kind + "Holding");
             List<String> entries = Grants.split(holding);
             if (entries.isEmpty()) {
                 out.append("  none\n");
+            } else if (entries.size() > LIST_IN_FULL) {
+                // The installed-package set runs to hundreds. Listing it would bury
+                // the three sets a person is here to look at, and the changes below
+                // are the news either way. The count is not a summary standing in
+                // for the set: the set itself is in the journal, whole.
+                out.append("  ").append(entries.size()).append(" — too many to list here\n");
             } else {
                 for (String entry : entries) out.append("  ").append(entry).append('\n');
             }
