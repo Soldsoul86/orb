@@ -5,7 +5,8 @@ Contract:   Policy
 Domain:     Execution
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
+Accepted:   2026-09-28
 Depends on: Event
 ```
 
@@ -25,9 +26,8 @@ control a property of the architecture rather than a promise about the code.
 > **Attribution note (v1 design).** Policy rules name Capabilities by **identity
 > and tier — values, not a kernel dependency**. As with `Action`, this keeps the
 > kernel a DAG under Art. X §40 (*a State contract never depends on a Service*).
-> `KERNEL.md` currently lists `Capability` as this contract's dependency; that
-> edge is State→Service and cannot stand — see
-> `../docs/ARCHITECTURAL_DEBT.md` AD-5.
+> `KERNEL.md` listed `Capability` as this contract's dependency; that edge was
+> State→Service and could not stand. **Corrected 2026-09-28** and AD-5 closed.
 
 ---
 
@@ -64,16 +64,58 @@ That requires consent to have been given **earlier**, not waived in the moment.
 
 Art. VII §28 requires irreversible actions to have "explicit, scoped
 authorization by default". A standing authorization is explicit and it is scoped;
-what differs is only *when* the human decided. The reading this contract rests
-on is therefore that §28 constrains the **quality** of consent, not its timing.
-**This is stated so that it can be rejected rather than assumed** — if review
-holds that §28 requires contemporaneous consent, then safety actions of this kind
-are outside Orb's reach and should be said to be, rather than smuggled in under a
-looser reading later.
+what differs is only *when* the human decided.
+
+**Ruled 2026-09-28 by the operator** (`../docs/CLAIMS.md` §5 Ruling 1), in general
+form:
+
+> **Standing authorization is available only where waiting would defeat the
+> action's purpose.**
+
+So §28 constrains the **quality** of consent and not its timing — but the licence
+that gives is narrow, and the narrowness is the ruling rather than a qualification
+of it. **A standing authorization must carry the argument for why a prompt could
+not be answered in time, and that argument is part of what is authorized.** A rule
+claiming a standing authorization without it is not merely unwise; it fails §4.10
+and is void.
+
+**Convenience is not urgency.** Scoped, bounded and revocable are necessary and not
+sufficient. A daily payment budget qualifies only if the payment sits on a path that
+cannot stop for a human — an autonomous agent paying per request, say — and does not
+qualify merely because asking each time would be tedious. See §8.
 
 A standing authorization is not a weaker authorization. It carries *more*
-obligations than a prompt: its condition and window are fixed in advance, it is
-revocable at any moment, its every use is recorded, and it expires.
+obligations than a prompt: its condition and window are fixed in advance, it names
+why waiting would defeat the purpose, it is revocable at any moment, its every use
+is recorded, and it expires.
+
+### The authorization record
+
+Evaluating a Policy produces an **authorization**, and that authorization is State:
+immutable, appended, and named by an `Action` (`Action.md` §4.3). Without it that
+reference dangles, so the record is defined here rather than left to
+implementation.
+
+An authorization names, at minimum:
+
+- **its own identity**, stable and permanent;
+- the **Policy version** that produced it, so the rule stays recoverable after
+  supersession (§2.3);
+- the **capability identity and tier** it permits — values, per the attribution
+  note above;
+- the **scope** it is bound to, in the terms §4.5 requires;
+- for a standing authorization, its **triggering condition**, its **window**, and
+  the **argument for urgency** the ruling above requires;
+- the **explanation** §4.8 requires, for a grant as much as for a denial.
+
+**An authorization's identity is derived from what it authorizes, never minted at
+the moment of use.** The same Policy, the same request and the same recorded context
+must yield the same authorization identity on replay — that is §4.7 applied to the
+record rather than only to the decision. An identity assigned at evaluation time
+would make every citation of it unreplayable, which is the defect
+`device-watch`'s alert ids demonstrated twice on 2026-09-28
+(`../docs/DEVICE_LOOP.md` §7b3): a replay mints new ids and every prior citation
+dangles. Cheaper to forbid in a specification than to repair in a journal.
 
 ---
 
@@ -127,6 +169,14 @@ history alone, at any distance in time.
 8. **Explained, always.** Every authorization and every denial records its
    reason. A denial without a reason is indistinguishable from a bug.
 9. **Revocation is immediate, recorded, and not retroactive.**
+10. **A standing authorization carries its urgency argument.** It is available only
+    where waiting would defeat the action's purpose, and the rule states why
+    (§1, ruled 2026-09-28). One that does not is void, like any rule that lowers a
+    floor — not merely unwise.
+11. **An authorization's identity is derived, never minted.** The same Policy,
+    request and recorded context yield the same authorization identity on replay.
+    An identity assigned at the moment of evaluation makes every later citation of
+    it unreplayable (§1).
 
 Upholds Constitution Articles I (History), II §9–10 (recomputable,
 explainable), VII (Capabilities and Human Agency), and VIII §30 (the user is the
@@ -178,14 +228,18 @@ Not guaranteed:
   must be guessed was never explicit, and §4.5 requires explicit.
 - **Standing authorization expired.** Denied, and the user is asked. Elapsed time
   is not consent.
+- **Standing authorization without an urgency argument.** Void, and recorded as
+  void rather than silently ignored — the same treatment as a rule that purports to
+  lower a floor (§4.4). The effect is then authorized contemporaneously or not at
+  all.
 - **Revoked between authorizing and issuing.** The Action is not issued and the
   lapse is recorded (`Action` §7). An already-issued Action stands.
 - **Evaluation itself fails.** Deny, and record the failure as the reason. An
   evaluator that cannot decide has decided no.
 
 Never permitted: failing open; blanket authorization; authorizing an undeclared
-effect; silently widening a scope; an unexplained decision; retroactive
-revocation.
+effect; silently widening a scope; an unexplained decision; retroactive revocation;
+a standing authorization whose only justification is convenience.
 
 ---
 
@@ -193,11 +247,18 @@ revocation.
 
 - **Contemporaneous consent.** "Sending a message requires my confirmation."
   Every send prompts. Confirming one send authorizes that send and no other.
-- **Standing, scoped, bounded.** "Up to ₹500 per day to payees I have already
-  paid, without asking." Explicit, scoped by amount, window and counterparty,
-  revocable, and every use recorded. A reference implementation of exactly this
-  shape exists outside the repository as `@allowance/policy`'s `WINDOW_BUDGET`
-  and `APPROVAL_THRESHOLD` (`CAPABILITY_MODEL.md` §5).
+- **Standing, scoped, bounded — and only with the urgency argument.** "Up to ₹500
+  per day to payees I have already paid, without asking" is explicit, scoped by
+  amount, window and counterparty, revocable, and every use recorded. **That is not
+  sufficient.** Under the 2026-09-28 ruling it stands only where waiting would
+  defeat the purpose — an agent paying per request on a path that cannot stop for a
+  human — and it is **void** where the justification is that asking each time would
+  be tedious. The shape of the rule is identical in both cases; what differs is
+  whether the argument exists, which is why §4.10 makes the argument part of what is
+  authorized rather than commentary on it. A reference implementation of the
+  mechanism exists outside the repository as `@allowance/policy`'s `WINDOW_BUDGET`
+  and `APPROVAL_THRESHOLD` (`CAPABILITY_MODEL.md` §5); the mechanism was never the
+  question.
 - **Ask, then act on silence.** "If a high-impact event is followed by five
   minutes without motion, ask me. If I do not answer within sixty seconds, call
   my emergency contact." The silence window is part of what was authorized, and

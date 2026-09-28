@@ -210,9 +210,17 @@ An action chain that dropped them would leave the gate's whole value unevidenced
 - **DR-4 splits the terminal state.** `release` and `result` mean what they say
   for email; a hand-off ends the chain without a result and says so.
 
-**Open.** `Capability.md` and `Action.md` are Draft and this belongs in them.
-`CLAIMS.md` §5 Ruling 2 — the general timing of consent — bears directly on what
-`review` must guarantee, and is unresolved.
+**Discharged 2026-09-28.** `Capability.md` and `Action.md` were amended to carry
+this and accepted. The chain, `causes`-as-lineage, cancels-as-evidence and the
+`release`/`result` split are in `Action.md` §4a; the gating obligation is
+`Capability.md` §4.10; hesitation time is recorded as erasable content, not
+bookkeeping.
+
+*(This note previously cited "§5 Ruling 2 — the general timing of consent". The
+timing of consent is **Ruling 1**; Ruling 2 is how narrowly C1 is stated. Ruling 1
+was ruled 2026-09-28 — standing authorization only where waiting would defeat the
+action's purpose — which is what `review` needed. Ruling 2 remains open and does not
+bear on this.)*
 
 ---
 

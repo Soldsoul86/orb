@@ -5,7 +5,8 @@ Contract:   Action
 Domain:     Execution
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
+Accepted:   2026-09-28
 Depends on: Event, Policy
 ```
 
@@ -29,9 +30,9 @@ forbids it from living.
 > dependency. This is deliberate and follows `Observation.md`'s treatment of its
 > source: it keeps the kernel a DAG under Art. X §40 (*a State contract never
 > depends on a Service*), avoids a cycle with `Capability`, and correctly admits
-> Actions whose Capability has since been retired. `KERNEL.md` currently lists
-> `Capability` among this contract's dependencies; that edge is a State→Service
-> edge and cannot stand — see `../docs/ARCHITECTURAL_DEBT.md` AD-5.
+> Actions whose Capability has since been retired. `KERNEL.md` listed
+> `Capability` among this contract's dependencies; that edge was State→Service and
+> could not stand. **Corrected 2026-09-28** and AD-5 closed.
 
 ---
 
@@ -49,6 +50,26 @@ arrives, the honest state of the world is *unknown*, not *done*.
 Every Action is realized as an `Event`; the Action is the meaning of an Event
 whose type is action. Per Art. XI §41, the converse does not hold: the *issuing*
 of an Action is runtime activity, not an Observation of reality.
+
+> **A conflict inside the Constitution, named rather than resolved quietly.**
+> Art. VII §29 reads *"An action, once taken, is appended to history **as a new
+> observation**."* Art. XI §41 reads *"the issuance of an Action [is] runtime
+> activity recorded as Events — they are not, in themselves, Observations."*
+> Those cannot both be literal.
+>
+> **This contract reads §29 as requiring that an action be appended to history and
+> never be silent, and §41 as governing what kind of record that is.** The reasons:
+> §41 is the more specific provision and the later article; §42's whole loop —
+> *reality is updated only through observation* — is vacuous if the issuance itself
+> were an Observation, because an Action would then update reality by existing; and
+> §43 gives every Observation a Confidence of Reality, which an issuance has no
+> honest value for. Under the other reading, "the message was sent" and "the message
+> arrived" become the same record, which is the single collapse this contract exists
+> to prevent.
+>
+> **Stated so it can be rejected rather than assumed**, following `Policy.md` §1. If
+> review holds that §29 is literal, then §29 and §41 conflict on their face and the
+> Constitution needs an amendment rather than this contract needing a reading.
 
 ---
 
@@ -98,8 +119,11 @@ changes, because it remains true that it was issued.
    unauthorized Action is not an Action; it is a defect.
 4. **Idempotency-bound.** It binds to the decision that triggered it, and that
    binding is its idempotency key: a retry for the same decision can never
-   produce a second effect. Irreversible capabilities must verify the effect has
-   not already occurred before repeating.
+   produce a second effect. *(The matching obligation — that an irreversible
+   Capability verify the effect has not already occurred before repeating — is a
+   runtime obligation and lives in `Capability.md` §4.9, where a Service contract
+   can impose it. A State contract cannot bind a Service's behaviour, and this
+   invariant previously tried to.)*
 5. **Names its Capability as a value** — identity plus declaration version — so
    the effect it was permitted to have stays recoverable after the Capability is
    retired or replaced.
@@ -113,6 +137,37 @@ changes, because it remains true that it was issued.
 Upholds Constitution Articles I (History), VII §28–29 (authorization, no silent
 actions), and XI §41–42 (issuance is runtime activity; reality only through
 observation).
+
+---
+
+### The chain an Action belongs to — DR-5
+
+An Action is rarely alone. `DECISIONS.md` DR-5 (decided 2026-09-26) fixes one chain
+per intent:
+
+```
+intent → review → confirm | cancel → release → result
+```
+
+Three consequences bind this contract:
+
+1. **The chain is `causes`, not a new field.** The Event envelope already expresses
+   lineage, and a parallel `intent_id` would be a second way to say one thing
+   (`Event.md`; Art. IX §33). An Action names its `intent` and its `confirm`
+   through `causes` and nowhere else.
+2. **Cancels are recorded, and they are the evidence.** *A gate that records only
+   what passed cannot demonstrate what it stopped.* A chain ending in `cancel`
+   produces a record exactly as one ending in `release` does — §4.6's *never
+   silent* covers refusals the human made, not only those the world made.
+3. **`release` and `result` are distinct terminal states** (DR-4). A hand-off ends
+   the chain without a result and says so; it does not borrow `result` to mean
+   *something happened, probably*. That is §1's issuance-not-effect boundary
+   appearing again at the end of the chain.
+
+**Hesitation time is content, not bookkeeping.** How long a person paused before
+confirming a payment is behavioural data of a fairly intimate kind. It is subject to
+`ERASURE.md` like any other payload, and it must not be written into a bookkeeping
+event that erasure does not reach.
 
 ---
 

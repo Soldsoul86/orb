@@ -119,12 +119,49 @@ durable reflection-state need materializes.
 
 ---
 
+## AD-7 — `device-watch` reads a person's whole package list outside the Capability boundary
+
+- **Status:** Open · **Raised:** 2026-09-28, at the Execution contracts' acceptance
+- **Domain:** Execution / Reality · **Kind (if adopted):** bring an existing read
+  under `Capability`, not a new contract
+
+**The finding.** `apps/pixel/pass2` holds `QUERY_ALL_PACKAGES` and reads all 484
+installed packages on a scan (`DEVICE_LOOP.md` §7b6–§7b8). The permission was added
+in a manifest at build time. There is no declaration, no tier, no Policy evaluation
+and no `Action` — none of which existed for it to use, because `device-watch`
+predates the Execution contracts accepted on 2026-09-28.
+
+`Capability.md` §1 is explicit that this is in scope: *"Reads are capabilities too:
+they leave the device's boundary and carry real privacy cost, and pretending
+otherwise is how read access becomes invisible."* The package set does not leave the
+device, but it describes a life in 484 lines, and the argument in §1 is about
+visibility rather than about the network.
+
+**Why it is debt and not a defect.** The implementation was correct for the
+architecture that existed when it was written, and the contract it violates was
+Draft until the day this was raised. Recording it as debt keeps both facts: the
+boundary is right, and something crossed it before the boundary was ratified.
+
+**What adopting it would mean.** A declared Capability at tier *Observe*, its
+privacy cost stated in the declaration, invoked through the runtime rather than
+read inline — and, under `Policy`, a rule the operator can actually see and revoke.
+Not urgent: the read is local, the operator installed it knowingly, and the manifest
+comment says what it is and how to remove it. It becomes urgent the moment a second
+reader of this kind is added without anyone noticing the first was never declared.
+
+---
+
 ## AD-5 — `KERNEL.md` lists two State→Service dependency edges
 
-- **Status:** Open · **Raised:** Phase 3b, Execution domain review · **Revisit at:**
-  the Phase 3b gate, before any Execution implementation interface is written
-- **Domain:** Execution · **Kind (if adopted):** correction to `KERNEL.md`, not a
-  new contract
+- **Status:** **Closed 2026-09-28** · **Raised:** Phase 3b, Execution domain review
+- **Domain:** Execution · **Kind:** correction to `KERNEL.md`, not a new contract
+
+**Resolution.** `KERNEL.md`'s two edges were corrected at the Phase 3b gate, as this
+entry said they should be. `Action` now depends on **Event, Policy**; `Policy` on
+**Event**. Both corrections carry the reason inline so the old edges cannot return
+by looking like a simplification. The `Capability` → `Action` → `Capability` cycle
+is gone, the section's DAG claim is true again, and the three Execution contracts
+were accepted the same day against the corrected kernel.
 
 **The finding.** `KERNEL.md` states as ratified kernel-wide law (Constitution
 Art. X §40):

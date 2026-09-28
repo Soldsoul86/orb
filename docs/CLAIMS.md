@@ -303,23 +303,38 @@ minimization was not minimal and the number in assertion 2 was decoration.
 
 ## 5. Open rulings — these block C1
 
-**Ruling 1 — timing of consent (Art. VII §28).** `Policy.md` §1 offers two
-readings: authorization is valid only at the moment of issue, or it persists for
-a declared window. A5 above cannot be specified until this is decided, because
-under one reading batch approval is a feature and under the other it is the
-hole. This awaits the operator's explicit ruling, as `PARTIAL_REPLICATION.md`
-§10 awaited one.
+**Ruling 1 — timing of consent (Art. VII §28). RULED 2026-09-28, operator.**
 
-**A narrower form was accepted, 2026-09-26** (`ERASURE.md` §4a), and it unblocks
-erasure without settling this. `Policy.md` §1 argues for standing
-authorization from one case — *a person who has fallen cannot confirm a prompt*
-— and that case has a shape: the action is urgent and the human cannot answer in
-time. The proposal is that standing authorization is available **only** where
-waiting would defeat the action's purpose. Erasure has no such case, so it is
-authorized contemporaneously or not at all, however Ruling 1 lands. **Ruled.**
-The general question stays open; erasure no longer waits on it, and A5 is closed
-for erasure specifically — a grant left lying around on a quiet device still
-binds to an unchanged plan, so only a window refuses it.
+`Policy.md` §1 offered two readings: authorization is valid only at the moment of
+issue, or it persists for a declared window. A5 could not be specified until this
+was decided, because under one reading batch approval is a feature and under the
+other it is the hole.
+
+**The ruling, in general form:**
+
+> **Standing authorization is available only where waiting would defeat the
+> action's purpose.**
+
+§28 therefore constrains the **quality** of consent, not its timing — but the
+licence that gives is narrow, and the narrowness is the ruling rather than a
+qualification of it. A standing authorization must carry an argument for why a
+prompt could not be answered in time, and that argument is part of what is
+authorized.
+
+**What it settles.** `Policy.md` §1 may stand. The fall alarm is the type case: a
+person who has fallen cannot confirm a prompt, so *ask, then act on silence* is the
+only shape that works, and the consent must have been given earlier. Erasure has no
+such case and remains contemporaneous-only, as already ruled on 2026-09-26
+(`ERASURE.md` §4a) — that narrower form is now a consequence of the general rule
+rather than an exception to an open question. A5 is closed.
+
+**What it costs, recorded because it was raised before the ruling and accepted
+with it.** A standing authorization for *convenience* does not qualify. A daily
+payment budget is not licensed merely by being scoped, bounded and revocable; it
+must show that waiting would defeat the purpose — which is arguable for an
+autonomous agent paying per request on a path that cannot stop for a human, and is
+not arguable for a person who could simply be asked. `Policy.md` §8's payment
+example is amended accordingly rather than left to imply the looser reading.
 
 **Ruling 2 — how narrowly C1 is stated.** Either the claim is made only for the
 mediated set (defensible today), or it also claims detection of out-of-band

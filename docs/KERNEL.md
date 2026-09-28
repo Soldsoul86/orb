@@ -713,10 +713,15 @@ unit of effect on Reality, captured as history.
 
 **Invariants**
 - Idempotent with respect to its triggering decision.
-- Recorded back as an observation; never silent.
+- Recorded as an Event; never silent.
 - Irreversible effects require explicit, scoped authorization.
 
-**Dependencies** — Capability, Policy.
+**Dependencies** — Event, Policy. *(Corrected 2026-09-28, AD-5. This previously
+read “Capability, Policy”, which is a State→Service edge forbidden by Art. X §40
+and which closed a `Capability` → `Action` → `Capability` cycle in a section
+claiming a DAG. An Action names its Capability by identity and declaration version
+— a **value**, following `Observation`'s treatment of its source — so the edge was
+never needed. See `contracts/Action.md`.)*
 
 ## Policy
 *Kind — State.*
@@ -735,7 +740,10 @@ under what authorization.
 - Authorization is scoped, never blanket.
 - Policy is declarative and auditable.
 
-**Dependencies** — Capability.
+**Dependencies** — Event. *(Corrected 2026-09-28, AD-5. This previously read
+“Capability”, a State→Service edge forbidden by Art. X §40. Policy rules name
+Capabilities by identity and tier — **values**, not a kernel dependency. See
+`contracts/Policy.md`.)*
 
 ## Scheduler
 *Kind — Service.*

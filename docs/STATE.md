@@ -276,8 +276,10 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | **An answer's identity** | alert ids are minted at raise time, not derived from the change. Replaying the same device lane into a fresh journal mints new ids, so an existing answer's citation dangles. An answer is therefore replayable only alongside the lane that raised what it answers — a design change, recorded 2026-09-28 and not made |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
-| `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
-| `CLAIMS.md` §5 Ruling 2 | the general timing of consent, unresolved |
+| ~~`Capability.md`, `Action.md`, `Policy.md`~~ | **Accepted 2026-09-28** (`reviews/EXECUTION.md`). Ruling 1 taken — standing authorization only where waiting would defeat the action's purpose; AD-5's two State→Service edges corrected in `KERNEL.md`; DR-5's chain folded in and discharged; the authorization record specified with a **derived** identity; Art. VII §29 vs XI §41 named rather than settled quietly |
+| **`Scheduler`, `Agent`** | Execution contracts in `KERNEL.md` with **no specification at all**. The domain is accepted for the three that exist, not as complete |
+| **AD-7** | `device-watch` reads 484 installed packages outside the `Capability` boundary — no declaration, no tier, no Policy. Debt, not a defect: the contract it crosses was Draft until the day it was raised |
+| `CLAIMS.md` §5 Ruling 2 | **how narrowly C1 is stated** — the mediated set only, or detection of out-of-band action within a stated bound. Unresolved, and a decision about what Orb promises. *(This row previously described it as the timing of consent; that is Ruling **1**, ruled 2026-09-28.)* |
 | `AIRWALL.md` | an unapproved proposal |
 | AD-6 | independence, open in the debt register |
 | ~~the pass-1 self-test fix~~ | **installed 2026-09-28.** Eleven self-tests had read `ok: false` failing `chain.linksEndToEnd`; the twelfth is the first to pass — `chain.noNewBreaks: true`, `chainBaseline: true`, `chainBreaks: "4"`, so the §5d break is recorded as known rather than repaired or hidden |

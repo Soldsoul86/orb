@@ -5,7 +5,8 @@ Contract:   Capability
 Domain:     Execution
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
+Accepted:   2026-09-28
 Depends on: Action, Policy
 ```
 
@@ -105,6 +106,16 @@ registered ──▶ available ──invoke──▶ invoking ──▶ availabl
    It reports that it issued something. Reality is updated only when a `Sensor`
    observes the result (Art. XI §42).
 8. **Owns no truth.** It holds no source-of-truth state.
+9. **Verifies before repeating.** An irreversible Capability must establish that the
+   effect has not already occurred before issuing again for the same decision.
+   `Action` §4.4 binds the retry to one decision; honouring that binding is runtime
+   behaviour and therefore this contract's obligation, not that one's — a State
+   contract cannot bind a Service.
+10. **Gated as a chain, not as a call.** Where a Capability's effect is subject to
+    human confirmation, it is reached through DR-5's chain — `intent → review →
+    confirm | cancel → release → result` — and a `cancel` produces a record exactly
+    as a `release` does. A gate that recorded only what passed could not demonstrate
+    what it stopped, which is the whole of its value (`DECISIONS.md` DR-5).
 
 Upholds Constitution Articles VI (The Three Planes), VII (Capabilities and Human
 Agency), VIII §31 (local-first), and XI §42 (reality only through observation).
@@ -202,3 +213,14 @@ reporting that reality changed; recording an unknown outcome as a known one.
 - **A composite that escalates.** "Summarise my week and send it" reaches a
   send. It is authorized as a send — irreversible — not as a summary. Composition
   never launders a tier.
+- **Enumerating every installed package — a read this contract would have caught.**
+  On 2026-09-28 `apps/pixel/pass2` was given `QUERY_ALL_PACKAGES` to read the
+  device's full package list (`../docs/DEVICE_LOOP.md` §7b6–§7b8). The decision was
+  made in a manifest, at build time, with no declaration and no Policy involvement.
+  Under this contract it is a Capability at tier **Observe**: it crosses no network
+  but it reads 484 entries describing a person's life, and §1's *reads are
+  capabilities too — pretending otherwise is how read access becomes invisible*
+  applies to it exactly. It is recorded here as an example rather than a defect,
+  because `device-watch` predates these contracts; what it demonstrates is that the
+  boundary this contract draws is the one an implementation crosses when nobody is
+  holding it to one. Carried as `../docs/ARCHITECTURAL_DEBT.md` AD-7.
