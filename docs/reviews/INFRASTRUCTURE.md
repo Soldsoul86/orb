@@ -181,3 +181,101 @@ finding only on a real device.
    everything cryptographic to it. If the only use is "the transport is encrypted",
    the edge may belong to the transport rather than to sync — the same question
    already open against `Journal`'s edge.
+---
+
+## Addendum — `ModelRouter` and `Encryption` drafted, 2026-09-28
+
+With these two, **all five Infrastructure contracts are drafted**: `Journal`,
+`Storage`, `Synchronization`, `ModelRouter`, `Encryption`. Five of the thirty
+kernel contracts remain at Draft rather than Accepted; none is reviewed.
+
+The two are opposite ends of the same domain. `ModelRouter` is the only
+Infrastructure contract that may send the user's data *out*; `Encryption` is the
+only one that depends on nothing, because everything depends on it. Writing them
+together made one thing plain: **the router is the disclosure boundary and the
+keyring is the enforcement of it.** Policy decides, the router minimizes and
+records, and encryption is why the decision still holds on a disk nobody expected
+to be read.
+
+### The spines they were written on
+
+- **ModelRouter** — routing is not interpretation; a remote route is a disclosure
+  (minimized, permissioned, recorded); an output is an observation with full
+  provenance, never truth; **capability is discovered, never assumed**; and
+  `degraded` is never `unavailable`, because a local route is always available.
+- **Encryption** — *cannot read* rather than *not allowed to read*; a key is stored
+  rather than derived **exactly when destroying it must accomplish something**;
+  encrypting bytes hides content but never *which* content; tamper-evidence is
+  detection, never prevention.
+
+### Gaps found
+
+#### 4. Is a remote model call a `Capability`?
+
+`Capability.md` §4.1 says the runtime affects the world only through a Capability,
+and §8 says **reads are capabilities too**. A remote model call is an outbound
+network effect carrying user data. On the plain reading of those two clauses it is
+a Capability — yet `ModelRouter` is a separate Service with its own gate to
+`Policy`, so **the architecture may have two independent egress paths, only one of
+which is described as egress**.
+
+Both readings are defensible and they are not the same architecture:
+
+- *The router is a Capability consumer* — it obtains a network Capability like
+  anything else, and there is one egress path with one authorization surface.
+- *The router is its own egress* — model disclosure is a distinct kind of effect,
+  gated distinctly, and `Capability.md` §8 does not reach it.
+
+Nothing in the kernel currently says which. **This should be settled before either
+contract is accepted**, because accepting them both as written freezes the
+ambiguity into v1.
+
+#### 5. `ModelRouter` is the only Infrastructure contract depending on `Policy`
+
+Every other one depends on `Journal`, `Storage`, `Event` or `Encryption` —
+mechanism. `ModelRouter` depends on a **decision-maker**, and the dependency
+direction check in `KERNEL.md` should say explicitly that this is intended. The
+reason it is intended is disclosure: the router cannot authorize itself
+(Art. VIII §32), so it must reach something that can. Recorded here so a later
+reader does not read it as a layering violation and "fix" it.
+
+#### 6. `AttachmentKeyring`'s rules lived only in code comments
+
+`runtime/journal/src/attachment-keyring.ts` carries three rules that no contract
+stated: keys stored never derived, a destroyed identity tombstoned so `seal`
+refuses, and `held`/`destroyed`/`absent` as three states rather than two. They were
+correct and they were load-bearing, and until today the only place they existed was
+a docstring above the implementation that depends on them. `Encryption.md` §1, §3
+and §4 now state them. **This is the case for writing the contract even where the
+code already works**: the code cannot tell a future reader which of its properties
+are obligations and which are incidental.
+
+#### 7. `AIRWALL.md` is an unapproved proposal that constrains the router
+
+It constrains `Reasoner` egress directly and bears on every remote route
+`ModelRouter` resolves. `ModelRouter.md` was written without assuming it, since
+assuming an unapproved document is how a proposal becomes architecture by
+accident. If it is approved, the router contract needs a pass; if it is rejected,
+that should be recorded so the next writer does not re-open it.
+
+### What a reviewer should challenge
+
+1. **Gap 4 first.** One egress or two. Everything else here is smaller.
+2. **"Capability is discovered, never assumed" is an obligation with a cost.**
+   Rechecking is a round trip. The contract says capability is rechecked rather
+   than remembered and does not say how often, which may be the right silence or
+   may be the same missing bound as `Synchronization`'s "resumable".
+3. **`Encryption` depends on nothing — is that true of key *custody*?** Hardware
+   key storage is a device facility; the contract says "behind hardware where the
+   device offers it" and otherwise keeps the keyring a port. If custody ever needs
+   a Service, the no-dependency claim fails and Art. X §40's spirit with it.
+4. **The confirmation oracle is accepted, not solved.** `payloadHash` commits to
+   plaintext, which makes a guess testable against history. `Encryption.md` §6
+   names it under "not guaranteed". A reviewer should decide whether naming it is
+   enough, or whether the hash should be salted — which would cost
+   cross-implementation vector agreement and `PARTIAL_REPLICATION.md` §3's ability
+   to check a payload recovered from anywhere.
+5. **Revocation has no record type.** §7 says a lost device's identity is revoked
+   and its future writes are not accepted. *Which* contract defines the revocation
+   record, and how a peer learns of it, is unspecified — the same shape of gap as
+   erasure confirmation in the previous addendum.
