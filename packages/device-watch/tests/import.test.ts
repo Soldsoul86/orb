@@ -17,6 +17,7 @@ import { Journal, MemoryJournalStore, verifyLane } from "@orb/journal";
 import { readObservation } from "@orb/observation";
 import {
   GRANTS_OBSERVED_TYPE,
+  GRANTS_PACKAGES_TYPE,
   ImportError,
   alertsFor,
   importExport,
@@ -37,7 +38,7 @@ async function journal() {
 describe("an export written by the phone", () => {
   test("parses into events, keeping the phone's own identities", async () => {
     const events = parseExport(await fixture());
-    assert.equal(events.length, 4);
+    assert.equal(events.length, 5);
     assert.ok(events.every((event) => event.lane === "grants"));
     assert.ok(events.every((event) => event.device === "Pixel 10a/stallion"));
   });
@@ -84,17 +85,20 @@ describe("replication, then observation", () => {
     const result = await importExport(j, await fixture());
 
     assert.deepEqual(result.lanes, ["grants"]);
-    assert.equal(result.replicated, 4);
-    // Three readings, one per `grants.observed`. The process.start is not one.
-    assert.equal(result.observed, 3);
+    assert.equal(result.replicated, 5);
+    // Four readings: three `grants.observed` and one `grants.packages`. The
+    // process.start is not one. A scan is a reading like any other — the phone
+    // separates the two types by cadence, not by whether they are perceptions.
+    assert.equal(result.observed, 4);
 
     const replica = await j.readLane("grants");
-    assert.equal(replica.length, 4);
+    assert.equal(replica.length, 5);
     assert.equal(replica.filter((e) => e.type === GRANTS_OBSERVED_TYPE).length, 3);
+    assert.equal(replica.filter((e) => e.type === GRANTS_PACKAGES_TYPE).length, 1);
 
     const mine = await j.readLane("mac");
     const observations = mine.filter((event) => readObservation(event) !== null);
-    assert.equal(observations.length, 3);
+    assert.equal(observations.length, 4);
     // inv. 3: what perceived it was pass 2 on the phone, not the importer.
     assert.equal(readObservation(observations[0]!)?.source, "pass2@Pixel 10a/stallion");
   });
@@ -123,7 +127,7 @@ describe("replication, then observation", () => {
 
     assert.equal(again.replicated, 0);
     assert.equal(again.observed, 0);
-    assert.equal((await j.readLane("grants")).length, 4);
+    assert.equal((await j.readLane("grants")).length, 5);
   });
 
   test("a longer export of the same lane adds only its tail", async () => {
@@ -132,8 +136,8 @@ describe("replication, then observation", () => {
     await importExport(j, lines.slice(0, 2).join("\n"));
     const rest = await importExport(j, lines.join("\n"));
 
-    assert.equal(rest.replicated, 2);
-    assert.equal((await j.readLane("grants")).length, 4);
+    assert.equal(rest.replicated, 3);
+    assert.equal((await j.readLane("grants")).length, 5);
   });
 });
 
@@ -169,11 +173,25 @@ describe("the readings are the ones pass 2 wrote", () => {
     const readings = (await j.readLane("mac"))
       .map((event) => readObservation<DeviceAuthorityReading>(event))
       .filter((o) => o !== null);
-    const last = readings.at(-1);
+    // The last reading that is *about* accessibility — which is not the last
+    // reading, because the fixture ends with a package scan. That distinction is
+    // the assertion below it.
+    const last = readings.filter((o) => o.data.kinds.some((k) => k.kind === "accessibility")).at(-1);
     const accessibility = last?.data.kinds.find((k) => k.kind === "accessibility");
 
     assert.equal(accessibility?.readable, false);
     assert.equal(accessibility?.holding, undefined, "not an empty list");
+
+    // And a scan carries **no accessibility kind at all** rather than an
+    // unreadable one. *This event is not about that* and *we tried and failed* are
+    // different facts, and the second would make every scan look like three
+    // simultaneous read failures.
+    const scan = readings.at(-1);
+    assert.deepEqual(
+      scan?.data.kinds.map((k) => k.kind),
+      ["installedPackage"],
+      "a scan reports one set and says nothing about the others",
+    );
   });
 });
 
@@ -209,7 +227,7 @@ describe("the loop, end to end, on the phone's own bytes", () => {
   });
 });
 
-describe("the fourth set crosses the language boundary", () => {
+describe("a scan crosses the language boundary as its own event", () => {
   test("the scope the phone recorded arrives as a scope, not as part of the set", async () => {
     // The fixture is written by `Grants.report` with a scopes map, the same call
     // `Pass2.observe` makes on the device. What is under test is the pair: a
@@ -225,30 +243,34 @@ describe("the fourth set crosses the language boundary", () => {
       .map((o) => o.data);
     assert.ok(readings.length > 0);
 
-    for (const data of readings) {
-      const packages = data.kinds.find((k) => k.kind === "installedPackage");
-      assert.ok(packages, "every reading carries the package set");
-      assert.equal(packages.scope, "all");
-      assert.deepEqual(packages.holding, [
-        "com.android.settings",
-        "com.google.android.gms",
-        "dev.orb.pass2",
-      ]);
-      // And the kinds that have one completeness carry no scope at all, rather
-      // than a made-up one that would compare equal to nothing.
-      assert.equal(data.kinds.find((k) => k.kind === "deviceAdmin")?.scope, undefined);
-    }
+    const scans = readings.filter((data) => data.kinds.some((k) => k.kind === "installedPackage"));
+    assert.equal(scans.length, 1, "one scan in the fixture, on its own event type");
 
-    // It held still across the fixture, so it is news in none of them.
+    const packages = scans[0]?.kinds.find((k) => k.kind === "installedPackage");
+    assert.equal(packages?.scope, "all");
+    assert.deepEqual(packages?.holding, [
+      "com.android.settings",
+      "com.google.android.gms",
+      "dev.orb.pass2",
+    ]);
+    assert.equal(scans[0]?.because, "operator.scan");
+
+    // A grant kind carries no scope at all, rather than a made-up one that would
+    // compare equal to nothing and re-baseline it for ever.
+    const admins = readings
+      .flatMap((data) => data.kinds)
+      .filter((k) => k.kind === "deviceAdmin");
+    assert.ok(admins.length > 0);
+    assert.ok(admins.every((k) => k.scope === undefined));
+
+    // The scan is a baseline — no prior scan to compare against — so it is news in
+    // neither direction, which is the §5j rule holding for the new kind too.
     const state = project(await j.readAll());
     assert.equal(
       state.changes.filter((c) => c.kind === "installedPackage").length,
       0,
-      "a set that did not move raises nothing",
+      "a first scan raises nothing",
     );
-    assert.equal(
-      state.holdings.find((h) => h.kind === "installedPackage")?.scope,
-      "all",
-    );
+    assert.equal(state.holdings.find((h) => h.kind === "installedPackage")?.scope, "all");
   });
 });

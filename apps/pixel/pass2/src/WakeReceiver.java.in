@@ -33,5 +33,24 @@ public final class WakeReceiver extends BroadcastReceiver {
             because = because + ":" + intent.getData();
         }
         app.observe(because);
+
+        // A package broadcast scans **unconditionally**, whatever the interval
+        // says: this is the route that knows a package moved, and it is the one
+        // moment when a scan is certain to find something. Every other wake scans
+        // only if the last one is stale. That is the whole shape of this signal --
+        // the broadcast for promptness, the scan for correctness, and neither
+        // depending on the other (`DEVICE_LOOP.md` 7b7).
+        if (isPackageAction(intent.getAction())) {
+            app.scanPackages(because);
+        } else {
+            app.scanPackagesIfDue(because);
+        }
+    }
+
+    /** Whether an action is one of the three package events this app filters for. */
+    private static boolean isPackageAction(String action) {
+        return Intent.ACTION_PACKAGE_ADDED.equals(action)
+            || Intent.ACTION_PACKAGE_REMOVED.equals(action)
+            || Intent.ACTION_PACKAGE_REPLACED.equals(action);
     }
 }

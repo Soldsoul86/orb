@@ -51,6 +51,8 @@ PACKAGE_RULE        = "device-watch.packages-changed"
 ```ts
 parseExport(text: string): readonly StoredEvent[]
 importExport(journal, text): Promise<ImportResult>
+GRANTS_OBSERVED_TYPE = "grants.observed"   // the three grants, every wake
+GRANTS_PACKAGES_TYPE = "grants.packages"   // the package set, on a scan
 ```
 A pass-2 export becomes a replica of the phone's lane plus Observations in this
 device's lane. `parseExport` throws `ImportError` naming the line on anything that

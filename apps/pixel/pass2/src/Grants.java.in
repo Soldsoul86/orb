@@ -33,35 +33,50 @@ import java.util.TreeSet;
  */
 final class Grants {
 
-    /** The three grants proper — things that hold power, as §4.4 means it. */
+    /**
+     * The three grants proper — things that hold power, as §4.4 means it.
+     *
+     * What an **observation** reports, at every wake, because all three are cheap:
+     * two `Settings.Secure` lookups and one `DevicePolicyManager` call.
+     */
     static final String[] GRANT_KINDS = {"accessibility", "notificationListener", "deviceAdmin"};
 
     /**
-     * Every set this app compares against history, grants first.
+     * What a **scan** reports, on its own cadence, because it is not cheap.
      *
-     * `installedPackage` is **not a grant** and is kept out of `GRANT_KINDS` for
-     * that reason: an app appearing is not an app being given power over the
-     * device, and a reader who is told otherwise has been told something false.
+     * `installedPackage` is not a grant, and it is not in `GRANT_KINDS` for that
+     * reason: an app appearing is not an app being given power over the device.
      * What it shares with the three is the *mechanism* — a named set, compared
-     * against what the journal last recorded — and that is the whole reason it is
-     * here.
+     * against what the journal last recorded — and that is the whole reason it
+     * exists here.
      *
-     * It is here because a broadcast is not a record. `PACKAGE_ADDED` reports an
+     * It exists because a broadcast is not a record. `PACKAGE_ADDED` reports an
      * **event**: miss the moment and there is nothing to come back to, which is
      * what happened on 2026-09-28 when an app was uninstalled while this one was
      * force-stopped and the platform withheld the broadcast (`DEVICE_LOOP.md`
-     * §7b5, P19). A set compares, so the next process start catches what any
-     * missed broadcast would have said, whenever that start comes — which
-     * demotes the broadcast from load-bearing to prompt, the same posture
-     * `watchSettings` already has.
+     * §7b5, P19). A set compares, so a later scan catches what the missed
+     * broadcast would have said — which demotes the broadcast from load-bearing
+     * to prompt, the same posture `watchSettings` already has.
      *
-     * It does **not** close the interval gap (P21). An app installed, granted
-     * something and removed between two observations still returns both sets to
-     * where they began, and both readings still say `changed: false`. This makes
-     * the window smaller and never zero, and saying so is the point.
+     * **Why it is a separate event and not a fourth field on every observation.**
+     * Enumerating every package is hundreds of `PackageInfo` objects across a
+     * binder transaction, and the whole holding set has to be written out to be
+     * comparable later. Doing that at every wake spends the operator's stated
+     * constraint — battery — on a set that moves far more slowly than the grants
+     * do. And the alternative shape was worse than expensive: an observation that
+     * reported the package kind as `Readable: false` whenever it skipped the read
+     * would be recording *we chose not to look* as *we could not find out*. Those
+     * are different facts, and this whole signal exists because collapsing two
+     * different facts into one field is how a record starts lying. A scan that
+     * did not happen leaves **no** package fields, and `lastOfType` finds the last
+     * one that did.
+     *
+     * It does **not** close the interval gap (P21) and the gap is now wider by
+     * design: an app installed and removed between two *scans* returns the set to
+     * where it began. The scan interval is the resolution of this signal, and it
+     * is a number someone can change once the journal says how often it fires.
      */
-    static final String[] KINDS =
-        {"accessibility", "notificationListener", "deviceAdmin", "installedPackage"};
+    static final String[] PACKAGE_KINDS = {"installedPackage"};
 
     private Grants() {}
 
@@ -175,11 +190,18 @@ final class Grants {
             String because,
             Map<String, List<String>> observed,
             Map<String, List<String>> previous) {
-        return report(because, observed, previous, null);
+        return report(GRANT_KINDS, because, observed, previous, null);
     }
 
     /**
-     * The same report, with a **scope** recorded for the kinds that have one.
+     * The same report over a named set of kinds, with a **scope** for those that
+     * have one.
+     *
+     * `kinds` is explicit because the two event types report different sets on
+     * different cadences — `GRANT_KINDS` at every wake, `PACKAGE_KINDS` on a scan.
+     * A kind this call does not name writes **no fields at all**, which is the
+     * point: the absence says *this event is not about that*, where a
+     * `Readable: false` would have said *we tried and failed*.
      *
      * A scope is *what kind of look this was* — see `scopeChanged`. Only
      * `installedPackage` has one today, because it is the only set the platform
@@ -187,6 +209,7 @@ final class Grants {
      * no scope field, which is what every reading before this change looks like.
      */
     static Map<String, Object> report(
+            String[] kinds,
             String because,
             Map<String, List<String>> observed,
             Map<String, List<String>> previous,
@@ -195,7 +218,7 @@ final class Grants {
         out.put("because", because);
 
         boolean anyChange = false;
-        for (String kind : KINDS) {
+        for (String kind : kinds) {
             List<String> held = observed.get(kind);
             if (held == null) {
                 // Recorded as a reason, never as none. No holding field at all,
@@ -263,7 +286,7 @@ final class Grants {
      * unreadable prior line, reached for the same reason and by the same path. One
      * silent observation is the cost, and `baseline: true` is on the record where a
      * reader can see it. It is structurally the v2-envelope note on
-     * `Pass2.lastObservation` again: a change in the instrument must never read as
+     * `Pass2.lastOfType` again: a change in the instrument must never read as
      * a change in the world.
      *
      * A `null` scope asks for a line that recorded no scope, which is what the

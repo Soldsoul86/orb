@@ -140,10 +140,13 @@ and waiting to be raised — because `alertsFor` returns what has not been raise
 yet, never what is unanswered, and one number in place of three would let a
 reader believe a raised alert had been dealt with.
 
-**A fourth set, and a second rule.** Since 2026-09-28 pass 2 also records the
-installed-package set, compared against history like the three grants, because a
-broadcast reports an event and is lost if it is missed while a set is not
-(`docs/DEVICE_LOOP.md` §7b5). It is deliberately **not** a grant: `ruleFor` routes
+**A second event type, and a second rule.** Since 2026-09-28 pass 2 also records
+the installed-package set, compared against history like the three grants, because
+a broadcast reports an event and is lost if it is missed while a set is not
+(`docs/DEVICE_LOOP.md` §7b5). It arrives on `grants.packages` rather than inside
+`grants.observed`, on its own cadence — a scan, not a per-wake read — so
+`importExport` turns both event types into readings and a payload's *missing* kinds
+mean *this event is not about that*, never *the read failed*. It is deliberately **not** a grant: `ruleFor` routes
 it to `device-watch.packages-changed`, so an alert never claims an app that merely
 appeared was given power over the device. Readings for it carry a `scope` — `all`,
 `visible` or `unknown` — and sets are never compared across scopes, because a

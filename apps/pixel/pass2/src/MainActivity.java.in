@@ -51,6 +51,17 @@ public final class MainActivity extends Activity {
         });
         root.addView(export);
 
+        // "Whenever we feel it is necessary" — the operator's own route to a scan,
+        // which is the third trigger beside a package broadcast and a stale
+        // interval. Recorded with its own `because`, because a scan a person asked
+        // for is different evidence from one a timer produced.
+        Button scan = new Button(this);
+        scan.setText("Scan installed packages now");
+        scan.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { scanNow(); }
+        });
+        root.addView(scan);
+
         status = new TextView(this);
         status.setTextSize(12);
         status.setTypeface(Typeface.MONOSPACE);
@@ -63,6 +74,29 @@ public final class MainActivity extends Activity {
     }
 
     /**
+     * An operator-requested scan, and what the screen says afterwards.
+     *
+     * The count is read back out of the event that was just written, not out of
+     * the variable that produced it — the journal is the record, and a screen that
+     * showed a number the journal does not hold would be a second source of truth
+     * the size of one line.
+     */
+    private void scanNow() {
+        Pass2 app = Pass2.get();
+        Map<String, Object> report = app == null ? null : app.scanPackages("operator.scan");
+        if (report == null) {
+            status.setText("\nscan failed: journal unavailable");
+            return;
+        }
+        StringBuilder out = new StringBuilder("\nscanned installed packages\n");
+        appendSet(out, "installedPackage", report);
+        out.append(Boolean.TRUE.equals(report.get("changed"))
+            ? "something changed since the last scan\n"
+            : "nothing changed since the last scan\n");
+        status.setText(out.toString());
+    }
+
+    /**
      * Opening the app is itself a wake, so it reads. Recorded with its own
      * reason, because an observation the operator triggered by looking is not
      * the same evidence as one the platform delivered.
@@ -70,11 +104,51 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        render(Pass2.get() == null ? null : Pass2.get().observe("app.opened"));
+        Pass2 app = Pass2.get();
+        render(app == null ? null : app.observe("app.opened"));
+        // Opening the app is a wake like any other, so it takes a scan if one is
+        // due. It does not force one: the button above is for that, and a person
+        // who opens the app twice in a minute should not pay for two scans.
+        if (app != null) app.scanPackagesIfDue("app.opened");
     }
 
-    /** Above this many entries a set is shown as a count. See `render`. */
+    /** Above this many entries a set is shown as a count. See `appendSet`. */
     private static final int LIST_IN_FULL = 25;
+
+    /**
+     * One set, as the screen shows it — shared by an observation and a scan,
+     * because the two carry the same fields and a second copy of this would drift.
+     */
+    private void appendSet(StringBuilder out, String kind, Map<String, Object> report) {
+        out.append(kind).append('\n');
+        if (!Boolean.TRUE.equals(report.get(kind + "Readable"))) {
+            // Never "none". The one thing this screen must not do is show a
+            // failed read as an empty device.
+            out.append("  could not be read\n\n");
+            return;
+        }
+        String scope = (String) report.get(kind + "Scope");
+        if (scope != null) out.append("  (").append(scope).append(")\n");
+        List<String> entries = Grants.split((String) report.get(kind + "Holding"));
+        if (entries.isEmpty()) {
+            out.append("  none\n");
+        } else if (entries.size() > LIST_IN_FULL) {
+            // The installed-package set runs to hundreds. Listing it would bury the
+            // sets a person is here to look at, and the changes below are the news
+            // either way. The count is not a summary standing in for the set: the
+            // set itself is in the journal, whole.
+            out.append("  ").append(entries.size()).append(" — too many to list here\n");
+        } else {
+            for (String entry : entries) out.append("  ").append(entry).append('\n');
+        }
+        if (Boolean.TRUE.equals(report.get(kind + "Baseline"))) {
+            out.append("  (first record of this kind — nothing to compare against)\n");
+        } else {
+            append(out, "gained", report.get(kind + "Gained"));
+            append(out, "lost", report.get(kind + "Lost"));
+        }
+        out.append('\n');
+    }
 
     private void render(Map<String, Object> report) {
         if (report == null) {
@@ -82,37 +156,7 @@ public final class MainActivity extends Activity {
             return;
         }
         StringBuilder out = new StringBuilder("\n");
-        for (String kind : Grants.KINDS) {
-            out.append(kind).append('\n');
-            if (!Boolean.TRUE.equals(report.get(kind + "Readable"))) {
-                // Never "none". The one thing this screen must not do is show a
-                // failed read as an empty device.
-                out.append("  could not be read\n\n");
-                continue;
-            }
-            String scope = (String) report.get(kind + "Scope");
-            if (scope != null) out.append("  (").append(scope).append(")\n");
-            String holding = (String) report.get(kind + "Holding");
-            List<String> entries = Grants.split(holding);
-            if (entries.isEmpty()) {
-                out.append("  none\n");
-            } else if (entries.size() > LIST_IN_FULL) {
-                // The installed-package set runs to hundreds. Listing it would bury
-                // the three sets a person is here to look at, and the changes below
-                // are the news either way. The count is not a summary standing in
-                // for the set: the set itself is in the journal, whole.
-                out.append("  ").append(entries.size()).append(" — too many to list here\n");
-            } else {
-                for (String entry : entries) out.append("  ").append(entry).append('\n');
-            }
-            if (Boolean.TRUE.equals(report.get(kind + "Baseline"))) {
-                out.append("  (first record of this kind — nothing to compare against)\n");
-            } else {
-                append(out, "gained", report.get(kind + "Gained"));
-                append(out, "lost", report.get(kind + "Lost"));
-            }
-            out.append('\n');
-        }
+        for (String kind : Grants.GRANT_KINDS) appendSet(out, kind, report);
         out.append(Boolean.TRUE.equals(report.get("changed"))
             ? "something changed since the last observation\n"
             : "nothing changed since the last observation\n");

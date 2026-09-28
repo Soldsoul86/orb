@@ -133,16 +133,35 @@ is happening — the operator named battery as the constraint — and it makes t
 app pass 1's missing **P6** experiment, since a service ran throughout pass 1,
 which is the condition P6 excludes.
 
-**A fourth set, which is not a grant.** Since 2026-09-28 each observation also
-records the **installed-package set**, compared against history exactly like the
-three grants. The reason is `DEVICE_LOOP.md` §7b5: `PACKAGE_ADDED` reports an
+**A scan, which is not an observation.** Since 2026-09-28 the app also records the
+**installed-package set**, compared against history exactly like the three
+grants — on its own event type, `grants.packages`, and its own cadence. The reason is `DEVICE_LOOP.md` §7b5: `PACKAGE_ADDED` reports an
 *event*, so missing the moment loses it for ever — which is what happened when an
 app was uninstalled while this one was force-stopped and the platform withheld the
-broadcast. A set compares, so the next process start catches what the missed
-broadcast would have said. That demotes the package broadcast from load-bearing to
-prompt, the posture `watchSettings` already had. It does **not** close the interval
-gap (P21): an app installed and removed between two observations still leaves both
-sets where they began.
+broadcast. A set compares, so a later scan catches what the missed broadcast would
+have said. That demotes the package broadcast from load-bearing to prompt, the
+posture `watchSettings` already had.
+
+**Why a scan and not a field on every observation.** Enumerating every package is
+hundreds of `PackageInfo` objects over a binder transaction; the three grant reads
+are two settings lookups and one service call. One event meant one cadence for two
+costs that are nothing alike, and battery is the constraint the operator named. A
+scan runs on three triggers, none needing a service, an alarm or another
+permission: a **package broadcast** (always — the one moment a scan is sure to find
+something), **any wake where the last scan is older than 12 h** (found with
+`lastOfType`, not a cache), and the **operator's button**, recorded as
+`because: "operator.scan"`.
+
+It had to be a separate event *type* for two reasons. The comparison looks up the
+last **scan**; looking up the last observation would find one with no package fields,
+read that as *no usable history*, and re-baseline at every scan for ever. And an
+observation that named the kind but skipped the read would have to write
+`installedPackageReadable: false` — *could not find out*, when the truth is *chose
+not to look*. A scan that did not happen writes no package fields at all.
+
+It does **not** close the interval gap (P21), and the gap is now wider by choice:
+an app installed and removed between two **scans** leaves both sets where they
+began.
 
 Two permissions. `RECEIVE_BOOT_COMPLETED`, which reads nothing, and
 `QUERY_ALL_PACKAGES`, which is the one cost here that is not free — without it

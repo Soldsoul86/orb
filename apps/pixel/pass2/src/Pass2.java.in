@@ -35,6 +35,19 @@ public final class Pass2 extends Application {
     /** Its own lane. Pass 1 holds `pixel`; two apps must never claim one chain. */
     static final String LANE = "grants";
     static final String OBSERVED = "grants.observed";
+    static final String PACKAGES = "grants.packages";
+
+    /**
+     * How stale a package scan may be before any wake takes a new one.
+     *
+     * **A guess, and labelled one.** The broadcast catches an install the moment
+     * it happens whenever this app is not in the stopped state, so this interval
+     * only bounds the case where that route was silenced — §7b5. Half a day means
+     * two scans daily against eight-odd wakes, and the journal will say how often
+     * it actually fired, which is the evidence for changing this number. It is not
+     * tuned, because there is nothing yet to tune it against.
+     */
+    static final long SCAN_INTERVAL_MS = 12L * 60L * 60L * 1000L;
 
     private static Pass2 instance;
     private Journal journal;
@@ -67,6 +80,7 @@ public final class Pass2 extends Application {
 
         recordStart();
         observe("process.start");
+        scanPackagesIfDue("process.start");
         watchSettings();
     }
 
@@ -86,25 +100,89 @@ public final class Pass2 extends Application {
         if (journal == null) return null;
 
         Map<String, List<String>> now = GrantReader.read(this);
-        Map<String, String> scopes = GrantReader.scopes(this);
 
-        String line = lastObservation();
+        String line = lastOfType(OBSERVED);
         Map<String, List<String>> before = new HashMap<>();
-        // The scope goes into the lookup, not just into the output: a set read
-        // under a different scope is not a prior reading of this set, and
-        // `Grants.previous` refuses it rather than diffing across the change.
-        for (String kind : Grants.KINDS) {
-            before.put(kind, Grants.previous(line, kind, scopes.get(kind)));
-        }
+        for (String kind : Grants.GRANT_KINDS) before.put(kind, Grants.previous(line, kind));
 
-        Map<String, Object> report = Grants.report(because, now, before, scopes);
+        Map<String, Object> report =
+            Grants.report(Grants.GRANT_KINDS, because, now, before, null);
         report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(OBSERVED, report);
         return report;
     }
 
     /**
-     * The last recorded observation, as a raw line, or null if there is none.
+     * The installed-package set, compared against the **last scan** rather than
+     * the last observation.
+     *
+     * That is what the separate event type buys: `lastOfType(PACKAGES)` walks back
+     * past however many grant observations happened in between, so scanning less
+     * often costs promptness and never re-baselines the set. Looking up the last
+     * *observation* instead would find one with no package fields, read it as *no
+     * usable prior record*, and re-baseline on every wake — a signal that never
+     * reports a change and never says why.
+     *
+     * The scope goes into the lookup, not only into the output: a set read under a
+     * different scope is not a prior reading of this set, and `Grants.previous`
+     * refuses it rather than diffing across the change (see there for what that
+     * prevents).
+     */
+    synchronized Map<String, Object> scanPackages(String because) {
+        if (journal == null) return null;
+
+        Map<String, List<String>> now = GrantReader.readPackages(this);
+        Map<String, String> scopes = GrantReader.scopes(this);
+
+        String line = lastOfType(PACKAGES);
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.PACKAGE_KINDS) {
+            before.put(kind, Grants.previous(line, kind, scopes.get(kind)));
+        }
+
+        Map<String, Object> report =
+            Grants.report(Grants.PACKAGE_KINDS, because, now, before, scopes);
+        report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(PACKAGES, report);
+        return report;
+    }
+
+    /**
+     * Scans if the last scan is older than `SCAN_INTERVAL_MS`, and records nothing
+     * if it is not.
+     *
+     * **Silence here is not ambiguous, which is the only reason it is allowed.**
+     * A wake that does not scan writes no event about not scanning, and that would
+     * normally be the mistake this app exists to avoid — except that
+     * `lastOfType(PACKAGES)` makes *when the last scan happened* a fact anyone can
+     * read off the journal. The question "was the package set being watched on
+     * that day" has an answer without a per-wake record of the negative.
+     *
+     * The clock is `wallClock`, which can jump: a clock change makes a scan early
+     * or late. That costs promptness, never correctness — the comparison is
+     * against history whenever it runs — which is the same posture the settings
+     * watch has.
+     */
+    synchronized Map<String, Object> scanPackagesIfDue(String because) {
+        if (journal == null) return null;
+        try {
+            Map<String, String> last = journal.lastOfType(PACKAGES);
+            if (last != null) {
+                String at = last.get("wallClock");
+                if (at != null
+                        && System.currentTimeMillis() - Long.parseLong(at) < SCAN_INTERVAL_MS) {
+                    return null;
+                }
+            }
+        } catch (IOException | NumberFormatException error) {
+            // History we cannot read is not history that says "recently". Falling
+            // through scans once more than needed, which is the harmless direction.
+        }
+        return scanPackages(because);
+    }
+
+    /**
+     * The last recorded event of a type, as a raw line, or null if there is none.
      *
      * **This depends on the v1 envelope**, where the event's real type is on the
      * line. Under v2 the type is coarsened to `orb.content` (the whole point of
@@ -114,9 +192,9 @@ public final class Pass2 extends Application {
      * a one-line change: it needs a way to find the last observation that does
      * not read the fine type off the line, and that has to land first.
      */
-    private String lastObservation() {
+    private String lastOfType(String type) {
         try {
-            Map<String, String> last = journal.lastOfType(OBSERVED);
+            Map<String, String> last = journal.lastOfType(type);
             return last == null ? null : last.get("line");
         } catch (IOException error) {
             // Unreadable history is not empty history. Returning null makes every

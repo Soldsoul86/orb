@@ -24,6 +24,7 @@ final class GrantsTest {
         readsBackOutOfAStoredLine();
         packagesAreASetLikeAnyOther();
         aChangeOfLookIsNotAChangeOfDevice();
+        aScanIsComparedAgainstTheLastScan();
     }
 
     private static void detectsWhatAppeared() {
@@ -153,7 +154,7 @@ final class GrantsTest {
         now.put("notificationListener", new ArrayList<String>());
         now.put("deviceAdmin", new ArrayList<String>());
         Map<String, List<String>> before = new HashMap<>();
-        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+        for (String kind : Grants.GRANT_KINDS) before.put(kind, Grants.previous(line, kind));
         Map<String, Object> next = Grants.report("process.start", now, before);
         Harness.equal("so a read that recovers does not claim two grants just appeared",
             next.get("accessibilityBaseline"), Boolean.TRUE);
@@ -191,7 +192,7 @@ final class GrantsTest {
 
         // The next comparison, built entirely from the stored line.
         Map<String, List<String>> before = new HashMap<>();
-        for (String kind : Grants.KINDS) before.put(kind, Grants.previous(line, kind));
+        for (String kind : Grants.GRANT_KINDS) before.put(kind, Grants.previous(line, kind));
         Map<String, List<String>> now = new HashMap<>();
         now.put("accessibility", Arrays.asList("com.a/.Svc", "com.b/.Svc", "com.new/.Svc"));
         now.put("notificationListener", Arrays.asList("com.n/.Listener$Inner"));
@@ -222,7 +223,8 @@ final class GrantsTest {
         observed.put("installedPackage", Arrays.asList("com.b.app", "com.a.app"));
         Map<String, String> scopes = new HashMap<>();
         scopes.put("installedPackage", "all");
-        String line = line(Grants.report("process.start", observed, null, scopes));
+        String line = line(
+            Grants.report(Grants.PACKAGE_KINDS, "process.start", observed, null, scopes));
 
         Harness.equal("the scope is recorded with the set",
             Grants.previousScope(line, "installedPackage"), "all");
@@ -234,7 +236,8 @@ final class GrantsTest {
         before.put("installedPackage", Grants.previous(line, "installedPackage", "all"));
         Map<String, List<String>> now = new HashMap<>();
         now.put("installedPackage", Arrays.asList("com.a.app", "com.new.app"));
-        Map<String, Object> next = Grants.report("process.start", now, before, scopes);
+        Map<String, Object> next =
+            Grants.report(Grants.PACKAGE_KINDS, "process.start", now, before, scopes);
 
         Harness.equal("an install nobody was awake for is still caught",
             Json.canonical(next.get("installedPackageGained")), "[\"com.new.app\"]");
@@ -247,8 +250,15 @@ final class GrantsTest {
         // it is by accident.
         Harness.check("and it is not counted among the grants",
             !Arrays.asList(Grants.GRANT_KINDS).contains("installedPackage"));
-        Harness.check("though it is a set this app compares",
-            Arrays.asList(Grants.KINDS).contains("installedPackage"));
+        Harness.check("it is the set a scan reports",
+            Arrays.asList(Grants.PACKAGE_KINDS).contains("installedPackage"));
+        // The reason the two lists are separate arrays and not one with a filter:
+        // an observation that named this kind and skipped the read would have to
+        // record it as unreadable, which is a different fact from not looking.
+        Harness.equal("and an observation writes no field for it at all",
+            Grants.report(Grants.GRANT_KINDS, "process.start", observed, null, scopes)
+                .get("installedPackageReadable"),
+            null);
     }
 
     private static void aChangeOfLookIsNotAChangeOfDevice() {
@@ -261,7 +271,8 @@ final class GrantsTest {
         observed.put("installedPackage", Arrays.asList("com.a.app", "com.b.app", "com.c.app"));
         Map<String, String> all = new HashMap<>();
         all.put("installedPackage", "all");
-        String line = line(Grants.report("process.start", observed, null, all));
+        String line = line(
+            Grants.report(Grants.PACKAGE_KINDS, "process.start", observed, null, all));
 
         Harness.check("a set read under a different scope is not a prior reading of it",
             Grants.previous(line, "installedPackage", "visible") == null);
@@ -281,7 +292,8 @@ final class GrantsTest {
             Grants.previous(line, "installedPackage", "visible"));
         Map<String, List<String>> now = new HashMap<>();
         now.put("installedPackage", Arrays.asList("com.a.app"));
-        Map<String, Object> next = Grants.report("process.start", now, before, visible);
+        Map<String, Object> next =
+            Grants.report(Grants.PACKAGE_KINDS, "process.start", now, before, visible);
 
         Harness.equal("the narrowed look is a baseline",
             next.get("installedPackageBaseline"), Boolean.TRUE);
@@ -296,11 +308,57 @@ final class GrantsTest {
         Harness.suite("a kind with no scope is unchanged by any of this");
         Map<String, List<String>> grants = new HashMap<>();
         grants.put("accessibility", Arrays.asList("com.a/.Svc"));
-        String plain = line(Grants.report("process.start", grants, null, all));
+        String plain = line(
+            Grants.report(Grants.GRANT_KINDS, "process.start", grants, null, all));
         Harness.check("it records no scope field",
             Grants.previousScope(plain, "accessibility") == null);
         Harness.equal("and reads back by the old two-argument call",
             Json.canonical(Grants.previous(plain, "accessibility")), "[\"com.a/.Svc\"]");
+    }
+
+    private static void aScanIsComparedAgainstTheLastScan() {
+        Harness.suite("an observation line is not a prior reading of the package set");
+        // Why `Pass2.scanPackages` looks up `lastOfType(PACKAGES)` and not the last
+        // observation. Scanning less often than we observe means the most recent
+        // event is usually an observation, which carries no package fields at all.
+        // Read as a prior record it means *no usable history*, so the set would
+        // re-baseline at every scan: a signal that never reports a change and never
+        // says why. The separate event type is what makes the older scan findable.
+        Map<String, String> all = new HashMap<>();
+        all.put("installedPackage", "all");
+
+        Map<String, List<String>> scanned = new HashMap<>();
+        scanned.put("installedPackage", Arrays.asList("com.a.app", "com.b.app"));
+        String scan = line(
+            Grants.report(Grants.PACKAGE_KINDS, "operator.scan", scanned, null, all));
+
+        Map<String, List<String>> grants = new HashMap<>();
+        grants.put("accessibility", Arrays.asList("com.a/.Svc"));
+        String observation = line(
+            Grants.report(Grants.GRANT_KINDS, "process.start", grants, null, all));
+
+        Harness.check("the scan line holds the set",
+            Grants.previous(scan, "installedPackage", "all") != null);
+        Harness.check("the observation line holds nothing about it",
+            Grants.previous(observation, "installedPackage", "all") == null);
+        // And the observation is not claiming the read failed either — there is no
+        // field at all, which is *this event is not about that*.
+        Harness.equal("and does not claim it was unreadable",
+            Grants.previousScope(observation, "installedPackage"), null);
+
+        // The comparison a later scan actually makes: against the earlier scan,
+        // however many observations came between.
+        Map<String, List<String>> before = new HashMap<>();
+        before.put("installedPackage", Grants.previous(scan, "installedPackage", "all"));
+        Map<String, List<String>> now = new HashMap<>();
+        now.put("installedPackage", Arrays.asList("com.a.app", "com.b.app", "com.late.app"));
+        Map<String, Object> next =
+            Grants.report(Grants.PACKAGE_KINDS, "process.start", now, before, all);
+
+        Harness.equal("so a scan catches what happened since the last scan",
+            Json.canonical(next.get("installedPackageGained")), "[\"com.late.app\"]");
+        Harness.equal("and it is not a baseline",
+            next.get("installedPackageBaseline"), Boolean.FALSE);
     }
 
     /** A payload as it is actually stored: canonical JSON, nested in an event. */

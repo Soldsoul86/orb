@@ -32,7 +32,7 @@ final class GrantReader {
 
     private GrantReader() {}
 
-    /** Reads every kind once. `null` for a kind means the read did not settle it. */
+    /** Reads the three grants once. `null` for a kind means the read did not settle it. */
     static Map<String, List<String>> read(Context context) {
         Map<String, List<String>> out = new HashMap<>();
         out.put("accessibility",
@@ -41,6 +41,18 @@ final class GrantReader {
         // exactly what a third-party app may do, which is the whole basis of this.
         out.put("notificationListener", secure(context, "enabled_notification_listeners"));
         out.put("deviceAdmin", admins(context));
+        return out;
+    }
+
+    /**
+     * The package set, read only when a scan asks for it.
+     *
+     * Separate from `read` because it is separately expensive and separately
+     * timed — `Grants.PACKAGE_KINDS` says why. The map has the same shape as
+     * `read`'s so `Grants.report` needs no special case for it.
+     */
+    static Map<String, List<String>> readPackages(Context context) {
+        Map<String, List<String>> out = new HashMap<>();
         out.put("installedPackage", packages(context));
         return out;
     }
@@ -49,8 +61,8 @@ final class GrantReader {
      * The scope of each set that has one, for `Grants.report`.
      *
      * Only the package set: the three grant lists are whole or unreadable, with
-     * no middle. This is read in the same breath as the set itself so the two
-     * cannot disagree.
+     * no middle. Read in the same breath as the set itself so the two cannot
+     * disagree.
      */
     static Map<String, String> scopes(Context context) {
         Map<String, String> out = new HashMap<>();

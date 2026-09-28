@@ -35,6 +35,14 @@ scope on a grant kind would compare equal to nothing and re-baseline it for ever
 `Grants.report` with a scopes map — the same call the device makes — and the
 import suite asserts the field arrives as a scope rather than as part of the set.
 
+**A scan reports one set and says nothing about the others.** The fixture ends with
+a `grants.packages` event, and the assertion is that its reading carries exactly
+`["installedPackage"]` — not three unreadable kinds beside it. *This event is not
+about that* and *we tried and failed* are different facts, and the second would make
+every scan look like three simultaneous read failures. The unreadable-kind test
+above now selects the last reading that is *about* accessibility rather than the last
+reading, which is what surfaced this.
+
 ## Negative controls, verified to fail
 
 | mutation | tests that fail |

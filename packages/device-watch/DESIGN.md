@@ -48,9 +48,22 @@ what the journal last recorded, and one reports an event:
 An event-shaped route has no state behind it, so what it misses cannot be
 reconstructed. On 2026-09-28 an app was uninstalled while pass 2 was force-stopped,
 the platform withheld the broadcast from a stopped package, and the journal holds
-nothing about it and cannot say so. Carrying the installed-package set makes that
-route's job recoverable: the next process start compares, and the broadcast becomes
-an optimisation rather than the only witness.
+nothing about it and cannot say so. Comparing the installed-package set makes that
+route's job recoverable: a later scan compares, and the broadcast becomes an
+optimisation rather than the only witness.
+
+**It arrives as a scan, on its own event type.** `grants.packages`, not a fourth
+field on `grants.observed`, because the two reads cost nothing alike — three
+settings-and-service calls against hundreds of `PackageInfo` objects over a binder
+transaction — and one event would force one cadence on both. Two things made the
+separate *type* necessary rather than merely tidy. The phone finds the previous set
+with `lastOfType`: pointed at observations it would find one with no package fields,
+read that as *no usable history*, and re-baseline at every scan for ever. And an
+observation that named the kind but skipped the read would have to record
+`Readable: false` — *could not find out* standing in for *chose not to look*, which
+is this project's founding error in a new costume. A scan that did not happen writes
+no package fields, and `importExport` reads absence as *this event is not about
+that*.
 
 **It is not a grant, and the rule says so.** `installedPackage` sits in
 `Grants.KINDS` but not in `Grants.GRANT_KINDS`, and `ruleFor` routes it to
@@ -73,10 +86,12 @@ level along — *a change in the instrument must never read as a change in the
 world.*
 
 **What it still does not catch.** Comparison reports on endpoints, not intervals
-(P21). An app installed, granted a listener and uninstalled between two
-observations returns both sets to where they began, and both readings say `changed:
-false` — true about the endpoints, silent about the interval. This narrows the
-window; it does not close it, and nothing here should be read as claiming it does.
+(P21). An app installed, granted a listener and uninstalled between two **scans**
+returns both sets to where they began, and both readings say `changed: false` — true
+about the endpoints, silent about the interval. The scan interval is therefore the
+resolution of this signal, and moving it off every wake made that window wider on
+purpose, in exchange for the battery it was costing. This narrows the gap; it does
+not close it, and nothing here should be read as claiming it does.
 
 ## What this does not decide
 

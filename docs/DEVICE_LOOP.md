@@ -34,8 +34,8 @@ needs, including the author in three months.*
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, and the silence is explained.** An app was uninstalled, but **after a force-stop**, and a stopped package is excluded from broadcasts until launched — the route was switched off by the platform while it was being tested. Re-test by opening Orb *first*, then installing or uninstalling (§7b3, §7b5) |
 | **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
-| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now carried and compared (§7b6), so a missed package *broadcast* is recoverable — but an install undone before the next observation still is not (§7b5, §7b6) |
-| **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next process start | **Written 2026-09-28, untested on the device.** Built, 59 desktop checks and 657 TypeScript tests. Two readings settle it: `installedPackageBaseline: true` on the new build's first observation, then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6) |
+| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history (§7b6), so a missed package *broadcast* is recoverable — but an install undone before the next **scan** still is not, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7) |
+| **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Written 2026-09-28, untested on the device.** Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
 ### What it establishes
 
@@ -2058,6 +2058,99 @@ with **Orb opened first** so it is not in the stopped state, a `process.start`
 reading with the package named in `installedPackageGained` or `…Lost` and
 `installedPackageScope: "all"`. That also gives P19 its clean re-test, since a
 launch before the install is exactly what §7b5 says was missing.
+
+### 7b7. A scan, not a fourth field — 2026-09-28
+
+§7b6 put the installed-package set on **every** observation. The operator's
+objection, the same day: *instead of carrying so much, can we run a scan
+periodically or whenever we feel it's necessary?* They were right, and for a
+better reason than the one they gave.
+
+**The byte count was the smaller cost.** ~5 KB an observation at eight wakes a day
+is ~15 MB a year, which a phone does not notice. The cost that mattered is the
+**read**: enumerating every installed package is hundreds of `PackageInfo` objects
+across a binder transaction, and doing it at every wake spends the operator's
+stated constraint — battery — on a set that moves far more slowly than the grants
+do. The three grant reads are two `Settings.Secure` lookups and one
+`DevicePolicyManager` call; they belong at every wake. The package read does not.
+Putting them in one event forced one cadence on two things that do not share one.
+
+#### The shape now
+
+| event | what it reports | when |
+| --- | --- | --- |
+| `grants.observed` | the three grants | **every wake** — process start, app opened, any signal, the settings watch |
+| `grants.packages` | the installed-package set | **on a scan** (below) |
+
+A scan happens on three triggers, and none of them needs a service, an alarm, or a
+new permission:
+
+1. **A package broadcast** — unconditionally. This is the one moment a scan is
+   certain to find something, and it makes the broadcast useful again without
+   making it load-bearing.
+2. **Any wake, if the last scan is stale** — `SCAN_INTERVAL_MS`, 12 h, read from
+   the journal by `lastOfType("grants.packages")` rather than from a cache.
+3. **The operator** — a *Scan installed packages now* button, recorded as
+   `because: "operator.scan"`. A scan a person asked for is different evidence
+   from one a timer produced, and the journal says which it was.
+
+#### Why it had to be a separate event type, and not a field left out
+
+Two reasons, and the first is the one that would have been a silent defect.
+
+**`Grants.previous` would find the wrong line.** The comparison reads the last
+recorded set out of the journal. Scanning less often than we observe means the most
+recent event is almost always an observation, which carries no package fields — read
+as a prior record that means *no usable history*, so the set would re-baseline at
+every scan and the signal would never report a change and never say why. A separate
+type makes the previous *scan* findable past however many observations came between,
+which is exactly what `lastOfType` already does. There is a test for this that
+asserts an observation line yields no prior package set.
+
+**And a skipped read must not be recorded as a failed one.** Had the observation
+kept naming the kind, a wake that skipped the scan would have written
+`installedPackageReadable: false` — *we could not find out*, when the truth is *we
+chose not to look*. That is this project's founding error in a new costume, the
+same one as an unreadable setting recorded as an empty one. So a scan that did not
+happen writes **no package fields at all**, and absence means *this event is not
+about that*. `Grants.GRANT_KINDS` and `Grants.PACKAGE_KINDS` are two arrays rather
+than one list with a filter so that nothing can drift into naming a kind it did not
+read.
+
+#### The silence that is allowed, and why
+
+A wake that does not scan records nothing about not scanning. Everywhere else this
+document treats that as the mistake — §7b's *every observation is recorded, changed
+or not*, because silence would otherwise mean *nothing happened* and *nothing was
+watching* at once. It is allowed here for one reason: `lastOfType("grants.packages")`
+makes **when the last scan happened** a fact anyone can read off the journal, so
+"was the package set being watched that day" has an answer without a per-wake record
+of the negative. That is the test to apply if this pattern is ever reached for
+again — not *is the negative cheap to omit*, but *can the negative still be
+answered*.
+
+The interval uses `wallClock`, which can jump. A clock change makes a scan early or
+late: promptness, never correctness, since the comparison is against history
+whenever it runs. Unreadable history falls through to scanning once more than
+needed, which is the harmless direction.
+
+#### What is unchanged from §7b6, and what got worse
+
+Unchanged: the scope field and the refusal to compare across a change in it; the
+second rule `device-watch.packages-changed`, because an app appearing is still not
+an app being given power; `QUERY_ALL_PACKAGES`, still the second permission and
+still stated rather than buried.
+
+Worse, and deliberately: **P21's window is wider.** An app installed and removed
+between two *scans* is invisible, where §7b6 would have needed only two
+observations. The scan interval is now the resolution of this signal. 12 h is a
+guess and labelled one in the source — the journal will say how often it actually
+fires, and that is the evidence for changing the number rather than an opinion
+about it.
+
+**P22 is unchanged in what settles it** and now has a third reading to look for: a
+`grants.packages` event with `because: "operator.scan"` after pressing the button,
+which is the cheapest confirmation that any of this works at all.
 
 ---
 

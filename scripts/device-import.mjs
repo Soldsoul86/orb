@@ -47,6 +47,9 @@ async function open() {
   return Journal.open({ lane: device, device, store });
 }
 
+/** Above this many entries a set prints as a count. Matches the phone's screen. */
+const LIST_IN_FULL = 25;
+
 /** What holds power now, and what is waiting on a person. */
 async function report(journal) {
   const state = project(await journal.readLane(device));
@@ -55,8 +58,20 @@ async function report(journal) {
   for (const holding of state.holdings) {
     // An unreadable kind is not an empty one, and must not print as one.
     const held = holding.unreadable ? "unreadable" : `${holding.holding.length}`;
-    console.log(`  ${holding.kind.padEnd(22)} ${held}`);
-    if (!holding.unreadable) for (const entry of holding.holding) console.log(`    ${entry}`);
+    // The scope is printed beside the count, never omitted: a `visible` set is an
+    // answer to a different question than an `all` set, and a reader handed the
+    // number alone would take the narrower one for the whole.
+    const scope = holding.scope === undefined ? "" : `  (${holding.scope})`;
+    console.log(`  ${holding.kind.padEnd(22)} ${held}${scope}`);
+    if (holding.unreadable) continue;
+    if (holding.holding.length > LIST_IN_FULL) {
+      // The package set runs to hundreds. The set is in the journal whole; this
+      // is a terminal, and burying the three grant sets under it would defeat the
+      // one thing this output is for.
+      console.log(`    too many to list — read the lane for the set itself`);
+      continue;
+    }
+    for (const entry of holding.holding) console.log(`    ${entry}`);
   }
 
   // Three different counts, because they answer three different questions and

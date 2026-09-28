@@ -30,18 +30,17 @@ public final class GenExport {
         journal.append("grants.process.start", start);
 
         // A first look: every kind a baseline, so nothing is news.
-        journal.append("grants.observed", Grants.report("process.start", observed(
+        journal.append("grants.observed", Grants.report(Grants.GRANT_KINDS, "process.start", observed(
             Arrays.asList("app.orb/app.actionlock.guard.PayGuardService"),
             Arrays.asList("com.google.android.apps.dreamliner/com.google.android.apps.dreamliner.notification.DreamlinerNotificationService"),
-            new ArrayList<String>()), null, scopes()));
+            new ArrayList<String>()), null, null));
 
         // Then a change: something gains accessibility.
         Map<String, List<String>> before = new HashMap<>();
         before.put("accessibility", Arrays.asList("app.orb/app.actionlock.guard.PayGuardService"));
         before.put("notificationListener", Arrays.asList("com.google.android.apps.dreamliner/com.google.android.apps.dreamliner.notification.DreamlinerNotificationService"));
         before.put("deviceAdmin", new ArrayList<String>());
-        before.put("installedPackage", PACKAGES);
-        journal.append("grants.observed", Grants.report("signal:android.intent.action.PACKAGE_ADDED", observed(
+        journal.append("grants.observed", Grants.report(Grants.GRANT_KINDS, "signal:android.intent.action.PACKAGE_ADDED", observed(
             Arrays.asList("app.orb/app.actionlock.guard.PayGuardService", "com.unknown/.Watcher"),
             Arrays.asList("com.google.android.apps.dreamliner/com.google.android.apps.dreamliner.notification.DreamlinerNotificationService"),
             new ArrayList<String>()), before, scopes()));
@@ -51,10 +50,19 @@ public final class GenExport {
         now.put("accessibility", null);
         now.put("notificationListener", Arrays.asList("com.google.android.apps.dreamliner/com.google.android.apps.dreamliner.notification.DreamlinerNotificationService"));
         now.put("deviceAdmin", new ArrayList<String>());
-        now.put("installedPackage", PACKAGES);
         Map<String, List<String>> prior = new HashMap<>(before);
         prior.put("accessibility", Arrays.asList("app.orb/app.actionlock.guard.PayGuardService", "com.unknown/.Watcher"));
-        journal.append("grants.observed", Grants.report("app.opened", now, prior, scopes()));
+        journal.append("grants.observed",
+            Grants.report(Grants.GRANT_KINDS, "app.opened", now, prior, null));
+
+        // A scan, on its own event type, because it has its own cadence. Held still
+        // against no prior scan, so it is a baseline: what this pins for the
+        // TypeScript reader is the shape, a one-kind payload with a scope beside the
+        // holding set, arriving under a type of its own.
+        Map<String, List<String>> scanned = new HashMap<>();
+        scanned.put("installedPackage", PACKAGES);
+        journal.append("grants.packages",
+            Grants.report(Grants.PACKAGE_KINDS, "operator.scan", scanned, null, scopes()));
 
         for (String line : journal.readLines()) System.out.println(line);
     }
@@ -65,11 +73,6 @@ public final class GenExport {
         out.put("accessibility", accessibility);
         out.put("notificationListener", listeners);
         out.put("deviceAdmin", admins);
-        // The fourth set, held still across this fixture: what it is here to pin
-        // is the *format* the TypeScript reader has to accept — a scope field
-        // beside a holding set — and a change in it is unit-tested elsewhere,
-        // where it does not also move every alert count in this file.
-        out.put("installedPackage", PACKAGES);
         return out;
     }
 

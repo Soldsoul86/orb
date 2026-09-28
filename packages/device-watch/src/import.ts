@@ -24,16 +24,35 @@ import { hasPayload, unwrapPayload } from "@orb/journal";
 import { observationDraft, readObservation } from "@orb/observation";
 import type { DeviceAuthorityReading, KindReading } from "./reading.js";
 
-/** The pass-2 event that carries a reading. */
+/** The pass-2 event that carries a grant reading, written at every wake. */
 export const GRANTS_OBSERVED_TYPE = "grants.observed";
 
 /**
- * The sets pass 2 records, in the order a reader should think about them.
+ * The pass-2 event that carries a package scan, written on its own cadence.
  *
- * Mirrors `Grants.KINDS`. `installedPackage` is the fourth and is **not a
- * grant** — it is here because a set can be compared against history and a
- * broadcast cannot (`DEVICE_LOOP.md` §7b5). `ruleFor` in `rules.ts` is what
- * keeps the distinction visible to whoever reads an alert.
+ * A separate type because it has a separate cost and a separate interval
+ * (`DEVICE_LOOP.md` §7b7): the phone finds the previous scan with
+ * `lastOfType("grants.packages")`, walking back past however many observations
+ * happened in between. Both types carry the same flat shape, so both become
+ * readings here by the same path — what differs is which kinds are present.
+ */
+export const GRANTS_PACKAGES_TYPE = "grants.packages";
+
+/** Both reading-bearing event types, in the order the phone writes them. */
+const READING_TYPES: readonly string[] = [GRANTS_OBSERVED_TYPE, GRANTS_PACKAGES_TYPE];
+
+/**
+ * Every set pass 2 can record, in the order a reader should think about them.
+ *
+ * The union of `Grants.GRANT_KINDS` and `Grants.PACKAGE_KINDS`, because one
+ * payload carries the first three and the other carries the last. `readingFrom`
+ * builds a `KindReading` only for the kinds actually present, so a kind's absence
+ * means *this event is not about that* — never *the read failed*, which is a
+ * different fact with its own field.
+ *
+ * `installedPackage` is **not a grant**: it is here because a set can be compared
+ * against history and a broadcast cannot (`DEVICE_LOOP.md` §7b5), and `ruleFor` in
+ * `rules.ts` keeps that distinction visible to whoever reads an alert.
  */
 const KINDS = [
   "accessibility",
@@ -127,7 +146,7 @@ async function observeReadings(journal: Journal, lanes: readonly string[]): Prom
   let observed = 0;
   for (const lane of lanes) {
     for (const event of await journal.readLane(lane)) {
-      if (event.type !== GRANTS_OBSERVED_TYPE) continue;
+      if (!READING_TYPES.includes(event.type)) continue;
       // A replicated envelope whose payload this device does not hold cannot be
       // read, and is left for a later import rather than recorded as an empty
       // reading.
