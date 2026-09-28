@@ -265,7 +265,9 @@ The section that matters most, and the one a summary is most tempted to shorten.
 
 | | |
 | --- | --- |
-| **P17** | why `BOOT_COMPLETED` was delivered twice inside one boot session (2026-09-28) is unknown. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6 and P16 are both answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; and a revocation while the process was dead was caught at the next process start |
+| **P17** | why `BOOT_COMPLETED` was delivered **four times** inside one boot session (2026-09-28) is unknown. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6, P16 and P18 are answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; grants changed while the process was dead were caught at the next process start, in **both** directions; and the settings watch caught a change with the process alive |
+| **P19** | whether a package broadcast reaches the manifest receiver at all. No `signal:…PACKAGE_*` reading exists in any export. Nothing records that an install was attempted, so *not performed* and *route silent* are indistinguishable from the journal alone. It is the only route that could notice a **new app** rather than a changed grant |
+| **An answer's identity** | alert ids are minted at raise time, not derived from the change. Replaying the same device lane into a fresh journal mints new ids, so an existing answer's citation dangles. An answer is therefore replayable only alongside the lane that raised what it answers — a design change, recorded 2026-09-28 and not made |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
 | `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
@@ -305,10 +307,30 @@ boot session, so the signal's name cannot date a boot — `elapsedRealtimeMs` ca
 and it also confirmed the operator's account of the power-off to the
 millisecond.
 
+**A third export answered both prompt routes** (2026-09-28, §7b3). P16 now holds
+in the direction it was written in: two listeners turned **on** while the process
+was dead, named in `notificationListenerGained` at the next process start, 3 → 5.
+And **P18 is new and held** — the first `settings.changed` readings ever recorded,
+the `ContentObserver` catching a re-enabled listener with the process already
+alive, 4 → 5, no wake and no launch. P17 is refuted harder: four
+`BOOT_COMPLETED` deliveries, one boot instant, to the millisecond. **P19 left no
+trace at all:** no package-broadcast reading exists, and the journal cannot say
+whether the install happened or the route is silent.
+
+The same import exposed a limit of the loop rather than a defect in it. A fresh
+container replayed the 28 device events into an empty journal and re-derived
+every Observation and alert from the events alone — but the operator's earlier
+`dismissed` answer did not return, and could not: answers live in the machine
+lane, which no export carries, and the replay mints **new** alert ids, so even a
+surviving answer would cite an id the journal does not hold. Deriving an alert's
+identity from the change it describes is the fix, and it is a design change.
+
 **The loop has a home and a command.** `scripts/device-import.mjs` imports an
 export, raises what the rule finds and records an answer, against a journal at
 `~/.orb/journal` — outside the repository, never committed, on the machine that
-made it.
+made it. **Outside meant outside the repo, not outside the container:** a home
+directory in an ephemeral session dies with it, which is how the replay above came
+to be run from empty.
 
 **What remains is the device.** The connector has no driver. Sync does not exist,
 so the export is a file the operator carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is

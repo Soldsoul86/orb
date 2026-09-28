@@ -140,6 +140,16 @@ and waiting to be raised — because `alertsFor` returns what has not been raise
 yet, never what is unanswered, and one number in place of three would let a
 reader believe a raised alert had been dealt with.
 
+**Two lanes, two durabilities.** The device lane arrives by export and can be
+replayed into an empty journal at any time; the machine lane holds the alerts and
+the answers and is carried by nothing. A replay therefore re-derives every
+Observation and alert from the events alone but mints **new** alert ids, because an
+alert's id is assigned when it is raised rather than derived from the change it
+describes. An answer cites that id, so an answer is only meaningful in the journal
+that raised what it answers — replay it elsewhere and the citation dangles, which
+is the same thing the `answer` refusal above catches when it is caused by a typo.
+Deriving the id from the change would fix it and is a design change, not made here.
+
 ### Still missing
 
 Sync. The export is a file the operator carries; nothing yet moves a lane between

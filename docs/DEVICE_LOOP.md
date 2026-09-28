@@ -29,8 +29,10 @@ needs, including the author in three months.*
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Superseded** — pass 2 has no service, so the question became P6 |
-| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28** — two notification listeners were turned off while the process was dead; the next `process.start` read `changed: true` and named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2) |
-| **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered twice in one boot session 9h43m apart, the second 14 ms after process start. `elapsedRealtimeMs` is the only field that can date a boot; the re-delivery's cause is unknown (§7b2) |
+| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28, both directions.** First on the mirror case — two listeners turned off while the process was dead, next `process.start` read `changed: true`, named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2). Then as literally written — two listeners turned **on** while dead, named in `notificationListenerGained`, 3 → 5 (§7b3) |
+| **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond; three of the four land within milliseconds of a user launch. `elapsedRealtimeMs` is the only field that can date a boot; the re-delivery's cause is unknown (§7b2, §7b3) |
+| **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
+| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, with the reason** — no reading of any kind appears in any export so far. Nothing records that an install was attempted, so *not performed* and *route silent* are indistinguishable from the journal alone (§7b3) |
 
 ### What it establishes
 
@@ -1656,6 +1658,145 @@ that is a guess and is recorded as one.
 it is *not* independent evidence that a signal arrives with nothing running.
 P6 still rests on the single clean instance in §7b1 — one signal, one date, one
 build.
+
+### 7b3. Both prompt routes answered, and an answer that cannot survive a replay — 2026-09-28
+
+The third export, `orb-pass2-20260928-085048.txt`: **28 events, 15 of them new**,
+`verifyLane` clean, all 28 replicated into an empty journal, 19 Observations,
+**4 alerts**. Two experiments were asked for and both held; a third left no trace
+at all; and the import exposed something about the loop's own memory that two
+earlier exports could not.
+
+#### Step 2 — a gain caught from history. The first non-empty `gained` outside a test
+
+```
+uptime 11h43m45s  because="process.start"  changed=true
+  notificationListenerGained: ["…apps.dreamliner/…", "…projection.gearhead/…"]
+  notificationListenerGainedCount: 2
+  notificationListenerHoldingCount: 3 → 5
+  notificationListenerBaseline: false
+```
+
+Two listeners were switched **on** while pass 2 was not running, and the next
+process start named both. This is what **P16 literally predicted** — *a grant
+**enabled** while the app is not running* — which §7b2 held on the mirror case, a
+revocation. The prediction now holds in the direction it was written in, on the
+same build, with `baseline: false` again doing the load-bearing work: the reading
+compared against history rather than starting over.
+
+Three minutes later the same route caught the reverse again:
+
+```
+uptime 11h47m45s  because="process.start"  changed=true
+  notificationListenerLost: ["…projection.gearhead/…"]
+  notificationListenerHoldingCount: 5 → 4
+```
+
+So the dead-process route is now exercised **three** times across two days, twice
+losing and once gaining, and it has never yet reported a change that the operator
+did not make.
+
+#### Step 3 — the live route works. The first `settings.changed` ever recorded
+
+```
+uptime 11h47m46s  because="settings.changed"  changed=false  holding 4
+uptime 11h48m10s  because="settings.changed"  changed=true
+  notificationListenerGained: ["…projection.gearhead/…"]
+  notificationListenerHoldingCount: 4 → 5
+```
+
+The `ContentObserver` on `enabled_notification_listeners` fired **with the
+process already alive**, 24 seconds apart, and the second reading caught the
+grant being turned back on. No wake, no launch, no boot: the route that exists
+only for promptness demonstrated that it is prompt.
+
+Both readings matter, and for different reasons. The `changed: false` one is the
+platform notifying on a URI whose *value* Orb's own comparison says is
+unchanged — the observer is a hint that something may have moved, never a claim
+that it did, and the journal records it as an observation exactly like the rest
+rather than suppressing it. The `changed: true` one is the route delivering what
+it was built for. **A route that reports only when something changed could not be
+distinguished from a route that had stopped working.**
+
+**What this does not establish.** `settings.changed` has a URI for accessibility
+and notification listeners and **none for device admin** — nothing here changes
+that. An admin enabled while the process is dead is still only ever seen at the
+next wake.
+
+#### Step 1 — absent, and the record cannot say why
+
+There is **no reading of any kind** labelled `signal:…PACKAGE_ADDED`,
+`PACKAGE_REMOVED` or `PACKAGE_REPLACED` in this export, or in any export so far.
+The four `because` values present are `process.start` (6), `app.opened` (7),
+`signal:…BOOT_COMPLETED` (4) and `settings.changed` (2).
+
+Two explanations fit the journal equally: the install was not performed, or the
+broadcast did not reach the manifest receiver. **The journal cannot separate
+them,** because nothing records that an install was attempted — the same shape as
+an unreadable setting and an empty one being the same value (§7b's `getActiveAdmins`
+note), one level up again. It is recorded as **untested with the reason** rather
+than as a refutation, and the operator was asked which of the two it was. If the
+answer is *the install happened*, the manifest route is refuted and that is the
+most consequential finding of the pass, because it is the only route that can
+notice a **new app** rather than a changed grant.
+
+#### P17 — now four deliveries in one boot session
+
+| uptime | `because` | `app.opened` |
+| --- | --- | --- |
+| 0h31m58s | `signal:…BOOT_COMPLETED` | 5h05m later |
+| 10h15m04s | `signal:…BOOT_COMPLETED` | same second |
+| 11h44m32s | `signal:…BOOT_COMPLETED` | same second |
+| 11h47m45s | `signal:…BOOT_COMPLETED` | same second |
+
+Every one of the 24 events with an `elapsedRealtimeMs` in this boot session
+derives the **same boot instant, 2026-09-27 15:31:00.640**, to the millisecond.
+So `BOOT_COMPLETED` was delivered **four times without a reboot**, and P17 stands
+refuted more strongly than it was.
+
+The three later deliveries each land within milliseconds of a process start that
+is itself coincident with a user launch. That pattern is consistent with a
+broadcast released when the app leaves a stopped or frozen state, which is now
+the hypothesis with the most evidence behind it — and it is still a hypothesis:
+nothing in the journal records the app being force-stopped, and four instances of
+a coincidence are not a mechanism.
+
+**P6 is untouched by this.** Its clean instance is the first row, and what makes
+it clean is the 5h05m gap to `app.opened`: that process start cannot have been a
+user launch, so the broadcast is what started the process. Rows two to four
+cannot carry P6 and were never asked to.
+
+#### What the import exposed about the loop's own memory
+
+The journal this import ran against was **empty** — a new container, a new
+hostname, so a new machine lane (`vm`, where the previous one was `desk`). The
+28 device events replayed into it and produced the 19 Observations and the 4
+alerts again, from the events alone. That part is the architecture working: the
+projection is a function of the journal and nothing else.
+
+The operator's `dismissed` answer from §7b2 did **not** come back, and it could
+not have, for two independent reasons that are worth separating:
+
+1. **Answers are not in the export.** The phone writes the `grants` lane; the
+   answer was written to the *machine* lane by the operator. An export carries
+   the device's history and by construction never carries the desk's.
+2. **Alert ids are minted at raise time, not derived from the change.** Replaying
+   the same grants lane raises four alerts with four **new** ULIDs. Even with the
+   old answer event present, its `causes` would cite an id this journal does not
+   hold — precisely the dangling citation the CLI refuses to create, arriving by
+   replay instead of by typo.
+
+So the loop's memory is split across two lanes with different durability, and
+answers are addressed to an identity that a replay does not preserve. Neither is
+a bug in what was built; both are limits of it, and (2) is the one that matters
+architecturally, because *every feature must be replayable from events* (Art. IX)
+and an answer is currently only replayable **alongside the lane that raised what
+it answers**. Making an alert's identity derive from the change it describes —
+so the same history mints the same id — is the fix, and it is a design change,
+not an implementation one. It is recorded here and not made.
+
+The practical consequence today: the four alerts are **unanswered**, and the
+operator answers them once rather than being told they were already handled.
 
 ---
 
