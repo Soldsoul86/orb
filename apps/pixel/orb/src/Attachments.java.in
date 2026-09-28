@@ -80,6 +80,20 @@ final class Attachments {
             this.detail = detail;
         }
 
+        /** Written now. */
+        static Stored stored(String identity, long bytes) {
+            return new Stored(identity, bytes, "stored", null);
+        }
+
+        /**
+         * Already present, and not written again.
+         *
+         * **Distinct from `stored` deliberately** (`DEVICE_LOOP.md` §7b35). Both
+         * mean *the content is here*, and only one of them cost disk. Collapsing
+         * them makes *how much is Orb storing* underivable from history — two
+         * different facts sharing one value, which is the `Readable: false`
+         * argument in its fifth costume.
+         */
         static Stored held(String identity, long bytes) {
             return new Stored(identity, bytes, "held", null);
         }
@@ -113,7 +127,8 @@ final class Attachments {
             String identity = identity(bytes);
             File blob = new File(dir(context, BLOBS), address(context, identity));
             if (blob.exists()) {
-                // Same content, already held. Not an error and not a second copy.
+                // Same content, already here. Not an error, not a second copy,
+                // and **not the same outcome as having just written it**.
                 return Stored.held(identity, bytes.length);
             }
 
@@ -130,7 +145,7 @@ final class Attachments {
                 out.write(sealed);
                 out.getFD().sync();
             }
-            return Stored.held(identity, bytes.length);
+            return Stored.stored(identity, bytes.length);
         } catch (Exception error) {
             return Stored.failed("sealFailed", error.getClass().getName() + ": " + error.getMessage());
         }

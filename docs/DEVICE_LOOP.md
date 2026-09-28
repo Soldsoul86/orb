@@ -4245,3 +4245,49 @@ this stores by.
 **64 MB cap, refused rather than truncated.** A shared video can be gigabytes.
 Half a file under a hash of the whole would fail inv. 5's re-check and look like
 corruption, which is a worse answer than *too large*.
+
+### 7b35. Resolution working, and content-addressing confirmed on one photograph — 2026-09-28
+
+Two shares of **the same photograph**, minutes apart:
+
+| | Reference wrapper | Attachment identity | Bytes | Outcome |
+| --- | --- | --- | --- | --- |
+| Share A | `…/media%2F201987/…/1692595697` | `sha256:c49c6297…beacbe15` | 3,642,498 | `held` |
+| Share B | `…/media%2F201987/…/580396436` | `sha256:c49c6297…beacbe15` | 3,642,498 | `held` |
+
+**Different reference, identical content identity.** §7b33 predicted exactly this
+— Photos wraps a stable MediaStore id in a per-share token — and it is now
+measured on the thing that matters: the *wrapper* is not the content, and storing
+by content hash is what makes a re-share cost nothing.
+
+`resolved: true`, `resolveOutcome: "held"`, and **`absenceReason` is gone** from
+both events. That field was written optimistically by the sensor and removed by
+the resolver, because leaving *unfetched* on an event whose content is in hand
+would be a false statement about what this device holds.
+
+A 3.64 MB photograph is now sealed under its own AES-256-GCM key at a blinded
+address. Erasing it is destroying that key — which reaches a peer's copy and the
+flash residue, where deleting the file reaches neither.
+
+#### The deferred path is still dead, now measured alongside a working one
+
+Event 13 is the probe run **10.2 s after a successful resolution**, on the same
+reference: `refused`, `SecurityException`. So within one export the record now
+shows both halves — **resolution during the share succeeds, and the same
+reference is unreadable ten seconds later.** §7b33's ruling is not an inference
+from one failure; it is a contrast measured in one lane.
+
+#### A gap this run exposes
+
+`Attachments.store` returns `held` whether it wrote the bytes or found them
+already present, so **the record cannot distinguish a first store from a
+duplicate.** Share B is indistinguishable from Share A in the journal, even
+though only one of them cost 3.64 MB of disk.
+
+That matters for a question an operator will certainly ask — *how much is Orb
+storing?* — and the answer is currently underivable from history, which is the
+sort of thing this project treats as a defect rather than a detail. It is the
+same shape as every `Readable: false` argument: two different facts sharing one
+value. **Fixed the same day**: `stored` and `held` are now separate outcomes. Both mean
+*the content is here*; only one of them cost disk, and the journal now says
+which.
