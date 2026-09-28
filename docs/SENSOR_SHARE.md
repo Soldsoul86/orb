@@ -61,10 +61,13 @@ adds a value, not a mechanism.
 > is refused outright: *"Permission Denial: opening provider … that is not
 > exported."* The **boundary** §3 draws is right; the **timing** it assumes is not.
 >
-> Pending a ruling, the recommendation is to resolve **during** the share, while
-> the grant is live — the share is itself the authorization event, and a person
-> handing something over deliberately is stronger consent than a prompt invented
-> afterwards.
+> **Ruled 2026-09-28: resolve during the share.** The Capability is declared where
+> it must happen rather than where it would be tidiest, and the share is itself
+> the authorization event — a person deliberately handing something over is
+> stronger consent than a prompt Orb could invent afterwards. §3's **boundary**
+> survives intact: only a `content://` reference the sender granted is opened, and
+> **a URL is still never fetched**, because that is egress at *Act (irreversible)*
+> under DR-9 and a different act from reading what was handed over.
 >
 > Also measured: **a reference is not a content identity.** The same photograph
 > shared twice produced two references, because Photos wraps a stable MediaStore

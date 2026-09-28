@@ -1,0 +1,226 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Locale;
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+/**
+ * Attachments on the device — content-addressed, blind-addressed, and sealed.
+ *
+ * `contracts/Attachment.md` is **Accepted**, so this is not a place to improvise.
+ * Three of its invariants have to hold the moment a photograph's bytes land here,
+ * and each is a few lines rather than a project:
+ *
+ * **inv. 1–2, identity is the content hash.** `sha256:<hex>`, scheme-tagged from
+ * the first one so a later scheme can be added rather than guessed at (§5).
+ *
+ * **inv. 7, the address is blinded.** `HMAC(addressSecret, identity)`. A store
+ * addressed by identity is *a list of identities*: anyone who can read the
+ * directory can test any file they already hold against it, so **encrypting the
+ * bytes hides the content and never which content.** The secret is
+ * derived-by-design, recomputable, and rotatable — and explicitly **not** an
+ * erasure key.
+ *
+ * **inv. 8, sealed under its own key.** AES-256-GCM, one key per Attachment, so
+ * erasure is *destroy that key* rather than *delete those bytes* — which reaches
+ * a copy on a peer's disk and residue in flash, neither of which deleting
+ * reaches (`ERASURE.md` §2a).
+ *
+ * **Deliberately matching `runtime/journal/src/attachment.ts`.** Same hash, same
+ * tag, same HMAC construction. §7 R2: two implementations of one thing must not
+ * diverge, and the cheapest way to keep them from diverging is to write the
+ * second one against the first rather than against its description.
+ *
+ * **Keys are stored, never derived** (`ERASURE.md` §2a). Anything derivable is
+ * re-derivable, so destroying a derived key destroys nothing.
+ */
+final class Attachments {
+    private Attachments() {}
+
+    static final String IDENTITY_SCHEME = "sha256";
+
+    /**
+     * The largest thing this will take into memory.
+     *
+     * A shared video can be gigabytes, and a phone reading one into a byte array
+     * dies. The cap is **refused and recorded** rather than truncated: half a
+     * photograph under a hash of the whole would fail inv. 5's re-check and look
+     * like corruption, which is a worse answer than *too large*.
+     */
+    static final int MAX_BYTES = 64 * 1024 * 1024;
+
+    private static final String KEYS = "attachment-keys";
+    private static final String BLOBS = "attachments";
+    private static final String ADDRESS_SECRET = "address.secret";
+    private static final int IV_BYTES = 12;
+    private static final int TAG_BITS = 128;
+
+    /** What happened, and enough to record it honestly. */
+    static final class Stored {
+        final String identity;
+        final long bytes;
+        final String outcome;
+        final String detail;
+
+        private Stored(String identity, long bytes, String outcome, String detail) {
+            this.identity = identity;
+            this.bytes = bytes;
+            this.outcome = outcome;
+            this.detail = detail;
+        }
+
+        static Stored held(String identity, long bytes) {
+            return new Stored(identity, bytes, "held", null);
+        }
+
+        static Stored failed(String outcome, String detail) {
+            return new Stored(null, 0L, outcome, detail);
+        }
+    }
+
+    /**
+     * Reads a stream to its end, seals it, and stores it at its blinded address.
+     *
+     * **The caller must still hold the URI grant** — that is the whole point of
+     * resolving during the share (`DEVICE_LOOP.md` §7b33). This never opens
+     * anything itself.
+     *
+     * Idempotent by identity: the same bytes stored twice land at the same
+     * address under the same key, so re-sharing one photograph costs one copy.
+     */
+    static Stored store(Context context, InputStream in) {
+        byte[] bytes;
+        try {
+            bytes = readAll(in);
+        } catch (TooLarge tooLarge) {
+            return Stored.failed("tooLarge", "over " + MAX_BYTES + " bytes");
+        } catch (IOException error) {
+            return Stored.failed("readFailed", error.getClass().getName() + ": " + error.getMessage());
+        }
+
+        try {
+            String identity = identity(bytes);
+            File blob = new File(dir(context, BLOBS), address(context, identity));
+            if (blob.exists()) {
+                // Same content, already held. Not an error and not a second copy.
+                return Stored.held(identity, bytes.length);
+            }
+
+            byte[] key = mintKey(context, identity);
+            byte[] iv = new byte[IV_BYTES];
+            new SecureRandom().nextBytes(iv);
+
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(TAG_BITS, iv));
+            byte[] sealed = cipher.doFinal(bytes);
+
+            try (RandomAccessFile out = new RandomAccessFile(blob, "rws")) {
+                out.write(iv);
+                out.write(sealed);
+                out.getFD().sync();
+            }
+            return Stored.held(identity, bytes.length);
+        } catch (Exception error) {
+            return Stored.failed("sealFailed", error.getClass().getName() + ": " + error.getMessage());
+        }
+    }
+
+    /** `sha256:<hex>` — inv. 1 and 2, scheme-tagged from the first one. */
+    static String identity(byte[] bytes) throws Exception {
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+        return IDENTITY_SCHEME + ":" + hex(digest);
+    }
+
+    /**
+     * `HMAC(addressSecret, identity)` — inv. 7.
+     *
+     * The secret is minted once and kept; rotating it voids every address an
+     * adversary has collected and breaks nothing, because only the local store
+     * layout depends on it while *identity* is what history references.
+     */
+    static String address(Context context, String identity) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(addressSecret(context), "HmacSHA256"));
+        return hex(mac.doFinal(identity.getBytes("UTF-8")));
+    }
+
+    /**
+     * This Attachment's own key, minted on first store.
+     *
+     * One key per Attachment is what makes inv. 8's erasure possible at all: a
+     * store-wide key cannot be destroyed for one photograph.
+     */
+    private static byte[] mintKey(Context context, String identity) throws Exception {
+        File file = new File(dir(context, KEYS), address(context, identity));
+        if (file.exists()) return readBytes(file);
+        byte[] key = new byte[32];
+        new SecureRandom().nextBytes(key);
+        writeBytes(file, key);
+        return key;
+    }
+
+    private static byte[] addressSecret(Context context) throws IOException {
+        File file = new File(context.getFilesDir(), ADDRESS_SECRET);
+        if (file.exists()) return readBytes(file);
+        byte[] secret = new byte[32];
+        new SecureRandom().nextBytes(secret);
+        writeBytes(file, secret);
+        return secret;
+    }
+
+    private static File dir(Context context, String name) {
+        File dir = new File(context.getFilesDir(), name);
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private static byte[] readBytes(File file) throws IOException {
+        try (RandomAccessFile in = new RandomAccessFile(file, "r")) {
+            byte[] bytes = new byte[(int) in.length()];
+            in.readFully(bytes);
+            return bytes;
+        }
+    }
+
+    private static void writeBytes(File file, byte[] bytes) throws IOException {
+        try (RandomAccessFile out = new RandomAccessFile(file, "rws")) {
+            out.write(bytes);
+            out.getFD().sync();
+        }
+    }
+
+    /** Raised rather than truncating: a partial read under a whole-content hash is corruption. */
+    private static final class TooLarge extends IOException {
+        TooLarge() {
+            super("attachment over " + MAX_BYTES + " bytes");
+        }
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1 << 16];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            if (out.size() + read > MAX_BYTES) throw new TooLarge();
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder out = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) out.append(String.format(Locale.US, "%02x", b));
+        return out.toString();
+    }
+}

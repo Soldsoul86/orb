@@ -4195,3 +4195,53 @@ project written as a declaration that contact with the device has falsified**,
 and the declaration was still worth writing: it got the Capability boundary
 right, stopped a URL fetch being smuggled in as a preview, and produced the
 sensor whose failure is this legible.
+
+### 7b34. Resolving during the share — ruled, and the device grows an Attachment store — 2026-09-28
+
+**Ruled: resolve during the share.** §3's separation was a good idea the platform
+does not permit, so the Capability is declared where it must happen rather than
+where it would be tidiest.
+
+#### The boundary survived; only the timing moved
+
+- **Only `content://`** references the sender granted are opened. A `file://`
+  path is one this app has no business reading.
+- **A URL is still never fetched.** That is egress at *Act (irreversible)* under
+  DR-9, and a different act from reading what was handed over. The thing §3 was
+  written to prevent is still prevented.
+- **Only the first item** of a multi-item share is resolved. All references are
+  recorded and `itemCount` is on the event, so a reader can see what was not
+  taken.
+- **Every outcome is written**, including `refused`, `tooLarge` and
+  `notAContentUri`. Leaving the field untouched on failure would make *not
+  attempted* and *attempted and refused* the same record.
+
+#### What it forced: `Attachment.md` is Accepted, so the phone needed a real store
+
+Bytes had to land somewhere, and landing them as plaintext in app-private storage
+would breach an accepted contract on the first photograph. `Attachments.java.in`
+implements three invariants in about a hundred lines:
+
+| Invariant | Implementation |
+| --- | --- |
+| inv. 1–2 — identity is the content hash | `sha256:<hex>`, scheme-tagged from the first one |
+| inv. 7 — the address is blinded | `HMAC(addressSecret, identity)`, because **a store addressed by identity is a list of identities**: encrypting the bytes hides the content and never *which* content |
+| inv. 8 — sealed under its own key | AES-256-GCM, one key per Attachment, so erasure is *destroy that key* — which reaches a peer's copy and flash residue, neither of which deleting reaches |
+
+**Written against `runtime/journal/src/attachment.ts` rather than against its
+description.** Same hash, same tag, same HMAC construction. §7 R2 says two
+implementations of one thing must not diverge, and the cheapest way to prevent
+that is to read the first while writing the second.
+
+**Keys are stored, never derived** — anything derivable is re-derivable, so
+destroying a derived key destroys nothing (`ERASURE.md` §2a).
+
+**Idempotent by identity.** The same photograph shared twice lands at the same
+address under the same key and costs one copy — which also answers §7b33's
+finding that the *reference* differs per share while the content does not. The
+wrapper token changes; the content hash does not, and the content hash is what
+this stores by.
+
+**64 MB cap, refused rather than truncated.** A shared video can be gigabytes.
+Half a file under a hash of the whole would fail inv. 5's re-check and look like
+corruption, which is a worse answer than *too large*.

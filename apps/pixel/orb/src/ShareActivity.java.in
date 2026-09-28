@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.widget.Toast;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,13 +25,24 @@ import java.util.Map;
  * reaching in: no permission, nothing enumerated, nothing requested. This class
  * declares no permission and asks for none.
  *
- * **A share hands over a reference, not content.** Android gives a `content://`
- * URI, a URL, or text. Turning a pointer into bytes is a *second* act and it is
- * where the Capability boundary falls — which is why nothing here opens a stream
- * or fetches a link. A share sensor that "helpfully" fetched a shared URL for a
- * title would make Orb initiate a connection to an arbitrary third party on the
- * strength of a tap, and under DR-9 that is a disclosure needing its own
- * authorization. **Sharing a link is not authorization to visit it.**
+ * **A share hands over a reference, not content**, and resolving that reference
+ * is a `Capability` at tier `Observe`. §3 put the resolution *later*, under a
+ * separate authorization — and **§7b33 measured that later is not available**:
+ * the URI grant is scoped to this activity's lifetime, and a read 9.5 s after the
+ * share is refused outright. The separation was a good idea the platform does not
+ * permit.
+ *
+ * **Ruled 2026-09-28: resolve during the share.** The Capability is declared where
+ * it must happen rather than where it would be tidiest, and **the share is itself
+ * the authorization event** — a person deliberately handing something over is
+ * stronger consent than a prompt Orb could invent afterwards. The act is recorded
+ * every time, including when it fails.
+ *
+ * **A URL is still not fetched.** Only a `content://` reference the sender granted
+ * is opened. Fetching a shared link would make Orb initiate a connection to an
+ * arbitrary third party on the strength of a tap — egress at tier
+ * *Act (irreversible)* under DR-9, and a different act from reading what was
+ * handed over. **Sharing a link is not authorization to visit it.**
  */
 public final class ShareActivity extends Activity {
 
@@ -48,6 +60,9 @@ public final class ShareActivity extends Activity {
 
         Intent intent = getIntent();
         Map<String, Object> payload = record(intent);
+        // While the grant is live, and only here. By the time this activity
+        // finishes it is gone (§7b33).
+        resolve(intent, payload);
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(Orb.SHARED, payload);
 
@@ -101,6 +116,62 @@ public final class ShareActivity extends Activity {
         payload.put("absenceReason", "unfetched");
 
         return payload;
+    }
+
+    /**
+     * Reads the shared content into an `Attachment`, while the grant still holds.
+     *
+     * **Only `content://`.** A `file://` reference would be a path this app has
+     * no business reading, and an `http(s)` one is a fetch — a different
+     * Capability at a higher tier (DR-9), not this one.
+     *
+     * **Only the first item.** A multi-item share is recorded in full as
+     * references; resolving all of them is more content than one tap authorizes
+     * comfortably, and the count is on the record for a reader to notice.
+     *
+     * Every outcome is written down. `resolved: false` with a reason is a
+     * finding; silently leaving the field as it was would make *not attempted*
+     * and *attempted and refused* the same record.
+     */
+    private void resolve(Intent intent, Map<String, Object> payload) {
+        Object first = payload.get("references");
+        String reference = first instanceof String ? (String) first : "";
+        int end = reference.indexOf(':', reference.indexOf("://") + 3);
+        if (end > 0) reference = reference.substring(0, end);
+
+        if (reference.isEmpty() || !reference.startsWith("content://")) {
+            // Text and links are not resolved, and that is a decision rather
+            // than a gap: text *is* the content already, and a link is a fetch.
+            payload.put("resolveOutcome", reference.isEmpty() ? "noReference" : "notAContentUri");
+            return;
+        }
+
+        try (InputStream in = getContentResolver().openInputStream(Uri.parse(reference))) {
+            if (in == null) {
+                payload.put("resolveOutcome", "openedNull");
+                return;
+            }
+            Attachments.Stored stored = Attachments.store(this, in);
+            payload.put("resolveOutcome", stored.outcome);
+            if (stored.detail != null) payload.put("resolveDetail", stored.detail);
+            if (stored.identity != null) {
+                payload.put("resolved", true);
+                payload.put("attachment", stored.identity);
+                payload.put("attachmentBytes", stored.bytes);
+                // The absence reason was set optimistically by `record`; the
+                // content is here now and leaving it would be a false statement
+                // about what this device holds.
+                payload.remove("absenceReason");
+            }
+        } catch (SecurityException refused) {
+            // The grant was not live after all. Worth distinguishing from a
+            // read failure: one is a permission, the other is availability.
+            payload.put("resolveOutcome", "refused");
+            payload.put("resolveDetail", String.valueOf(refused.getMessage()));
+        } catch (Exception error) {
+            payload.put("resolveOutcome", "failed");
+            payload.put("resolveDetail", error.getClass().getName() + ": " + error.getMessage());
+        }
     }
 
     /**
