@@ -342,34 +342,61 @@ action within a stated bound (stronger, and requires the off-device vantage
 point to exist first). This is a decision about what Orb promises, which is not
 mine to make.
 
-> **Proposed 2026-09-28, after the operator asked whether a laptop can be the
-> vantage: state C1 in two tiers rather than choosing one.**
+> **Proposed 2026-09-28, revised the same day. A laptop was considered as the
+> second vantage and is rejected: Orb is India-first and Android-first, and a
+> second machine can never be a requirement.** A claim that holds only for people
+> who own a laptop is a claim that quietly fails for most of the people it is for.
+> The same objection retires `SOVEREIGN_STACK.md`'s router: a home router does not
+> see a phone on mobile data, which is where much of this user's life happens.
 >
-> A laptop can be a genuine second vantage, under three conditions that have to be
-> met rather than assumed:
+> **The replacement: a second *channel*, not a second *device*.** What A6 needs is
+> a path to the same fact that the acting agent does not control. That is a
+> requirement about **independence of source**, and it was read as a requirement
+> about independence of hardware. It is not the same thing, and the cheaper
+> reading is the correct one.
 >
-> 1. **It must see the same reality by an independent path.** A device that only
->    replicates the phone's lane is a copy, not a vantage — it sees exactly what
->    the phone saw. Detecting out-of-band action requires its own channel to the
->    same reality.
-> 2. **The bound is the laptop's duty cycle.** The stronger form claims detection
->    *within a stated bound*; a machine shut sixteen hours a day makes that bound
->    "within N hours of next waking". Statable, which is the win — but it has to
->    actually be stated, not implied.
-> 3. **Shared fate breaks independence.** If both devices ride the same account
->    compromise, there is no second vantage for that threat.
+> An out-of-band act leaves residue in channels Orb already observes, reported by
+> a party that is not the agent:
 >
-> The consequence that decides the wording: **C1 would stop being a property of Orb
-> and become a property of a *configuration* of Orb.** A single-device user gets the
-> weaker claim, silently, unless the statement says so — and a claim conditional on
-> hardware someone may not own is a claim that quietly weakens for the people least
-> able to notice.
+> | The act | Where it surfaces, without Orb mediating it |
+> | --- | --- |
+> | a payment | the bank's own SMS or notification |
+> | a message sent | the messaging app's own notification |
+> | a booking, an order | the confirmation mail or notification |
+> | a file shared | the OS share record, the app's own receipt |
 >
-> So the two options are not exclusive. **State the mediated set
-> unconditionally, and out-of-band detection as a conditional capability with a
-> named bound wherever a second vantage exists.** That takes the stronger claim
-> where it is true without weakening the base claim where it is not, and it makes
-> the condition visible instead of assumed.
+> The agent performing the act does not author the bank's SMS. That is the
+> property the vantage had to have, and it is already on the device.
+>
+> **The bound improves, too.** A laptop's bound is its duty cycle — hours, and
+> unstated. A channel's bound is its latency: an SMS arrives in seconds. The
+> stronger form of C1 becomes *detected within the latency of the corroborating
+> channel*, which is both tighter and honestly measurable.
+>
+> **What this costs, and the limit it cannot pass.** An act with residue in **no**
+> channel Orb observes is undetectable, and no amount of architecture changes that.
+> So the claim must enumerate its channels: *"detected for acts that surface in
+> one of these N channels, within that channel's latency; silent otherwise."*
+> That enumeration is what turns A6 from a hole into a stated boundary — and it is
+> the same discipline as everywhere else here, the difference between **Orb did
+> not see it** and **Orb could not have seen it**.
+>
+> **An on-device network vantage is a possible third tier, not assumed.** Android's
+> `VpnService` runs locally with no server and sits below the apps, so an ordinary
+> app cannot opt out of it, and it would show that an unmediated outbound
+> connection happened even where no channel reports it. It is not free: Android
+> permits one VPN at a time, so it displaces the user's own; there is a battery
+> cost; and distribution rules for VPN apps are strict and change. **Verify all
+> three against current platform and store policy before relying on it** — it is
+> listed as a candidate, not as a mechanism this document is claiming.
+>
+> **Proposed wording, in two tiers, neither requiring hardware the user may not
+> own:**
+>
+> 1. **Unconditional.** Within the mediated set, the gate cannot be routed around.
+> 2. **Conditional, and the condition is a channel rather than a device.** Outside
+>    it, an act is detected and recorded when it surfaces in an observed channel,
+>    within that channel's stated latency — and the channels are named.
 >
 > Still the operator's to rule; recorded as a proposal, not adopted.
 

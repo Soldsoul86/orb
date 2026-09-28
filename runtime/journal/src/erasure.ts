@@ -82,3 +82,59 @@ export function erasedHashes(events: Iterable<StoredEvent>): ReadonlySet<string>
 export function isDeclaredErased(events: Iterable<StoredEvent>, hash: string): boolean {
   return erasedHashes(events).has(hash);
 }
+
+/**
+ * Which devices have declared `hash` erased.
+ *
+ * `docs/reviews/RECORDS.md` §1. `INFRASTRUCTURE.md` asked where the
+ * erasure-confirmation record lives and concluded no contract defined one. **It
+ * was already here.** A peer that honours an erasure appends its *own*
+ * declaration naming the same `{lane, hash}` on its *own* lane, so the confirming
+ * device is `event.device` — the same rule that keeps `holder` out of a custody
+ * receipt's payload (Art. IX §33).
+ *
+ * What was missing is this function. `erasedHashes` collapses every declaration
+ * into a set of hashes, which is what the erased-set projection needs and which
+ * discards the one field that answers `ERASURE.md` D5.
+ *
+ * **A device confirming its own erasure is included.** Whether to discount it is
+ * the caller's judgement — `evaluatePrune` excludes self for custody because
+ * durability needs copies elsewhere, but D5 asks *who has honoured this*, and the
+ * originator honouring it is a fact rather than a tautology: it is the difference
+ * between declared-and-done and declared-only.
+ */
+export function confirmationsFor(
+  events: Iterable<StoredEvent>,
+  hash: string,
+): ReadonlySet<string> {
+  const devices = new Set<string>();
+
+  for (const event of events) {
+    if (!isErasureDeclaration(event)) continue;
+    const record = unwrapPayload(event.payload) as ErasureRecord | undefined;
+    // A declaration whose payload this device cannot open says nothing about
+    // which envelope it referred to, exactly as in `erasedHashes`. Counting it
+    // would attribute a confirmation nobody made.
+    if (record?.hash === hash) devices.add(event.device);
+  }
+
+  return devices;
+}
+
+/**
+ * Holders that have not confirmed, given who holds and who has declared.
+ *
+ * The honest D5 sentence is *"gone here; three of four peers confirmed; one has
+ * not been seen since Tuesday"* (`Synchronization.md` §7), and this is its second
+ * clause. **An unconfirmed holder is not a refusing one** — it may be offline,
+ * may not have received the declaration, may have honoured it without this device
+ * having seen the lane. `Synchronization.md` §7 already refuses to call that
+ * *withholding*, and so does this: the set is named `unconfirmed`, never
+ * `withholding`.
+ */
+export function unconfirmedHolders(
+  holders: Iterable<string>,
+  confirmed: ReadonlySet<string>,
+): readonly string[] {
+  return [...holders].filter((holder) => !confirmed.has(holder));
+}

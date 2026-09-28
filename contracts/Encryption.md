@@ -249,7 +249,16 @@ Not guaranteed:
 - **A device is lost or stolen.** Its identity is revoked so it enrolls no further
   devices and its future writes are not accepted; history it already wrote remains
   valid and attributed. Revocation is a statement about the future, never a rewrite
-  of the past.
+  of the past — so the record names **the point acceptance stops**, not merely the
+  device (`../docs/reviews/RECORDS.md` §2). Two limits follow and are part of the
+  contract rather than of an implementation:
+  1. **A revoked device can still write its own lane.** Nothing stops it; it holds
+     its key. Revocation is a rule about **acceptance**, enforced independently by
+     every peer — never a rule about writing, which no one can enforce.
+  2. **A device cannot reliably be told it is revoked.** A stolen phone may never
+     sync again. Revocation is effective where it is known, so the honest sentence
+     has the same shape as an unconfirmed erasure: *"revoked, and four of five
+     peers have seen it."*
 - **A relay or provider is compromised.** It holds ciphertext and learns nothing
   new. This is the case the contract is designed around, not an exceptional one.
 

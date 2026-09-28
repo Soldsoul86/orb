@@ -162,8 +162,11 @@ export function planErasure(input: {
     {
       point: "D5",
       reason:
-        "holders are listed, but no erasure-confirmation protocol exists, so none of " +
-        "them can be shown as having honoured it. Treat every holder as unconfirmed.",
+        "holders are listed, and a holder's confirmation is its own `orb.erasure` " +
+        "declaration on its own lane (`confirmationsFor`) — but no other device's " +
+        "lane reaches this one until sync exists, so none can be shown as having " +
+        "honoured it. Treat every holder as unconfirmed. The record type is not " +
+        "missing; the transport is.",
     },
     {
       point: "D6",

@@ -27,6 +27,7 @@
 import { CUSTODY_RECEIPT_TYPE } from "./custody.js";
 import { SYNC_POLICY_TYPE } from "./sync-types.js";
 import { ERASURE_TYPE } from "./erasure.js";
+import { REVOCATION_TYPE } from "./revocation.js";
 import type { SchemaRef } from "./types.js";
 
 /**
@@ -52,6 +53,16 @@ const BOOKKEEPING: ReadonlySet<string> = new Set([
   CUSTODY_RECEIPT_TYPE,
   SYNC_POLICY_TYPE,
   ERASURE_TYPE,
+  // A peer must stop accepting a revoked device's later events, and must do it
+  // *without decrypting* — the same argument that put erasure on this list. A
+  // witness holds no payloads ever and would otherwise keep accepting writes
+  // from a device its owner revoked.
+  //
+  // `orb.intent.unbindable` is deliberately **not** here. Nothing outside this
+  // device reads it: it is a finding about the user's own plans, *of* a life
+  // rather than *about* the record, so it takes `orb.content` like everything
+  // else and its projection reads above the store.
+  REVOCATION_TYPE,
 ]);
 
 export function isBookkeepingType(type: string): boolean {

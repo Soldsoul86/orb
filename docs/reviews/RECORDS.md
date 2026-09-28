@@ -214,6 +214,33 @@ rest is unknowable — conceded more than the architecture actually requires.
 
 ---
 
+## Landed 2026-09-28 — and one thing the tests found that this report missed
+
+Items 1–3 are implemented in `runtime/journal` with 9 tests. Writing them
+surfaced a design question none of the four sections had asked:
+
+> **Which of these stay legible on the wire?**
+
+`vocabulary.ts` coarsens every envelope to `orb.content` except a bookkeeping
+allowlist, because a record of *what* happened is an oracle under compulsion
+(`ERASURE.md` §2b). The two new types fall on opposite sides, and the rule that
+separates them is the allowlist's own:
+
+- **`orb.device.revoked` is bookkeeping.** A peer must stop accepting a revoked
+  device's later events, and must do it **without decrypting** — the same
+  argument that put `orb.erasure` on the list. A witness holds no payloads ever
+  and would otherwise keep accepting writes from a device its owner revoked.
+- **`orb.intent.unbindable` is not.** Nothing outside this device reads it. It is
+  a finding about the user's own plans — *of* a life rather than *about* the
+  record — so it takes `orb.content`, and its projection reads above the store.
+
+The tests failed first, by returning nothing, which is how the question got
+asked. A report that had only reasoned about where the records *live* would have
+shipped both as bookkeeping and leaked the second one to every peer and witness
+for ever, under a ruling that says every label is permanent.
+
+---
+
 ## What this proposes, in full
 
 | # | Finding | Kernel contract needed? | Action |

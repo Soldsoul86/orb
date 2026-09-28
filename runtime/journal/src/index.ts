@@ -50,11 +50,29 @@ export {
   ERASURE_TYPE,
   ERASURE_SCHEMA,
   erasureDraft,
+  confirmationsFor,
+  unconfirmedHolders,
   isErasureDeclaration,
   erasedHashes,
   isDeclaredErased,
 } from "./erasure.js";
 export type { ErasureRecord } from "./erasure.js";
+export {
+  REVOCATION_TYPE,
+  REVOCATION_SCHEMA,
+  revocationDraft,
+  isRevocation,
+  revokedDevices,
+} from "./revocation.js";
+export type { RevocationRecord } from "./revocation.js";
+export {
+  UNBINDABLE_TYPE,
+  UNBINDABLE_SCHEMA,
+  unbindableDraft,
+  isUnbindable,
+  unbindableIntents,
+} from "./unbindable.js";
+export type { UnbindableRecord } from "./unbindable.js";
 
 export { MemoryPayloadKeyring, isSealed } from "./keyring.js";
 export type { PayloadKeyring, SealedPayload } from "./keyring.js";

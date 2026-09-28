@@ -160,8 +160,11 @@ Not guaranteed:
   is either already recorded or was never recorded, and there is no third case
   because the Agent held nothing.
 - **Intent cannot be bound.** No Capability matches what the Planner asked for. This
-  is **recorded as unbindable, with the intent**, and it is a finding rather than an
-  error: the runtime was asked for something Orb cannot do, and that is worth knowing
+  is **recorded as unbindable, with the intent**, on its own Event type —
+  `orb.intent.unbindable`, which is neither an `InferenceRecord` (no reasoning
+  happened here) nor an `Action` (no Capability was invoked), but a record that a
+  *binding did not exist* (`../docs/reviews/RECORDS.md` §3). It is a finding rather
+  than an error: the runtime was asked for something Orb cannot do, and that is worth knowing
   about the plan, the capability set, or both. Silently dropping it would delete the
   only evidence that the gap exists.
 - **Policy denies.** Recorded with the reason (`Policy.md` §4.8). **The Agent stops.**

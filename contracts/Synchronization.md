@@ -191,7 +191,10 @@ Not guaranteed:
 - **An erasure that a peer does not confirm.** **Synchronization cannot make
   another device forget.** A peer may be offline, lost, or unwilling. What is
   available is: erase locally, declare it, propagate the declaration, and **record
-  which peers confirmed**. The honest statement is therefore never *"it is gone"*
+  which peers confirmed** — where a peer's confirmation is **its own erasure
+  declaration on its own lane**, the confirming device being `event.device` by the
+  same rule that keeps `holder` out of a custody receipt. No separate record type
+  exists or is needed (`../docs/reviews/RECORDS.md` §1). The honest statement is therefore never *"it is gone"*
   but *"gone here; three of four peers confirmed; one has not been seen since
   Tuesday"* (`ERASURE.md`, D5). Where the peer only ever held ciphertext and the key
   is destroyed, its unconfirmed copy is inert — so the limit constrains bookkeeping
