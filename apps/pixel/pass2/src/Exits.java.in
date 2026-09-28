@@ -32,6 +32,13 @@ import java.util.Map;
  * **It is a second *source*, not a second *machine*** — the same principle
  * `CLAIMS.md` §5 reached for C1's vantage. When a fact cannot be supplied
  * reliably by the actor, find something else that already knows it.
+ *
+ * **What it cannot see, carried on every reading as `exitScope`.** These are
+ * process exits. A package force-stopped while it has no running process leaves
+ * no record here at all, so the absence of a `user.requested` is never evidence
+ * that no stop occurred (§7b20). The probe answers *why the last process died*;
+ * it does not answer *whether the package was stopped*, and the two were
+ * conflated once already at the cost of a refutation withdrawn the same day.
  */
 final class Exits {
     private Exits() {}
@@ -78,6 +85,24 @@ final class Exits {
             default: return "unmapped:" + reason;
         }
     }
+
+    /**
+     * What kind of event this probe can see at all.
+     *
+     * **`process`, and the distinction is load-bearing.** This API reports
+     * *process exits*. A force-stop is a *package stop*, and a package stopped
+     * while it has no running process has no process to exit — so **nothing is
+     * recorded** and the newest entry stays whatever killed the process earlier
+     * (`DEVICE_LOOP.md` §7b20, where that gap produced a refutation that had to be
+     * withdrawn the same day).
+     *
+     * So the scope travels on every reading, exactly as `installedPackageScope`
+     * does and for the same reason: **a reader must be able to tell what kind of
+     * look produced the answer.** If a later build ever observes package-stop
+     * transitions directly this becomes `package`, and a comparison across the
+     * change can refuse rather than silently diff two different measurements.
+     */
+    static final String SCOPE = "process";
 
     /**
      * Whether a reason is one a person caused deliberately.
@@ -173,24 +198,35 @@ final class Exits {
         if (exits == null) {
             // The whole point of the field. Absent is not empty.
             payload.put("exitsReadable", false);
+            // Scope even here: what this probe would have looked at is known even
+            // when the look failed, and a reader needs it to interpret the failure.
+            payload.put("exitScope", SCOPE);
             return payload;
         }
 
         payload.put("exitsReadable", true);
+        payload.put("exitScope", SCOPE);
         payload.put("baseline", baseline);
         payload.put("exitCount", (long) exits.size());
 
         long newest = 0L;
+        // The newest exit, tracked separately from the batch. **This is the one
+        // that pairs with this process start**, and the reason the old any-of
+        // flag was wrong: on a baseline report it read `true` because one of
+        // three historical exits was user-initiated, while the death immediately
+        // before this start was `low.memory` (`DEVICE_LOOP.md` §7b15).
+        int newestReason = -1;
         StringBuilder reasons = new StringBuilder();
         StringBuilder codes = new StringBuilder();
         StringBuilder times = new StringBuilder();
-        boolean anyUserInitiated = false;
 
         for (ApplicationExitInfo info : exits) {
             int reason = info.getReason();
             long at = info.getTimestamp();
-            if (at > newest) newest = at;
-            if (userInitiated(reason)) anyUserInitiated = true;
+            if (at > newest) {
+                newest = at;
+                newestReason = reason;
+            }
 
             if (reasons.length() > 0) {
                 reasons.append(':');
@@ -207,7 +243,24 @@ final class Exits {
         // reason this build could not name is still recoverable from the record.
         payload.put("exitCodes", codes.toString());
         payload.put("exitTimestamps", times.toString());
-        payload.put("exitsUserInitiated", anyUserInitiated);
+
+        // The newest exit, named for what it is.
+        //
+        // **`exitsUserInitiated` is gone, deliberately.** It was an any-of across
+        // the batch under a name that read as a statement about *this* start, and
+        // it is not replaced by a better aggregate: anything of that shape is
+        // derivable from `exitCodes`, and a second copy would be a second source
+        // of truth for one fact (Art. IX §33).
+        //
+        // The name says *last recorded process death*, never *was force-stopped*.
+        // Under `exitScope: process` a stop of an already-dead package leaves no
+        // record at all, so **`false` here is never evidence that no stop
+        // occurred** — it is the absence of a process exit, which is a different
+        // fact and a weaker one.
+        if (newestReason >= 0) {
+            payload.put("lastExitReason", name(newestReason));
+            payload.put("lastExitUserInitiated", userInitiated(newestReason));
+        }
         // The watermark the next start compares against. Newest-seen rather than
         // a count, because the platform trims its own history and a count would
         // drift the moment it did.

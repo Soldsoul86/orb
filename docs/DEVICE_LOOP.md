@@ -3371,3 +3371,40 @@ answer it. **P20 is now a rule the journal can rely on**: a
 `signal:…BOOT_COMPLETED` at non-trivial uptime means the package left the stopped
 state, and — because §7b20's blind spot is real — the absence of a recorded
 `user.requested` does **not** mean the stop did not happen.
+
+---
+
+### 7b22. The `Exits` flag, fixed — a field that says what it measures — 2026-09-28
+
+Two defects, both found by the probe's own first day of data rather than by
+review, and both the same shape: **a field whose name claimed more than the
+measurement supports.**
+
+| Defect | Found | Fix |
+| --- | --- | --- |
+| `exitsUserInitiated` was an **any-of across the batch** — `true` on a baseline because one of three historical exits was user-initiated, while the death immediately before that start was `low.memory` | §7b15 | **Removed.** Replaced by `lastExitReason` and `lastExitUserInitiated`, which describe the **newest** exit — the one that actually pairs with this process start |
+| The name read as *the app was force-stopped*, but a stop of an **already-dead** package records nothing, so `false` was never evidence of no stop | §7b20 | **`exitScope: "process"` on every reading**, and the payload comment states the limit |
+
+#### `exitScope` follows the precedent that already exists
+
+It is `installedPackageScope` again, one signal over: **a reader must be able to
+tell what kind of look produced the answer.** A package set read under `visible`
+compared against one read under `all` reports two hundred uninstalls that never
+happened — and an exit history read at `process` scope, compared against a future
+one that could see package stops, would be the same error with a different
+subject. The scope travels so the comparison can refuse rather than silently diff
+two different measurements.
+
+If a later build observes stopped-state transitions directly, this becomes
+`package` and the change is visible in the record rather than inferred from a
+build date.
+
+#### What was deliberately not added
+
+**No replacement aggregate.** Anything of that shape — *were any of these
+user-initiated* — is derivable from `exitCodes`, which is on every reading in
+full and in order. A second copy would be a second source of truth for one fact
+(Art. IX §33), and the first copy is what went wrong.
+
+Built and signed on the same key, so it upgrades in place and `grants-b`
+survives.
