@@ -1,0 +1,97 @@
+package @PKG@;
+
+import android.app.Application;
+import android.os.Build;
+import android.os.SystemClock;
+import java.io.IOException;
+import java.util.Map;
+
+/**
+ * Orb — one app, with an identity of its own.
+ *
+ * The consolidated runtime. Pass 1 and pass 2 were instruments: they existed to
+ * answer P1–P22 and they did (`DEVICE_LOOP.md`). This is the first build whose
+ * purpose is to be useful rather than to be measured, and it starts by paying the
+ * debt those instruments left: **AD-8**, the identity that named a handset where
+ * it should have named an install.
+ *
+ * What is deliberately *not* here yet: the grants watch and the package scan.
+ * They work, they are pass 2 B's, and porting them in the same change as a new
+ * identity scheme would make a failure in either indistinguishable from a
+ * failure in the other. Pass 2 B keeps running until this replaces it, exactly
+ * as pass 1 kept running while pass 2 was built (§7 R4).
+ */
+public final class Orb extends Application {
+
+    static final String SHARED = "orb.shared";
+    static final String STARTED = "orb.process.start";
+
+    private static Orb instance;
+    private Journal journal;
+    private String install;
+
+    public static Orb get() {
+        return instance;
+    }
+
+    Journal journal() {
+        return journal;
+    }
+
+    String install() {
+        return install;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+
+        try {
+            // Minted here, before anything can want a lane. A first run is the
+            // only run that writes to disk before it reads.
+            install = Install.id(this);
+            // Lane *and* device are the install identity: one writer, one lane,
+            // one name for both (AD-8). The handset's identity is recorded in
+            // the start event below, where it is context rather than identity —
+            // and an envelope that named the phone model would tell a witness
+            // holding no payloads which phone it was watching.
+            journal = Journal.open(this, Install.lane(this), install);
+        } catch (IOException error) {
+            // No journal means no recording. Everything below checks, and
+            // nothing invents a journal to write to.
+            return;
+        }
+
+        if (journal.discontinuous()) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("reason", "previous chain head unreadable on open");
+            journal.append("orb.chain.discontinuity", payload);
+        }
+
+        recordStart();
+    }
+
+    /**
+     * The process started, and what the platform looked like when it did.
+     *
+     * The hardware fields live **here** rather than in `device`, which is the
+     * AD-8 correction in one line: the envelope carries who wrote, the payload
+     * carries what they were running on. A reader wanting the phone model reads
+     * an event; a witness holding envelopes alone learns nothing about the
+     * handset.
+     */
+    private void recordStart() {
+        Map<String, Object> payload = Json.obj();
+        payload.put("androidRelease", Build.VERSION.RELEASE);
+        payload.put("sdkInt", (long) Build.VERSION.SDK_INT);
+        payload.put("securityPatch", Build.VERSION.SECURITY_PATCH);
+        payload.put("fingerprintBuild", Build.DISPLAY);
+        payload.put("model", Build.MODEL);
+        payload.put("device", Build.DEVICE);
+        // Wall clock minus this is the boot instant, and it is the only field
+        // that can date a boot (§7b2, §7b4 — P17 was refuted on exactly this).
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(STARTED, payload);
+    }
+}

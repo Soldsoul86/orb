@@ -1,0 +1,161 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Enough of a screen to see the identity, hand things to Orb, and get the
+ * journal off the phone. Not a product surface — the output is the journal.
+ */
+public final class MainActivity extends Activity {
+    private TextView status;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Orb");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        Button export = new Button(this);
+        export.setText("Export and share journal");
+        export.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { export(); }
+        });
+        root.addView(export);
+
+        status = new TextView(this);
+        status.setTextSize(12);
+        status.setTypeface(Typeface.MONOSPACE);
+        status.setTextIsSelectable(true);
+        root.addView(status);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    /**
+     * Shows the identity and what has been recorded under it.
+     *
+     * **The identity is on screen deliberately.** AD-8 came from two installs
+     * being indistinguishable, and the cheapest guard against a repeat is that a
+     * person can read which install they are looking at without exporting
+     * anything.
+     */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+        try {
+            List<String> lines = journal.readLines();
+            StringBuilder out = new StringBuilder("\ninstall  ");
+            out.append(app.install()).append('\n');
+            out.append("lane     ").append(app.install()).append('\n');
+            out.append("package  ").append(getPackageName()).append('\n');
+            out.append("events   ").append(lines.size()).append('\n');
+            out.append("\nShare anything to Orb to record it.\n");
+            status.setText(out.toString());
+        } catch (IOException error) {
+            status.setText("\nread failed: " + error);
+        }
+    }
+
+    /**
+     * Writes the journal to Downloads, recording the disclosure first.
+     *
+     * **The export names its own source**, which the pass-1 and pass-2 exports
+     * never did — AD-8's third requirement. Four packages writing lane `pixel`
+     * produced four files that nothing in the data could tell apart, and the
+     * precedent for the fix was already in this repository: `dev.orb.probeg`'s
+     * capability report opens by naming its package (`DEVICE_LOOP.md` §7b30).
+     * This follows it.
+     *
+     * The install identity is on every envelope as `device`, so it is not
+     * repeated here — that would be a second source of truth for one fact
+     * (Art. IX §33). The **package** is not derivable from any envelope, so it is.
+     */
+    private void export() {
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+
+        try {
+            List<String> lines = journal.readLines();
+            String name = "orb-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".txt";
+
+            Map<String, Object> record = Json.obj();
+            record.put("destination", "Downloads/" + name);
+            record.put("eventsBeforeThis", (long) lines.size());
+            record.put("reason", "operator export");
+            // The two things a reader of the file alone cannot otherwise recover.
+            record.put("package", getPackageName());
+            record.put("exportScope", "whole-lane");
+            journal.append("orb.export", record);
+
+            // Re-read, so the file contains the record of its own export. A
+            // disclosure missing from the copy it produced would be a gap in the
+            // history the copy exists to carry.
+            lines = journal.readLines();
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+            values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+            ContentResolver resolver = getContentResolver();
+            Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (target == null) {
+                status.setText("\nexport failed: no destination");
+                return;
+            }
+            try (OutputStream out = resolver.openOutputStream(target)) {
+                if (out == null) {
+                    status.setText("\nexport failed: destination not writable");
+                    return;
+                }
+                for (String line : lines) {
+                    out.write(line.getBytes(StandardCharsets.UTF_8));
+                    out.write('\n');
+                }
+            }
+            status.setText("\nexported " + lines.size() + " events\nDownloads/" + name);
+        } catch (IOException error) {
+            status.setText("\nexport failed: " + error);
+        }
+    }
+}

@@ -1,0 +1,123 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.security.SecureRandom;
+import java.util.Locale;
+
+/**
+ * This install's identity — minted once, at first run, and never derived.
+ *
+ * **`ARCHITECTURAL_DEBT.md` AD-8.** Pass 1 opened lane `"pixel"` as a literal and
+ * set `device` to `Build.MODEL + "/" + Build.DEVICE` — the handset. Four packages
+ * on one phone therefore held four chains under one lane name *and* one device
+ * identity, which every layer above assumes cannot happen: Art. IV §14 makes
+ * devices equal peers, `SECURITY.md` §4 says a device writes only its own lane,
+ * and `custody.ts` counts distinct holders by `event.device`. Nothing misbehaved
+ * on the phone, because a journal never sees another app's store. It broke the
+ * moment two exports met.
+ *
+ * So the identity here is **per install**, not per handset. Two Orbs on one
+ * phone are two peers, which is what they have always actually been.
+ *
+ * **Minted, not derived, and that is the point.** An identity derived from
+ * anything the platform offers — `ANDROID_ID`, the build fingerprint, a hardware
+ * serial — would be the same for two installs on one phone, which is the defect,
+ * and would also be a stable cross-app identifier for this person, which is the
+ * thing `MOBILE_SENSING.md` says not to build. Random and local is both correct
+ * and cheaper.
+ *
+ * **It is not a secret.** It appears in every envelope as `device` and in the
+ * lane's filename. It identifies a writer, not a person, and it is meaningless
+ * off this device.
+ */
+final class Install {
+    private Install() {}
+
+    /** Where the identity lives. App-private, so it dies with the app — as the journal does. */
+    private static final String FILE = "install.id";
+
+    /**
+     * 96 bits.
+     *
+     * Enough that two installs anywhere never collide, short enough to read in a
+     * filename and quote in a bug report. A ULID would carry a timestamp this
+     * has no use for; a UUID would carry version bits and hyphens for the same.
+     */
+    private static final int BYTES = 12;
+
+    private static String cached;
+
+    /**
+     * This install's identity, minting it on first call.
+     *
+     * **Synchronized, and the file is the arbiter rather than the field.** Two
+     * threads reaching first run together must not mint two identities, and a
+     * process that died between generating and writing must not leave a lane
+     * named after an identity nothing remembers.
+     */
+    static synchronized String id(Context context) throws IOException {
+        if (cached != null) return cached;
+
+        File file = new File(context.getFilesDir(), FILE);
+        String existing = read(file);
+        if (existing != null) {
+            cached = existing;
+            return cached;
+        }
+
+        byte[] bytes = new byte[BYTES];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder hex = new StringBuilder("orb-");
+        for (byte b : bytes) hex.append(String.format(Locale.US, "%02x", b));
+        String minted = hex.toString();
+
+        // Write-then-fsync before returning. The lane is named after this, so an
+        // identity that reached a journal filename but not the disk would make
+        // the next start open a *different* lane and orphan everything written
+        // under the first — a chain nothing would ever append to again.
+        try (RandomAccessFile out = new RandomAccessFile(file, "rws")) {
+            out.write(minted.getBytes("UTF-8"));
+            out.getFD().sync();
+        }
+
+        cached = minted;
+        return cached;
+    }
+
+    /**
+     * The lane this install appends to: its identity, unchanged.
+     *
+     * **One writer, one lane, one name for both**, which is what the model has
+     * always said and what pass 1's literal quietly broke. `device-import.mjs`
+     * already opens `{ lane: device, device }` on the other side of the wire;
+     * this is the same rule on this side.
+     */
+    static String lane(Context context) throws IOException {
+        return id(context);
+    }
+
+    /** Whether an identity exists yet — a first run has not minted one. */
+    static boolean minted(Context context) {
+        return new File(context.getFilesDir(), FILE).exists();
+    }
+
+    private static String read(File file) throws IOException {
+        if (!file.exists()) return null;
+        try (RandomAccessFile in = new RandomAccessFile(file, "r")) {
+            byte[] bytes = new byte[(int) in.length()];
+            in.readFully(bytes);
+            String value = new String(bytes, "UTF-8").trim();
+            // A truncated or empty file is *not* a missing identity. Re-minting
+            // over it would orphan whatever lane the first one named, so this
+            // refuses rather than quietly starting again — the same reasoning as
+            // `Readable: false` never becoming an empty set.
+            if (value.isEmpty()) {
+                throw new IOException("install identity file is empty: refusing to mint a second");
+            }
+            return value;
+        }
+    }
+}

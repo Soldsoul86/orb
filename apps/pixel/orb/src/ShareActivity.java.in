@@ -1,0 +1,149 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.content.ClipDescription;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.widget.Toast;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Share to Orb — the first sensor that is handed its mandate rather than taking
+ * it.
+ *
+ * `docs/SENSOR_SHARE.md`, written as a declaration before this file existed,
+ * because that is the test `AD-7` failed by being decided in a manifest at build
+ * time. Two results from writing it first, both load-bearing here:
+ *
+ * **Receiving a share is not a `Capability`.** `Capability.md` §8's *reads are
+ * capabilities too* is about Orb reaching out and taking. A share is the world
+ * reaching in: no permission, nothing enumerated, nothing requested. This class
+ * declares no permission and asks for none.
+ *
+ * **A share hands over a reference, not content.** Android gives a `content://`
+ * URI, a URL, or text. Turning a pointer into bytes is a *second* act and it is
+ * where the Capability boundary falls — which is why nothing here opens a stream
+ * or fetches a link. A share sensor that "helpfully" fetched a shared URL for a
+ * title would make Orb initiate a connection to an arbitrary third party on the
+ * strength of a tap, and under DR-9 that is a disclosure needing its own
+ * authorization. **Sharing a link is not authorization to visit it.**
+ */
+public final class ShareActivity extends Activity {
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            Toast.makeText(this, "Orb: journal unavailable, nothing recorded", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        Intent intent = getIntent();
+        Map<String, Object> payload = record(intent);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(Orb.SHARED, payload);
+
+        Toast.makeText(this, "Orb recorded the share", Toast.LENGTH_SHORT).show();
+        finish();
+    }
+
+    /**
+     * What the hand-off was, as the sender declared it.
+     *
+     * Nothing here inspects content. `SENSOR_SHARE.md` §8: a sensor that sniffed
+     * the bytes to correct a wrong `mimeType` would be **interpreting**, which
+     * `Sensor.md` §1 forbids — record the declaration, and let a later stage
+     * disagree with it in its own record.
+     */
+    private Map<String, Object> record(Intent intent) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("because", "user.shared");
+
+        if (intent == null) {
+            // Not an empty share. A share whose intent this activity could not
+            // read is *cannot check*, and rendering it as "nothing was shared"
+            // is the `Readable: false` error one signal over.
+            payload.put("shareReadable", false);
+            return payload;
+        }
+        payload.put("shareReadable", true);
+        payload.put("action", String.valueOf(intent.getAction()));
+
+        // Declared by the sender, never verified here.
+        String declared = intent.getType();
+        payload.put("mimeType", declared == null ? "unknown" : declared);
+
+        // Android may or may not say who initiated the share, and absent is an
+        // ordinary outcome rather than a failure. `unknown` is recorded rather
+        // than the field being omitted: dropping it would make "we do not know
+        // where this came from" and "it came from nowhere" the same record, and
+        // later make a referrer a fact nobody observed.
+        Uri referrer = getReferrer();
+        payload.put("referrer", referrer == null ? "unknown" : referrer.toString());
+
+        List<String> references = references(intent);
+        payload.put("itemCount", (long) references.size());
+        // The pointers, not the bytes. `Observation.md` inv. 5 — references,
+        // never copies — satisfied by construction rather than by discipline.
+        payload.put("references", String.join(":", references));
+        // Nothing has been resolved, and the record says so rather than leaving
+        // a reader to assume either way. Resolution is a declared Capability
+        // (`SENSOR_SHARE.md` §3) and has not happened.
+        payload.put("resolved", false);
+        payload.put("absenceReason", "unfetched");
+
+        return payload;
+    }
+
+    /**
+     * The references a share carries, in the order the sender gave them.
+     *
+     * Plain text is *itself* the content and is recorded as the reference; a
+     * `content://` URI and a URL are pointers. The distinction matters for what
+     * resolution would later have to do, and not for what is recorded now.
+     */
+    private List<String> references(Intent intent) {
+        List<String> out = new ArrayList<>();
+        String action = intent.getAction();
+
+        if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
+            ArrayList<Uri> uris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri.class);
+            if (uris != null) {
+                for (Uri uri : uris) {
+                    if (uri != null) out.add(uri.toString());
+                }
+            }
+            return out;
+        }
+
+        Uri stream = intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class);
+        if (stream != null) {
+            out.add(stream.toString());
+            return out;
+        }
+
+        CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+        if (text != null) {
+            out.add(text.toString());
+            return out;
+        }
+
+        // A share that named neither a stream nor text. Recorded as an empty
+        // list, which with `itemCount: 0` says *this arrived and carried
+        // nothing we could name* — a fact, and different from a failed read.
+        return out;
+    }
+
+    /** The MIME types this activity accepts, for the manifest to mirror. */
+    static boolean accepts(ClipDescription description) {
+        return description != null && description.getMimeTypeCount() > 0;
+    }
+}

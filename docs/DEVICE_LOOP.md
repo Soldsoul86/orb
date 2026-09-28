@@ -3918,3 +3918,86 @@ reading id, where three hours earlier the same six changes produced ULIDs that
 differed between journals by milliseconds of import time. **Tested on real device
 history rather than on the fixture**, which is the difference between the fix
 working and the fix being believed to work.
+
+---
+
+### 7b31. The consolidated app — AD-8 paid, and the first sensor that is handed its mandate — 2026-09-28
+
+`apps/pixel/orb/`, package `dev.orb.app`, 21 KB. **Zero permissions.**
+
+The first build whose purpose is to be *useful* rather than to be measured. It
+starts by paying what the instruments left behind.
+
+#### AD-8, in three changes
+
+| | Before | Now |
+| --- | --- | --- |
+| Identity | `Build.MODEL + "/" + Build.DEVICE` — the **handset** | **96 random bits minted at first run**, stored app-private (`Install.java.in`) |
+| Lane | a literal in pass 1, a build flag in pass 2 | **derived from that identity** — there is no `ORB_LANE` |
+| Export provenance | absent | `orb.export` carries `package` |
+
+**Minted rather than derived, and that is the point.** An identity taken from
+`ANDROID_ID`, a build fingerprint or a serial would be *identical for two
+installs on one phone* — which is the defect — and would also be a stable
+cross-app identifier for a person, which `MOBILE_SENSING.md` says not to build.
+
+**Removing the flag is half the fix.** Pass 2 parameterised its lane, which felt
+like the correction to pass 1's literal and was not: a build flag still puts the
+lane's identity *outside the install that writes it*, so it can be set wrong,
+forgotten, or duplicated by rebuilding. A name that cannot be supplied cannot be
+supplied twice.
+
+**The envelope stopped naming the phone.** Model, device, build and patch moved
+into the `orb.process.start` payload. A witness holding envelopes and no payloads
+(`WITNESSES.md` W2) now learns *that* someone wrote and nothing about which
+handset — a privacy improvement that fell out of the identity fix rather than
+being aimed at.
+
+`orb.export` repeats the install identity **nowhere**: it is on every envelope as
+`device` already, and a second copy would be a second source of truth (Art. IX
+§33). Only `package`, which no envelope can supply, is added — following the
+precedent §7b30 found in `dev.orb.probeg`'s own report.
+
+#### The share sensor
+
+`ShareActivity`, built from `SENSOR_SHARE.md` — **declared before it was
+written**, which is the test AD-7 failed by being decided in a manifest at build
+time. Two results from that order carried straight into the code:
+
+- **Receiving a share needs no permission and is not a `Capability`.** The
+  manifest declares none. `Capability.md` §8's *reads are capabilities too* is
+  about Orb reaching out and taking; a share is the world reaching in.
+- **A share hands over a reference, not content.** Nothing opens a stream or
+  fetches a link. A share sensor that resolved a shared URL for a preview would
+  make Orb initiate a connection to an arbitrary third party on the strength of a
+  tap — a disclosure at tier *Act (irreversible)* under DR-9. **Sharing a link is
+  not authorization to visit it.**
+
+Recorded per hand-off: the declared `mimeType` (never sniffed — sniffing is
+interpreting, `Sensor.md` §1), `referrer` or `unknown` (never omitted, so *we do
+not know* and *nowhere* stay different facts), the references, `itemCount`, and
+`resolved: false` with `absenceReason: unfetched`.
+
+The activity is `exported`, and it is safe to export **because it takes
+nothing**: it records what it was handed and finishes. `noHistory` and a dialog
+theme keep it out of the way, because a sensor that is annoying to feed stops
+being fed.
+
+#### What is deliberately absent
+
+**The grants watch and the package scan.** They work, they are pass 2 B's, and
+porting them in the same change as a new identity scheme would make a failure in
+either indistinguishable from a failure in the other. Pass 2 B keeps running
+until this replaces it — §7 R4, the rule that let pass 2 be built while pass 1
+ran.
+
+**Resolution of shared references**, declared with its tiers in
+`SENSOR_SHARE.md` §3 and not built. Recording pointers is complete and honest on
+its own.
+
+#### A new signing key exists, and that is a liability from this moment
+
+`keys/app.keystore`, signer SHA-256 `3ab87f9a…2f9f31d1`. New package, so a new
+key was minted and the build said so. It is gitignored — a signing key in version
+control is a worse failure than the one it prevents — and it is **the only key
+that can ever upgrade this install**. §7b8 is what losing one costs.
