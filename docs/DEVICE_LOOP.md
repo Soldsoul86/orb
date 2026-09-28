@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Now instrumented**: from §7b14 the platform's own exit reason is journalled at each start, so the prediction is checkable from one export without anyone remembering | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **§7b13's second absence is retracted as evidence, 2026-09-28**: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rests on §7b9's single absence; the mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Instrumented and answered, 2026-09-28** (§7b14, §7b15). The platform's exit reason is journalled at each start, and the first export pairs **four for four in both directions**: two `user.requested` exits each followed by the reading, two `low.memory` deaths neither followed by it. The mechanism is still unexplained; the prediction is now checkable from one export with nobody required to remember | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **Settled by §7b15: the exit before that launch was `low.memory`, so it was the control half after all — recall said force-stop and the platform disagreed.** *(Previously: retracted as evidence, 2026-09-28*: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rested on §7b9's single absence until §7b15 gave it three more.)* The mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -2888,3 +2888,67 @@ different route. Signer SHA-256 `98093b72163770afd40b1744934d9064889da8b725f4922
 The key was handed to the operator to keep off-container; it cannot live in the
 repository, because a signing key in version control is a worse failure than the
 one it prevents.
+
+---
+
+### 7b15. P20 answered, and §7b13 settled — by the platform, against recall — 2026-09-28
+
+`orb-pass2-20260928-185558.txt`, lane `grants-b`, 39 events. The exit probe
+(§7b14) was installed at ~13:24 and **produced a decisive result on its first two
+records.**
+
+#### Every exit the platform reported, paired with the launch that followed it
+
+| Exit at | Platform's reason | Next launch | `BOOT_COMPLETED`? | P20 predicts |
+| --- | --- | --- | --- | --- |
+| 06:41:05 | `user.requested` | 06:41:54 | **yes** | yes ✓ |
+| 07:26:29 | `low.memory` | 09:45:12 | no | no ✓ |
+| 12:02:45 | `low.memory` | 13:24:27 | no | no ✓ |
+| 13:24:46 | `user.requested` | 13:25:48 | **yes** | yes ✓ |
+
+**Four for four, in both directions.** Two user-initiated exits, each followed by
+the reading; two low-memory deaths, neither followed by it. This is the first time
+both halves of P20 have been tested against a witness that is not a person's
+memory, and the first time the *negative* half has more than one instance.
+
+P20 is no longer *"a correlation over deliveries and absences"*. It is a
+correlation whose independent variable is now **measured at each occurrence** by
+the platform that caused it. The mechanism is still unexplained — why a force-stop
+should produce a `BOOT_COMPLETED` at 21 hours' uptime is not answered by knowing
+that it does — but the prediction itself is now checkable from one export with
+nobody required to remember anything.
+
+#### §7b13 is settled, and recall was wrong
+
+The launch at 09:45:12 is §7b13's. The exit that preceded it, at 07:26:29, was
+**`low.memory`** — not a force-stop.
+
+So that absence **was the control half**, and §7b9's single negative now has
+company. The operator's stated expectation was the opposite: *"I would have force
+killed it, I meant I didn't know."* The platform disagreed with the habit.
+
+This is the outcome the probe was built for, arriving faster than expected — and
+it arrived because **the platform's history reached back past the probe's own
+installation.** The exit at 06:41:05 happened nearly seven hours before `Exits`
+existed on the device, and the answer to §7b13's question was sitting in the OS
+the entire time it was being argued about from the lane. Nothing needed to be
+re-run.
+
+> The general lesson, which is the same one `CLAIMS.md` §5 reached from the other
+> end: **when the actor cannot supply a fact reliably, the answer is usually
+> already held by something else that was watching anyway.** Both times, the
+> instinct was to add apparatus — a second device, a stricter protocol — and both
+> times the existing second source was cheaper and better.
+
+#### One defect in the probe, found on first contact with data
+
+`exitsUserInitiated` is an **any-of across the batch**, and on the baseline record
+it read `true` while the *immediately preceding* exit was `low.memory`. For a
+single-exit report it is exactly right; for the baseline it answers a question
+nobody asked. The pairing above was recoverable only because `exitTimestamps` and
+`exitCodes` are ordered and complete — the flag alone would have misled.
+
+**Not yet fixed, deliberately**: the operator has just started the control run
+with the app backgrounded, and installing a new build would force-stop it and
+destroy that run. The fix is to name the most recent exit's reason in its own
+field and leave the any-of as an aggregate. It waits for the next export.
