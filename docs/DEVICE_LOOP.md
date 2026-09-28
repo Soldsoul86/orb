@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **REFUTED 2026-09-28 (§7b19).** A `low.memory` death at 13:40:30, `exitsUserInitiated: false`, was followed at 13:48:18 by the reading. No force-stop, reading present. The exit probe (§7b14) is what made the refutation possible — under the old procedure it would have been logged as another positive and blamed on a force-stop nobody could check. What survives: the reading **stops** once a genuine boot delivery has occurred (§7b19 row 8), which points at *first sight of a missed boot* rather than at force-stop. That framing is also incomplete — three undelivered-state launches carried no reading — and is not yet a prediction |
+| **P20** | A `signal:…BOOT_COMPLETED` at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Unresolved, and strongly supported. §7b19's refutation was withdrawn the same day (§7b20).** The probe records *process exits*; a force-stop of an already-dead app records nothing, so *last death was `low.memory`* does not mean *no force-stop happened* — `Readable: false` in a new costume. Six positives, two negatives, one row the instrument cannot classify. Untouched by the correction: the reading **stops** after a genuine boot delivery (§7b19 row 8) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -3250,3 +3250,59 @@ would discriminate is a second reboot run — this time letting the app receive 
 boot delivery and then force-stopping it deliberately. H2 predicts no reading;
 any surviving form of H1 predicts one. That is a single run, and the exit probe
 makes it self-verifying.
+
+---
+
+### 7b20. The probe's blind spot, and why §7b19's refutation does not stand — 2026-09-28
+
+**`getHistoricalProcessExitReasons` records process exits. A force-stop is a
+package stop.** When a package is force-stopped while it has **no running
+process**, there is no process to exit, so **nothing is recorded** — and the most
+recent entry stays whatever killed the process earlier.
+
+§7b19's counterexample falls exactly in that gap:
+
+| | |
+| --- | --- |
+| 13:40:30 | process dies, platform reason `low.memory` |
+| 13:40:30 → 13:48:18 | **a force-stop here would leave no trace** — the process was already gone |
+| 13:48:18 | launch, `signal:…BOOT_COMPLETED` fires |
+
+So the probe's report — *the last process death was `low.memory`* — is true, and
+the conclusion drawn from it — *therefore no force-stop happened* — **does not
+follow.** Those are different claims, and reading the first as the second is the
+project's founding error in a new place: `Readable: false` means *cannot check*,
+never *nothing there*. The instrument answers **why the last process died**. It
+does not answer **whether the package was stopped**, and §7b14 should have said
+so.
+
+**P20 is therefore restored to unresolved**, not refuted. Its status before this
+export stands: strongly supported, six positives and two negatives, one row
+(13:48:18) that the instrument cannot classify either way.
+
+**What genuinely survives §7b19, untouched by this correction:**
+
+- **P6 at 131 s with no foreground service.** Independent of the blind spot; the
+  delivery and its uptime are directly recorded.
+- **The negative control** — after the genuine boot delivery, a `low.memory`
+  death and a launch produced **no reading** (14:03:35). Also independent: that
+  row needs no claim about stops, only that a reading was absent.
+
+#### The fix to the probe, and the fix to the procedure
+
+**Procedure, immediately:** a force-stop only becomes visible if the app has a
+**live process when it is stopped**. So the test must be *open the app, then
+force-stop it* — never force-stop an app that is already dead.
+
+**Instrument, next build:** record the package's stopped-state transitions
+directly rather than inferring them from process exits, or at minimum have
+`Exits` state in its own payload that a `user.requested` absence is **not**
+evidence of no force-stop. The honest field name is not `exitsUserInitiated` but
+*"the last recorded process death was user-initiated"*, and the flag should say
+so or go.
+
+This is the second defect found in `Exits` within hours of its first data
+(§7b15 named the first). Both were found by the data rather than by review,
+which is the argument for shipping a small instrument early — and both were
+about the same thing: **a field whose name claims more than the measurement
+supports.**
