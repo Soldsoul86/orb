@@ -452,7 +452,10 @@ and three of them will stay archive files.
    parameterised it via `ORB_LANE`; pass 1 never did, and that asymmetry is the
    whole cause.
 3. The export names its own source, so a file can say which writer produced it
-   (`Observation.md` inv. 3 at the file boundary).
+   (`Observation.md` inv. 3 at the file boundary). **The precedent already
+   exists**: `dev.orb.probeg`'s capability report opens with
+   `package: dev.orb.probeg`, so the artifact that needed it least already does
+   it and the journal export can simply follow (`DEVICE_LOOP.md` §7b30).
 
 **Discharged when** one Orb install on one phone is one peer with an identity of
 its own, and two installs are two peers rather than a collision.

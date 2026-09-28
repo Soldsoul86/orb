@@ -3859,3 +3859,62 @@ Added to a contract that was already **Accepted**, which is not free: Art. X §3
 and §38 are named in the text, the change is argued non-breaking because no
 existing Event becomes invalid, and the alternative — that this belongs in an
 `Event` v2 — is stated so it can be chosen instead.
+
+### 7b30. Four files, three chains, and the derived identity confirmed on real data — 2026-09-28
+
+#### What the four files are
+
+| File | What it is | Lane | Events | Genesis |
+| --- | --- | --- | --- | --- |
+| `…probeg-203904` | **not a journal** — a capability report | — | — | — |
+| `…pass1-203909` | journal | `pixel` | 5,914 | `b8c10c31d8` |
+| `…pass2-203915` | journal | `grants` | 45 | `b1d116a651` |
+| `…pass2-203920` | journal | `grants-b` | 74 | `b23b46f10b` |
+
+**All three genesis hashes match chains already held**, so these are the same
+three journals as before, extended by 37, 3 and 3 events. No new chain arrived —
+`Orb probe` and `Orb probe B` are separate packages whose journals are not in
+this set. Stated as a fact about the files, not as a task.
+
+**A correction.** §7b25 said the pass-1 builds all carry the label `Orb pass 1`
+and are indistinguishable in the launcher. The launcher shows otherwise —
+`Orb grants …`, `Orb pass 1`, `Orb pass 2`, `Orb pass 2 B`, `Orb probe`,
+`Orb probe B`, each labelled distinctly. `ORB_PROBE_LABEL` was set per build. The
+identification problem was real *inside the exported data* and never on the
+phone, and conflating those was sloppy.
+
+#### The capability report already does what AD-8 asks of the journal export
+
+`dev.orb.probeg` is the P12–P14 prober, not a journal app, and its first lines
+read:
+
+```
+package:  dev.orb.probeg  (no permissions declared)
+```
+
+**It names its own source.** That is AD-8's third requirement — *"the export names
+its own source"* — already implemented, in the same codebase, by the artifact
+that did not need it as badly. The journal export, which does need it, omits it.
+The precedent for the fix is already written and can simply be followed.
+
+The report itself re-confirms P12, P13 and P14 with the control holding: the
+direct read of `settings_secure.xml` threw `EACCES`, so the successful reads went
+**through the framework and not around it**. Its five notification listeners match
+the `grants` lane's current holdings, which is two independent instruments
+agreeing about the same device.
+
+#### §7b29's fix, confirmed on the operator's own data
+
+Two journals, two device identities (`vm` and `other-machine`), sharing no
+storage and never having met, each folding the same two exports:
+
+```
+A: 6 ids   B: 6 ids
+IDENTICAL — two journals, two devices, never met, same six identities
+```
+
+The six alerts now carry `sha256:…` identities derived from the phone's own
+reading id, where three hours earlier the same six changes produced ULIDs that
+differed between journals by milliseconds of import time. **Tested on real device
+history rather than on the fixture**, which is the difference between the fix
+working and the fix being believed to work.
