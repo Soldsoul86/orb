@@ -118,15 +118,18 @@ These invariants directly uphold Constitution Articles I (History) and IV
 > identity"*). A rule rediscovered three times belongs where it can be found
 > once.
 >
-> **Added after acceptance, 2026-09-28, and that is not free.** Art. X §37 says
-> the kernel evolves by addition and never by changing the meaning of an existing
-> contract; §38 says a breaking change requires a new version. This is judged
-> **non-breaking on the ground that no existing Event becomes invalid** — the
-> obligation falls on components that *recompute* records, which is Service
-> behaviour, and the only implementation affected was corrected in the same
-> change. **Stated so it can be rejected**: if review holds that adding an
-> invariant to an accepted contract is mutation regardless of whether anything
-> breaks, then this belongs in an `Event` v2 and not here.
+> **Added after acceptance, and kept there — ruled 2026-09-28** (`../docs/
+> DECISIONS.md` DR-11). Art. X §37 says the kernel evolves by addition and never
+> by changing the meaning of an existing contract; §38 says a breaking change
+> requires a new version. The alternative — an `Event` v2 carrying this alone —
+> was put to the operator and declined.
+>
+> The ground it stands on, which is the ground any future addition must stand on:
+> **no Event already in history becomes invalid.** Inv. 9 constrains components
+> that *recompute* records, which is Service behaviour, so every Event ever
+> appended still satisfies the contract it was appended under. That test is
+> checkable rather than rhetorical, and DR-11 makes it the condition rather than
+> this instance the precedent.
 
 ---
 

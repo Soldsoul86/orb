@@ -667,6 +667,68 @@ may ever be adopted.
 
 ---
 
+## DR-11 — an Accepted contract may gain an invariant, on one condition
+
+- **Status:** Decided · **Decided:** 2026-09-28, operator · **Bears on:**
+  `contracts/Event.md` inv. 9, Art. X §37–§38, every future contract amendment
+
+**The question.** `Event.md` was Accepted. Inv. 9 — *a recomputed record's
+identity is derived from what it is about, never minted* — was added to it after
+acceptance, to close the loophole in inv. 8's *"structurally (for
+interpretation)"* that `DEVICE_LOOP.md` §7b28 measured. Art. X §37 says the
+kernel evolves by **addition, never by changing the meaning of an existing
+contract**; §38 says a breaking change **requires a new version**. So either the
+addition is legitimate or inv. 9 belongs in an `Event` v2 of its own.
+
+**Ruled: it stays in `Event` v1.** The v2 alternative was put and declined.
+
+### The condition, which matters more than the instance
+
+> **An Accepted contract may gain an invariant if and only if no instance
+> already in history becomes invalid.**
+
+Inv. 9 passes because it constrains components that **recompute** records —
+Service behaviour — so every Event ever appended still satisfies the contract it
+was appended under. Nothing in any journal is retroactively wrong.
+
+That test is **checkable rather than rhetorical**, which is the whole reason it
+is safe to have a rule here at all. The question *"does this invalidate anything
+already written?"* has an answer you can go and look for.
+
+### What follows, whether we like it or not
+
+1. **"Accepted" does not mean "sealed against clarification."** It means the
+   contract's *meaning* is fixed. An addition that no existing record violates
+   does not change the meaning; it writes down something that was already true
+   and was being rediscovered — three times, in this case (`Attachment` inv. 1–2,
+   the authorization record, alerts).
+2. **The burden is on the addition, and it is evidential.** Anyone adding an
+   invariant must be able to say *which records were checked and found already
+   compliant.* An assertion that it is non-breaking is not the test; the check is.
+3. **A version is still required the moment the condition fails.** If a proposed
+   invariant would make any existing record non-conforming — even one, even an
+   obsolete one — it is a v2, and no argument about how minor it is applies.
+4. **This does not license reinterpretation.** Narrowing an existing invariant,
+   or reading an old clause a new way, is mutation regardless of whether any
+   record breaks. §37 still forbids it. DR-11 permits *addition*, and nothing
+   else.
+
+### The risk, named rather than hoped away
+
+This is exactly the rule that erodes by being convenient. Every future amendment
+will arrive with a case for why it is non-breaking, and the temptation will be to
+accept the case rather than run the check. **The defence is that the condition is
+falsifiable**: it asks for records, not for reasoning, and a proposal that cannot
+name what it checked has not met it.
+
+### What it does not change
+
+Art. X §39 — implementations are replaceable, the kernel is not. Art. X §38's
+requirement of a new version for a **breaking** change is untouched; DR-11
+defines the boundary of "breaking" rather than moving it.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
