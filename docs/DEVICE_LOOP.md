@@ -2407,13 +2407,22 @@ route work, a `signal:…PACKAGE_ADDED:package:…` reading appears in the journ
 says so. A refuted route deleted is a refutation nobody can un-make; kept and
 labelled, it is a standing measurement.
 
-#### The loop, twice more
+#### The loop, twice more — and what the answers do and do not measure
 
 The reinstall raised a second package alert — `+ com.ixigo`, under
-`device-watch.packages-changed` — and the earlier one stayed answered. Three package
-changes have now gone reading → scan → alert, and two of the three were caught with
-**no broadcast of any kind involved**, which is now known to be the only way they
-could have been caught at all.
+`device-watch.packages-changed` — and the operator answered it as they had the
+first. Three package changes have now gone reading → scan → alert → person →
+answer → journal, **none of them with a broadcast involved**, which is now known to
+be the only way any of them could have been caught.
+
+**Two alerts, two answers, both `dismissed`, and zero false positives — which are
+not the same statement.** `dismissed` records that the person recognised the change
+as their own doing. A false positive would be an alert for a change that **did not
+happen**, and there has not been one: every entry named in every alert moved on the
+device, confirmed by the operator in both cases. The distinction matters because §7
+R6 makes false positives the expensive failure, and a rule whose dismissals were
+counted as errors would be tuned in exactly the wrong direction. Two is not a rate
+and is not offered as one; it is the start of a count that now exists.
 
 ---
 
