@@ -2424,6 +2424,78 @@ R6 makes false positives the expensive failure, and a rule whose dismissals were
 counted as errors would be tuned in exactly the wrong direction. Two is not a rate
 and is not offered as one; it is the start of a count that now exists.
 
+### 7b11. Why pass 1 stopped opening — an unbuffered read, measured — 2026-09-28
+
+Pass 1 held on its launch splash and then raised *isn't responding*. The operator
+got it open long enough to export: **5,667 events, 3.3 MB.**
+
+It is not a crash, and **it is not the journal's size.** 3.3 MB is nothing to read.
+
+#### The measurement
+
+`Journal.readLines` used `RandomAccessFile.readLine()`, which is **unbuffered** —
+one `read()` per byte, so 3.3 MB costs about 3.3 million syscalls per pass. Against
+pass 1's real lane, on a desktop JVM, which is faster than ART:
+
+| | unbuffered | buffered |
+| --- | --- | --- |
+| one pass over the lane | **1,017 ms** | **6 ms** |
+
+Byte-identical output, asserted across three rounds. **A 60× constant factor**, and
+the launch path walks the lane six or seven times before a screen can draw:
+
+| call | before | after |
+| --- | --- | --- |
+| `Journal.open` | 1,065 ms | 54 ms |
+| `last` (in `reconstructGap`) | 987 ms | 8 ms |
+| `chainBreaks` (in `SelfTest`) | 1,028 ms | 32 ms |
+| `verify` (on the screen) | 2,141 ms | 16 ms |
+| `lastOfType` (last self-test) | 1,127 ms | 12 ms |
+| **launch path, together** | **~6.3 s** | **~0.12 s** |
+
+Android's *isn't responding* threshold is five seconds, and ART is slower than the
+JVM these numbers came from. **That is the ANR, measured rather than argued.**
+
+#### What the defect actually was
+
+A constant factor that nothing could see until a lane grew large enough to make it
+fatal. Every test passes at every size; the desktop suite's 101 checks passed before
+the fix and after it. It is invisible to correctness and lethal to usability, and
+**the only thing that could have caught it is a real journal that had been running
+for days** — which is what this loop is for.
+
+The fix is `BufferedReader` over `FileInputStream`, decoding UTF-8 directly instead
+of round-tripping bytes through ISO-8859-1 (which the old shape needed only because
+`RandomAccessFile.readLine` returns one char per byte). The journal writes `\n`
+only, so the two readers agree on line breaks.
+
+**Pass 2 inherits it, and would have hit the same wall.** `Journal.java.in` is taken
+from pass 1 at build time, and `Pass2.observe` calls `lastOfType` on every wake while
+`scanPackages` calls it again. At the measured 42 KB/day (§7b8), pass 2's lane
+reaches 3.3 MB in about **eleven weeks** — and it was on course to become unopenable
+in exactly the same way, silently, having passed every test the whole time.
+
+#### What the export also confirms, and does not fix
+
+`verify` reports **1 break in 5,667 events, at line 4** — line 5's `previous` is the
+string `"35"`, the first two characters of a hash from two events earlier. That is
+**§5d, already diagnosed and already recorded**: a partial read of the chain head on
+reload. It is confirmed still present and is not news.
+
+It does mean `chain.linksEndToEnd` reports FAILED **correctly**. The chain really is
+broken there, history is never rewritten to hide it, and no fix to the self-test
+changes that. The pending self-test change was about the check's own logic, not about
+this break, and saying otherwise would be the §5j error again: a real pre-existing
+failure reported as if the instrument were at fault.
+
+#### The design fault this exposed
+
+Pass 1's journal can leave the phone **only through pass 1's own Export button**. An
+app that will not open cannot surrender the evidence of why it will not open, and
+nothing else on the device can read app-private storage. It cost something today —
+the export arrived only because the ANR dialog could be waited out — and it is
+recorded now rather than after it costs more.
+
 ---
 
 ## 7a. Sequencing the pass-1 run

@@ -281,7 +281,8 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | `AIRWALL.md` | an unapproved proposal |
 | AD-6 | independence, open in the debt register |
 | the pass-1 self-test fix | built, never installed; the running build reports `chain.linksEndToEnd` FAILED for ever |
-| **pass 1 will not open** | 2026-09-28: tapping it holds on the launch splash and never reaches the screen. Cause unknown. `Probe.onCreate` does whole-journal work before any Activity can draw — `journal.last()`, `reconstructGap`, and a `chainBreaks` pass in `SelfTest` — which is the first thing to rule out, but the linkage check is a string compare per line and should not cost seconds, so it is a candidate and not a diagnosis |
+| ~~**pass 1 will not open**~~ | **diagnosed and fixed in source 2026-09-28** (§7b11). `Journal.readLines` used `RandomAccessFile.readLine()`, which is unbuffered — one syscall per byte. Measured on pass 1's real 5,667-event, 3.3 MB lane: **1,017 ms per pass against 6 ms buffered**, byte-identical, and the launch path walks the lane six or seven times, so ~6.3 s on a desktop JVM before a screen can draw. Not a crash and not the journal's size. **Built, not installed** |
+| **pass 2 inherits it** | `Journal.java.in` is shared at build time and `Pass2.observe` calls `lastOfType` on every wake. At the measured 42 KB/day, pass 2's lane reaches 3.3 MB in about eleven weeks and becomes unopenable the same way. The fix is in source; the running builds do not have it |
 | **an export path that needs a healthy app** | pass 1's journal can only leave the phone through pass 1's own Export button. An app that will not open therefore cannot surrender the evidence of why it will not open, and nothing else on the device can reach app-private storage. Recorded as a design fault the moment it cost something, not before |
 | the device's security patch | roughly six months old |
 

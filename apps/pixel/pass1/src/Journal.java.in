@@ -1,9 +1,12 @@
 package @PKG@;
 
 import android.content.Context;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -222,13 +225,38 @@ final class Journal {
         return discontinuous;
     }
 
+    /**
+     * Every line of the lane, buffered.
+     *
+     * **This was `RandomAccessFile.readLine()` until 2026-09-28, and that is what
+     * made pass 1 unopenable.** That method is unbuffered: it issues one `read()`
+     * per byte, so a 3.3 MB journal costs about 3.3 million syscalls per pass.
+     * Measured against pass 1's real 5,667-event lane on a desktop JVM — which is
+     * faster than ART — **1,017 ms unbuffered against 6 ms buffered, a 60×
+     * difference with byte-identical output** (`DEVICE_LOOP.md` §7b11).
+     *
+     * The launch path walks the lane six or seven times before a screen can
+     * draw — `open`, `last`, `chainBreaks` in the self-test, then `verify`,
+     * `lastOfType` and the counts on the screen — so the cost was seconds, and
+     * Android showed *isn't responding*. **Nothing about the journal's size was
+     * the problem**; 3.3 MB is nothing to read. The defect was in how it was read,
+     * and it was invisible until a lane grew large enough to make a constant
+     * factor fatal.
+     *
+     * The decode is now done by the reader rather than by round-tripping bytes
+     * through ISO-8859-1, which the old shape needed because
+     * `RandomAccessFile.readLine` returns one char per byte. The journal writes
+     * `\n` only, so the two agree on line breaks; a stray lone `\r` would be a
+     * terminator here and not there, and no writer in this project emits one.
+     */
     synchronized List<String> readLines() throws IOException {
         List<String> out = new ArrayList<>();
         if (!file.exists()) return out;
-        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8), 1 << 16)) {
             String line;
-            while ((line = raf.readLine()) != null) {
-                if (!line.isEmpty()) out.add(new String(line.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8));
+            while ((line = reader.readLine()) != null) {
+                if (!line.isEmpty()) out.add(line);
             }
         }
         return out;
