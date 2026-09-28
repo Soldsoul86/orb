@@ -2312,14 +2312,26 @@ a safety net. If the scan sees the new package and no reading exists, the manife
 route is refuted — and that is the finding worth having, because it is the only
 route that could be prompt about a new app rather than up to twelve hours late.
 
-#### A change the operator did not announce
+#### A change the operator did not announce — and the answer
 
 The scan reported **two** losses: `com.nhn.android.band`, which was stated, and
-`com.ixigo`, which was not. Nothing in the record says which is which — the journal
-knows what moved, never why — and that is the first time this loop has surfaced a
-change its operator did not mention. Whether ixigo was them, an auto-archive, or
-something else is exactly the question the alert exists to put to a person, and it
-is put rather than guessed.
+`com.ixigo`, which was not. Nothing in the record said which was which — the journal
+knows what moved, never why — and that was the first time this loop surfaced a
+change its operator had not mentioned. The alert put the question rather than
+guessing at it, and **the operator answered: both were them.**
+
+So the package rule's loop has now closed end to end, the way the grant rule's did
+in §7b2: reading → scan → comparison → change → alert → person → answer → journal.
+The answer is `orb.alert.answered` citing the alert in `causes`, the next projection
+reads it, and a second `raiseAlerts` returns **zero** — not because the answer taught
+the rule anything (DR-8) but because the alert was already raised. Verified after the
+fact: the lane length did not move, `alertsFor` returns nothing, and the answer folds
+as `dismissed`.
+
+**A false positive would have looked identical up to the answer**, which is the
+reason the answer is recorded at all: §7 R6 says false positives cost trust, and a
+rule nobody can measure for them is a rule nobody can improve. This one was true,
+and the record can now say so with a date.
 
 ---
 

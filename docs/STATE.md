@@ -342,7 +342,7 @@ released a `BOOT_COMPLETED` but no `PACKAGE_REMOVED`, so it is not a queue of mi
 broadcasts being replayed. P20's correlation is untouched; only the explanation was
 wrong.
 
-**P21's first fix is built, rebuilt as a scan, and has now run for real** (§7b6, §7b7, §7b9). On 2026-09-28 an uninstall performed while the app was force-stopped reached no broadcast at all, and the next scan reported it: 484 → 482, both packages named, one alert under `device-watch.packages-changed`. The scenario that exposed the gap is the scenario that closed it. The
+**P21's first fix is built, rebuilt as a scan, and has now run for real** (§7b6, §7b7, §7b9). On 2026-09-28 an uninstall performed while the app was force-stopped reached no broadcast at all, and the next scan reported it: 484 → 482, both packages named, one alert under `device-watch.packages-changed`. The scenario that exposed the gap is the scenario that closed it. **The package rule's loop then closed end to end** — the operator answered that both removals were theirs, the answer is in the journal citing the alert, and a second `raiseAlerts` returns zero because the alert was already raised rather than because the answer taught the rule anything (DR-8). The
 **installed-package set** is compared against history like the three grants, so a
 package *broadcast* that never arrives is recoverable — which demotes
 `signal:…PACKAGE_*` from load-bearing to prompt, the posture `settings.changed`
