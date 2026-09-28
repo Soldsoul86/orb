@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **No force-stop in that window, operator-confirmed 2026-09-28** — the first control performed as a control rather than reconstructed. Still a correlation; the mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **§7b13's second absence is retracted as evidence, 2026-09-28**: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rests on §7b9's single absence; the mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -2750,12 +2750,27 @@ Two launches in the same export, and they disagree:
 | 06:41:54 (uptime 54,653 s) | **10 min 15 s** | **yes** — 06:41:54, uptime 54,654 s |
 | 09:45:12 (uptime 65,651 s) | **2 h 48 min 09 s** | **no** — `process.start`, `observed(process.start)`, `observed(app.opened)`, and nothing else |
 
-**This is the control half's predicted outcome** (§7b9: *let the process die on its
-own, then open, and expect nothing*). **The operator confirmed no force-stop in that
-2 h 48 m window, 2026-09-28** — the one fact the lane cannot carry, since a
-force-stop leaves no trace in the journal of the app it stopped. The absence is
-therefore an ordinary process death followed by a launch, which is exactly the
-control the prediction asked for.
+**Whether this is the control half or a refutation is not known**, and the two
+readings point in opposite directions.
+
+This section first recorded the operator as having confirmed no force-stop in the
+2 h 48 m window. **That was wrong, and is retracted 2026-09-28.** What they said
+was that they *did not know* — and that their habit is to force-kill, so a
+force-stop in that window is more likely than not.
+
+The consequence is not a weaker version of the same finding. It is a different
+finding, or its opposite:
+
+| If, in that window | Then the 09:45 absence is |
+| --- | --- |
+| no force-stop occurred | **the control half**, as §7b9 predicted |
+| a force-stop occurred | **a counterexample.** P20 predicts a `BOOT_COMPLETED` on the next launch. None arrived |
+
+A force-stop leaves no trace in the journal of the app it stops, so **the lane
+cannot settle this and neither can recall.** The honest state is *unknown*, which
+is not the same as the control having failed — and recording it as a confirmation
+was the exact error this project keeps a register for: reasoning to a conclusion a
+source could not support.
 
 The pairing is what makes it worth recording rather than the absence alone.
 **The longer gap produced no signal and the shorter one did**, which rules out
@@ -2763,18 +2778,35 @@ elapsed time as the trigger in the most direct way available: the same device, t
 same boot, the same build, four hours apart. Any explanation of the form *the app
 had been closed long enough* now has a counterexample inside one export.
 
-The control half therefore rests on **two** absences rather than §7b9's one, and
-this is the first one performed as a declared control rather than reconstructed
-afterwards. P20 is **not settled** — a correlation over six deliveries and two
+The control half therefore still rests on §7b9's **single** absence. P20 is **not
+settled** — a correlation over six deliveries and two
 absences is still a correlation, and the mechanism remains unexplained after §7b4's
-queue-replay guess was withdrawn — but both halves now have evidence gathered on
-purpose, and the one alternative explanation that cost nothing to hold (elapsed
-time) has been closed off by a counterexample inside a single export.
+queue-replay guess was withdrawn — — but one thing here does survive the retraction intact.
 
-What would still settle it: a **mechanism**, or a run large enough that the
-correlation stops being the only thing on offer. Neither is cheap, and P20 is
-useful as a correlation in the meantime — it is what tells a reader that a
-`BOOT_COMPLETED` at 15 hours' uptime is not a reboot.
+**Elapsed time is still ruled out.** That conclusion never depended on knowing
+about the force-stop: the 06:41 launch carried the reading after ten minutes and
+the 09:45 launch did not after two hours and forty-eight, so *the app had been
+closed long enough* has a counterexample inside one export either way.
+
+#### The real lesson: stop asking a person to remember
+
+Both halves of P20 now depend on a fact **no instrument records** — whether a
+force-stop happened — and the only witness has been human recall. §7b9 got it
+right by having the operator declare the force-stop in advance; this section got
+it wrong by asking afterwards. A protocol that works only when someone remembers
+to declare is not a protocol.
+
+The fix is to get the answer from the OS instead. Android exposes historical
+process exit reasons (`ActivityManager.getHistoricalProcessExitReasons`, API 30+;
+this device is SDK 36), which would let pass 2 record **why its previous process
+died** at the next start — from the platform, not from memory. That would turn
+P20's subject from something reconstructed into something observed, by an
+independent source that the person cannot misremember.
+
+**Unverified against the SDK on this device.** It is the candidate worth trying
+next, not a mechanism this document is claiming. It is also the same principle
+the C1 vantage question landed on (`CLAIMS.md` §5): when you need a fact the
+actor cannot supply reliably, find a **second source**, not a second machine.
 
 #### The package set moved twice, and the scan caught both
 
