@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Instrumented and answered, 2026-09-28** (§7b14, §7b15). The platform's exit reason is journalled at each start, and the first export pairs **four for four in both directions**: two `user.requested` exits each followed by the reading, two `low.memory` deaths neither followed by it. The mechanism is still unexplained; the prediction is now checkable from one export with nobody required to remember | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **Settled by §7b15: the exit before that launch was `low.memory`, so it was the control half after all — recall said force-stop and the platform disagreed.** *(Previously: retracted as evidence, 2026-09-28*: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rested on §7b9's single absence until §7b15 gave it three more.)* The mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Instrumented and answered, 2026-09-28** (§7b14, §7b15). The platform's exit reason is journalled at each start, and the first export pairs **four for four in both directions**: two `user.requested` exits each followed by the reading, two `low.memory` deaths neither followed by it. The prediction is checkable from one export with nobody required to remember. **§7b16**: pass 1's boot deliveries arrive at ~2–3 min uptime, once per boot, so these readings at 15 h and 21 h do not resemble a real one — and pass 1, running a `specialUse` service and therefore never in the stopped state, is the control this has always needed and is installed on the same phone | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **Settled by §7b15: the exit before that launch was `low.memory`, so it was the control half after all — recall said force-stop and the platform disagreed.** *(Previously: retracted as evidence, 2026-09-28*: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rested on §7b9's single absence until §7b15 gave it three more.)* The mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -2952,3 +2952,77 @@ nobody asked. The pairing above was recoverable only because `exitTimestamps` an
 with the app backgrounded, and installing a new build would force-stop it and
 destroy that run. The fix is to name the most recent exit's reason in its own
 field and leave the any-of as an aggregate. It waits for the next export.
+
+---
+
+### 7b16. The control for P20 has existed since §5k, on the same phone — 2026-09-28
+
+§7b15 closed with *"the mechanism is still unexplained."* That is true, but it
+skipped past evidence this project already has, and the operator was right to
+push back on it.
+
+#### What the early runs established, and why it matters here
+
+§5i and §5k measured the boot path in pass 1 directly:
+
+| | |
+| --- | --- |
+| **Two services**, sharing one process | `dataSync` and `specialUse` |
+| `dataSync` at boot | **Refused by name.** `ForegroundServiceStartNotAllowedException` — *"FGS type dataSync not allowed to start from BOOT_COMPLETED!"* |
+| `specialUse` at boot | **Starts.** 15 beats, zero skipped, nobody opened the app |
+| `BOOT_COMPLETED` delivered | **133 s after boot** (§5k); 172 s in the confounded first attempt (§5i) |
+
+The last row is the one that bears on P20, and it is the one §7b15 did not use.
+**In pass 1, a genuine boot delivery has a shape: it arrives about two to three
+minutes into uptime, once per boot, with nothing having been opened.** Every
+reading P20 is about looks nothing like that — 15 h 10 m in §7b9, 21 h 54 m in
+§7b15 — which is already strong evidence that pass 2's readings are not boot
+deliveries at all.
+
+#### Pass 1 is the negative control, it is installed, and it has been running
+
+The package set in this export names **seven** Orb-family packages: `app.orb`,
+`dev.orb.pass1`, `dev.orb.pass2`, `dev.orb.pass2b`, `dev.orb.probe`,
+`dev.orb.probeb`, `dev.orb.probeg`.
+
+So pass 1 is on the device, with a `specialUse` foreground service that §5k
+showed restarts itself at boot and §5h showed running 6 h 31 m. **An app running
+a foreground service is never in the stopped state**, which is the condition the
+force-stop hypothesis turns on. The two apps therefore differ in exactly the
+variable under test, on the same phone, through the same boot.
+
+That makes the comparison sharp, and it costs one export:
+
+| | Pass 1 (`probeg`) — service running, never force-stopped | Pass 2 B — force-stopped repeatedly |
+| --- | --- | --- |
+| Expected `BOOT_COMPLETED` readings since the 09-27 15:31 boot | **exactly one**, at ~2–3 min uptime | **several**, at 15 h and 21 h uptime |
+
+**Both outcomes are informative**, which is what makes it worth doing rather than
+assuming:
+
+- **One reading at low uptime in pass 1** → the readings in pass 2 are not boot
+  broadcasts, and the difference tracks the stopped state exactly. P20 stops
+  being a bare correlation and gains the control it has never had.
+- **Readings at high uptime in pass 1 too** → the force-stop is not the variable
+  at all, and P20's whole framing is wrong. That would be a refutation, and a
+  cheap one.
+
+#### What was wrong in §7b15's closing line
+
+*"The mechanism is still unexplained"* conflated two questions that the early
+runs already separate:
+
+1. **Is this a boot broadcast?** Answerable, and probably already answered:
+   pass 1 shows what a real one looks like and these do not resemble it.
+2. **Why does Android emit this action to a package leaving the stopped state?**
+   Genuinely unexplained, and a question about platform internals rather than
+   about Orb.
+
+Only the second is open. Treating both as open ignored a measurement this
+project paid for four days ago — which is the failure `SETTLED.md` exists to
+catch, arriving this time as *under*-using a settled finding rather than
+re-deriving one.
+
+**Next export needed: pass 1 (`dev.orb.probeg`), whole lane.** Nothing needs to
+be done to the phone first, and the pass 2 B control run must not be disturbed to
+get it.
