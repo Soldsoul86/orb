@@ -24,7 +24,7 @@ needs, including the author in three months.*
 | **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** Now across a full day: 21.1 h, two services, three reboots, eight process restarts, **zero unexplained** — and the beat counter never skips (§5l) |
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
 | **P6** | Cheap signals arrive with no foreground service | **Held 2026-09-27, strengthened 2026-09-28 (§7b19).** First shown on a delivery 31m59s after boot (§7b1); now measured at **131 s uptime** on a reboot, matching pass 1's genuine boot deliveries (133 s, §5k) on an app that has never had a service of any kind |
-| **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
+| **P0b** | The novelty scan is declinable on the sideload path | **HELD 2026-09-28 (§7b38).** Play Protect blocked `dev.orb.app` v5 outright — *Harmful app blocked* — and offered **Install anyway**, which worked. The block is declinable, which is all P0b asked. What it cost is a separate finding: on a controlled comparison (same package, same key, same day) v1–v4 with **no permissions** installed silently and v5 with `QUERY_ALL_PACKAGES` was blocked |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
@@ -4339,3 +4339,80 @@ that can be done now, and the half that was missing.
 Nothing, once this is confirmed on the device. Pass 2 B can be retired after one
 export shows the grant reads, a scan and an exit record arriving in the new lane —
 the §7 R4 rule that let pass 2 be built while pass 1 ran, applied one more time.
+
+### 7b37. The port confirmed, and the capability gate working — 2026-09-28
+
+Six events, in the order the design predicted:
+
+| Event | What it says |
+| --- | --- |
+| `orb.process.start` | the new build running |
+| `grants.exits` | **four `package.updated` exits** — v2→v3→v4→v5, every upgrade caught, with `exitScope: process` and `lastExitUserInitiated: false` |
+| `grants.observed` | accessibility 1, notification listeners 5, device admins 1, all `baseline: true` — a new lane, correctly announcing it has nothing to compare against |
+| `grants.packages` | **`installedPackageReadable: false`, `installedPackageScope: "ungranted"`** |
+| `grants.capability.granted` | `installedPackages.read`, **tier `Observe`**, scope *all installed packages on this device*, by operator |
+| `grants.packages` | **484**, scope `all`, `baseline: true` |
+
+**The refusal is on the record, which is the whole point.** The scan ran before
+the grant existed and said so, rather than being silently skipped — *the scan did
+not run because nobody authorized it* and *the scan ran and found nothing* are
+opposite facts, and both are now distinguishable by a reader who was not there.
+
+The grant event carries its **tier and scope**, so the record states what was
+authorized rather than only that something was. That is `Capability.md`'s shape
+running on a phone, three contracts short of the machinery that would enforce it.
+
+**484, up from pass 2 B's 483** — and `dev.orb.app` is in the list. The new app
+counted itself, which is a small proof that the read is the whole set rather than
+a filtered view.
+
+### 7b38. Play Protect blocked it — and the natural experiment says which permission
+
+**`Harmful app blocked` — *"This app may be harmful."*** Declined once, then
+installed via *Install anyway*.
+
+#### P0b is answered
+
+`P0b` — *the scan is declinable on the sideload path* — has been **Untested**
+since 2026-09-25. It is now **held**: the block offers *Install anyway*, so a
+sideloaded build the operator wants can still be installed. That is the whole of
+what P0b asked.
+
+#### What changed, on a controlled comparison
+
+This is as close to a natural experiment as this project has had. **Same package
+name, same signing key, same device, same day, four prior versions installed with
+no warning at all:**
+
+| Build | Permissions | Play Protect |
+| --- | --- | --- |
+| v1 – v4 | **none** | silent |
+| **v5** | `QUERY_ALL_PACKAGES`, `RECEIVE_BOOT_COMPLETED` | **blocked** |
+
+**The confound, named:** v5 also added a `BOOT_COMPLETED` receiver and grew from
+21 KB to 33 KB, and Google's heuristics are not published. So this is a strong
+correlation across one controlled change, not a proof of which permission did it.
+`QUERY_ALL_PACKAGES` is the likeliest by a distance — it is the permission
+stalkerware needs and the one Play's own policy singles out.
+
+#### Why this matters beyond one dialog
+
+`AndroidManifest.xml` already called `QUERY_ALL_PACKAGES` *"the permission a
+surveillance app would want, held here by an app whose purpose is to notice
+one."* **Google's heuristics independently reached the same judgement about the
+same permission on the same day** — which is corroboration of AD-7's severity
+from outside this repository, and the first time anything outside it has weighed
+in at all.
+
+It also sharpens the India-first distribution question. The thesis puts the
+notification listener and the package scan at the centre of mobile context, and
+this is the first hard evidence of what carrying them costs: **an app holding
+them is one a user must be told to force past a harm warning.** That is survivable
+for the operator's own build and a serious problem for anything handed to someone
+else — which is exactly the split `MOBILE_SENSING.md` predicted between *available
+to the operator* and *available to anything distributed*.
+
+**A cheap next measurement, when it is wanted:** build the same code with the
+`QUERY_ALL_PACKAGES` lines deleted — the manifest already documents that as the
+one-step reversal — and see whether the block goes away. That would separate the
+permission from the receiver and the size in one install.
