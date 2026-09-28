@@ -305,6 +305,11 @@ boot session, so the signal's name cannot date a boot — `elapsedRealtimeMs` ca
 and it also confirmed the operator's account of the power-off to the
 millisecond.
 
+**The loop has a home and a command.** `scripts/device-import.mjs` imports an
+export, raises what the rule finds and records an answer, against a journal at
+`~/.orb/journal` — outside the repository, never committed, on the machine that
+made it.
+
 **What remains is the device.** The connector has no driver. Sync does not exist,
 so the export is a file the operator carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is
 where DR-5's intent chain and DR-7's seven days belong.

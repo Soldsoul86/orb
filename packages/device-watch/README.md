@@ -119,6 +119,27 @@ whole journal from the beginning.
 **A bad line fails the whole import.** A partly-imported chain is the known-absence
 problem at its worst: a gap that looks like history. The error names the line.
 
+### Running it
+
+```
+node scripts/device-import.mjs ~/Downloads/orb-pass2-20260928-071608.txt
+node scripts/device-import.mjs status
+node scripts/device-import.mjs answer <alertId> acknowledged|dismissed
+```
+
+**The journal lives outside this repository** — `~/.orb/journal` by default,
+`ORB_JOURNAL` to move it, `ORB_DEVICE` to name the lane this machine appends to
+(the hostname, so two machines never write one lane). It is a record of one
+person's device and it is never committed.
+
+The script decides nothing: it is argument parsing, a path and printing around
+the tested functions above. Two things it does refuse. **Answering an alert this
+journal does not hold** writes a citation to an event nobody raised, so it exits
+non-zero instead. And it reports **three separate counts** — raised, unanswered,
+and waiting to be raised — because `alertsFor` returns what has not been raised
+yet, never what is unanswered, and one number in place of three would let a
+reader believe a raised alert had been dealt with.
+
 ### Still missing
 
 Sync. The export is a file the operator carries; nothing yet moves a lane between
