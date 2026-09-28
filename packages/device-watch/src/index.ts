@@ -16,6 +16,7 @@ export {
   ALERT_ANSWERED_TYPE,
   ALERT_RAISED_SCHEMA,
   ALERT_RAISED_TYPE,
+  deriveAlertId,
 } from "./alert.js";
 export type { AlertAnswer, AlertAnswered, AlertRaised } from "./alert.js";
 export {

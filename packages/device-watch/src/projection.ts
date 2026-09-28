@@ -22,8 +22,26 @@ import type { DeviceAuthorityReading } from "./reading.js";
 
 /** One change the device made, as seen in one reading. */
 export interface AuthorityChange {
-  /** The Observation it was read from. Identity of the change, with `kind`. */
+  /**
+   * The local Observation it was read from — **this journal's** record of
+   * having seen it. Used for lineage here, and journal-local by nature.
+   */
   readonly observation: string;
+  /**
+   * The **phone's own** event id for the reading, one hop back through
+   * `causes`.
+   *
+   * This is the stable one. `importExport` replicates the device lane verbatim,
+   * so the phone's ids survive into every journal that folds it, while the local
+   * Observation above is minted fresh in each. `DEVICE_LOOP.md` §7b28 measured
+   * the difference: deriving an alert identity from `observation` still drifted
+   * between journals, because the drift was never in the alert — it was here.
+   *
+   * Empty when the Observation cites nothing, which a well-formed import never
+   * produces; the alert identity then falls back to `observation` and is
+   * journal-local, honestly rather than silently.
+   */
+  readonly reading: string;
   readonly kind: string;
   readonly gained: readonly string[];
   readonly lost: readonly string[];
@@ -110,6 +128,9 @@ export function project(events: readonly StoredEvent[]): DeviceAuthority {
 
       changes.push({
         observation: event.id,
+        // The device event this Observation was made from. `observeReadings`
+        // puts exactly one cause there: the replicated reading.
+        reading: event.causes?.[0] ?? "",
         kind: reading.kind,
         gained: [...gained],
         lost: [...lost],

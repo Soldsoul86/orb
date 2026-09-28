@@ -201,11 +201,15 @@ describe("the loop closes, and does not tell you twice", () => {
     const [alert] = await raiseAlerts(j);
     assert.ok(alert);
 
-    const answered = await answerAlert(j, alert.id, "dismissed");
-    assert.deepEqual(answered.causes, [alert.id]);
+    // The **derived** identity, not the event's — `DEVICE_LOOP.md` §7b28. The
+    // event id identifies this journal's recording; the alert id identifies the
+    // rule firing on the change, and is the same in any journal that sees it.
+    const alertId = (alert.payload as AlertRaised).alertId;
+    const answered = await answerAlert(j, alertId, "dismissed");
+    assert.deepEqual(answered.causes, [alert.id], "lineage still names the local event");
 
     const state = project(await j.readAll());
-    assert.equal(state.answers.get(alert.id), "dismissed");
+    assert.equal(state.answers.get(alertId), "dismissed");
     assert.equal(state.raised.has(changeKey(state.changes[0]!.observation, "accessibility")), true);
   });
 });

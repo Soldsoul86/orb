@@ -12,13 +12,14 @@
  * the same thing twice.** The answers are also read, and recorded, and — by
  * DR-8 — used for nothing else yet.
  */
-import type { Journal, OrbEvent } from "@orb/journal";
+import { hasPayload, unwrapPayload, type Journal, type OrbEvent } from "@orb/journal";
 import {
   ALERT_ANSWERED_SCHEMA,
   ALERT_ANSWERED_TYPE,
   ALERT_RAISED_SCHEMA,
   ALERT_RAISED_TYPE,
   type AlertAnswer,
+  deriveAlertId,
   type AlertAnswered,
   type AlertRaised,
 } from "./alert.js";
@@ -42,6 +43,11 @@ export async function raiseAlerts(journal: Journal): Promise<readonly OrbEvent<A
   const raised: OrbEvent<AlertRaised>[] = [];
   for (const { rule, change } of pending) {
     const payload: AlertRaised = {
+      // Derived, so this alert has the same identity in every journal that
+      // ever folds this lane (`deriveAlertId`, `DEVICE_LOOP.md` §7b28).
+      alertId: deriveAlertId(rule, change.reading || change.observation, change.kind),
+      // What the identity was derived from, so a reader can recompute it.
+      reading: change.reading,
       rule,
       kind: change.kind,
       gained: change.gained,
@@ -70,14 +76,31 @@ export async function raiseAlerts(journal: Journal): Promise<readonly OrbEvent<A
  */
 export async function answerAlert(
   journal: Journal,
-  alertEventId: string,
+  alertId: string,
   answer: AlertAnswer,
 ): Promise<OrbEvent<AlertAnswered>> {
+  // The raising event in *this* journal, if it has one. Absent is legitimate
+  // now: an alert raised on another device can be answered here, and before
+  // §7b28 that was impossible because the citation was a local event id.
+  const raising = (await journal.readAll()).find(
+    (event) =>
+      event.type === ALERT_RAISED_TYPE &&
+      hasPayload(event) &&
+      (unwrapPayload((event as OrbEvent).payload) as AlertRaised)?.alertId === alertId,
+  );
+
+  const payload: AlertAnswered = raising
+    ? { alert: alertId, answer, alertEvent: raising.id }
+    : { alert: alertId, answer };
+
   const event = await journal.appendOne({
     type: ALERT_ANSWERED_TYPE,
     schema: ALERT_ANSWERED_SCHEMA,
-    payload: { alert: alertEventId, answer } satisfies AlertAnswered,
-    causes: [alertEventId],
+    payload,
+    // Lineage only where there is lineage to state. An answer to an alert this
+    // journal never held has no local cause, and inventing one would be a claim
+    // about history rather than a record of it.
+    causes: raising ? [raising.id] : [],
   });
   return event as OrbEvent<AlertAnswered>;
 }

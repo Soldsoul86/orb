@@ -3801,3 +3801,61 @@ architecture have now needed the same answer**, which is a strong sign it belong
 in a contract rather than being rediscovered a fourth time.
 
 Carried as a design change, now with evidence rather than reasoning behind it.
+
+### 7b29. The alert identity, derived — and the drift was never in the alert — 2026-09-28
+
+Implemented, with the finding that the first diagnosis was one hop short.
+
+#### The defect was in the Observation, not the alert
+
+`deriveAlertId(rule, observation, kind)` was written against
+`AuthorityChange.observation` — and the test of *two journals that never meet*
+**failed**, with two different ids for one change. The probe said why:
+
+```
+mac   changes: [ 01M3M8HFQX8J8GPRYHC1FX4A5H ]
+phone changes: [ 01M3M8HFR0KJJ0DKRKXSY4GZDP ]
+```
+
+ULIDs minted **milliseconds apart, at import time.** `importExport` does two
+things, and only the first preserves identity: it **replicates** the device lane
+verbatim — the phone's event ids survive — and then **translates** each reading
+into a *new local Observation* citing it through `causes`. The projection was
+reading the second. So the alert id inherited a local identity and drifted
+exactly as before.
+
+**The stable identity was one hop back the whole time**: `causes[0]`, the phone's
+own id for the reading. `AuthorityChange` now carries it as `reading`, and the
+derivation uses it — falling back to the local `observation` when a reading cites
+nothing, which is journal-local **honestly rather than silently**.
+
+> Worth recording as a method note: the fix was written, the test failed, and the
+> failure named a defect one layer below the one being fixed. Deriving the id
+> without that test would have produced something that looked right, passed
+> inspection, and drifted anyway.
+
+#### What landed
+
+- `deriveAlertId(rule, reading, kind)` — sha256 over **length-prefixed** parts,
+  so no separator can be forged across them (`("a:b","c")` must not collide with
+  `("a","b:c")`; there is a test).
+- `gained`/`lost` are **not** inputs. They are what the rule *concluded*; an
+  identity that moved when a rule's wording changed would defeat the purpose.
+- `AlertRaised` carries `alertId` and `reading`, so a reader can **recompute** the
+  identity rather than trust it.
+- `AlertAnswered.alert` is now the derived id; `alertEvent` is an optional local
+  convenience. **Answering an alert this journal never raised is now possible**,
+  with `causes: []` — no lineage invented to fill the gap.
+- Six tests, and two existing ones updated because they asserted the old contract.
+  **672 passing.**
+
+#### The contract
+
+`Event.md` **inv. 9** — *a recomputed record's identity is derived from what it
+is about, never minted.* Inv. 8's *"structurally (for interpretation)"* is the
+loophole it closes.
+
+Added to a contract that was already **Accepted**, which is not free: Art. X §37
+and §38 are named in the text, the change is argued non-breaking because no
+existing Event becomes invalid, and the alternative — that this belongs in an
+`Event` v2 — is stated so it can be chosen instead.

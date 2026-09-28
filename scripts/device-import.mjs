@@ -22,7 +22,7 @@ import { hostname } from "node:os";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { Journal, FileJournalStore, hasPayload } from "@orb/journal";
+import { Journal, FileJournalStore, hasPayload, unwrapPayload } from "@orb/journal";
 import {
   ALERT_RAISED_TYPE,
   alertsFor,
@@ -80,15 +80,18 @@ async function report(journal) {
   const raised = (await journal.readLane(device)).filter(
     (event) => event.type === ALERT_RAISED_TYPE && hasPayload(event),
   );
-  const unanswered = raised.filter((event) => !state.answers.has(event.id));
+  // Keyed by the alert's **derived** id, not the event's — DEVICE_LOOP.md §7b28.
+  // An answer given in any journal is an answer here.
+  const alertIdOf = (event) => unwrapPayload(event.payload)?.alertId ?? event.id;
+  const unanswered = raised.filter((event) => !state.answers.has(alertIdOf(event)));
   console.log(
     `\nchanges seen: ${state.changes.length}   alerts: ${raised.length} raised, ` +
       `${unanswered.length} unanswered, ${alertsFor(state).length} waiting to be raised`,
   );
   for (const event of raised) {
     const { rule, kind, gained, lost } = event.payload;
-    const answer = state.answers.get(event.id);
-    console.log(`  ${event.id}  ${kind}  ${answer ?? "UNANSWERED"}  (${rule})`);
+    const answer = state.answers.get(alertIdOf(event));
+    console.log(`  ${alertIdOf(event)}  ${kind}  ${answer ?? "UNANSWERED"}  (${rule})`);
     for (const entry of gained) console.log(`    + ${entry}`);
     for (const entry of lost) console.log(`    - ${entry}`);
   }
@@ -109,7 +112,10 @@ if (command === "status") {
   // journal does not hold is a dangling one, and reads later as if a person
   // answered something nobody ever raised.
   const held = (await journal.readLane(device)).some(
-    (event) => event.id === alertId && event.type === ALERT_RAISED_TYPE,
+    (event) =>
+      event.type === ALERT_RAISED_TYPE &&
+      hasPayload(event) &&
+      (unwrapPayload(event.payload)?.alertId ?? event.id) === alertId,
   );
   if (!held) {
     console.error(`no alert ${alertId} in lane ${device} — nothing answered`);

@@ -90,9 +90,43 @@ move a committed Event back out of existence or into a modified form.
 8. **Replayable.** The set of all Events, folded in `(HLC, lane)` order,
    reconstructs all derived state exactly (for history) and structurally (for
    interpretation).
+9. **A recomputed record's identity is derived from what it is about, never
+   minted.** An Event's own id identifies *this device recording this thing*,
+   and two devices folding one lane genuinely do append two Events. But where a
+   record is **recomputed** rather than replicated — every interpretation, which
+   inv. 8 permits to match only *structurally* — its identity must be a function
+   of its subject, so the same subject yields the same identity in every journal,
+   at any time, on any device. Anything that cites such a record cites the
+   derived identity; the Event id remains the record of the recording.
 
 These invariants directly uphold Constitution Articles I (History) and IV
 (Distribution).
+
+> **Why inv. 9 exists, and what inv. 8 could not carry alone.** Inv. 8's
+> *"structurally (for interpretation)"* is correct and is the loophole: two
+> journals folding one lane produce structurally identical interpretations under
+> different minted identities, and **a citation to one of them is then readable
+> only in the journal that minted it.** Measured rather than argued
+> (`../docs/DEVICE_LOOP.md` §7b28): the same device export folded into two
+> journals produced four identical changes under eight different identities, and
+> a human's answer to one was invisible to the other — so the loop asked the same
+> question twice, which is the one thing it exists not to do.
+>
+> **This is the third place in this architecture to need the same answer**, after
+> `Attachment` inv. 1–2 (identity is the content hash) and the authorization
+> record settled in `../docs/reviews/EXECUTION.md` (*"specified with a derived
+> identity"*). A rule rediscovered three times belongs where it can be found
+> once.
+>
+> **Added after acceptance, 2026-09-28, and that is not free.** Art. X §37 says
+> the kernel evolves by addition and never by changing the meaning of an existing
+> contract; §38 says a breaking change requires a new version. This is judged
+> **non-breaking on the ground that no existing Event becomes invalid** — the
+> obligation falls on components that *recompute* records, which is Service
+> behaviour, and the only implementation affected was corrected in the same
+> change. **Stated so it can be rejected**: if review holds that adding an
+> invariant to an accepted contract is mutation regardless of whether anything
+> breaks, then this belongs in an `Event` v2 and not here.
 
 ---
 
