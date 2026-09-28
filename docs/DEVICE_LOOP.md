@@ -3746,3 +3746,58 @@ app you have given up on may be the one holding the signal.
 > change about notification access between 01:46 and 03:19 on 09-28? If yes, the
 > alerts are `dismissed` and the rule is behaving. If not, four authority changes
 > happened unattended — which is precisely the case this signal exists for.
+
+### 7b28. The loop closed — and the alert-identity defect, measured — 2026-09-28
+
+**The operator answered: the notification-listener changes were their own doing.**
+All six alerts `dismissed`; **six raised, zero unanswered.**
+
+That is DR-8's loop complete for the first time on data nobody curated:
+*observe → journal → project → rule → alert → human answer → recorded.* The four
+authority changes came from a lane the operator did not know was still being
+written, and the answer came from the one person who could give it.
+
+**`dismissed` is not a false positive** (`SETTLED.md`). It means the person
+recognised the change as their own. A false positive would be an alert for a
+change that did not happen, and there has still never been one.
+
+#### The defect, no longer an assertion
+
+`STATE.md` has carried this as a design note: *alert ids are minted at raise
+time, not derived from the change, so replaying the same lane mints new ids and
+an existing answer's citation dangles.* It was reasoned, not measured. It is now
+measured:
+
+```
+same export -> fresh journal -> 01M3M86AY4KGDRQNVRTX9WWCDM  …AY5FD…  …AY69B…  …AY73F…
+original journal            -> 01M3M7ZT2RN0V995ZQKQ5ZBTE0  …2SJ0A…  …2SWG4…  …2T9F5…
+```
+
+Four identical changes, four completely different identities. The ULIDs come from
+the clock at raise time, so **an answer is durable only alongside the exact
+journal that raised what it answers.**
+
+Two consequences, and the second is the one that bites:
+
+1. These six answers live in a **scratch journal in an ephemeral container**.
+   They will not survive the session. What survives is this paragraph — the
+   *fact* that the operator confirmed it, written where facts are kept.
+2. More generally, **an answered alert cannot be re-derived.** Re-import the same
+   export anywhere and the loop raises the same six changes as *unanswered*, with
+   no way to connect them to answers already given. The human is asked the same
+   question again, which is the one thing an alert loop must not do.
+
+#### The fix has a name already used in this project
+
+Derive the identity from **what the alert is about** rather than when it was
+raised: the lane, the envelope hash of the observation that carries the change,
+and the rule id. Same change, same rule, same id — in any journal, at any time,
+on any device.
+
+That is precisely the technique the Execution review settled for the
+authorization record — *"the authorization record specified with a **derived**
+identity"* — and `Attachment.md` inv. 1–2 for content. **Three places in this
+architecture have now needed the same answer**, which is a strong sign it belongs
+in a contract rather than being rediscovered a fourth time.
+
+Carried as a design change, now with evidence rather than reasoning behind it.
