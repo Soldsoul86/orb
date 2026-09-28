@@ -128,8 +128,14 @@ The runtime extends human judgment; it does not replace it.
    concrete **Capability** and gates it through Policy.
 2. Human/policy authorizes it per the required permission tier.
 3. The runtime invokes the bound **Capability** to perform the **Action**.
-4. The Action's occurrence and outcome are appended to the journal as new
-   **Observation** events.
+4. The Action's **issuance** is appended to the journal as an **Event** — not an
+   Observation. Its **outcome**, if the world ever reveals one, arrives separately as
+   an Observation from a `Sensor`, re-entering the loop at Sense.
+   *(Corrected 2026-09-28. This previously read "appended to the journal as new
+   Observation events", conflating the two halves. `contracts/Action.md` §1 settles
+   it on Art. XI §41: the issuing of an Action is runtime activity, not an
+   Observation of reality. Collapsing them makes "Orb sent it" and "it arrived" the
+   same record, which is the single failure that contract exists to prevent.)*
 5. **Reflection** compares outcome to expectation; **Continuous Learning** folds
    the result back into the Twin.
 
@@ -146,7 +152,9 @@ The agent never persists the loop's state itself — every step is in the journa
    provenance — and is explainable.
 5. Model swaps affect only future interpretation; history is untouched.
 6. Actions execute only through permissioned Capabilities.
-7. Every Action is recorded back as an Observation.
+7. Every Action is recorded — never silent (Art. VII §29). The **issuance** is an
+   Event; a confirming **Observation**, if one ever arrives, is a separate record
+   from a `Sensor`. *(Corrected 2026-09-28; see §7.4 and `contracts/Action.md` §1.)*
 
 ---
 

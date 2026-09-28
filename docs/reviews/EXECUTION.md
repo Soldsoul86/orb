@@ -4,7 +4,9 @@
 > affect the world, and who says it may?** **Status: Accepted 2026-09-28** — one
 > operator ruling taken, one kernel correction applied, four amendments made.
 > Specs: `../../contracts/{Capability,Action,Policy}.md` — 1 Service, 2 State.
-> `Scheduler` and `Agent` are in this domain and have **no specification yet**.
+> **Addendum 2026-09-28:** `Scheduler.md` and `Agent.md` were written the same day
+> and are **Draft, unreviewed**. The domain now has 5 specifications of 5; three are
+> Accepted. See *Addendum* below.
 
 ---
 
@@ -104,9 +106,8 @@ journal costs the journal.
 
 ## What this domain still owes
 
-- **`Scheduler` and `Agent` have no specifications.** Both are Execution contracts
-  in `KERNEL.md`; neither has a document. The domain is accepted for the three that
-  exist, not as complete.
+- ~~**`Scheduler` and `Agent` have no specifications.**~~ **Written 2026-09-28,
+  Draft.** The domain is complete in coverage and not in acceptance.
 - **`Decision` is referenced as a non-contract** (`Policy.md` §1, a transition
   rather than State). That is consistent with `KERNEL.md`'s Contract Kinds, and it
   means the thing that *evaluates* policy is specified nowhere. Deliberate, and
@@ -127,3 +128,61 @@ The Phase 3b gate is *every* contract specification accepted, so accepting Execu
 does not open Phase 3c. It does mean the three contracts that govern effect are no
 longer the thing blocking the runtime from acting — which was their status for the
 whole of the device loop, and is why they were reviewed first.
+
+
+---
+
+## Addendum — `Scheduler` and `Agent` drafted, 2026-09-28
+
+Written after the three above were accepted, against `KERNEL.md`'s entries,
+`RUNTIME_LOOP.md` §5–§10 and `AGENT_RUNTIME.md` §3, §7. **Both are Draft and neither
+has been reviewed by anyone but their author**, which is the whole point of the
+status: the three accepted above changed on review, and there is no reason to think
+these two would not.
+
+**The spine of `Scheduler`** is that its queue is a **projection, not a record**. It
+owns no durable state; what is pending is derived from history. A queue that were
+itself the source of truth would make losing the queue mean losing the work, and
+Art. IX §33 forbids the second source needed to avoid that. Three distinctions carry
+the rest: `saturated` is not failing, `constrained` is not `stopped`, and a retry
+re-attempts transport and never re-authorizes.
+
+**The spine of `Agent`** is four verbs with four owners — the `Planner` decides, the
+**Agent binds**, `Policy` permits, the `Capability` acts. The Agent exists because
+the Planner leaves the binding undone on purpose (Art. VI §25), and because putting
+it anywhere else collapses the separation: in the Planner, interpretation acquires
+power; in the Capability, the actor picks its own authorization.
+
+Its sharpest invariant is §4.5 — **an Agent never routes around a denial.** Not by
+retrying, not by finding a lower-tier path, not by decomposing an effect into parts
+that each pass. `Capability.md` §4.3 forbids self-escalation by composition, and the
+Agent is where that laundering would be easiest to do by accident.
+
+### A contradiction found while writing them
+
+`AGENT_RUNTIME.md` §7.4 read *"The Action's occurrence and outcome are appended to
+the journal as new **Observation** events"*, and §8.7 *"Every Action is recorded back
+as an Observation."* Both carry the Art. VII §29 reading that `Action.md` §1 examined
+and rejected the same day in favour of Art. XI §41.
+
+Corrected rather than left to diverge: the **issuance** is an Event; the **outcome**,
+if the world ever reveals one, is a separate Observation from a `Sensor`. A
+`SETTLED.md` row records the old wording so it cannot return later looking like a
+fix.
+
+### What a reviewer should challenge
+
+1. **`Scheduler` depends on `Agent` and `Policy`** per `KERNEL.md`, and the draft
+   keeps both. But the contract states that the scheduler never consults permission
+   — so what is the `Policy` edge *for*? Either it is scheduling-relevant policy
+   (rate limits, quiet hours) and the contract should say so, or the edge is wrong
+   and should go the way AD-5's two went. **The draft does not resolve this**, and
+   should not have quietly dropped the edge either.
+2. **Starvation legibility** (§7) is asserted as an obligation without a mechanism.
+   *A reader must be able to tell deferred-for-an-hour from deferred-for-a-month* is
+   right, and nothing in the contract says how that is derivable.
+3. **`Agent` §7's unbindable intent** invents a record type the kernel does not
+   name. It may belong in `InferenceRecord` or `Action`, or it may be its own thing.
+4. **Whether `Scheduler` and `Agent` should be one contract.** They are drafted as
+   two because §21 separates who wakes from who works, but a reviewer who thinks the
+   kernel should get smaller rather than larger is entitled to ask.
