@@ -23,7 +23,7 @@ needs, including the author in three months.*
 | **P2** | Nothing resumes after reboot until the app is opened | **Refuted.** `specialUse` reached the foreground **133 s after boot** and recorded 15 clean beats with nobody present (§5k) |
 | **P4** | The runtime can record that it was killed or deferred | **Held, in every condition.** Now across a full day: 21.1 h, two services, three reboots, eight process restarts, **zero unexplained** — and the beat counter never skips (§5l) |
 | **P3** | A differently-typed service outlasts six hours | **Overtaken.** `dataSync` itself lasted, so the premise was never tested. The types differ elsewhere: at boot (§5k) |
-| **P6** | Cheap signals arrive with no foreground service | **Held 2026-09-27** — `BOOT_COMPLETED` reached a manifest receiver with no service running, 5 min before the app was opened. One signal, and **31m59s after boot** (§7b1) |
+| **P6** | Cheap signals arrive with no foreground service | **Held 2026-09-27, strengthened 2026-09-28 (§7b19).** First shown on a delivery 31m59s after boot (§7b1); now measured at **131 s uptime** on a reboot, matching pass 1's genuine boot deliveries (133 s, §5k) on an app that has never had a service of any kind |
 | **P0b** | The novelty scan is declinable on the sideload path | **Untested** |
 | **P12** | `ENABLED_ACCESSIBILITY_SERVICES` is readable with no permission | **Confirmed 2026-09-26** — by two independent APIs |
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Instrumented and answered, 2026-09-28** (§7b14, §7b15). The platform's exit reason is journalled at each start, and the first export pairs **four for four in both directions**: two `user.requested` exits each followed by the reading, two `low.memory` deaths neither followed by it. The prediction is checkable from one export with nobody required to remember. **§7b17 — reproduces in pass 1, and the platform discriminates.** At a real boot Android refuses `dataSync` by name, citing `BOOT_COMPLETED`; at the 15.60 h delivery the same path returned `foreground`. Same action string, different platform treatment, so these are not the same event. Six positives and two negatives, all platform-attested. **§7b18: the negative control exists** — pass 1's 09-26 session ran 1,474 unbroken heartbeats over thirty hours after one low-uptime delivery, with no second reading, and pass 2 B's `low.memory` negatives give the same result with no service. What remains unseparated is **H1 (re-delivery on leaving the stopped state)** versus **H2 (first sight of a boot the app missed)** — pass 2 B was installed fifteen hours *after* the boot, so every reading it has is for a boot it never saw. One reboot of pass 2 B separates them and answers **P6** on the way | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **Settled by §7b15: the exit before that launch was `low.memory`, so it was the control half after all — recall said force-stop and the platform disagreed.** *(Previously: retracted as evidence, 2026-09-28*: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rested on §7b9's single absence until §7b15 gave it three more.)* The mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **REFUTED 2026-09-28 (§7b19).** A `low.memory` death at 13:40:30, `exitsUserInitiated: false`, was followed at 13:48:18 by the reading. No force-stop, reading present. The exit probe (§7b14) is what made the refutation possible — under the old procedure it would have been logged as another positive and blamed on a force-stop nobody could check. What survives: the reading **stops** once a genuine boot delivery has occurred (§7b19 row 8), which points at *first sight of a missed boot* rather than at force-stop. That framing is also incomplete — three undelivered-state launches carried no reading — and is not yet a prediction |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -3167,3 +3167,86 @@ so a force-stop that was supposed not to happen shows up as `user.requested` and
 the run is known to be spoiled rather than silently misread. That is the whole
 point of §7b14 and the reason this experiment can be trusted where §7b13's could
 not.
+
+---
+
+### 7b19. The reboot ran — P6 strengthened, and **P20 refuted as written** — 2026-09-28
+
+`orb-pass2-20260928-193337.txt`, lane `grants-b`, 55 events. The phone rebooted at
+**13:49:00** (derived; new boot instant `1790603340662`). Three results, and the
+second is the one that matters most.
+
+#### 1. A genuine boot delivery, with no foreground service — P6 strengthened
+
+| | |
+| --- | --- |
+| Launch after the reboot | **131 s uptime** |
+| `BOOT_COMPLETED` | **131 s uptime**, same second |
+| Foreground service in this app | **none, ever** |
+| `grants.exits` at that start | `exitCount: 0` — correct; a reboot is not an app exit |
+
+P6 was already **held** from §7b1, but on a delivery **31m59s** after boot. This
+one lands at **131 seconds**, which matches pass 1's genuine boot deliveries
+(133 s, §5k) to within two seconds — on an app that has never had a service of
+any kind. The strongest form of P6 is now measured, not inferred.
+
+The exit history also **survived the reboot**: the later report lists all six
+exits, including the four from before the restart.
+
+#### 2. P20 is refuted as written
+
+At **13:40:30** the process died. The platform's reason was **`low.memory`**,
+`exitsUserInitiated: false`. At **13:48:18** the app was launched, and
+`signal:…BOOT_COMPLETED` **fired**.
+
+P20 says the reading marks *a force-stop since the app last ran, and is absent
+after an ordinary process death.* Here there was no force-stop and the reading
+appeared. **The prediction is wrong, and the exit probe is what proved it** —
+under the old procedure this would have been recorded as another positive and
+attributed to a force-stop nobody could check.
+
+Six for six became six for seven the moment the instrument could disagree.
+
+#### 3. The before-and-after is the real signal
+
+Every pass 2 B launch, with the platform's reason for the preceding death:
+
+| Launch | Uptime | Preceding exit | Reading? |
+| --- | --- | --- | --- |
+| 06:30:23 | 15.0 h | *(install)* | no |
+| 06:41:54 | 15.2 h | `user.requested` | **yes** |
+| 09:45:12 | 18.2 h | `low.memory` | no |
+| 13:24:27 | 21.9 h | `low.memory` | no |
+| 13:25:48 | 21.9 h | `user.requested` | **yes** |
+| 13:48:18 | 22.3 h | **`low.memory`** | **yes** ← the counterexample |
+| — | — | *— reboot —* | — |
+| 13:51:11 | **131 s** | *(none; reboot)* | **yes** — genuine |
+| 14:03:35 | 874 s | `low.memory` | **no** |
+
+**Above the line**, pass 2 B had never received the 09-27 boot's broadcast — it
+was installed fifteen hours after that boot. **Below the line**, it received the
+new boot's broadcast properly, at 131 s. The launch after that, following an
+ordinary death, got **nothing**.
+
+That is the negative control §7b18 asked for, and it holds: **once the app has
+received a boot's broadcast at the boot, the re-delivery stops.**
+
+#### What is now established, and what is not
+
+**Established.** The reading is *not* caused by a force-stop — a `low.memory`
+death produced one. And it *does* stop once a genuine boot delivery has occurred.
+Both halves point at H2 (first sight of a boot the app missed) rather than H1
+(re-delivery on leaving the stopped state).
+
+**Not established, and stated rather than papered over.** H2 does not predict the
+table either. If an undelivered app were simply re-offered the broadcast on every
+launch, the 06:30, 09:45 and 13:24 rows would all carry a reading, and they do
+not. **Three launches in the undelivered state produced no reading and three
+did**, and nothing recorded so far separates them.
+
+So the honest position: **the force-stop framing is dead, the first-sight framing
+fits better and is incomplete, and the next step is not another guess.** What
+would discriminate is a second reboot run — this time letting the app receive the
+boot delivery and then force-stopping it deliberately. H2 predicts no reading;
+any surviving form of H1 predicts one. That is a single run, and the exit probe
+makes it self-verifying.
