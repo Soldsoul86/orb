@@ -3462,3 +3462,63 @@ re-delivers.
 P20 needed a human to remember on Sunday morning. By Sunday evening it is a rule
 with a controlled test, three negatives, two positives, and an instrument that
 states its own scope and was twice corrected by its own data.
+
+---
+
+### 7b24. Consolidating to one app — what must happen first — 2026-09-28
+
+Seven Orb-family packages are installed (§7b16). The operator has decided to keep
+one. Two facts make the order of operations matter more than the choice.
+
+#### 1. Uninstalling destroys a journal. The export is the durable form.
+
+App-private storage goes with the package. `dev.orb.probeg` holds **5,757
+events** — four days, three reboots, every `gap.inferred`, the §5d chain break
+that Art. I forbids repairing, and the whole of P4's *zero unexplained* record.
+None of it is anywhere else.
+
+That is not an argument against uninstalling. It is an argument for **exporting
+every app before uninstalling any of them**: `importExport` already adopts an
+export into a journal (`packages/device-watch`), so the history is *relocated*
+rather than lost — the same distinction `PARTIAL_REPLICATION.md` §10 turned on.
+
+#### 2. Four packages write the **same lane name**, and the exports will not say so
+
+`Probe.java.in:48` opens lane `"pixel"` as a literal — pass 1 has no `ORB_LANE`
+parameter, unlike pass 2's `build.sh`. So `dev.orb.pass1`, `dev.orb.probe`,
+`dev.orb.probeb` and `dev.orb.probeg` **each hold a different chain claiming the
+lane `pixel`**, in four separate private stores.
+
+Nothing on the device has noticed, because a journal never sees another app's
+store. It is noticed the moment two of those exports meet: `replicate` refuses
+two chains under one lane name, correctly and after the fact.
+
+> **So the exports must be labelled by package at the moment they are taken.**
+> The file names carry a timestamp and the lane says `pixel` for all four. Once
+> they are in a folder together, nothing in the data distinguishes them.
+
+| Package | Lane | Note |
+| --- | --- | --- |
+| `dev.orb.pass1`, `dev.orb.probe`, `dev.orb.probeb` | `pixel` | superseded builds; one may be signature-locked (§7b8) |
+| `dev.orb.probeg` | `pixel` | **the live pass 1** — 5,757 events, the one that matters |
+| `dev.orb.pass2` | `grants` | signature-mismatched, cannot be upgraded (§7b8) |
+| `dev.orb.pass2b` | `grants-b` | **the live instrument** — keep this one |
+| `app.orb` | — | a **different product** (ActionLock/PayGuard); it is what pass 2 *watches* |
+
+#### The order
+
+1. **Export from every Orb package that opens**, one at a time, renaming each file
+   to name its package before taking the next.
+2. Keep **`dev.orb.pass2b`**. Uninstall the rest of the `dev.orb.*` family.
+3. Leave **`app.orb`** alone unless it is genuinely unwanted — it holds the
+   accessibility grant pass 2 watches, so removing it will correctly produce an
+   `accessibilityLost` reading. **That is the signal working, not a fault**, and
+   it belongs in `SETTLED.md`'s spirit: a change in what is installed is not a
+   change in the instrument.
+
+#### On the name `pass2b`
+
+It is an accident of §7b8's signature mismatch, and renaming it costs the
+`grants-b` lane — a new package is a new store and a new chain. **Not worth it.**
+The next real app gets a clean package name and a fresh lane, and these exports
+are imported into it. The ugly name is cheaper than the discontinuity.
