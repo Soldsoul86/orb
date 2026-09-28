@@ -624,6 +624,49 @@ coarse-grained first one.**
 
 ---
 
+## DR-10 — The Airwall is rejected
+
+- **Status:** Decided · **Decided:** 2026-09-28, operator · **Bears on:** `AIRWALL.md`,
+  `ModelRouter.md`, DR-9, `SECURITY.md` §7, `AGENT_RUNTIME.md` §4
+
+**Rejected.** `AIRWALL.md` proposed that Orb never initiate a network connection,
+with intelligence reaching the outside only through an isolated exception path. It
+had stood as an unapproved proposal since it was written, and is now closed.
+
+**Recorded so it is not reopened by accident.** An unapproved proposal that keeps
+sitting in `docs/` is read by the next writer as a direction not yet taken rather
+than as one declined, and `ModelRouter.md` was deliberately written without
+assuming it for exactly that reason. The file stays in the repository as the
+argument that was made and lost; its status line now says so.
+
+### What follows
+
+1. **DR-9 is the egress story, alone.** Until today the architecture held two
+   unreconciled answers to *can Orb call out* — DR-9's Capability at tier
+   *Act (irreversible)* under a standing per-scope authorization, and the Airwall's
+   *never*. There is now one.
+2. **`ModelRouter.md` needs no pass.** It was written not assuming the Airwall, so
+   the rejection changes nothing in it. Had the ruling gone the other way the
+   contract would have needed reworking — which is the argument for not assuming
+   unapproved documents, demonstrated rather than asserted.
+3. **The requirement the Airwall was answering does not disappear.** *Orb stays
+   offline; Orb is intelligent; an LLM call never makes Orb reachable*
+   (`AIRWALL.md` §1) is still what Art. VIII §31 asks for. What is rejected is the
+   mechanism, not the goal: a local route is always available (`ModelRouter.md`
+   inv. 2), no remote route is ever required, and nothing makes Orb *reachable* —
+   outbound-only, authorized per scope, recorded.
+4. **`SOVEREIGN_STACK.md` §5 loses its companion.** Where egress is decided is now
+   answered by DR-9 rather than by a document in proposal state.
+
+### What this does not decide
+
+Whether a *stricter* posture is later wanted — a route allowlist, an egress budget,
+a per-scope default of deny. Those are `Policy` questions and remain open on their
+own terms; rejecting a specific architecture is not a ruling that nothing stricter
+may ever be adopted.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

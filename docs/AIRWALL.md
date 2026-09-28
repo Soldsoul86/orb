@@ -1,6 +1,12 @@
 # The Airwall — offline by construction, intelligent by exception
 
-> Status: **PROPOSAL. Architectural. Not accepted, not implemented.**
+> Status: **REJECTED, 2026-09-28** (`DECISIONS.md` DR-10). Kept as the argument
+> that was made and lost — not as a direction still open. Egress is decided by
+> DR-9: a remote model call is a `Capability` at tier *Act (irreversible)*, under
+> a standing per-scope authorization. **Do not implement anything below.** The
+> requirement in §1 survives the mechanism's rejection; see DR-10.
+>
+> *Superseded status line:* **PROPOSAL. Architectural. Not accepted, not implemented.**
 > Per `CLAUDE.md`: design explained, risks identified, implementation proposed —
 > **awaiting approval before any code.** It introduces one new component and
 > constrains `Reasoner` behaviour, so it touches `AGENT_RUNTIME.md` §4 and

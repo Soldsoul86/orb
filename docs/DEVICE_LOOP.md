@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened 2026-09-28, control half still open.** Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. Pending the operator confirming no force-stop in that window. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -2734,3 +2734,57 @@ user owns, with any provider.
 follow: a named adversary, a negative control, a dated and versioned
 comparison, and a stated boundary. Same discipline, different subject. Neither
 loop starts a new test while the other one is mid-run.
+
+---
+
+### 7b13. P20's control half — a second absence, and it is not elapsed time — 2026-09-28
+
+`orb-pass2-20260928-151525.txt`, lane `grants-b`, 26 events. Every event derives
+the boot instant **1790523060640 ±1 ms**, so this is one boot session throughout —
+no reboot anywhere in the window.
+
+Two launches in the same export, and they disagree:
+
+| Launch | Gap since the lane's last event | `signal:…BOOT_COMPLETED`? |
+| --- | --- | --- |
+| 06:41:54 (uptime 54,653 s) | **10 min 15 s** | **yes** — 06:41:54, uptime 54,654 s |
+| 09:45:12 (uptime 65,651 s) | **2 h 48 min 09 s** | **no** — `process.start`, `observed(process.start)`, `observed(app.opened)`, and nothing else |
+
+**This is the control half's predicted outcome** (§7b9: *let the process die on its
+own, then open, and expect nothing*) — conditional on no force-stop having occurred
+in that 2 h 48 m window, which is the operator's to confirm and is not derivable
+from the lane.
+
+The pairing is what makes it worth recording rather than the absence alone.
+**The longer gap produced no signal and the shorter one did**, which rules out
+elapsed time as the trigger in the most direct way available: the same device, the
+same boot, the same build, four hours apart. Any explanation of the form *the app
+had been closed long enough* now has a counterexample inside one export.
+
+The control half therefore rests on **two** absences rather than §7b9's one. P20 is
+not settled — a correlation over six deliveries and two absences is still a
+correlation, and the mechanism remains unexplained after §7b4's queue-replay guess
+was withdrawn — but the one alternative explanation that cost nothing to hold has
+been closed off.
+
+#### The package set moved twice, and the scan caught both
+
+Four `operator.scan` readings, `scope: all`, `readable: true` throughout:
+
+| Scan | Count | Change |
+| --- | --- | --- |
+| 06:30:28 | 484 | none (`baseline: false`) |
+| 06:42:03 | **482** | lost `com.ixigo`, `com.nhn.android.band` |
+| 06:56:56 | **483** | gained `com.ixigo` |
+| 09:45:21 | 483 | none |
+
+`com.nhn.android.band` stays uninstalled; `com.ixigo` left and returned, which is
+the reinstall already recorded in §7b10 repeating in a fresh window. Both
+transitions were reported by the scan, on demand, with the gained and lost sets
+named — no broadcast was involved in either, consistent with P19's refutation.
+
+**The fourth scan is the one that carries information.** `changed: false` at
+09:45:21, after two changes earlier in the same lane, is `lastOfType(PACKAGES)`
+working across intervening observations: the comparison reached past three
+`grants.observed` events to the previous scan, and correctly found nothing new.
+A baseline that reset on every launch would have said `baseline: true` here.
