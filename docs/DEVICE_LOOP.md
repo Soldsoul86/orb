@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` at non-zero uptime marks the package **leaving the stopped state** — and is absent after an ordinary process death | **HELD 2026-09-28 (§7b21)**, by a controlled test inside one boot session: delivery received at 131 s, `low.memory` death at 875 s → no reading, force-stop *with a live process* at 1 433 s → reading at 1 551 s. **First-sight refuted** — the app had already seen this boot. Only `BOOT_COMPLETED` returns; package broadcasts do not (§7b4–§7b5, §7b10), so this is not a queue replay. **Caveat that stays**: a force-stop of an already-dead app is invisible to the probe (§7b20), so an absent `user.requested` never means no stop occurred |
+| **P20** | A `signal:…BOOT_COMPLETED` at non-zero uptime marks the package **leaving the stopped state** — and is absent after an ordinary process death | **HELD 2026-09-28 (§7b21, §7b23).** Controlled inside one boot session: boot delivery at 131 s, then `low.memory` → no reading, **force-stop with a live process** → reading, `package.updated` → no reading. Three distinct death causes, both readings explained by one rule. First-sight refuted; queue-replay refuted (§7b4–§7b5, §7b10 — only the boot broadcast returns). **Caveat that stays**: a force-stop of an already-dead app is invisible at `exitScope: process` (§7b20), so an absent `user.requested` never means no stop |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -3408,3 +3408,57 @@ full and in order. A second copy would be a second source of truth for one fact
 
 Built and signed on the same key, so it upgrades in place and `grants-b`
 survives.
+
+---
+
+### 7b23. The fix verified, and the install was itself a test — 2026-09-28
+
+`orb-pass2-20260928-195200.txt`. The new build's first `grants.exits`:
+
+```json
+{ "baseline": false, "exitScope": "process", "exitCount": 1,
+  "exitCodes": "16", "exitReasons": "package.updated",
+  "exitTimestamps": "1790605292642", "exitsThrough": 1790605292642,
+  "lastExitReason": "package.updated", "lastExitUserInitiated": false,
+  "exitsReadable": true }
+```
+
+Every part of §7b22 landed: `exitScope` present, `lastExitReason` and
+`lastExitUserInitiated` describing the newest exit, and `exitsUserInitiated`
+gone. **`baseline: false`** matters on its own — the new build read the watermark
+out of a line the *old* build wrote, so the format change did not re-baseline the
+series.
+
+#### The install exercised the mapping it was never asked to
+
+`REASON_PACKAGE_UPDATED` (code 16) is the **first reason outside `low.memory` and
+`user.requested`** this probe has ever seen, and it came out as
+`package.updated` rather than `unmapped:16`. The seventeen-case table in `name()`
+is doing its job on a code nobody planned to test, which is the argument for
+having written it out instead of special-casing the two that mattered.
+
+It is also correctly **not** user-initiated. An update is not a force-stop, and a
+flag that had guessed from "the process died right before a launch" would have
+said otherwise.
+
+#### A third negative, with a third distinct cause
+
+The install killed the process and the relaunch carried **no `BOOT_COMPLETED`** —
+consistent with P20, since an update does not put the package in the stopped
+state. One boot session now holds:
+
+| Uptime | Death before it | Reading? |
+| --- | --- | --- |
+| 131 s | *(reboot)* | **yes** — genuine boot delivery |
+| 875 s | `low.memory` | no |
+| 1 551 s | `user.requested` | **yes** |
+| 1 977 s | **`package.updated`** | no |
+
+**Four launches, three distinct death causes, and both readings explained by the
+same rule.** The negatives are no longer one repeated condition — an ordinary
+memory kill and a package update are different platform paths, and neither
+re-delivers.
+
+P20 needed a human to remember on Sunday morning. By Sunday evening it is a rule
+with a controlled test, three negatives, two positives, and an instrument that
+states its own scope and was twice corrected by its own data.
