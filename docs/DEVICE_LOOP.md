@@ -3690,3 +3690,59 @@ self-test and fails only on a **new** one.
 So Orb-on-device says *"a known, recorded, historical break — carry on"*, and
 Orb-on-import says *"reject all of it"*. Both are defensible in isolation and
 they cannot both be the policy. Opened as **AD-9**.
+
+### 7b27. The import, run — and the abandoned app was still working — 2026-09-28
+
+Four files arrived. **They are three chains and one exact duplicate**
+(byte-identical `sha256`), and only **one** carries lane `pixel` — so the other
+pass-1-family packages were not exported, and §7b24's four-way collision has not
+in fact been realised on disk.
+
+| File | Lane | Events | Result |
+| --- | --- | --- | --- |
+| `…pass1-201622` | `pixel` | 5,877 | **refused** — break at index 4, `actualPrevious: '35'` |
+| `…pass2-201626` | `grants` | 42 | **adopted** |
+| `…pass2-201631` | `grants-b` | 71 | **adopted** |
+| `…pass2-201631` (2nd) | `grants-b` | 71 | **no-op** — see below |
+
+`grants` and `grants-b` are different lane names, so **one journal holds both**;
+the separate-store advice only ever applied to the `pixel` collision. The `pixel`
+refusal is exactly AD-9, at exactly the predicted index.
+
+#### Two properties demonstrated rather than assumed
+
+**Idempotence.** The duplicate was imported into the same journal and the lane
+stayed at **71 lines, not 142** — `replicate` skipping what it already holds,
+shown on a real byte-identical re-import rather than a test fixture.
+
+**Lane independence.** Two lanes from two packages, adopted into one journal,
+projected together, with no interaction between them.
+
+#### The finding: `dev.orb.pass2` was never dead
+
+The signature-mismatched build from §7b8 — *"can never be upgraded, only
+removed"* — **has been recording since 09-26 and nobody had ever read its
+journal.** It holds four authority changes, all on 09-28, none previously seen:
+
+| Time | Change | Caught by |
+| --- | --- | --- |
+| 01:46:04 | **lost** `dreamliner` and `gearhead` notification listeners | `process.start` |
+| 03:14:46 | **regained** both | `process.start` |
+| 03:18:46 | **lost** `gearhead` again | `process.start` |
+| 03:19:10 | **regained** `gearhead` | **`settings.changed`** |
+
+**Both routes are in that table.** Three were caught by comparison against
+history at the next process start; the fourth by the live `ContentObserver` while
+the process happened to be alive. That is P16 — *signal or poll* — answered from
+the record in a single lane, and the `because` field is what makes it answerable.
+
+**This is the alert loop's first output on data nobody curated.** Six alerts now
+stand unanswered, four of them from a lane whose app the operator had written off
+as unupgradable and was about to uninstall. It is also the strongest possible
+argument for §7b25's revised order: **export before uninstalling**, because the
+app you have given up on may be the one holding the signal.
+
+> **Open question for the operator, and the loop cannot answer it:** did anything
+> change about notification access between 01:46 and 03:19 on 09-28? If yes, the
+> alerts are `dismissed` and the rule is behaving. If not, four authority changes
+> happened unattended — which is precisely the case this signal exists for.
