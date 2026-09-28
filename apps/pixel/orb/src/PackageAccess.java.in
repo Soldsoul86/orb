@@ -1,6 +1,8 @@
 package @PKG@;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.SystemClock;
 import java.io.File;
 import java.io.IOException;
@@ -56,7 +58,7 @@ final class PackageAccess {
      */
     static void grant(Context context, Journal journal) throws IOException {
         if (granted(context)) return;
-        record(journal, GRANTED);
+        record(context, journal, GRANTED);
         touch(new File(context.getFilesDir(), FILE));
     }
 
@@ -69,20 +71,54 @@ final class PackageAccess {
      */
     static void revoke(Context context, Journal journal) {
         new File(context.getFilesDir(), FILE).delete();
-        record(journal, REVOKED);
+        record(context, journal, REVOKED);
     }
 
-    private static void record(Journal journal, String type) {
+    private static void record(Context context, Journal journal, String type) {
         if (journal == null) return;
+        boolean all = declaresQueryAll(context);
         Map<String, Object> payload = Json.obj();
         payload.put("capability", "installedPackages.read");
         // The tier `Capability.md` §8 assigns it. Written down so the record
         // states what was authorized rather than only that something was.
         payload.put("tier", "Observe");
-        payload.put("scope", "all installed packages on this device");
+        // **The breadth is the manifest's, not the operator's.** §7b40 caught
+        // this over-claiming: a build with `QUERY_ALL_PACKAGES` omitted recorded
+        // the grant as `"all installed packages on this device"` and then scanned
+        // and found `visible` — the grant asserted a scope the build could never
+        // deliver. However emphatically the operator grants, the platform answers
+        // the visible set when the permission is absent, so the grant records the
+        // scope it *can* honour. The scan confirms the realized scope
+        // independently (`installedPackageScope`); this only stops the two
+        // records from contradicting each other.
+        payload.put("scope", all ? "all installed packages on this device"
+                                  : "packages visible without QUERY_ALL_PACKAGES");
+        payload.put("manifestScope", all ? "all" : "visible");
         payload.put("by", "operator");
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(type, payload);
+    }
+
+    /**
+     * Whether this build declares `QUERY_ALL_PACKAGES` — the manifest fact that
+     * decides what a scan can return, read from our own package rather than
+     * assumed. A build flag (`ORB_PACKAGE_SCAN=0`) omits the permission, so the
+     * answer is a property of the installed APK, not a constant.
+     */
+    private static boolean declaresQueryAll(Context context) {
+        try {
+            PackageInfo info = context.getPackageManager().getPackageInfo(
+                context.getPackageName(), PackageManager.GET_PERMISSIONS);
+            if (info.requestedPermissions != null) {
+                for (String requested : info.requestedPermissions) {
+                    if ("android.permission.QUERY_ALL_PACKAGES".equals(requested)) return true;
+                }
+            }
+        } catch (PackageManager.NameNotFoundException unreachable) {
+            // Our own package is always resolvable; the narrower claim is the
+            // safe default if it somehow is not.
+        }
+        return false;
     }
 
     private static void touch(File file) throws IOException {

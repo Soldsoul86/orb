@@ -4487,3 +4487,84 @@ the first place. The grant is honoured; the answer is smaller; both are on the
 record.
 
 **Staged:** `orb-app-v6-noquery.apk`. Awaiting one install and one export.
+
+### 7b40. Both predictions held — and the grant was over-claiming its scope — 2026-09-28
+
+The install ran, and both predictions from §7b39 are confirmed on one device,
+one continuous lane (`orb-d7d5f6ec…`), export `orb-20260928-230133.txt`.
+
+#### Prediction 1: Play Protect let it through — silently
+
+*"This app looks safe."* A green tick, not the neutral unknown-app dialog and
+certainly not v5's *Harmful app blocked*. Same package, same key, same day, same
+`BOOT_COMPLETED` receiver, same 33 KB — **the only difference from the blocked v5
+is the removed `QUERY_ALL_PACKAGES`**, and the block lifted.
+
+This also retires the caveat §7b39 named. The worry was that Play Protect might
+re-flag on the package's reputation rather than the current manifest — in which
+case a silent install would prove nothing. It did **not** re-flag: the same
+package name that was blocked yesterday passed today with the permission gone. So
+the block was manifest-driven, not reputation-driven, and §7b38's three confounds
+(the permission, the receiver, the size) are now separated. **`QUERY_ALL_PACKAGES`
+was the cause.** Google's heuristic and `AndroidManifest.xml`'s own comment agree
+on which permission is the dangerous one — now by a controlled single-variable
+change rather than a correlation.
+
+#### Prediction 2: the scan degraded honestly, with exactly one re-baseline
+
+The v6 process came up (`package.updated` exit confirms the in-place upgrade),
+the operator revoked, re-granted, and pressed scan. That scan:
+
+```
+installedPackageScope: "visible"
+installedPackageHoldingCount: 135        (was 484 under "all")
+installedPackageBaseline: true
+changed: false
+```
+
+**One re-baseline, not two hundred phantom uninstalls.** `Grants.previous` saw
+the stored line's scope was `all` and the current scope was `visible`, refused to
+diff across the boundary, and re-baselined once — exactly the behaviour the
+manifest comment said had *"never actually been run."* Now it has. The
+honest-degradation claim `Watch` and `Grants` carried in a docstring is a
+measured fact: a scope contraction reads as a contraction of *what can be seen*,
+never as 349 apps vanishing.
+
+#### The defect the experiment surfaced: the grant over-claimed
+
+This is the §7b40 finding, and it follows the pattern `grants.exits` set — an
+experiment producing a defect in its own first data. The scan degraded honestly,
+but the **grant** did not. Both `grants.capability.granted` and `...revoked`
+recorded:
+
+```
+scope: "all installed packages on this device"
+```
+
+…while the scan they authorized returned `visible`. The grant asserted a breadth
+the build could never deliver, because `PackageAccess.record` hardcoded the
+string. *The grant claims more than the manifest can honour* is the same shape as
+`exitsUserInitiated` claiming more than the platform reported — a record stating
+more than the measurement supports.
+
+**Fixed.** `PackageAccess.declaresQueryAll` now reads our own package's
+`requestedPermissions` and the grant records the scope it can actually honour —
+`"packages visible without QUERY_ALL_PACKAGES"` with `manifestScope: "visible"`
+when the permission is omitted, `"all…"` with `manifestScope: "all"` when it is
+declared. The breadth is the manifest's fact, read from the APK, not the
+operator's intent and not a constant. The scan still confirms the realized scope
+independently; this only stops the grant and the scan from contradicting each
+other. Staged as `orb-app-v7-noquery-scopefix.apk` — the grant it writes will
+read `visible` to match its own scan.
+
+#### What this settles about the no-permission build
+
+It is a **coherent product**, not a degraded one. Play Protect passes it; the
+capability gate still works (grant, revoke, re-grant all recorded in order); the
+scan runs and reports the smaller set it can see, labelled honestly; and the
+comparison machinery survives the scope change without inventing events. What the
+operator loses is reach — 135 packages instead of 484, the visible set rather
+than the whole installed life — which is precisely the trade `MOBILE_SENSING.md`
+framed: *available to anything distributed* costs the breadth that *available to
+the operator* keeps. This build is the distributable half, and it now has device
+evidence that it degrades where the thesis said it would and nowhere else.
