@@ -57,6 +57,24 @@ final class SelfTest {
         record(checks, failed, "encoder.payloadDigest",
             Journal.sha256(Vectors.PAYLOAD_CANONICAL).equals(Vectors.PAYLOAD_HASH));
         record(checks, failed, "encoder.eventDigest", eventDigestAgrees());
+        // This check replaced `chain.linksEndToEnd`, and the rename is the point.
+        //
+        // The old name asked *does the chain link end to end*, and on the
+        // operator's phone the answer is **no, permanently**: line 4 carries the
+        // §5d defect's signature and Art. I forbids editing history to remove it.
+        // So it read FAILED on every start for the life of that journal, which is
+        // worse than no check — it teaches its reader to ignore the one line that
+        // would matter the day something genuinely breaks (`DEVICE_LOOP.md` §5j).
+        //
+        // The question worth asking is *has anything broken since I last looked*,
+        // so this compares break **positions** against the previous
+        // `probe.selftest`. Positions are durable: an append-only file never moves
+        // a line, so a break at 4 is at 4 for ever, while the rendered sentence
+        // carries an event count that changes on every append.
+        //
+        // **A build showing `chain.linksEndToEnd` FAILED is a build from before
+        // this fix.** It is not a new failure, and `docs/SETTLED.md` says so for
+        // whoever meets it cold.
         String breaks = breakSignature(journal);
         String knownBreaks = lastKnownBreaks(journal);
         boolean baseline = knownBreaks == null;

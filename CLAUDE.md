@@ -54,6 +54,10 @@ Before writing code:
 
 1. Read MASTER.md.
 2. Read CONSTITUTION.md.
+2a. Read docs/SETTLED.md before calling anything in a device export, a journal
+    or a self-test result new, broken, or in need of fixing. It is short, and it
+    exists because re-deriving a settled finding from the code and the data is
+    the failure that actually happens — not forgetting it.
 3. Explain the design.
 4. Identify risks.
 5. Propose implementation.
