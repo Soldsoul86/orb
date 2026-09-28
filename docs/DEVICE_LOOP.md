@@ -3588,3 +3588,45 @@ builds about to be deleted:
    `eventsBeforeThis` and nothing about where it came from — a record that cannot
    say who produced it, which is `Observation.md` inv. 3's *always attributed*
    failing at the file boundary rather than the event one.
+
+#### A better way, found by asking — nothing has to be lost (2026-09-28)
+
+§7b25 above concluded that three of the four `pixel` chains become archive files.
+**That was wrong**, and the correction needs no code and no edit to any event.
+
+**1. Four chains, four journals.** `importExport(journal, text)` takes the
+journal as a parameter, and `scripts/device-import.mjs` already honours
+`ORB_JOURNAL` to relocate it. So:
+
+```
+ORB_JOURNAL=~/.orb/probeg node scripts/device-import.mjs probeg.txt
+ORB_JOURNAL=~/.orb/probeb node scripts/device-import.mjs probeb.txt
+```
+
+Each chain is adopted under its own store, verified, replayable, queryable.
+Nothing is edited, no hash is touched, and `replicate` never sees two chains
+under one lane because it never sees two at all.
+
+**This is not a workaround — it is the honest representation.** AD-8's whole
+point is that four packages are **four writers**. Forcing four writers into one
+lane is the thing that would be false; giving each its own store says exactly
+what happened. The single-journal assumption was mine, not the architecture's.
+
+**2. The irreversible step is not the uninstall.** It is uninstalling *before
+adopting*. Once each export is imported, the history lives off the device and the
+APK holds nothing unique — so the uninstall becomes free, and the operator gets
+the single-app phone they asked for with nothing surrendered for it.
+
+> **Revised order: export each → import each into its own journal → then
+> uninstall freely.**
+
+**3. If the decision is to be deferred, force-stop rather than uninstall** — and
+this project has just measured why that works. §7b17 found pass 1 **in the
+stopped state through the 09-27 boot, receiving no `BOOT_COMPLETED` at that
+boot**; it got one later, on launch, at 15.6 h. So a force-stopped build starts no
+service, receives no broadcast, and costs battery nothing while its journal sits
+intact. Four days of P20 work, paying off as an operations decision.
+
+The residual cost of the revised plan is **nothing**, against three permanently
+unadoptable histories in the original. The error was assuming one journal because
+the script defaults to one.
