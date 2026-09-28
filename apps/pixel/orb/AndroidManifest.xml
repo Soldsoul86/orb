@@ -2,17 +2,24 @@
 <!--
   Orb — the consolidated runtime.
 
-  **No permissions. None at all.** Pass 2 needed two; this needs zero, because
-  the only sensor here is one the user hands its input to. `SENSOR_SHARE.md` §1:
-  receiving a share is not a Capability, because Orb reaches for nothing — the
-  world reaches in. That is why this is the first sensor built rather than the
-  notification listener, which reads other people's messages continuously on one
-  grant.
+  **Two permissions, and the second one is AD-7.**
 
-  The grants watch and the package scan are **not here yet**. They work and they
-  are pass 2 B's; porting them in the same change as a new identity scheme would
-  make a failure in either indistinguishable from a failure in the other. Pass 2 B
-  keeps running until this replaces it (§7 R4).
+  The share sensor needs none at all: receiving a share is not a Capability,
+  because Orb reaches for nothing — the world reaches in (`SENSOR_SHARE.md` §1).
+
+  `RECEIVE_BOOT_COMPLETED` wakes the app after a restart and reads nothing.
+
+  `QUERY_ALL_PACKAGES` **does** read: the whole installed set, 484 entries
+  describing a person's life. It is the permission a surveillance app would want,
+  held by an app whose purpose is to notice one. `Capability.md` §8 puts it at
+  tier `Observe` and AD-7 records that pass 2 took it with no declaration and no
+  authorization.
+
+  **So it is declared here and gated at runtime.** The manifest permission only
+  makes the read *possible*; `PackageAccess` decides whether it *happens*, and
+  the grant, the refusal and the revocation are all events. Reverse the whole
+  thing by deleting those four lines: `GrantReader.packageScope` then records
+  `visible` and the signal degrades honestly instead of breaking or lying.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@PKG@"
@@ -20,6 +27,20 @@
     android:versionName="0.1-orb">
 
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!--
+      Without this, `queryBroadcastReceivers` for admin receivers sees some
+      packages and not others — and the ones it would miss are third-party,
+      which is exactly the case this signal exists for.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+        </intent>
+    </queries>
 
     <application
         android:name=".Orb"
@@ -69,5 +90,19 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
+        <!-- P6 held and strengthened: these arrive with no foreground service (§7b19). -->
+        <receiver
+            android:name=".WakeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -59,6 +59,22 @@ public final class MainActivity extends Activity {
         });
         root.addView(resolve);
 
+        // AD-7, half paid: the package scan does not run until this is tapped,
+        // and the grant, the refusal and the revocation are all events.
+        Button access = new Button(this);
+        access.setText("Package scanning: grant / revoke");
+        access.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { togglePackageAccess(); }
+        });
+        root.addView(access);
+
+        Button scan = new Button(this);
+        scan.setText("Scan installed packages now");
+        scan.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { scanNow(); }
+        });
+        root.addView(scan);
+
         status = new TextView(this);
         status.setTextSize(12);
         status.setTypeface(Typeface.MONOSPACE);
@@ -94,11 +110,64 @@ public final class MainActivity extends Activity {
             out.append("lane     ").append(app.install()).append('\n');
             out.append("package  ").append(getPackageName()).append('\n');
             out.append("events   ").append(lines.size()).append('\n');
+            out.append("scanning ").append(PackageAccess.granted(this) ? "granted" : "not granted").append('\n');
             out.append("\nShare anything to Orb to record it.\n");
             status.setText(out.toString());
         } catch (IOException error) {
             status.setText("\nread failed: " + error);
         }
+    }
+
+    /** Grants or revokes the one read in this app that needs authorizing. */
+    private void togglePackageAccess() {
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+        try {
+            if (PackageAccess.granted(this)) {
+                PackageAccess.revoke(this, journal);
+                status.setText("\npackage scanning REVOKED\nrecorded as " + PackageAccess.REVOKED + "\n");
+            } else {
+                PackageAccess.grant(this, journal);
+                status.setText("\npackage scanning GRANTED (tier Observe)\nrecorded as "
+                    + PackageAccess.GRANTED + "\n");
+            }
+        } catch (IOException error) {
+            status.setText("\ncould not record the change: " + error);
+        }
+    }
+
+    /**
+     * An operator-requested scan.
+     *
+     * The count is read back out of the event that was just written rather than
+     * out of the variable that produced it — the journal is the record, and a
+     * screen showing a number the journal does not hold would be a second source
+     * of truth the size of one line.
+     */
+    private void scanNow() {
+        Orb app = Orb.get();
+        Map<String, Object> report = app == null || app.watch() == null
+            ? null : app.watch().scanPackages("operator.scan");
+        if (report == null) {
+            status.setText("\nscan failed: journal unavailable");
+            return;
+        }
+        if (Boolean.FALSE.equals(report.get("installedPackageReadable"))) {
+            status.setText("\nscan REFUSED — not granted\nthe refusal is on the record, "
+                + "because \"nobody authorized it\" and \"nothing was found\" are opposite facts\n");
+            return;
+        }
+        StringBuilder out = new StringBuilder("\nscanned installed packages\n");
+        out.append("count  ").append(report.get("installedPackageHoldingCount")).append('\n');
+        out.append("scope  ").append(report.get("installedPackageScope")).append('\n');
+        out.append(Boolean.TRUE.equals(report.get("changed"))
+            ? "something changed since the last scan\n"
+            : "nothing changed since the last scan\n");
+        status.setText(out.toString());
     }
 
     /**

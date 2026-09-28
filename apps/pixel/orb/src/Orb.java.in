@@ -15,11 +15,9 @@ import java.util.Map;
  * debt those instruments left: **AD-8**, the identity that named a handset where
  * it should have named an install.
  *
- * What is deliberately *not* here yet: the grants watch and the package scan.
- * They work, they are pass 2 B's, and porting them in the same change as a new
- * identity scheme would make a failure in either indistinguishable from a
- * failure in the other. Pass 2 B keeps running until this replaces it, exactly
- * as pass 1 kept running while pass 2 was built (§7 R4).
+ * The grants watch arrived in §7b36, once the identity scheme had been confirmed
+ * on the device — porting it in the same change would have made a failure in
+ * either indistinguishable from a failure in the other.
  */
 public final class Orb extends Application {
 
@@ -29,6 +27,7 @@ public final class Orb extends Application {
     private static Orb instance;
     private Journal journal;
     private String install;
+    private Watch watch;
 
     public static Orb get() {
         return instance;
@@ -40,6 +39,10 @@ public final class Orb extends Application {
 
     String install() {
         return install;
+    }
+
+    Watch watch() {
+        return watch;
     }
 
     @Override
@@ -70,6 +73,14 @@ public final class Orb extends Application {
         }
 
         recordStart();
+
+        // Ported from pass 2 B (§7b36). The grant reads cost nothing and run
+        // unconditionally; the package scan is gated by `PackageAccess`.
+        watch = new Watch(this, journal);
+        watch.recordExits();
+        watch.observe("process.start");
+        watch.scanPackagesIfDue("process.start");
+        watch.watchSettings();
     }
 
     /**

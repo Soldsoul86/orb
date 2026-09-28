@@ -4291,3 +4291,51 @@ same shape as every `Readable: false` argument: two different facts sharing one
 value. **Fixed the same day**: `stored` and `held` are now separate outcomes. Both mean
 *the content is here*; only one of them cost disk, and the journal now says
 which.
+
+### 7b36. The grants watch, ported — and AD-7 half paid on the way — 2026-09-28
+
+`Grants`, `GrantReader`, `Exits` and `WakeReceiver` came across **byte for byte**.
+They work, they have four days of evidence behind them, and rewriting working
+code during a port is how a port becomes a rewrite nobody asked for. 33 KB.
+
+**The event types are unchanged**: `grants.observed`, `grants.packages`,
+`grants.exits`. A type says what an event *is*, not which app wrote it, and
+`packages/device-watch/src/import.ts` keys on exactly those strings — so the
+TypeScript importer reads the new app's lane with no change at all. Renaming them
+would have diverged two implementations of one thing, which §7 R2 exists to
+prevent.
+
+#### What did not come across unchanged: the package scan
+
+`AD-7` says `device-watch` reads a person's whole package list outside the
+Capability boundary — *"decided in a manifest, at build time, with no declaration
+and no Policy involvement."* Porting that as it stood would carry the debt
+forward into the app built to pay debts.
+
+| Read | Gate | Why |
+| --- | --- | --- |
+| accessibility, notification listeners, device admins | **none** | P12–P14 confirmed them readable with no permission; they cost nothing and they are what the signal is *for* |
+| the installed package set | **an explicit, recorded grant** | `Capability.md` §8, tier `Observe`: 484 entries describing a person's life |
+
+`PackageAccess` is the Capability shape at its smallest — **declared, authorized
+by a person, recorded, and only then acted on.** The grant is an event, the
+revocation is an event, and **a refused scan is an event too**: *the scan did not
+run because nobody authorized it* and *the scan ran and found nothing* are
+opposite facts, and a signal that rendered them identically would be the
+`Readable: false` mistake at the level of the whole reading.
+
+Two orderings chosen rather than defaulted: the grant **records before** it
+enables, so a crash between the two leaves a journal claiming a capability the
+device is not yet exercising; the revocation **disables before** it records, so
+the same crash leaves the capability off. Both fail toward not-reading.
+
+**This does not close AD-7.** There is no `Policy` on this device to consult and
+no `Capability` registry to declare into, so the debt stays open. What it does is
+move the decision **out of the manifest and into history** — which is the half
+that can be done now, and the half that was missing.
+
+#### What is still pass 2 B's
+
+Nothing, once this is confirmed on the device. Pass 2 B can be retired after one
+export shows the grant reads, a scan and an exit record arriving in the new lane —
+the §7 R4 rule that let pass 2 be built while pass 1 ran, applied one more time.

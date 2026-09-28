@@ -1,0 +1,339 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+/**
+ * What currently holds power over this device, and what changed since last time.
+ *
+ * `MOBILE_SENSING.md` §4.4 — *"Is the device itself under attack?"* — the group
+ * that document calls "the group most often skipped, and the one that matters
+ * most for a system holding a decades-long record of a life", and which costs
+ * no permission at all. §4.4 rates *a new package with Accessibility or Device
+ * Admin* as **the classic stalkerware install: cheap, high-value, low-noise.**
+ *
+ * This is pass 2's first signal under `DEVICE_LOOP.md` §7 R4, which asks for
+ * *"at least one signal that is useful to a person rather than to this
+ * document."* The occasion for it was measured rather than imagined: on
+ * 2026-09-26 an accessibility service was enabled on the operator's phone, a
+ * third-party payment app detected it within hours and refused to run, and the
+ * pass-1 journal contained no record that anything had happened. That is
+ * `CLAIMS.md` C1 route **A6** — a path Orb does not mediate — arriving as an
+ * event rather than a hypothesis.
+ *
+ * **It reports a fact, never a verdict.** A grant appearing is not an attack; it
+ * is usually the owner installing something. Art. XI §42 — the runtime never
+ * assumes reality matched an expectation — and `Observation.md`: an observation
+ * owns confidence, not truth. Whether a change is alarming is interpretation,
+ * and interpretation lives above this.
+ */
+final class Grants {
+
+    /**
+     * The three grants proper — things that hold power, as §4.4 means it.
+     *
+     * What an **observation** reports, at every wake, because all three are cheap:
+     * two `Settings.Secure` lookups and one `DevicePolicyManager` call.
+     */
+    static final String[] GRANT_KINDS = {"accessibility", "notificationListener", "deviceAdmin"};
+
+    /**
+     * What a **scan** reports, on its own cadence, because it is not cheap.
+     *
+     * `installedPackage` is not a grant, and it is not in `GRANT_KINDS` for that
+     * reason: an app appearing is not an app being given power over the device.
+     * What it shares with the three is the *mechanism* — a named set, compared
+     * against what the journal last recorded — and that is the whole reason it
+     * exists here.
+     *
+     * It exists because a broadcast is not a record. `PACKAGE_ADDED` reports an
+     * **event**: miss the moment and there is nothing to come back to, which is
+     * what happened on 2026-09-28 when an app was uninstalled while this one was
+     * force-stopped and the platform withheld the broadcast (`DEVICE_LOOP.md`
+     * §7b5, P19). A set compares, so a later scan catches what the missed
+     * broadcast would have said.
+     *
+     * **And the broadcast never arrives at all.** P19 was refuted on 2026-09-28
+     * (§7b10): an install with this process alive, launched, and never
+     * force-stopped produced no reading, while the same receiver's
+     * `BOOT_COMPLETED` filter fired in the same export. So this is not a set
+     * backing up a prompt signal — it is the **only** way a package change is
+     * ever noticed, and `Pass2.SCAN_INTERVAL_MS` is the detection latency for a
+     * new app rather than a fallback behind something faster.
+     *
+     * **Why it is a separate event and not a fourth field on every observation.**
+     * Enumerating every package is hundreds of `PackageInfo` objects across a
+     * binder transaction, and the whole holding set has to be written out to be
+     * comparable later. Doing that at every wake spends the operator's stated
+     * constraint — battery — on a set that moves far more slowly than the grants
+     * do. And the alternative shape was worse than expensive: an observation that
+     * reported the package kind as `Readable: false` whenever it skipped the read
+     * would be recording *we chose not to look* as *we could not find out*. Those
+     * are different facts, and this whole signal exists because collapsing two
+     * different facts into one field is how a record starts lying. A scan that
+     * did not happen leaves **no** package fields, and `lastOfType` finds the last
+     * one that did.
+     *
+     * It does **not** close the interval gap (P21) and the gap is now wider by
+     * design: an app installed and removed between two *scans* returns the set to
+     * where it began. The scan interval is the resolution of this signal, and it
+     * is a number someone can change once the journal says how often it fires.
+     */
+    static final String[] PACKAGE_KINDS = {"installedPackage"};
+
+    private Grants() {}
+
+    /**
+     * Splits a `Settings.Secure` component list.
+     *
+     * Colon-separated, and **`null` is not empty**. A device that has never had
+     * an accessibility service returns `null`; a device whose setting could not
+     * be read returns `null` too. The caller decides which it is — this only
+     * refuses to invent an empty list out of a missing one, because *cannot
+     * read* and *nothing is enabled* are opposite facts and a signal built on
+     * confusing them would announce that everything had just been revoked.
+     */
+    static List<String> split(String setting) {
+        List<String> out = new ArrayList<>();
+        if (setting == null) return out;
+        for (String part : setting.split(":")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) out.add(trimmed);
+        }
+        return out;
+    }
+
+    /**
+     * The inverse of `split`: sorted, de-duplicated, colon-joined.
+     *
+     * This is the form a holding set is **recorded** in, and it is the platform's
+     * own form rather than a JSON array, for one reason: the next process has to
+     * read it back, and `Journal` has no JSON parser. A single-field extraction
+     * over the stored line plus this `split` recovers the set exactly, so the
+     * last observation lives in the journal and nowhere else — Art. IX §33, no
+     * second source of truth, and no cache that would outlive an erasure of the
+     * events it describes.
+     *
+     * Sorted and de-duplicated because the record is compared byte for byte: if
+     * the platform's ordering reached the line, two observations of one
+     * unchanged device would hash differently and the journal would look like it
+     * had moved when nothing did. Component names cannot contain a colon, so the
+     * separator is unambiguous.
+     */
+    static String join(List<String> entries) {
+        StringBuilder out = new StringBuilder();
+        for (String entry : new TreeSet<>(entries)) {
+            if (out.length() > 0) out.append(':');
+            out.append(entry);
+        }
+        return out.toString();
+    }
+
+    /**
+     * The difference between two observations of the same kind.
+     *
+     * A sorted, de-duplicated comparison: the platform's own ordering of these
+     * lists is not promised to be stable, and a reordering is not a change. A
+     * signal that fired on reordering would be noise, and §7 R6 — *"false
+     * positives cost trust, and trust is the product"* — makes noise the
+     * expensive failure here rather than the cheap one.
+     */
+    static Map<String, Object> diff(List<String> before, List<String> after) {
+        TreeSet<String> was = new TreeSet<>(before);
+        TreeSet<String> now = new TreeSet<>(after);
+
+        List<String> gained = new ArrayList<>(now);
+        gained.removeAll(was);
+        List<String> lost = new ArrayList<>(was);
+        lost.removeAll(now);
+
+        Map<String, Object> out = Json.obj();
+        out.put("gained", gained);
+        out.put("lost", lost);
+        // The holding set is a joined string, not a list, because this is the
+        // field the next process reads back (see `join`).
+        out.put("holding", join(new ArrayList<>(now)));
+        // Integers, never fractions: the two journals spell other numbers
+        // differently (`runtime/journal/API.md`).
+        out.put("gainedCount", (long) gained.size());
+        out.put("lostCount", (long) lost.size());
+        out.put("holdingCount", (long) now.size());
+        return out;
+    }
+
+    /** Whether a diff is worth an event at all. */
+    static boolean changed(Map<String, Object> diff) {
+        return !asList(diff.get("gained")).isEmpty() || !asList(diff.get("lost")).isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> asList(Object value) {
+        return value == null ? Collections.<String>emptyList() : (List<String>) value;
+    }
+
+    /**
+     * One flat payload for every observation, first or not.
+     *
+     * Flat, with one key per fact and no nesting, because every field here has
+     * to survive being read back out of a stored line without a parser. And one
+     * shape rather than two — there is no separate "baseline event" — because
+     * *baseline* is a property of a **kind**, not of an observation: the device
+     * admin list can be new to us in the same breath as the accessibility list
+     * has three months of history behind it. A per-event flag would have to pick
+     * one of those and be wrong about the other.
+     *
+     * `observed` holds what was just read, with `null` for a kind that could not
+     * be read. `previous` holds what history says, with `null` for a kind with no
+     * usable prior record. Both nulls mean *we do not know*, and neither is ever
+     * silently turned into an empty set — which is the whole of §5j's lesson:
+     * a first look that reports what was already there as news says FAILED
+     * forever and means nothing.
+     */
+    static Map<String, Object> report(
+            String because,
+            Map<String, List<String>> observed,
+            Map<String, List<String>> previous) {
+        return report(GRANT_KINDS, because, observed, previous, null);
+    }
+
+    /**
+     * The same report over a named set of kinds, with a **scope** for those that
+     * have one.
+     *
+     * `kinds` is explicit because the two event types report different sets on
+     * different cadences — `GRANT_KINDS` at every wake, `PACKAGE_KINDS` on a scan.
+     * A kind this call does not name writes **no fields at all**, which is the
+     * point: the absence says *this event is not about that*, where a
+     * `Readable: false` would have said *we tried and failed*.
+     *
+     * A scope is *what kind of look this was* — see `scopeChanged`. Only
+     * `installedPackage` has one today, because it is the only set the platform
+     * will hand over in more than one completeness. A kind with no scope records
+     * no scope field, which is what every reading before this change looks like.
+     */
+    static Map<String, Object> report(
+            String[] kinds,
+            String because,
+            Map<String, List<String>> observed,
+            Map<String, List<String>> previous,
+            Map<String, String> scopes) {
+        Map<String, Object> out = Json.obj();
+        out.put("because", because);
+
+        boolean anyChange = false;
+        for (String kind : kinds) {
+            List<String> held = observed.get(kind);
+            if (held == null) {
+                // Recorded as a reason, never as none. No holding field at all,
+                // so a later read cannot mistake this for an observed empty set.
+                out.put(kind + "Readable", Boolean.FALSE);
+                continue;
+            }
+            out.put(kind + "Readable", Boolean.TRUE);
+            String scope = scopes == null ? null : scopes.get(kind);
+            // Recorded before the holding set, because it says what the holding
+            // set *is*. A set read under one scope and a set read under another
+            // are not two observations of one thing.
+            if (scope != null) out.put(kind + "Scope", scope);
+            out.put(kind + "Holding", join(held));
+            out.put(kind + "HoldingCount", (long) new TreeSet<>(held).size());
+
+            List<String> was = previous == null ? null : previous.get(kind);
+            if (was == null) {
+                out.put(kind + "Baseline", Boolean.TRUE);
+                continue;
+            }
+            Map<String, Object> d = diff(was, held);
+            out.put(kind + "Baseline", Boolean.FALSE);
+            out.put(kind + "Gained", d.get("gained"));
+            out.put(kind + "Lost", d.get("lost"));
+            out.put(kind + "GainedCount", d.get("gainedCount"));
+            out.put(kind + "LostCount", d.get("lostCount"));
+            if (changed(d)) anyChange = true;
+        }
+        out.put("changed", anyChange ? Boolean.TRUE : Boolean.FALSE);
+        return out;
+    }
+
+    /**
+     * The last recorded holding set for one kind, read out of a stored line.
+     *
+     * A single-field extraction, which is all the journal's own `last()` does —
+     * not a parser, and not a claim to be one. It returns `null` for every shape
+     * of *we do not know*: no line, a line that recorded the kind as unreadable,
+     * or a line with no holding field for it. `null` here becomes `previous ==
+     * null` in `report`, which makes that kind a baseline rather than a diff
+     * against nothing — so the failure mode of a line this cannot read is a
+     * silent re-baseline, never a fabricated alarm that every grant on the
+     * device had just appeared.
+     *
+     * Component names contain no character JSON escapes, so a raw `indexOf` over
+     * the line recovers the value exactly.
+     */
+    static List<String> previous(String line, String kind) {
+        return previous(line, kind, null);
+    }
+
+    /**
+     * The same read, refused when the recorded scope is not the one asked for.
+     *
+     * **This is the field's whole purpose.** A complete package list compared
+     * against a filtered one reports every package the filtered look could not
+     * see as *lost* — two hundred removals that never happened, in the one
+     * signal whose value is that it does not cry wolf (§7 R6: false positives
+     * cost trust, and trust is the product). The reverse direction invents two
+     * hundred installs. Neither is a change in the device; both are a change in
+     * how it was looked at.
+     *
+     * So a scope mismatch makes the kind a **baseline** — the same outcome as an
+     * unreadable prior line, reached for the same reason and by the same path. One
+     * silent observation is the cost, and `baseline: true` is on the record where a
+     * reader can see it. It is structurally the v2-envelope note on
+     * `Pass2.lastOfType` again: a change in the instrument must never read as
+     * a change in the world.
+     *
+     * A `null` scope asks for a line that recorded no scope, which is what the
+     * three grant kinds write and what every reading before 2026-09-28 looks like.
+     */
+    static List<String> previous(String line, String kind, String scope) {
+        if (line == null) return null;
+        if (line.contains("\"" + kind + "Readable\":false")) return null;
+        if (scopeChanged(line, kind, scope)) return null;
+
+        String key = "\"" + kind + "Holding\":\"";
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int from = at + key.length();
+        int to = line.indexOf('"', from);
+        if (to < 0) return null;
+        return split(line.substring(from, to));
+    }
+
+    /** Whether a stored line's scope for a kind differs from the one now in hand. */
+    static boolean scopeChanged(String line, String kind, String scope) {
+        String recorded = previousScope(line, kind);
+        return scope == null ? recorded != null : !scope.equals(recorded);
+    }
+
+    /**
+     * The scope a stored line recorded for a kind, or `null` if it recorded none.
+     *
+     * The same single-field extraction as `previous`, and `null` is *no scope
+     * field on that line* rather than *unknown scope* — a line written before
+     * scopes existed genuinely has none, and that is a fact about the line rather
+     * than a gap in it.
+     */
+    static String previousScope(String line, String kind) {
+        if (line == null) return null;
+        String key = "\"" + kind + "Scope\":\"";
+        int at = line.indexOf(key);
+        if (at < 0) return null;
+        int from = at + key.length();
+        int to = line.indexOf('"', from);
+        return to < 0 ? null : line.substring(from, to);
+    }
+}

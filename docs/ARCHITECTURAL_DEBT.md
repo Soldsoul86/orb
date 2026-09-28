@@ -415,6 +415,17 @@ quorum instead of conflating them under one K.
 
 ---
 
+> **Half paid 2026-09-28** (`DEVICE_LOOP.md` §7b36). In `dev.orb.app` the package
+> scan no longer runs on a manifest permission alone: it requires an explicit
+> grant, and the grant, the revocation and a **refused scan** are all events. That
+> is the Capability shape at its smallest — declared, authorized, recorded, then
+> acted on.
+>
+> **It does not close.** There is no `Policy` on the device to consult and no
+> `Capability` registry to declare into, so what moved is the *decision*, out of
+> the manifest and into history. The rest waits on the runtime those contracts
+> describe.
+
 ## AD-8 — `device` identifies the handset, so two Orbs on one phone are one peer contradicting itself
 
 **Opened 2026-09-28** (`DEVICE_LOOP.md` §7b25). **Debt, not a defect**: nothing

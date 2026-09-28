@@ -1,0 +1,94 @@
+package @PKG@;
+
+import android.content.Context;
+import android.os.SystemClock;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.Map;
+
+/**
+ * The one read in this app that a person has to authorize — `AD-7`, half paid.
+ *
+ * **The debt.** `QUERY_ALL_PACKAGES` lets Orb enumerate every app installed on
+ * the phone — 484 entries describing a person's life. In pass 2 that was
+ * *"decided in a manifest, at build time, with no declaration and no Policy
+ * involvement"*, and `Capability.md` §8 names it as a Capability at tier
+ * `Observe`: **reads are capabilities too, and pretending otherwise is how read
+ * access becomes invisible.**
+ *
+ * **What this does, and what it does not.** There is no `Policy` on this device
+ * to consult and no `Capability` registry to declare into, so AD-7 cannot be
+ * closed here. What *can* be done now is move the decision **out of the manifest
+ * and into history**: the scan does not run until a person grants it, the grant
+ * is an event, and a refusal is an event too. Declared, authorized, recorded,
+ * then acted on — the Capability shape at its smallest.
+ *
+ * **The three grant reads are deliberately not gated.** P12, P13 and P14
+ * confirmed them readable with no permission at all, they are what the signal is
+ * *for*, and gating the thing that costs nothing while ungating the thing that
+ * costs everything would be the permission dialogue nobody reads.
+ *
+ * **Revocable, and revocation is also an event.** A grant that could only be
+ * given would be a one-way door, and `Policy.md`'s whole posture is that
+ * authorization is scoped and withdrawable.
+ */
+final class PackageAccess {
+    private PackageAccess() {}
+
+    private static final String FILE = "package-access.granted";
+
+    static final String GRANTED = "grants.capability.granted";
+    static final String REVOKED = "grants.capability.revoked";
+
+    /** Whether the package scan may run. */
+    static boolean granted(Context context) {
+        return new File(context.getFilesDir(), FILE).exists();
+    }
+
+    /**
+     * Records the grant and enables the scan.
+     *
+     * The **event is written before the flag**, so a process that died between
+     * the two leaves a journal claiming a capability the device does not yet
+     * exercise — which is the harmless direction. The other order would leave
+     * Orb reading the package list with no record of having been allowed to.
+     */
+    static void grant(Context context, Journal journal) throws IOException {
+        if (granted(context)) return;
+        record(journal, GRANTED);
+        touch(new File(context.getFilesDir(), FILE));
+    }
+
+    /**
+     * Records the revocation and disables the scan.
+     *
+     * Flag first here, for the mirror of the reason above: stop reading, *then*
+     * say so. A crash in between leaves the capability off and unrecorded, which
+     * fails toward not-reading.
+     */
+    static void revoke(Context context, Journal journal) {
+        new File(context.getFilesDir(), FILE).delete();
+        record(journal, REVOKED);
+    }
+
+    private static void record(Journal journal, String type) {
+        if (journal == null) return;
+        Map<String, Object> payload = Json.obj();
+        payload.put("capability", "installedPackages.read");
+        // The tier `Capability.md` §8 assigns it. Written down so the record
+        // states what was authorized rather than only that something was.
+        payload.put("tier", "Observe");
+        payload.put("scope", "all installed packages on this device");
+        payload.put("by", "operator");
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(type, payload);
+    }
+
+    private static void touch(File file) throws IOException {
+        try (RandomAccessFile out = new RandomAccessFile(file, "rws")) {
+            out.write(new byte[] {1});
+            out.getFD().sync();
+        }
+    }
+}

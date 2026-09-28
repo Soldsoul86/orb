@@ -1,0 +1,61 @@
+package @PKG@;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+
+/**
+ * The wakes this app gets without running: boot, and packages coming and going.
+ *
+ * With no foreground service anywhere in this package, whether these arrive at
+ * all is **P6** — pass 1 could not answer it, because a service ran throughout,
+ * which is precisely the condition P6 excludes.
+ *
+ * A package appearing is not itself a grant. It is the moment *before* one: an
+ * app is installed, and the grant is switched on in Settings some seconds later.
+ * Reading at both ends means the pair is in the journal either way — and if the
+ * settings watch was not alive for the second half, the next wake still catches
+ * it by comparison, just later.
+ */
+public final class WakeReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        Orb app = Orb.get();
+        if (app == null || intent.getAction() == null) return;
+
+        // Named with the action, so the journal shows which route caught a
+        // change: the settings watch while alive, a boot, a package event, or
+        // only the next process start. That difference is P16 — whether this is
+        // a signal or a poll — and it is answered from the record rather than
+        // argued about.
+        String because = "signal:" + intent.getAction();
+        if (intent.getData() != null) {
+            because = because + ":" + intent.getData();
+        }
+        app.watch().observe(because);
+
+        // A package broadcast would scan unconditionally, whatever the interval
+        // says, because it is the one moment a scan is certain to find something.
+        //
+        // **It has never happened.** P19 was refuted on 2026-09-28
+        // (`DEVICE_LOOP.md` 7b10): an install with this process alive and never
+        // force-stopped produced no reading, while the BOOT_COMPLETED filter on
+        // this same receiver fired in the same export. The branch below is kept
+        // deliberately, relabelled -- it costs one comparison, and if a future
+        // platform, a wider <queries>, or a context-registered receiver ever makes
+        // the route deliver, the reading appears in the journal and says so. A
+        // refuted route deleted is a refutation nobody can un-make.
+        if (isPackageAction(intent.getAction())) {
+            app.watch().scanPackages(because);
+        } else {
+            app.watch().scanPackagesIfDue(because);
+        }
+    }
+
+    /** Whether an action is one of the three package events this app filters for. */
+    private static boolean isPackageAction(String action) {
+        return Intent.ACTION_PACKAGE_ADDED.equals(action)
+            || Intent.ACTION_PACKAGE_REMOVED.equals(action)
+            || Intent.ACTION_PACKAGE_REPLACED.equals(action);
+    }
+}

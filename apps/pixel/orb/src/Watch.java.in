@@ -1,0 +1,206 @@
+package @PKG@;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.database.ContentObserver;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.provider.Settings;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * What holds power over this device — ported from pass 2, with one thing changed.
+ *
+ * The reading logic is pass 2 B's, unaltered: it works, it has four days of
+ * evidence behind it, and `Grants` / `GrantReader` came across byte for byte.
+ * **The event types are unchanged too** — `grants.observed`, `grants.packages`,
+ * `grants.exits`. A type says what an event *is*, not which app wrote it, and
+ * `packages/device-watch/src/import.ts` keys on exactly these strings. Renaming
+ * them would break the importer and diverge two implementations of one thing,
+ * which §7 R2 exists to prevent.
+ *
+ * **What changed: the package scan is no longer ambient.**
+ *
+ * `ARCHITECTURAL_DEBT.md` AD-7 says `device-watch` reads a person's whole package
+ * list outside the Capability boundary — *"decided in a manifest, at build time,
+ * with no declaration and no Policy involvement."* Porting that unchanged into
+ * the app built to pay debts would carry it forward knowingly.
+ *
+ * So the three **grant** reads run unconditionally — P12, P13 and P14 confirmed
+ * them readable with no permission at all, they are the signal's core, and they
+ * cost nothing. The **package scan** runs only after an explicit, recorded grant
+ * (`PackageAccess`). That is the Capability shape at its smallest: declared,
+ * authorized by a person, recorded, and only then acted on. It does not make AD-7
+ * disappear — there is still no `Policy` on this device to consult — but it moves
+ * the decision out of the manifest and into history, which is the half that can
+ * be done now.
+ */
+final class Watch {
+
+    static final String OBSERVED = "grants.observed";
+    static final String PACKAGES = "grants.packages";
+    static final String EXITS = "grants.exits";
+
+    /**
+     * How stale a package scan may be before a wake takes a new one.
+     *
+     * **Still a guess, and still labelled one.** §7b6 measured a scan at 16.7 KB
+     * for 484 packages — 10.5× an observation — so at two a day the scans are
+     * most of the journal's growth. P19 refuted the broadcast route entirely
+     * (§7b10), so this interval is not a backstop for a silenced signal: it is
+     * the **whole** detection latency for an install or an uninstall.
+     */
+    static final long SCAN_INTERVAL_MS = 12L * 60L * 60L * 1000L;
+
+    private final Context context;
+    private final Journal journal;
+    private ContentObserver watcher;
+
+    Watch(Context context, Journal journal) {
+        this.context = context;
+        this.journal = journal;
+    }
+
+    /**
+     * Read the grants now, compare against history, append the result.
+     *
+     * **Every observation is recorded, changed or not.** Recording only changes
+     * would make silence mean two things — *nothing happened* and *nothing was
+     * watching* — and a journal that cannot tell those apart cannot be used to
+     * say a grant did **not** appear on some day.
+     */
+    synchronized Map<String, Object> observe(String because) {
+        if (journal == null) return null;
+
+        Map<String, List<String>> now = GrantReader.read(context);
+
+        String line = lastOfType(OBSERVED);
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.GRANT_KINDS) before.put(kind, Grants.previous(line, kind));
+
+        Map<String, Object> report =
+            Grants.report(Grants.GRANT_KINDS, because, now, before, null);
+        report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(OBSERVED, report);
+        return report;
+    }
+
+    /**
+     * Scan the installed set — **only with a recorded grant**.
+     *
+     * A refusal is journaled rather than silently skipped. *The scan did not
+     * run because nobody authorized it* and *the scan ran and found nothing* are
+     * opposite facts, and a signal that rendered them identically would be the
+     * `Readable: false` mistake at the level of the whole reading.
+     */
+    synchronized Map<String, Object> scanPackages(String because) {
+        if (journal == null) return null;
+
+        if (!PackageAccess.granted(context)) {
+            Map<String, Object> refused = Json.obj();
+            refused.put("because", because);
+            refused.put("installedPackageReadable", false);
+            refused.put("installedPackageScope", "ungranted");
+            refused.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+            journal.append(PACKAGES, refused);
+            return refused;
+        }
+
+        Map<String, List<String>> now = GrantReader.readPackages(context);
+        Map<String, String> scopes = GrantReader.scopes(context);
+
+        String line = lastOfType(PACKAGES);
+        Map<String, List<String>> before = new HashMap<>();
+        for (String kind : Grants.PACKAGE_KINDS) {
+            before.put(kind, Grants.previous(line, kind, scopes.get(kind)));
+        }
+
+        Map<String, Object> report =
+            Grants.report(Grants.PACKAGE_KINDS, because, now, before, scopes);
+        report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(PACKAGES, report);
+        return report;
+    }
+
+    /** The same scan, taken only if the interval has elapsed. */
+    synchronized Map<String, Object> scanPackagesIfDue(String because) {
+        if (journal == null) return null;
+        try {
+            Map<String, String> last = journal.lastOfType(PACKAGES);
+            if (last != null) {
+                String at = last.get("wallClock");
+                if (at != null
+                        && System.currentTimeMillis() - Long.parseLong(at) < SCAN_INTERVAL_MS) {
+                    return null;
+                }
+            }
+        } catch (IOException | NumberFormatException error) {
+            // History we cannot read is not history that says "recently".
+            // Falling through scans once more than needed, the harmless direction.
+        }
+        return scanPackages(because);
+    }
+
+    /** Why the previous process died, from the platform rather than from memory. */
+    synchronized void recordExits() {
+        if (journal == null) return;
+        String line = lastOfType(EXITS);
+        boolean baseline = line == null;
+        Map<String, Object> payload =
+            Exits.report(Exits.since(context, Exits.previousThrough(line)), baseline);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(EXITS, payload);
+    }
+
+    /**
+     * Watch the two settings that have a URI, so a change while this process is
+     * alive is seen at once rather than at the next wake.
+     *
+     * Not load-bearing: the comparison against history catches the same change
+     * later if the process was dead. **Device admin has no settings URI**, so an
+     * admin enabled while this is not running is only seen at the next wake.
+     */
+    void watchSettings() {
+        watcher = new ContentObserver(new Handler(Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean selfChange, Uri uri) {
+                observe("settings.changed");
+            }
+        };
+        ContentResolver resolver = context.getContentResolver();
+        register(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        register(resolver, "enabled_notification_listeners");
+    }
+
+    private void register(ContentResolver resolver, String key) {
+        try {
+            resolver.registerContentObserver(Settings.Secure.getUriFor(key), false, watcher);
+        } catch (RuntimeException error) {
+            Map<String, Object> payload = Json.obj();
+            payload.put("setting", key);
+            payload.put("threw", error.getClass().getName());
+            journal.append("grants.watch.failed", payload);
+        }
+    }
+
+    /**
+     * The last stored line of a type, or null.
+     *
+     * **Unreadable history is not empty history.** Returning null makes the next
+     * reading a baseline, which is silent; inventing an empty set instead would
+     * announce that the whole device had just been granted.
+     */
+    private String lastOfType(String type) {
+        try {
+            Map<String, String> last = journal.lastOfType(type);
+            return last == null ? null : last.get("line");
+        } catch (IOException error) {
+            return null;
+        }
+    }
+}
