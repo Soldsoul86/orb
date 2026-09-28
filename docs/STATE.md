@@ -267,7 +267,7 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | --- | --- |
 | **P17** | why `BOOT_COMPLETED` was delivered **four times** inside one boot session (2026-09-28) is **accounted for but not proven**: the operator force-stopped the app and reopened it, three deliveries land mid-launch, and the one launch following an ordinary process death carries none. The platform's queueing was not read, so the marker in P20 rests on one absence against three presences. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6, P16 and P18 are answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; grants changed while the process was dead were caught at the next process start, in **both** directions; and the settings watch caught a change with the process alive |
 | **P20** | whether a `BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran. If it does, it is the first thing in the record that can separate *force-stopped* from *killed and reclaimed* from *never installed* — and a force-stop is how a person stops this watch. It is a side effect of platform behaviour rather than an API, so it can vanish in an OS update; the control half (an ordinary death, then a launch, expecting no reading) needs its own export |
-| **P19** | whether a package broadcast reaches the manifest receiver at all. An app *was* uninstalled (2026-09-28) and nothing was recorded — but **after a force-stop**, and a stopped package is excluded from broadcasts until launched, so the route was off while it was tested. Re-test by opening Orb first, then installing or uninstalling |
+| **P19** | whether a package broadcast reaches the manifest receiver at all. **Three uninstalls, three silences, and every one happened while the app was force-stopped** — a stopped package is excluded from broadcasts until launched, so the route has never had a chance to work or fail. The settling test uses no force-stop: open Orb, leave it, install something |
 | **P21** | **a recorded limit, narrowed on 2026-09-28 and not closed.** Comparison reports on endpoints, not intervals: a grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now carried and compared, so a **missed broadcast** is recoverable — an install *undone* before the next observation still is not. The second candidate, recording the blind window explicitly, is not implemented |
 | ~~**P22**~~ | **held 2026-09-28 on the device** — `scope: "all"`, 484 packages, baseline on the first scan, the operator button recorded as `operator.scan`, and a second scan comparing `baseline: false` across an intervening observation. What remains of it is P19's half: a named entry in `installedPackageGained` after an actual install |
 | **the signing key** | the keystore in the build environment does not match the pass 2 installed on the phone. That install can never be upgraded, only removed, and its journal goes with it. The new build runs beside it as `dev.orb.pass2b` on lane `grants-b` |
@@ -280,6 +280,8 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | `AIRWALL.md` | an unapproved proposal |
 | AD-6 | independence, open in the debt register |
 | the pass-1 self-test fix | built, never installed; the running build reports `chain.linksEndToEnd` FAILED for ever |
+| **pass 1 will not open** | 2026-09-28: tapping it holds on the launch splash and never reaches the screen. Cause unknown. `Probe.onCreate` does whole-journal work before any Activity can draw — `journal.last()`, `reconstructGap`, and a `chainBreaks` pass in `SelfTest` — which is the first thing to rule out, but the linkage check is a string compare per line and should not cost seconds, so it is a candidate and not a diagnosis |
+| **an export path that needs a healthy app** | pass 1's journal can only leave the phone through pass 1's own Export button. An app that will not open therefore cannot surrender the evidence of why it will not open, and nothing else on the device can reach app-private storage. Recorded as a design fault the moment it cost something, not before |
 | the device's security patch | roughly six months old |
 
 **DR-7 is complete.** Tier 3's ambiguity was ruled on 2026-09-26: the key is
@@ -340,7 +342,7 @@ released a `BOOT_COMPLETED` but no `PACKAGE_REMOVED`, so it is not a queue of mi
 broadcasts being replayed. P20's correlation is untouched; only the explanation was
 wrong.
 
-**P21's first fix is built, then rebuilt as a scan** (§7b6, §7b7). The
+**P21's first fix is built, rebuilt as a scan, and has now run for real** (§7b6, §7b7, §7b9). On 2026-09-28 an uninstall performed while the app was force-stopped reached no broadcast at all, and the next scan reported it: 484 → 482, both packages named, one alert under `device-watch.packages-changed`. The scenario that exposed the gap is the scenario that closed it. The
 **installed-package set** is compared against history like the three grants, so a
 package *broadcast* that never arrives is recoverable — which demotes
 `signal:…PACKAGE_*` from load-bearing to prompt, the posture `settings.changed`

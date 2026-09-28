@@ -32,9 +32,9 @@ needs, including the author in three months.*
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28, both directions.** First on the mirror case — two listeners turned off while the process was dead, next `process.start` read `changed: true`, named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2). Then as literally written — two listeners turned **on** while dead, named in `notificationListenerGained`, 3 → 5 (§7b3) |
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
-| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, and the silence is explained.** An app was uninstalled, but **after a force-stop**, and a stopped package is excluded from broadcasts until launched — the route was switched off by the platform while it was being tested. Re-test by opening Orb *first*, then installing or uninstalling (§7b3, §7b5) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
-| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history (§7b6), so a missed package *broadcast* is recoverable — but an install undone before the next **scan** still is not, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7) |
+| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, three attempts, all invalidated the same way.** Three uninstalls across two days and **not one broadcast reached the receiver** — each happened while the app was force-stopped, and a stopped package is excluded from broadcasts until launched. That is evidence about the procedure, not the route. The settling test involves no force-stop: open Orb, leave it, install something (§7b3, §7b5, §7b9) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened 2026-09-28, control half still open.** Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
 ### What it establishes
@@ -2244,6 +2244,82 @@ open and not stopped, so an install should produce both a
 `installedPackageGained`. Either arriving without the other is itself the finding.
 
 **P20** — no force-stop was performed. Both halves still needed.
+
+### 7b9. The scan recovers what the broadcast lost — 2026-09-28
+
+The operator force-stopped Orb pass 2 B, uninstalled an app while it was stopped,
+reopened it and scanned. That is the exact scenario §7b5 was written about, run
+deliberately this time, and **the recovery worked.**
+
+```
+ 5  06:30:28  15h10m27s  packages  operator.scan   base=false  n=484  unchanged
+ 8  06:41:54  15h10m53s  process.start                    <- after the force-stop
+ 9  06:41:54             observed  process.start
+10  06:41:54  15h10m54s  observed  signal:…BOOT_COMPLETED  <- +69 ms
+11  06:41:54             observed  app.opened              <- +151 ms
+14  06:42:03  15h11m02s  packages  operator.scan   changed: TRUE  484 → 482
+                                   lost: com.ixigo, com.nhn.android.band
+```
+
+#### P21's fix, demonstrated end to end
+
+**No package broadcast of any kind appears.** The uninstall happened inside a
+stopped window, so the platform withheld it from `WakeReceiver` exactly as it did
+on the first attempt. The event route lost it, permanently and silently.
+
+**The scan caught it anyway.** `changed: true`, 484 → 482, both packages named.
+One alert was raised on import, under `device-watch.packages-changed` — not
+`authority-changed`, because an app being removed is not an authority being
+revoked, and the rule name says which happened.
+
+That is the whole argument of §7b5–§7b7 happening for real: *a broadcast reports an
+event and is lost if it is missed; a set compares, so a later scan catches what the
+missed broadcast would have said.* The scenario that exposed the gap is now the
+scenario that closes it.
+
+**And the interval gate stayed out of the way.** Event 8's process start took **no**
+scan — the last one was eleven minutes earlier, well inside 12 h — so the recovery
+came from the operator's button rather than from the wake. Had nobody pressed it,
+the next due scan would have reported the same two losses up to twelve hours later.
+Slower, and still not lost, which is the property being bought.
+
+#### P20's first half, this time under controlled conditions
+
+`signal:…BOOT_COMPLETED` at **uptime 15h10m54s**, 69 ms after a process start that
+followed a deliberate force-stop, and 82 ms before the Activity resumed. Every
+event in this lane derives the same boot instant as the `grants` lane —
+**2026-09-27 15:31:00.640** — so this is the **fifth** delivery inside one boot
+session, and the first where the operator stated the force-stop in advance rather
+than the record reconstructing it afterwards.
+
+The count is now five deliveries after a stop, against **one** launch after an
+ordinary process death that carried none (§7b4's 11h43m45s row). P20's control half
+still rests on that single absence, so the prediction is strengthened and not yet
+settled: *let the process die on its own, then open, and expect nothing.*
+
+#### P19, untested for the third time, and the reason is now a pattern
+
+Three uninstalls have now been performed across two days, and **not one package
+broadcast has ever reached the receiver** — because every one of them happened
+while the app was force-stopped. The route has never had an opportunity to work or
+to fail. That is not evidence about the route; it is evidence about the procedure,
+and the procedure keeps invalidating the test in the same way.
+
+The test that would settle it does not involve a force-stop at all: **open Orb pass
+2 B, leave it alone, and install something.** If a
+`signal:…PACKAGE_ADDED:package:…` reading appears, the route works and the scan is
+a safety net. If the scan sees the new package and no reading exists, the manifest
+route is refuted — and that is the finding worth having, because it is the only
+route that could be prompt about a new app rather than up to twelve hours late.
+
+#### A change the operator did not announce
+
+The scan reported **two** losses: `com.nhn.android.band`, which was stated, and
+`com.ixigo`, which was not. Nothing in the record says which is which — the journal
+knows what moved, never why — and that is the first time this loop has surfaced a
+change its operator did not mention. Whether ixigo was them, an auto-archive, or
+something else is exactly the question the alert exists to put to a person, and it
+is put rather than guessed.
 
 ---
 
