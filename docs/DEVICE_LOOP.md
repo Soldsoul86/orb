@@ -33,7 +33,7 @@ needs, including the author in three months.*
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **§7b13's second absence is retracted as evidence, 2026-09-28**: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rests on §7b9's single absence; the mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death. **Now instrumented**: from §7b14 the platform's own exit reason is journalled at each start, so the prediction is checkable from one export without anyone remembering | **Strengthened twice 2026-09-28; control half now rests on two absences, not settled.** §7b13 adds the decisive pairing: in one export and one boot session, a launch after **10 min** carried the reading and a launch after **2 h 48 min** did not — so the trigger is not elapsed time. **§7b13's second absence is retracted as evidence, 2026-09-28**: the operator did not know whether they force-stopped, and their habit is to force-kill — so that launch is either the control half or a **counterexample**, and the lane cannot say which. Elapsed time is still ruled out, which never depended on it. P20's control half rests on §7b9's single absence; the mechanism is unexplained. Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
@@ -2829,3 +2829,62 @@ named — no broadcast was involved in either, consistent with P19's refutation.
 working across intervening observations: the comparison reached past three
 `grants.observed` events to the previous scan, and correctly found nothing new.
 A baseline that reset on every launch would have said `baseline: true` here.
+
+---
+
+### 7b14. The exit-reason probe — asking the platform instead of a person — 2026-09-28
+
+`apps/pixel/pass2/src/Exits.java.in`, wired into `Pass2.onCreate` immediately
+after `recordStart()`. New event type `grants.exits`.
+
+**The problem it removes.** Both halves of P20 turn on whether a force-stop
+happened, and **a force-stopped app writes nothing — that is what being
+force-stopped is.** So this journal is structurally unable to record its own
+force-stop, and the only witness has ever been human recall. §7b13 is what that
+costs: one absence that is either the control half or a counterexample, with
+nothing in the lane able to decide, after an answer given in good faith turned out
+to be *I did not know*.
+
+`ActivityManager.getHistoricalProcessExitReasons` survives the stop because the
+platform does. **Verified present in the SDK before writing against it** —
+`android.app.ApplicationExitInfo` carries `REASON_USER_REQUESTED` and
+`REASON_USER_STOPPED` among seventeen codes, and the method is
+`getHistoricalProcessExitReasons(String, int, int)` on `ActivityManager`. `minSdk`
+is 34, so no version branch is needed.
+
+It is **a second source, not a second machine** — the same conclusion `CLAIMS.md`
+§5 reached for C1's vantage, arrived at independently on the device side. When a
+fact cannot be supplied reliably by the actor, find something that already knows.
+
+#### What it records, and the three disciplines it carries
+
+| Field | Why it is shaped that way |
+| --- | --- |
+| `exitsReadable` | `false` on any throw or missing service. **Cannot-check is never an empty list** — an empty list would claim *this process has never died*, which of a running app on its second start is false and load-bearing |
+| `exitReasons` **and** `exitCodes` | The integer is what the platform said; the name is this build's reading of it. A future Android adding a constant would otherwise have it silently rendered as an existing one, so an unmapped code becomes `unmapped:<n>` |
+| `exitsUserInitiated` | A **reading**, recorded beside the codes rather than instead of them, so P20's answer never depends on this function being right. Deliberately narrow: `REASON_OTHER` and `REASON_UNKNOWN` are not counted, because an exit the platform could not classify is not evidence a person caused it |
+| `exitsThrough` | Newest timestamp seen, the watermark the next start compares against — not a count, because the platform trims its own history and a count would drift the moment it did |
+| `baseline` | Same meaning as everywhere else: no prior record, so what is listed was already there. A first run finds every exit still remembered, and reporting those as news would be §5j's always-failing check in a new place |
+
+`exitCount: 0` is deliberately still written. It separates *nothing died between
+these two starts* from *this was never looked at*.
+
+#### What it will settle
+
+A launch that carries `signal:…BOOT_COMPLETED` should carry an exit report naming
+`user.requested` or `user.stopped`; a launch without the reading should not. **P20
+becomes checkable from one export, with no one required to remember anything.**
+It may also answer a question §7b9 raised and left open — whether swiping from
+recents counts as a force-stop — since the platform will say which reason it
+recorded.
+
+#### A risk this build surfaced, unrelated to the probe
+
+`keys/pass2b.keystore` is **gitignored, untracked, and exists only in the build
+container**. It is the one key that can upgrade the installed pass 2 B, so if the
+container is recycled the app can never be updated again and `grants-b` goes with
+it at the forced reinstall — §7b8's signature-mismatch failure, arriving by a
+different route. Signer SHA-256 `98093b72163770afd40b1744934d9064889da8b725f4922389b6b7ce4fb69019`.
+The key was handed to the operator to keep off-container; it cannot live in the
+repository, because a signing key in version control is a worse failure than the
+one it prevents.

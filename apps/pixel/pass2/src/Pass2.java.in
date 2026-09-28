@@ -44,6 +44,16 @@ public final class Pass2 extends Application {
     static final String LANE = "@LANE@";
     static final String OBSERVED = "grants.observed";
     static final String PACKAGES = "grants.packages";
+    /**
+     * Why the previous process died, read from the platform (`Exits`).
+     *
+     * Its own type for the same reason `PACKAGES` has one: the comparison has to
+     * reach past however many observations happened in between, and
+     * `lastOfType(EXITS)` does that while a lookup of the last *observation*
+     * would find a line with no exit fields, read it as no usable prior record,
+     * and re-baseline on every start.
+     */
+    static final String EXITS = "grants.exits";
 
     /**
      * How stale a package scan may be before any wake takes a new one.
@@ -87,6 +97,9 @@ public final class Pass2 extends Application {
         }
 
         recordStart();
+        // Immediately after the start, so a reader pairing "this process began"
+        // with "the last one ended because" finds them adjacent in the lane.
+        recordExits();
         observe("process.start");
         scanPackagesIfDue("process.start");
         watchSettings();
@@ -246,6 +259,34 @@ public final class Pass2 extends Application {
             payload.put("threw", error.getClass().getName());
             journal.append("grants.watch.failed", payload);
         }
+    }
+
+    /**
+     * Ask the platform why the previous process ended, and record what it says.
+     *
+     * **The answer P20 could not get any other way.** A force-stopped app writes
+     * nothing — that is what being force-stopped is — so this journal is
+     * structurally unable to record its own force-stop, and both halves of P20
+     * have rested on someone remembering. §7b13 is what that costs: the same
+     * absence is either the control half or a counterexample, and no amount of
+     * re-reading the lane decides it.
+     *
+     * Runs on every start and reports only what is newer than the last report's
+     * watermark, so a start that follows a start with no exit between them writes
+     * `exitCount: 0` — which is itself worth having, because it distinguishes
+     * *nothing died* from *this was never looked at*.
+     */
+    private void recordExits() {
+        if (journal == null) return;
+
+        String line = lastOfType(EXITS);
+        // No prior line at all is a baseline; a prior line with a watermark of 0
+        // is a real comparison that happens to start from the beginning.
+        boolean baseline = line == null;
+        Map<String, Object> payload =
+            Exits.report(Exits.since(this, Exits.previousThrough(line)), baseline);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(EXITS, payload);
     }
 
     private void recordStart() {
