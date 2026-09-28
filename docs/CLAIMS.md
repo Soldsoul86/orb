@@ -342,6 +342,37 @@ action within a stated bound (stronger, and requires the off-device vantage
 point to exist first). This is a decision about what Orb promises, which is not
 mine to make.
 
+> **Proposed 2026-09-28, after the operator asked whether a laptop can be the
+> vantage: state C1 in two tiers rather than choosing one.**
+>
+> A laptop can be a genuine second vantage, under three conditions that have to be
+> met rather than assumed:
+>
+> 1. **It must see the same reality by an independent path.** A device that only
+>    replicates the phone's lane is a copy, not a vantage — it sees exactly what
+>    the phone saw. Detecting out-of-band action requires its own channel to the
+>    same reality.
+> 2. **The bound is the laptop's duty cycle.** The stronger form claims detection
+>    *within a stated bound*; a machine shut sixteen hours a day makes that bound
+>    "within N hours of next waking". Statable, which is the win — but it has to
+>    actually be stated, not implied.
+> 3. **Shared fate breaks independence.** If both devices ride the same account
+>    compromise, there is no second vantage for that threat.
+>
+> The consequence that decides the wording: **C1 would stop being a property of Orb
+> and become a property of a *configuration* of Orb.** A single-device user gets the
+> weaker claim, silently, unless the statement says so — and a claim conditional on
+> hardware someone may not own is a claim that quietly weakens for the people least
+> able to notice.
+>
+> So the two options are not exclusive. **State the mediated set
+> unconditionally, and out-of-band detection as a conditional capability with a
+> named bound wherever a second vantage exists.** That takes the stronger claim
+> where it is true without weakening the base claim where it is not, and it makes
+> the condition visible instead of assumed.
+>
+> Still the operator's to rule; recorded as a proposal, not adopted.
+
 ---
 
 ## 6. Order of work

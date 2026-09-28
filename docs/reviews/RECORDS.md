@@ -149,7 +149,7 @@ adding a Capability, and nothing should treat a run of these as an error rate.
 
 ---
 
-## 4. Disclosure — the one DR-9 did not close, and cannot
+## 4. Disclosure — DR-9 did not close it, but the reply does
 
 `erasure-plan.ts` reports D4 unconditionally: *"no disclosure record type exists,
 so this device cannot say what left it. Nothing was found because nothing can be
@@ -170,26 +170,47 @@ as **out of their hands**, because that is the question that changes whether an
 erasure is worth performing. An Action cannot answer it without becoming the exact
 collapse — *sent* and *arrived* as one record — that `Action.md` exists to prevent.
 
-So the gap is narrower and harder than it read:
+### The revision — the reply is the sensor
 
-- **Issuance is recorded** — after DR-9, completely and through one gate.
-- **Disclosure is not**, and under Art. XI §42 (*reality is updated only through
-  observation*) it would have to arrive as an `Observation` from a `Sensor`
-  observing the egress.
-- **That Sensor may not be constructible.** A device can observe that it wrote
-  bytes to a socket. Whether they were received, retained, or logged by the other
-  side is not observable from here, ever.
+This report first concluded that arrival was unobservable and D4 should stay open
+as debt. **That was too pessimistic, and the correction matters more than the
+original finding.**
 
-Which means Art. VIII §32's *"data leaving the device is … itself recorded as
-history"* is satisfiable only in its issuance half, and the strongest honest
-version of D4 is *"these disclosures were issued; whether each completed is
-unknown, and unknowable from this device."* **That is still enormously better than
-today's silence** — today the plan cannot even list the attempts.
+A device cannot observe retention or onward sharing. It *can* observe **a reply
+that depends on the content having arrived.** If a remote model returns a
+completion that reflects the prompt, the prompt demonstrably reached the other
+party. Nothing needs to be invented for this: `Capability.md` inv. 7 already says
+*reality is updated only when a `Sensor` observes the result*, and
+`ModelRouter.md` §1 already records the output as an observation with full
+provenance. The same observation also evidences the input's arrival.
 
-**Recommendation:** leave D4 open as architectural debt with this characterisation
-attached, rather than closing it with Actions and calling disclosure recorded. Of
-the four questions this report set out to answer, this is the one that needs a
-ruling; the other three need only writing down.
+And it does what `Action.md` wants rather than what it forbids — **two records,
+not one.** The Action is issuance; the reply is an `Observation`. The collapse
+that contract exists to prevent never happens.
+
+So D4 answers in three states, not two:
+
+| State | What the plan can honestly say |
+| --- | --- |
+| issued, no reply | **unknown** whether it left — the honest unknown, and the only one |
+| issued, content-dependent reply received | **confirmed disclosed** — it reached them |
+| issued, transport failed before send | likely did not leave, not certain |
+
+**One caveat that keeps this honest.** A transport-level error — a `413`, a proxy
+`400` — can arrive without the body having been read. Only a reply that *depends on
+the content* is evidence of arrival. A sensor that counted any response would be
+manufacturing the confirmation it was supposed to observe.
+
+### What stays permanently unknowable
+
+Once *confirmed disclosed*, the device can never learn whether the content was
+retained, logged, or passed on. **That is a boundary to state, not work to
+schedule** — it does not become knowable with more engineering, and an erasure
+plan that implied otherwise would be lying in the owner's favour.
+
+**Recommendation:** close D4 with the three states and the named limit, rather than
+leaving it open as debt. The original recommendation — record issuance, admit the
+rest is unknowable — conceded more than the architecture actually requires.
 
 ---
 
@@ -200,13 +221,16 @@ ruling; the other three need only writing down.
 | 1 | Erasure confirmation **already has a record type** | No | Add a `confirmationsFor` projection; correct D5's reason string and `Synchronization.md` §7 |
 | 2 | Revocation is an Event type, and the first record about *another* device | No | Add `orb.device.revoked`; state the two limits in `Encryption.md` §7 |
 | 3 | Unbindable intent is a record of *could not* | No | Add `orb.intent.unbindable`; cite it from `Agent.md` §7 |
-| 4 | Disclosure is genuinely unrecorded, and an `Action` cannot record it | Undecided | **Needs a ruling.** Propose: record issuance, name the unknowable half, keep D4 open |
+| 4 | Disclosure is recordable after all — the reply evidences arrival | No | Emit an `Observation` for a content-dependent reply; close D4 with three states and the retention limit named |
 
 **No new kernel contract, and the kernel is not amended.** Three of the four
 questions were asking for a contract where an `Event` type was the right answer —
 and one of those three was asking for a record that already existed.
 
-The fourth is the only one that was really a gap, and DR-9 makes it *sharper*
-rather than smaller: now that every disclosure goes through one gate, the thing
-that is missing is no longer "somewhere to put it" but the honest admission that
-what left the device cannot be observed from the device.
+The fourth looked like the only real gap and turned out to be answerable: DR-9
+routes every disclosure through one gate, and the reply that comes back through
+that gate is the observation that it arrived. What remains is not a gap but a
+boundary — retention and onward sharing, permanently unknowable from here.
+
+**All four are closed without a kernel contract**, which was not the expected
+result when this report was opened.

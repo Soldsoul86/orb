@@ -1,0 +1,219 @@
+# Sensor Declaration — Share to Orb
+
+> Status: **declaration, 2026-09-28.** No code. Written first so the posture meets
+> Orb's own rules before a line of Kotlin exists — which is the test `AD-7` failed
+> by being decided in a manifest at build time.
+>
+> Contracts it stands on, **all Accepted**: `Sensor`, `Observation`, `Event`,
+> `Evidence`, `Entity`, `Capability`, `Policy`, `Action`.
+
+The user selects content in any app, taps **Share**, and picks Orb. Android
+delivers it. That is the whole sensor.
+
+---
+
+## 1. Why this one first
+
+Every other mobile sensor infers its mandate. This one is **handed** it.
+
+| | Share | Notification listener |
+| --- | --- | --- |
+| Consent | a deliberate act, per item | one grant, then continuous |
+| Third-party data | only what the user chose to hand over | everything that arrives, forever |
+| Permission needed | **none** | the most closely policed one Android has |
+| What Orb reaches for | nothing | every notification on the device |
+
+The last row is the architectural one. `Capability.md` §8 says *reads are
+capabilities too … pretending otherwise is how read access becomes invisible* —
+and it says that about Orb **reaching out and taking**. A share is the opposite
+direction: the world reaches in. Which produces the first useful result of writing
+this down:
+
+> **Receiving a share is not a Capability.** Orb affects nothing and reaches for
+> nothing. It is a `Sensor` with no Capability behind it — the only one that will
+> ever be true of.
+
+Contrast `AD-7`: enumerating 484 packages *is* a Capability at tier `Observe`,
+because Orb reached out and read a list nobody handed it.
+
+---
+
+## 2. Registration (`Sensor.md` §2.1)
+
+| Field | Value |
+| --- | --- |
+| `id` | `orb.sensor.share` |
+| Source identity | `android.intent.action.SEND` / `SEND_MULTIPLE`, delivered to Orb's share target |
+| Signal class | one user-initiated hand-off of content, with its declared MIME type |
+| Schedule | **trigger only.** The runtime does not poll this; Android delivers. `Sensor.md` §2.2 — *Sensors do not wake randomly* — is satisfied trivially, because the trigger is a person |
+| Emits | one `Observation` per hand-off, `because: user.shared` |
+
+`because: user.shared` is deliberately the same shape as pass 2's
+`because: operator.scan`. The projections already read that field; this sensor
+adds a value, not a mechanism.
+
+---
+
+## 3. The line that makes this safe: a share is a **reference**, not content
+
+Android hands over a `content://` URI, a URL, or text — **a pointer**. Turning
+that pointer into bytes is a second, separate act, and it is where the Capability
+boundary actually falls:
+
+```
+user taps Share
+      ↓
+Observation recorded          ← no Capability. Nothing was reached for.
+   (type, referrer, time, reference)
+      ↓
+─────── boundary ───────
+      ↓
+resolving the reference       ← a Capability, declared and tiered
+```
+
+Three resolutions, three different declarations:
+
+| What was shared | Resolution | Tier | Why |
+| --- | --- | --- | --- |
+| plain text | none — it *is* the content | — | nothing to reach for |
+| `content://` URI (photo, PDF, file) | read the bytes into an `Attachment` | `Observe` | a local read the user authorized by sharing; the URI grant is scoped and expires |
+| a URL | **fetching it is egress** | `Act (irreversible)` | the host learns you fetched. You cannot un-disclose that — the same reasoning DR-9 applied to a remote model route |
+
+**That third row is the one worth having written down before building.** A naive
+share sensor "helpfully" fetches shared links to get a title and a preview, and in
+doing so makes Orb initiate a network connection to an arbitrary third party on
+the strength of a share. Under DR-9 that is a disclosure needing its own
+authorization. **Sharing a link is not authorization to visit it.**
+
+This also satisfies `Observation.md` inv. 5 — *references, never copies; raw
+content is referenced as Attachments by identity* — by construction rather than by
+discipline.
+
+---
+
+## 4. What the Observation carries
+
+| Field | Value | Note |
+| --- | --- | --- |
+| `sensor` | `orb.sensor.share` | inv. 3, always attributed |
+| `because` | `user.shared` | |
+| `mimeType` | as declared by the sender | *declared*, never verified by the sensor |
+| `referrer` | the calling package, or `unknown` | §5 |
+| `reference` | the URI or the text itself | never the resolved bytes |
+| `resolvable` | `true` / `false` + `AbsenceReason` | §6 |
+| `confidence` | see §7 | inv. 7 |
+| `itemCount` | 1, or n for `SEND_MULTIPLE` | |
+
+Placement in time and device comes from the envelope (inv. 4), not from fields —
+the same rule that keeps the custody receipt's holder out of its payload.
+
+---
+
+## 5. `referrer: unknown` is *cannot check*, never *nobody*
+
+Android may or may not tell Orb which app initiated the share, and the value can be
+absent for ordinary reasons. So:
+
+> **An absent referrer is recorded as `unknown`, never omitted and never guessed.**
+
+This is the register's oldest entry in a new costume: `Readable: false` means
+*cannot check*, never *nothing is enabled*. A share sensor that dropped the field
+when Android withheld it would make "we don't know where this came from" and "it
+came from nowhere" the same record — and later, "shared from WhatsApp" would become
+a fact nobody ever observed.
+
+The same applies to `mimeType`: it is what the sending app **declared**. A sensor
+that sniffed the bytes to correct it would be interpreting, which `Sensor.md` §1
+forbids. Record the declaration; let a later stage disagree with it in its own
+record.
+
+---
+
+## 6. A share that cannot be resolved is still an observation
+
+URI grants are scoped and can expire; a file can be deleted between the share and
+the read. When the bytes cannot be read:
+
+- The Observation is **still recorded** — the hand-off happened.
+- `resolvable: false` carries an `AbsenceReason` (`unfetched` / `pruned` /
+  `erased`).
+- No Attachment is minted, and **no empty one** is minted either.
+
+The failure this prevents is a shared photo that becomes a record of "the user
+shared nothing." Same fault line as `Readable: false`; same answer.
+
+---
+
+## 7. Confidence: certain about the occurrence, silent about the content
+
+`Observation.md` inv. 2 — *occurrence, not truth* — and inv. 7 — *carries
+confidence, not truth* — resolve cleanly here, and the resolution is the point of
+the whole sensor:
+
+- **The occurrence is as certain as anything Orb will ever record.** A person
+  deliberately handed this over and the OS witnessed the act. There is no inference
+  in it.
+- **The content gets no confidence at all**, because the sensor makes no claim
+  about it. A shared WhatsApp screenshot is an observation that *a screenshot was
+  shared* — not that Ravi said anything.
+
+"Ravi asked for the proposal" is an **interpretation**, produced later, by a
+`Reasoner`, recorded with its own provenance and its own confidence. That
+contract is still Draft, which is exactly why the sensor must not quietly do its
+job: the observation layer is Accepted and can be built today; the interpretation
+layer is not, and a sensor that interpreted would be building on Draft contracts
+without saying so.
+
+---
+
+## 8. What this sensor must never do
+
+1. **Interpret.** No entity extraction, no commitment detection, no summarising.
+2. **Fetch.** No URL resolution without the declared egress Capability and its
+   authorization.
+3. **Deduplicate silently.** The same photo shared twice is two occurrences. A
+   sensor that collapsed them would be deciding they meant the same thing.
+4. **Correct the sender.** A wrong `mimeType` is recorded as declared.
+5. **Reach past the share.** The URI grant covers one item. Walking a directory
+   from a shared file's path is reaching for something nobody handed over — AD-7,
+   re-committed.
+
+---
+
+## 9. The cost, stated now rather than discovered
+
+**Shared content contains other people.** A forwarded thread carries Ravi's words,
+and Ravi did not consent to Orb.
+
+This is not avoidable and should not be pretended away. Two things make it the
+least-bad available posture, and they are worth holding to:
+
+- The act is **the user's, deliberate, and per-item** — the same act as forwarding
+  the thread to a friend, which needs no justification at all.
+- The exposure is **bounded by attention**. A notification listener captures
+  everything that arrives, indefinitely, from everyone. Share captures what one
+  person decided to hand over, once. That bound is not a technical control, but it
+  is a real one, and it disappears the moment continuous capture is added.
+
+`ERASURE.md`'s machinery applies unchanged: a shared item is a payload under its
+own key, and erasing it destroys the key rather than the bytes — which is what
+makes it reachable on a peer's disk too.
+
+---
+
+## 10. What it does not need, and what it would block on
+
+**Needs nothing that is not already Accepted.** `Sensor`, `Observation`, `Event`,
+`Evidence`, `Entity`, `Capability`, `Policy`, `Action` — the full set this
+declaration touches, all accepted.
+
+**Would block on Draft contracts the moment it did more.** Linking a share to a
+person needs `Relationship`; turning it into a commitment needs `Goal` or
+`Project`; extracting anything from it needs `Reasoner`, `InferenceRecord` and
+`ModelRouter`. All Draft.
+
+That split is not an obstacle — **it is the recommendation.** Build exactly the
+half that is accepted: the observation layer, complete and honest, with nothing
+claimed about meaning. The interpretation layer arrives when its contracts are
+accepted, and the history recorded in the meantime is already in the right shape
+to be interpreted, because it was recorded without interpretation.
