@@ -32,8 +32,16 @@ import java.util.Map;
  */
 public final class Pass2 extends Application {
 
-    /** Its own lane. Pass 1 holds `pixel`; two apps must never claim one chain. */
-    static final String LANE = "grants";
+    /**
+     * Its own lane. Pass 1 holds `pixel`; **two apps must never claim one chain.**
+     *
+     * Substituted at build time so a second install under another package name
+     * (`ORB_PROBE_PKG=dev.orb.pass2b ORB_LANE=grants-b`) writes a lane of its own.
+     * Without that, two builds on one phone would both append to `grants`, and a
+     * journal that replicated both would hold two chains claiming one name — which
+     * `replicate` refuses, correctly and after the fact. The default is unchanged.
+     */
+    static final String LANE = "@LANE@";
     static final String OBSERVED = "grants.observed";
     static final String PACKAGES = "grants.packages";
 

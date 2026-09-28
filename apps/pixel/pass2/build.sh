@@ -14,6 +14,9 @@ JAR="$SDK/platforms/android-$API/android.jar"
 
 PKG="${ORB_PROBE_PKG:-dev.orb.pass2}"
 LABEL="${ORB_PROBE_LABEL:-Orb pass 2}"
+# The journal lane this build appends to. A second install under another package
+# name needs its own, or two chains claim one lane name (see `Pass2.LANE`).
+LANE="${ORB_LANE:-grants}"
 # Minutes since the epoch: versionCode is a signed 32-bit int, so a plain
 # timestamp overflows it and a yymmddHHMM stamp passes 2^31 in this decade.
 VERSION_CODE="${ORB_VERSION_CODE:-$(( $(date -u +%s) / 60 ))}"
@@ -40,7 +43,7 @@ for source in src/*.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in; do
   name="$(basename "$source" .java.in)"
-  sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
+  sed -e "s/@PKG@/$PKG/g" -e "s/@LANE@/$LANE/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
 
 "$BT/aapt2" link \
@@ -92,5 +95,5 @@ fi
 
 "$BT/apksigner" verify "$OUT/${PKG##*.}.apk" && echo "signature ok"
 ls -lh "$OUT/${PKG##*.}.apk"
-echo "package: $PKG  versionCode: $VERSION_CODE"
+echo "package: $PKG  lane: $LANE  versionCode: $VERSION_CODE"
 echo "signing key: $KEYSTORE"
