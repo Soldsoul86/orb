@@ -1,0 +1,159 @@
+package @PKG@;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.net.Uri;
+import android.os.SystemClock;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
+
+/**
+ * Does the reference a share handed over still resolve?
+ *
+ * **`DEVICE_LOOP.md` §7b32 asks this and cannot answer it from a document.** The
+ * URI in an `orb.shared` event was granted to `ShareActivity` by the intent, and
+ * that grant is expected to last only until the receiving activity's task
+ * finishes — which, with `noHistory` and an immediate `finish()`, is at once. If
+ * that is right, `SENSOR_SHARE.md` §3's clean line — *record the reference now,
+ * resolve later under a declared Capability* — is not available on this platform,
+ * and the sensor records **that a photo was shared** while the photo itself is
+ * gone from that record for ever.
+ *
+ * Expected from the platform's model is not the same as measured on the device.
+ * This measures it.
+ *
+ * ---
+ *
+ * **This probe is itself the Capability act, and says so.** `SENSOR_SHARE.md` §3
+ * puts resolving a `content://` reference at tier `Observe`. Running it to find
+ * out whether it *can* run is still running it, and pretending otherwise would be
+ * the exact self-exemption `Capability.md` inv. 4 forbids. It is invoked only by
+ * an explicit tap, once per tap, and every attempt is recorded whether it
+ * succeeds or fails.
+ *
+ * **It keeps nothing.** The question is whether a read is permitted, not what the
+ * bytes are, so it reads at most `PROBE_BYTES` and discards them. A probe that
+ * captured the photo to prove it could have would have answered the question by
+ * doing the thing the answer was supposed to gate.
+ */
+final class Resolve {
+    private Resolve() {}
+
+    /**
+     * Enough to prove a stream opened and delivered, and far too little to be
+     * content. One byte would do; a few make a truncated-but-open stream
+     * distinguishable from an empty one.
+     */
+    private static final int PROBE_BYTES = 64;
+
+    /**
+     * Attempts the first reference of the most recent share.
+     *
+     * Returns the report, which the caller appends. Never throws: every outcome
+     * — no share, no reference, refused, readable — is a finding, and a probe
+     * that threw would lose the one it was run for.
+     */
+    static Map<String, Object> attempt(Context context, Journal journal) {
+        Map<String, Object> report = Json.obj();
+        report.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        // Named so a reader knows which question this answers, and that the
+        // answer is about *this device at this moment* rather than the platform
+        // in general.
+        report.put("probe", "share.reference.readable");
+
+        String line;
+        try {
+            Map<String, String> last = journal.lastOfType(Orb.SHARED);
+            line = last == null ? null : last.get("line");
+        } catch (IOException error) {
+            // Unreadable history is not an absent share. Saying `noShare` here
+            // would answer the question with a fact about the journal.
+            report.put("outcome", "historyUnreadable");
+            report.put("threw", error.getClass().getName());
+            return report;
+        }
+
+        if (line == null) {
+            report.put("outcome", "noShare");
+            return report;
+        }
+
+        String reference = field(line, "references");
+        if (reference == null || reference.isEmpty()) {
+            report.put("outcome", "noReference");
+            return report;
+        }
+        // Only the first, because `references` is colon-joined and a `content://`
+        // URI contains no bare colon after its scheme in the forms observed. A
+        // multi-item share is not what this probe is for.
+        int end = reference.indexOf(':', reference.indexOf("://") + 3);
+        String first = end < 0 ? reference : reference.substring(0, end);
+        report.put("reference", first);
+
+        // How long the grant had to survive. The whole question is a lifetime,
+        // so an answer without one would not be usable evidence.
+        String sharedAt = field(line, "elapsedRealtimeMs");
+        if (sharedAt != null) {
+            try {
+                report.put("sinceShareMs", SystemClock.elapsedRealtime() - Long.parseLong(sharedAt));
+            } catch (NumberFormatException ignored) {
+                // A field that will not parse is not a zero interval.
+            }
+        }
+
+        ContentResolver resolver = context.getContentResolver();
+        try (InputStream in = resolver.openInputStream(Uri.parse(first))) {
+            if (in == null) {
+                // Opened without throwing and gave nothing. Distinct from both
+                // refused and readable, and the platform does permit it.
+                report.put("outcome", "openedNull");
+                return report;
+            }
+            byte[] probe = new byte[PROBE_BYTES];
+            int read = in.read(probe);
+            report.put("outcome", "readable");
+            report.put("bytesRead", (long) Math.max(read, 0));
+            // Stated in the record, not only in this comment: nothing was kept.
+            report.put("retained", false);
+        } catch (SecurityException refused) {
+            // The expected answer if the grant died with the activity.
+            report.put("outcome", "refused");
+            report.put("threw", refused.getClass().getName());
+            report.put("message", String.valueOf(refused.getMessage()));
+        } catch (Exception error) {
+            // A missing file, a provider that is gone, anything else. Not the
+            // same as refused, and collapsing them would answer the permission
+            // question with an availability failure.
+            report.put("outcome", "failed");
+            report.put("threw", error.getClass().getName());
+            report.put("message", String.valueOf(error.getMessage()));
+        }
+
+        return report;
+    }
+
+    /**
+     * One field out of a stored line — the same single-field extraction the
+     * journal's own `lastOfType` does, and not a parser.
+     *
+     * Handles a quoted string or a bare number, because `references` is one and
+     * `elapsedRealtimeMs` is the other.
+     */
+    private static String field(String line, String key) {
+        String quoted = "\"" + key + "\":\"";
+        int at = line.indexOf(quoted);
+        if (at >= 0) {
+            int from = at + quoted.length();
+            int to = line.indexOf('"', from);
+            return to < 0 ? null : line.substring(from, to);
+        }
+        String bare = "\"" + key + "\":";
+        at = line.indexOf(bare);
+        if (at < 0) return null;
+        int from = at + bare.length();
+        int to = from;
+        while (to < line.length() && (Character.isDigit(line.charAt(to)) || line.charAt(to) == '-')) to++;
+        return to == from ? null : line.substring(from, to);
+    }
+}

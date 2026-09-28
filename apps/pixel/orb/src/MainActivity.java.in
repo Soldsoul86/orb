@@ -50,6 +50,15 @@ public final class MainActivity extends Activity {
         });
         root.addView(export);
 
+        // The §7b32 probe, behind an explicit tap. It *is* the Capability act
+        // it is testing for (`Resolve`), so it never runs on its own.
+        Button resolve = new Button(this);
+        resolve.setText("Test: can the last share still be read?");
+        resolve.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { resolveProbe(); }
+        });
+        root.addView(resolve);
+
         status = new TextView(this);
         status.setTextSize(12);
         status.setTypeface(Typeface.MONOSPACE);
@@ -90,6 +99,37 @@ public final class MainActivity extends Activity {
         } catch (IOException error) {
             status.setText("\nread failed: " + error);
         }
+    }
+
+    /**
+     * Attempts the last share's reference, and records what happened.
+     *
+     * The answer §7b32 needs: whether a URI granted to `ShareActivity` outlives
+     * the activity it was granted to. Expected from the platform's model is not
+     * the same as measured on the device, and this is the measurement.
+     */
+    private void resolveProbe() {
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+        Map<String, Object> report = Resolve.attempt(this, journal);
+        journal.append("orb.resolve.attempt", report);
+
+        StringBuilder out = new StringBuilder("\nprobe: can the last share still be read?\n");
+        out.append("outcome  ").append(report.get("outcome")).append('\n');
+        Object since = report.get("sinceShareMs");
+        if (since instanceof Long) {
+            out.append("age      ").append(((Long) since) / 1000L).append(" s since the share\n");
+        }
+        Object threw = report.get("threw");
+        if (threw != null) out.append("threw    ").append(threw).append('\n');
+        Object bytes = report.get("bytesRead");
+        if (bytes != null) out.append("bytes    ").append(bytes).append(" (read and discarded)\n");
+        out.append("\nrecorded as orb.resolve.attempt\n");
+        status.setText(out.toString());
     }
 
     /**

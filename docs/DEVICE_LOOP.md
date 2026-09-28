@@ -4082,3 +4082,34 @@ option 2 is only forced if it does.
 > right, kept a URL fetch from being smuggled in as a preview, and produced a
 > sensor that needs no permission. What it could not do was know how long a
 > permission it deliberately declined to use would last.
+
+#### The probe for it — `orb.resolve.attempt`
+
+`Resolve.java.in`, behind an explicit tap. It attempts the first reference of the
+most recent `orb.shared` and records the outcome:
+
+| Outcome | Means |
+| --- | --- |
+| `readable` | the grant survived — deferred resolution is available, and §3's line stands |
+| `refused` | `SecurityException` — the grant died with the activity, and §3's line does not |
+| `failed` | something else went wrong; **not** an answer to the permission question |
+| `openedNull` · `noShare` · `noReference` · `historyUnreadable` | each a distinct finding rather than a shrug |
+
+`failed` is separated from `refused` deliberately. A missing file or a departed
+provider is an *availability* failure, and collapsing it into `refused` would
+answer a permission question with an unavailability — the `Readable: false`
+mistake in a fourth costume.
+
+**The probe is the Capability act it is testing for, and says so.**
+`SENSOR_SHARE.md` §3 puts resolving a `content://` reference at tier `Observe`;
+running it to find out whether it *can* run is still running it, and pretending
+otherwise would be the self-exemption `Capability.md` inv. 4 forbids. So it never
+fires on its own, and every attempt is journaled whether it succeeds or not.
+
+**It keeps nothing.** At most 64 bytes are read and discarded, and `retained:
+false` is in the record rather than only in a comment. A probe that captured the
+photo to prove it could have would have answered the question by doing the thing
+the answer was meant to gate.
+
+`sinceShareMs` travels with the result, because the whole question is a lifetime
+and an answer without one is not usable evidence.
