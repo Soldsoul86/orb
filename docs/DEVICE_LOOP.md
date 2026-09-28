@@ -4599,3 +4599,27 @@ derives `manifestScope` from the manifest has not yet been installed. The fix is
 staged (`orb-app-v7-noquery-scopefix.apk`); its confirmation is the grant reading
 `manifestScope: "visible"` to match its own scan, and that reading is not yet in
 any export.
+
+#### Confirmed: the grant now matches its own scan
+
+`orb-20260928-231246.txt`, events 37–42 — v7 installed (a `package.updated`
+exit at 38) and the grant-scope fix is on the device:
+
+```
+event 40  grants.capability.revoked  scope="packages visible without QUERY_ALL_PACKAGES"  manifestScope="visible"
+event 41  grants.capability.granted  scope="packages visible without QUERY_ALL_PACKAGES"  manifestScope="visible"
+event 42  grants.packages            installedPackageScope="visible"  count=135  baseline=false  changed=false
+```
+
+The grant's `manifestScope: "visible"` matches the scan's
+`installedPackageScope: "visible"` — the two records no longer contradict each
+other, and both are read from what the build actually is rather than from a
+constant string. The over-claim §7b40 found is closed on-device, not just in the
+tree.
+
+The scan (42) is a **third** consecutive visible reading and is still
+`baseline: false, changed: false` — steady state held across the v6→v7 upgrade
+itself. An in-place update that carried a code change to the grant path did not
+disturb the package comparison, because the two are independent: the scope of the
+*answer* is a manifest fact, the scope of the *grant record* is now the same
+manifest fact, and neither is a baseline event once the boundary is behind them.
