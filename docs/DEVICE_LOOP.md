@@ -29,7 +29,8 @@ needs, including the author in three months.*
 | **P13** | `ENABLED_NOTIFICATION_LISTENERS` is readable on the same terms | **Confirmed 2026-09-26** — 5 entries, no permission |
 | **P14** | Active device admins are enumerable without being one | **Confirmed 2026-09-26** — one active admin returned, no permission |
 | **P15** | `ACTION_PACKAGE_ADDED` reaches a runtime receiver inside `specialUse`, as the screen signals do | **Superseded** — pass 2 has no service, so the question became P6 |
-| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Open** — nothing changed in the first export, so the question was never put. The mechanism it needs is confirmed: the post-reboot reading compared against history rather than re-baselining (§7b1) |
+| **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28** — two notification listeners were turned off while the process was dead; the next `process.start` read `changed: true` and named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2) |
+| **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered twice in one boot session 9h43m apart, the second 14 ms after process start. `elapsedRealtimeMs` is the only field that can date a boot; the re-delivery's cause is unknown (§7b2) |
 
 ### What it establishes
 
@@ -1572,6 +1573,89 @@ recorded whether or not it changed.
 09-26 at 11:30 UTC** — the three events from the morning's install are not in it.
 A fresh journal, not a truncated one; the distinction is visible rather than
 inferred.
+
+---
+
+### 7b2. P16 answered, and a route label that lies — 2026-09-28
+
+The second export, `orb-pass2-20260928-071608.txt`: thirteen events, five of them
+new, `verifyLane` clean again, five replicated, three Observations, re-import
+0/0.
+
+**P16 held.** Two notification listeners were turned off while pass 2 was not
+running, and the **next process start caught it from history**:
+
+```
+2026-09-28 01:46:04.997  uptime 10h15m04s  because="process.start"  changed=true
+  notificationListenerHoldingCount: 5 → 3
+  notificationListenerLost: ["…apps.dreamliner/…", "…projection.gearhead/…"]
+  notificationListenerBaseline: false
+```
+
+`baseline: false` is the load-bearing field: the reading compared against
+history instead of starting over, which is the whole mechanism the prediction
+names. The two readings 14 ms and 44 ms later both say `changed: false` — they
+compare against the reading just written — so a single revocation produced a
+**single** change, not three.
+
+**And the loop closed, once, on a real device.** `project` folded the three
+Observations into one `AuthorityChange`; `alertsFor` returned one
+`PendingAlert`; `raiseAlerts` journalled one alert and a second call journalled
+nothing. The operator answered — *they had turned the two listeners off
+themselves* — and the answer went into the journal as `orb.alert.answered`
+citing the alert in `causes`. The next `project` reads that answer, and
+`raiseAlerts` still returns zero, because the alert was already raised and **not
+because the answer taught the rule anything** (DR-8). Journal → Observation →
+projection → rule → person → answer → journal, with nothing in that chain
+invented.
+
+### The power-off, cross-confirmed by two sources that cannot copy each other
+
+The operator's account: the phone switched off the previous day, the listeners
+were turned off, and it is back on. The record agrees and dates it. Both the
+09-27 and 09-28 sessions derive the **same boot instant, to the millisecond**:
+
+| session | wallClock | `elapsedRealtimeMs` | derived boot |
+| --- | --- | --- | --- |
+| 09-27 | 16:02:59.403 | 1,918,763 | **2026-09-27 15:31:00.640** |
+| 09-28 | 01:46:04.981 | 36,904,341 | **2026-09-27 15:31:00.640** |
+
+So the power-off preceded 15:31:00.640 UTC (21:01 IST), and §7b1's
+**31m59s** was measured from a genuine cold boot rather than from a process
+restart — a person's memory and a monotonic counter agreeing, which is worth
+more than either alone. It does not explain *why* the broadcast took half an
+hour; the not-direct-boot-aware-waits-for-first-unlock reading stays a
+hypothesis.
+
+### P17 — the signal name is not the event
+
+The same table shows something that was never predicted and is now measured:
+
+```
+2026-09-27 16:02:59.588  uptime  0h31m59s  signal:…BOOT_COMPLETED
+2026-09-28 01:46:05.011  uptime 10h15m04s  signal:…BOOT_COMPLETED
+```
+
+**`BOOT_COMPLETED` was delivered twice inside one boot session, 9h43m apart.**
+`elapsedRealtimeMs` rises monotonically across the two and the derived boot
+instant is identical, so the record *rules out* a second reboot; and the second
+delivery landed 14 ms after the process started and 30 ms before `app.opened`,
+i.e. as the app was launched, not at boot.
+
+**What this settles:** `because: "signal:…BOOT_COMPLETED"` is not evidence that
+the device rebooted. Only `elapsedRealtimeMs`, and the boot instant derived from
+it, can say that — and here it says the opposite, twice. Any rule that reads the
+action string as *a reboot happened* would be wrong on both events in this file.
+
+**What it does not settle:** why the broadcast was delivered again. A broadcast
+queued while the app sat in a stopped or frozen state and released on launch
+would fit, but nothing in the journal says the app was ever force-stopped, so
+that is a guess and is recorded as one.
+
+**One consequence for P6.** Today's delivery is coincident with a user launch, so
+it is *not* independent evidence that a signal arrives with nothing running.
+P6 still rests on the single clean instance in §7b1 — one signal, one date, one
+build.
 
 ---
 

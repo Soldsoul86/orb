@@ -265,7 +265,7 @@ The section that matters most, and the one a summary is most tempted to shorten.
 
 | | |
 | --- | --- |
-| **P16** | the first export (2026-09-27) carried no change at all, so it is still unknown how coarse the detection is. P6 is answered: a `BOOT_COMPLETED` broadcast did reach pass 2 with no service running — 32 minutes after boot |
+| **P17** | why `BOOT_COMPLETED` was delivered twice inside one boot session (2026-09-28) is unknown. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6 and P16 are both answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; and a revocation while the process was dead was caught at the next process start |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
 | `Capability.md`, `Action.md`, `Policy.md` | Draft. DR-5's chain and DR-7's seven-day value belong in them |
@@ -293,11 +293,17 @@ cross-implementation verification on real data: `verifyLane` re-derives every
 envelope and payload hash, which the phone cannot do for itself, since
 re-derivation needs a JSON parser the probe deliberately does not have.
 
-**The loop has now run on a real export** (2026-09-27, §7b1 of `DEVICE_LOOP.md`):
-eight events, `verifyLane` clean over the phone's own chain, five Observations,
-zero alerts — because nothing had changed. **P6 held** on one signal; **P16 is
-still open**, since no grant moved for the next process start to catch, though
-the post-reboot reading did compare against history rather than re-baseline.
+**The loop has now closed once, end to end, on a real device** (2026-09-28, §7b2
+of `DEVICE_LOOP.md`). Two notification listeners were turned off while pass 2 was
+not running; the next process start caught it from history (5 → 3, both named,
+`baseline: false`); `project` folded it into one change, the rule raised one
+alert, the operator answered *dismissed* — they had turned them off — and the
+answer is in the journal citing the alert, where the next projection reads it and
+still raises nothing. **P16 held.** **P6 held** on the single clean signal of
+2026-09-27. **P17 is new and refuted:** `BOOT_COMPLETED` arrived twice in one
+boot session, so the signal's name cannot date a boot — `elapsedRealtimeMs` can,
+and it also confirmed the operator's account of the power-off to the
+millisecond.
 
 **What remains is the device.** The connector has no driver. Sync does not exist,
 so the export is a file the operator carries. And `Capability.md`, `Action.md` and `Policy.md` are still Draft, which is
