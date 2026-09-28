@@ -35,7 +35,7 @@ needs, including the author in three months.*
 | **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, and the silence is explained.** An app was uninstalled, but **after a force-stop**, and a stopped package is excluded from broadcasts until launched — the route was switched off by the platform while it was being tested. Re-test by opening Orb *first*, then installing or uninstalling (§7b3, §7b5) |
 | **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history (§7b6), so a missed package *broadcast* is recoverable — but an install undone before the next **scan** still is not, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7) |
-| **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Written 2026-09-28, untested on the device.** Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
+| **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
 
 ### What it establishes
 
@@ -2045,7 +2045,7 @@ alternative was re-baselining the whole device's history on the next process sta
 
 | | |
 | --- | --- |
-| journal size | the holding set is stored whole, so each observation grows by roughly the package count × the average name length — on the order of **5 KB**, against ~300 bytes today. To be **measured on the next export**, not guessed |
+| journal size | the holding set is stored whole, so each observation grows by roughly the package count × the average name length — guessed at **5 KB**, against ~300 bytes today. **Measured on the device (§7b8): 16.7 KB**, from 484 packages. The guess was low by 3.3× |
 | noise | a system update changes the package set, so this rule will fire where the grant rule would not. That is the second reason it is a separate rule |
 | the screen | a set over 25 entries shows as a count. The set itself is in the journal whole; the screen is not the record |
 
@@ -2151,6 +2151,99 @@ about it.
 **P22 is unchanged in what settles it** and now has a third reading to look for: a
 `grants.packages` event with `because: "operator.scan"` after pressing the button,
 which is the cheapest confirmation that any of this works at all.
+
+### 7b8. The scan, on a real device — 2026-09-28
+
+The update to the installed pass 2 was **refused**: *App not installed*. The build
+environment's keystore is not the one that signed what is on the phone, so that
+install can never be upgraded — only removed, which would take its journal with
+it. §7b7's build went on instead as **`dev.orb.pass2b`**, its own package, its own
+key, its own lane `grants-b`, alongside the original and touching nothing of it.
+
+Seven events, a fresh chain, `verifyLane` clean, imported beside `grants` with no
+conflict. **P22 holds**, and four separate properties held with it.
+
+#### What the seven events settle
+
+```
+1  grants.process.start                              uptime 14h59m22s
+2  grants.observed   process.start   baseline: true  (3 grant kinds, no package fields)
+3  grants.packages   process.start   baseline: true  scope: "all"   484
+4  grants.observed   app.opened      changed: false  (3 grant kinds, no package fields)
+5  grants.packages   operator.scan   baseline: FALSE changed: false 484
+6  grants.observed   app.opened      changed: false  — and no scan
+7  grants.export
+```
+
+**The permission took.** `installedPackageScope: "all"` on a real device:
+`QUERY_ALL_PACKAGES` is granted at install with no prompt, and the list is the
+complete one. **484 packages.**
+
+**A first scan is not an alarm.** `installedPackageBaseline: true`, `changed:
+false`. §5j's lesson holds for the new kind on its first outing.
+
+**The operator's button is a third trigger and says so.** Event 5 carries `because:
+"operator.scan"` — a scan a person asked for, distinguishable in the record from
+one a wake produced, which is the whole reason the field exists.
+
+**And the load-bearing property is now proven rather than argued.** Event 5's
+`installedPackageBaseline: false` is the one to read twice. Between the two scans
+sits **event 4, an observation carrying no package fields at all.** Had
+`scanPackages` looked up the last *observation* — the obvious implementation —
+it would have found event 4, read it as *no usable history*, and re-baselined. It
+looked up the last **scan** and found event 3. That is `lastOfType(PACKAGES)`
+walking back past an intervening observation, on a real journal, which is exactly
+the silent defect §7b7 was written to avoid.
+
+**Observations stayed silent about packages.** Events 2, 4 and 6 have no
+`installedPackage*` fields — not `installedPackageReadable: false`. *Did not look*
+is an absence; *could not find out* would have been a claim. Both now demonstrated
+on the device rather than only in the desktop suite.
+
+**The interval gate works.** Event 6 is an `app.opened` 70 seconds after the scan,
+and it took no scan: `scanPackagesIfDue` read the journal, found a scan well inside
+12 h, and declined. The first wake scanned because there was no prior scan at all.
+
+**Orb can see itself.** The set contains `dev.orb.pass1`, `dev.orb.pass2`,
+`dev.orb.pass2b`, `dev.orb.probe`, `dev.orb.probeb` and `dev.orb.probeg`. Removing
+any Orb app is therefore a change this signal reports — including removing the
+watcher, by whichever build is still installed.
+
+**Cross-checked three ways at one moment.** `grants-b`'s baseline names the same
+five notification listeners, the same admin and the same accessibility service as
+the old pass 2's last reading (11:48) and as `probeg`'s independent readout (11:49).
+Three implementations, one device, no disagreement.
+
+#### The cost, measured — and my estimate was wrong
+
+§7b6 guessed "on the order of 5 KB" per scan. **Measured: 16.7 KB**, from 484
+packages rather than the couple of hundred assumed. Off by 3.3×, and the error was
+in the direction that mattered, so the number is recorded here in place of it.
+
+| | bytes | |
+| --- | --- | --- |
+| `grants.process.start` | 573 | |
+| `grants.observed` | 1,809 | three grant sets |
+| `grants.packages` | **16,740** | **10.5× an observation** |
+
+At six wakes a day, the design §7b7 replaced — the set on every observation — would
+cost **98 KB/day, 35 MB/year**. As built, six observations and two scans cost **42
+KB/day, 15 MB/year**.
+
+Note what that decomposes into: **33 KB of the 42 is the two scans.** Moving the set
+off every observation was worth 2.3× and the *scan interval* now governs the rest.
+Halving the interval roughly doubles the journal; the number to tune is
+`SCAN_INTERVAL_MS`, and it is now tunable against a measurement instead of a guess.
+
+#### Still open, and unchanged by this
+
+**P19** — no app was installed or uninstalled in this window, so the package
+broadcast route is still untested. The clean test is now cheap: Orb pass 2 B is
+open and not stopped, so an install should produce both a
+`signal:…PACKAGE_ADDED:package:…` reading *and* a named entry in the next scan's
+`installedPackageGained`. Either arriving without the other is itself the finding.
+
+**P20** — no force-stop was performed. Both halves still needed.
 
 ---
 
