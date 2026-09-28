@@ -412,3 +412,47 @@ custody receipt — following the `Observation.md` source-identity precedent tha
 AD-5 also leans on, rather than a new kernel contract with a dependency edge.
 `RetentionPolicy` would then distinguish a durability quorum from a witness
 quorum instead of conflating them under one K.
+
+---
+
+## AD-8 — `device` identifies the handset, so two Orbs on one phone are one peer contradicting itself
+
+**Opened 2026-09-28** (`DEVICE_LOOP.md` §7b25). **Debt, not a defect**: nothing
+misbehaves today, and the condition was created by testing rather than by design.
+
+**The finding.** `apps/pixel/pass1/src/Probe.java.in:48` opens its journal with
+`device = Build.MODEL + "/" + Build.DEVICE` and the lane as the literal
+`"pixel"`. Four packages — `dev.orb.pass1`, `.probe`, `.probeb`, `.probeg` — are
+installed on one handset, so **four independent chains claim one lane name and
+one device identity**, in four private stores that can never see each other.
+
+**Why it is debt rather than a bug.** Every layer above assumes **one writer per
+`device` value**:
+
+- Art. IV §14 — devices are equal peers, none authoritative.
+- `SECURITY.md` §4 — a device writes only its own lane, and lane authorship is
+  cryptographic.
+- `custody.ts` — the holder is `event.device` precisely so it is not a forgeable
+  field, and `evaluatePrune` counts distinct holders.
+- `contracts/Encryption.md` inv. 7 — the same assumption, stated as an invariant.
+
+None of those is violated *on the device*, because a journal never sees another
+app's store. They are violated the moment two of those exports meet, and then
+correctly: `replicate` refuses two chains under one lane name.
+
+**Why it cannot be patched where it was found.** `lane` is inside
+`eventPreimage` in both envelope versions, so relabelling an existing export
+invalidates every hash behind it. The four histories are permanently unmergeable,
+and three of them will stay archive files.
+
+**What it requires of the consolidated app**, which is where it gets paid:
+
+1. `device` identifies the **install**, minted at first run — not the handset.
+2. The lane derives from that identity and is never a literal. Pass 2 already
+   parameterised it via `ORB_LANE`; pass 1 never did, and that asymmetry is the
+   whole cause.
+3. The export names its own source, so a file can say which writer produced it
+   (`Observation.md` inv. 3 at the file boundary).
+
+**Discharged when** one Orb install on one phone is one peer with an identity of
+its own, and two installs are two peers rather than a collision.

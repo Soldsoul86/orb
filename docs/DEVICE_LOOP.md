@@ -3522,3 +3522,69 @@ It is an accident of §7b8's signature mismatch, and renaming it costs the
 `grants-b` lane — a new package is a new store and a new chain. **Not worth it.**
 The next real app gets a clean package name and a fresh lane, and these exports
 are imported into it. The ugly name is cheaper than the discontinuity.
+
+### 7b25. The consolidation procedure, and what the collision reveals — 2026-09-28
+
+#### You cannot relabel the exports, and the reason is mechanical
+
+The tempting fix is to rewrite `pixel` to `pixel-probeb` in one export so the four
+can live together. **It does not work and must not be attempted.**
+`eventPreimage` puts **`lane` inside the hash** in *both* v1 and v2
+(`integrity.ts`). Changing it invalidates every event's hash and every `previous`
+link behind it — so the chain fails verification immediately, and `replicate`
+refuses it as tampered rather than adopting it. Art. I §2 forbids it; the
+integrity check would catch it anyway.
+
+**So exactly one of the four `pixel` chains can ever be adopted as lane `pixel`.**
+The others stay as archive files. That is a real cost and it is worth naming:
+the superseded builds' histories become readable records that no journal will
+ever hold.
+
+#### The procedure needs no way to read package names
+
+Android will not readily show which sideloaded app is which package, and **the
+export does not say either** — see below. The way around it is to never hold two
+unlabelled exports at once:
+
+> **For each `dev.orb.*` app except `pass2b`, in any order:**
+> **open it → export → rename the file immediately → uninstall it → next.**
+
+Renaming only needs to make them *distinguishable* (`a`, `b`, `c`, `d` is
+enough), because with one app uninstalled at each step there is never ambiguity
+about which one produced the file in front of you.
+
+Afterwards, line-count them. The **~5,757-line** file is the live pass 1 — four
+days, three reboots, P4's whole record — and that is the one to adopt as lane
+`pixel`. The rest are archive.
+
+`dev.orb.pass2` (lane `grants`) has no collision and can be exported at leisure.
+Leave **`app.orb`** alone; it is a different product and it is what pass 2
+watches.
+
+#### What the collision actually reveals: `device` names the hardware, not the writer
+
+The deeper problem is not the hardcoded lane literal. It is that
+`Probe.java.in:48` sets `device` to `Build.MODEL + "/" + Build.DEVICE` — **the
+phone**. Four packages on one phone therefore share a lane name *and* a device
+string, and nothing in any envelope distinguishes them.
+
+That contradicts the model. Art. IV §14 makes devices equal peers and
+`SECURITY.md` §4 says **a device writes only its own lane**; `custody.ts` relies
+on the holder being `event.device`. All of that assumes **one writer per
+`device` value.** Here there are four, and the architecture never said they could
+not exist — it assumed one Orb per phone, which stopped being true the moment
+testing needed a second build.
+
+**Requirements this puts on the consolidated app**, rather than a patch to
+builds about to be deleted:
+
+1. **`device` identifies the install, not the handset.** A per-install identity
+   minted at first run, so two Orbs on one phone are two peers rather than one
+   peer contradicting itself.
+2. **The lane is derived from that identity**, never a literal. Pass 2 already
+   parameterised it (`ORB_LANE`); pass 1 never did, and that asymmetry is what
+   produced four chains under one name.
+3. **The export names its own source.** It currently records `destination` and
+   `eventsBeforeThis` and nothing about where it came from — a record that cannot
+   say who produced it, which is `Observation.md` inv. 3's *always attributed*
+   failing at the file boundary rather than the event one.
