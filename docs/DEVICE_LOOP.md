@@ -4113,3 +4113,85 @@ the answer was meant to gate.
 
 `sinceShareMs` travels with the result, because the whole question is a lifetime
 and an answer without one is not usable evidence.
+
+### 7b33. Measured: the grant does not outlive the activity — 2026-09-28
+
+Two attempts, two different failure modes, and **the distinction the probe was
+built to preserve is what made them legible.**
+
+| Attempt | Age of the reference | Outcome | Threw |
+| --- | --- | --- | --- |
+| 1 | **32.3 min** | `failed` | `FileNotFoundException` — *"No content provider: …"* |
+| 2 | **9.5 s** | **`refused`** | `SecurityException` — *"Permission Denial: opening provider … from dev.orb.app … that is not exported from UID 10216"* |
+
+#### The answer
+
+**`SENSOR_SHARE.md` §3's line — *record the reference now, resolve later under a
+declared Capability* — is not available on this platform.** Nine and a half
+seconds after the share, the read is a clean permission denial: Photos' provider
+is not exported, `dev.orb.app` holds no grant, and the request is refused
+outright.
+
+**Stated precisely, because the number is misleading.** This does *not* show that
+a grant expires after nine seconds. The grant is scoped to the **receiving
+activity's lifetime**, and `ShareActivity` is `noHistory` and calls `finish()` at
+once — so it was already gone long before the probe ran. What is measured is that
+**the grant does not outlive the activity it was granted to.** A share target that
+held its activity open would still hold the grant.
+
+#### The two failure modes are not one finding twice
+
+`failed` was deliberately separated from `refused` on the grounds that collapsing
+an availability failure into a permission failure would be *"the `Readable: false`
+mistake in a fourth costume."* That separation earned itself inside one run:
+
+- At **32 minutes** the URI does not even resolve to a provider — the wrapper is
+  transient and is simply gone. Nothing about permissions is stated.
+- At **9.5 seconds** the provider is there and the permission is denied. That is
+  the answer.
+
+Had both been recorded as `refused`, the conclusion would have been right for the
+wrong reason in one of the two cases — and a reader checking it later would have
+found a `FileNotFoundException` under a permission verdict.
+
+#### An unexpected finding: a reference is not a content identity
+
+The two shares were **the same photograph**. Their references differ:
+
+```
+…/content%3A%2F%2Fmedia%2Fexternal%2Fimages%2Fmedia%2F229335/…/615544899
+…/content%3A%2F%2Fmedia%2Fexternal%2Fimages%2Fmedia%2F229335/…/378787396
+```
+
+Photos wraps a **stable** MediaStore id (`media/229335`) in a **per-share** token.
+So the same content shared twice produces two different references, and the
+reference is a handle to *an act of sharing*, not a name for *a thing*.
+
+That bears directly on `Event.md` inv. 9 and §7b29: **anything deriving an
+identity from a share reference would mint a new identity for every re-share of
+one photo.** The embedded MediaStore id is the stable part, and it is the part a
+derivation would have to use — a finding worth having before something is built
+on the wrapper.
+
+#### What follows, and the choice is the operator's
+
+Option 3 — *ask at share time* — survives, since the activity could stay alive
+while a person answers. Options 1 and 2 are unchanged:
+
+1. **Resolve during the share**, copying bytes into an `Attachment` while the
+   grant is live. **This is the recommendation.** The separation §3 wanted was a
+   good idea that the platform does not permit, and the honest response is to
+   declare the Capability where it must happen rather than pretend it can happen
+   later. The share *is* the authorization event: a person deliberately handed
+   this over, which is stronger consent than any prompt Orb could invent
+   afterwards.
+2. **Accept reference-only.** Honest, and enough if the value is the *event*
+   rather than the *content* — but it means the proposal PDF in
+   `MOBILE_SENSING.md`'s motivating loop can never be read, which is most of why
+   the share sensor was chosen first.
+
+`SENSOR_SHARE.md` §3 needs amending either way. **It is the first thing in this
+project written as a declaration that contact with the device has falsified**,
+and the declaration was still worth writing: it got the Capability boundary
+right, stopped a URL fetch being smuggled in as a preview, and produced the
+sensor whose failure is this legible.
