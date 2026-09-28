@@ -267,7 +267,8 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | --- | --- |
 | **P17** | why `BOOT_COMPLETED` was delivered **four times** inside one boot session (2026-09-28) is **accounted for but not proven**: the operator force-stopped the app and reopened it, three deliveries land mid-launch, and the one launch following an ordinary process death carries none. The platform's queueing was not read, so the marker in P20 rests on one absence against three presences. What is settled: the action string cannot date a boot, only `elapsedRealtimeMs` can. P6, P16 and P18 are answered — a broadcast reached pass 2 with no service running, 32 minutes after a cold boot; grants changed while the process was dead were caught at the next process start, in **both** directions; and the settings watch caught a change with the process alive |
 | **P20** | whether a `BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran. If it does, it is the first thing in the record that can separate *force-stopped* from *killed and reclaimed* from *never installed* — and a force-stop is how a person stops this watch. It is a side effect of platform behaviour rather than an API, so it can vanish in an OS update; the control half (an ordinary death, then a launch, expecting no reading) needs its own export |
-| **P19** | whether a package broadcast reaches the manifest receiver at all. No `signal:…PACKAGE_*` reading exists in any export. Nothing records that an install was attempted, so *not performed* and *route silent* are indistinguishable from the journal alone. It is the only route that could notice a **new app** rather than a changed grant |
+| **P19** | whether a package broadcast reaches the manifest receiver at all. An app *was* uninstalled (2026-09-28) and nothing was recorded — but **after a force-stop**, and a stopped package is excluded from broadcasts until launched, so the route was off while it was tested. Re-test by opening Orb first, then installing or uninstalling |
+| **P21** | **a recorded limit, not a question.** Comparison against history reports on endpoints, not intervals: a grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The broadcast routes were the only mitigation and are the ones that lose events permanently. Two candidate fixes — carry an installed-package set so package changes become comparisons too, or record the blind window explicitly — neither implemented, both design changes |
 | **An answer's identity** | alert ids are minted at raise time, not derived from the change. Replaying the same device lane into a fresh journal mints new ids, so an existing answer's citation dangles. An answer is therefore replayable only alongside the lane that raised what it answers — a design change, recorded 2026-09-28 and not made |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
 | ~~**Observation**~~ | **implemented 2026-09-26** — `runtime/observation`, with inv. 3, 5 and 7 enforced at the boundary. DR-7 tier 2 is wired into the connector |
@@ -326,6 +327,23 @@ a property of how the app last stopped, not of launching. **P20** is written fro
 that: the reading may be a **force-stop marker**, which would be the first thing in
 the record able to say *the watch was stopped* rather than *the watch saw nothing*.
 It is a platform side effect, not an API, and the control half is untested.
+
+**Then the operator named the other action: an app was uninstalled, after the
+force-stop** (§7b5). That explains P19's silence — a stopped package is excluded
+from broadcasts until launched, so the route was switched off by the platform while
+it was being tested, and the test was null by construction. It also **withdraws
+§7b4's guess at P20's mechanism**: a launch followed that stopped window and
+released a `BOOT_COMPLETED` but no `PACKAGE_REMOVED`, so it is not a queue of missed
+broadcasts being replayed. P20's correlation is untouched; only the explanation was
+wrong.
+
+**The asymmetry those two accounts expose is the more important finding** and is
+recorded as **P21**. Routes that compare a set against history self-heal — the next
+process start catches what was missed, whenever it comes. A route that reports an
+*event* has no state behind it, so what it misses is gone, and nothing records that
+it was missed. The same gap exists with no force-stop anywhere: an app installed,
+granted a listener and uninstalled between two process starts leaves the grant set
+where it began, and the reading says `changed: false`.
 
 The same import exposed a limit of the loop rather than a defect in it. A fresh
 container replayed the 28 device events into an empty journal and re-derived

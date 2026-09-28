@@ -32,8 +32,9 @@ needs, including the author in three months.*
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28, both directions.** First on the mirror case — two listeners turned off while the process was dead, next `process.start` read `changed: true`, named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2). Then as literally written — two listeners turned **on** while dead, named in `notificationListenerGained`, 3 → 5 (§7b3) |
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
-| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, with the reason** — no reading of any kind appears in any export so far. Nothing records that an install was attempted, so *not performed* and *route silent* are indistinguishable from the journal alone (§7b3) |
-| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. It is a side effect of platform behaviour, not an API, and the control half needs its own export (§7b4) |
+| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, and the silence is explained.** An app was uninstalled, but **after a force-stop**, and a stopped package is excluded from broadcasts until launched — the route was switched off by the platform while it was being tested. Re-test by opening Orb *first*, then installing or uninstalling (§7b3, §7b5) |
+| **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Predicted 2026-09-28, untested.** Three re-deliveries land mid-launch and the 11h43m45s launch carries none, which fits. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
+| **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The broadcast routes were the only mitigation and are the lossy ones. Two candidate fixes, neither implemented (§7b5) |
 
 ### What it establishes
 
@@ -1878,6 +1879,103 @@ unexplained.
 question asked — no package install or uninstall is confirmed or denied, and no
 `signal:…PACKAGE_*` reading exists in any export. It stays untested with the
 reason.
+
+### 7b5. P19's silence explained, and the routes that cannot self-heal — 2026-09-28
+
+The operator's second account: **an app (Clash Royale) was uninstalled, after the
+force-stop.** So step 1 *was* performed, and the manifest route still recorded
+nothing. That is not a refutation, and the reason is the state the app was in.
+
+**A force-stopped package is excluded from broadcasts until it is launched again**
+(documented platform behaviour, not measured here). The uninstall happened inside
+a stopped window, so `WakeReceiver` was never offered the broadcast. **The test was
+null by construction** — it exercised the route while the route was switched off
+by the platform. P19 stays untested, now with a known reason instead of two
+indistinguishable ones.
+
+The corrected procedure for the next attempt, and the reason it differs: **open
+Orb first**, so the package is not in the stopped state, *then* install or
+uninstall something, then export. Grant changes do not need this — they are caught
+by comparison whenever the process next starts (P16) — and that difference is the
+finding below.
+
+#### Every stopped window in this file is closed by a launch
+
+The record bounds where the uninstall can have fallen. Six minutes hold the whole
+episode:
+
+```
+01:46:04.981   process start  10h15m04s   BOOT_COMPLETED +30ms
+03:14:46.431   process start  11h43m45s   (none)            <- caught the two gained listeners
+03:15:33.450   process start  11h44m32s   BOOT_COMPLETED +46ms
+03:18:46.096   process start  11h47m45s   BOOT_COMPLETED +55ms
+03:20:48.466   export
+```
+
+A force-stop kills the process, so every stopped window shows up as the gap before
+the next `grants.process.start`, and **every such gap in this file ends in a
+launch.** No further process start exists after 03:18:46, so the uninstall fell
+either in one of those gaps — in which case a launch followed it — or after the
+export at 03:20:48, in which case it is simply not in this file yet.
+
+That is decidable by the next export rather than by argument, and it is why the
+next export is worth taking: if the uninstall came after 03:20:48 and the route
+works, its first launch carries a `signal:…PACKAGE_REMOVED:package:…`.
+
+#### A correction to §7b4's preferred mechanism
+
+§7b4 preferred *withheld from a stopped package, released when the user launches
+it* over *queued against a frozen process*, on the strength of the 03:14:46 launch
+carrying nothing. If the uninstall fell in one of the gaps above, that preference
+does not survive: a launch followed it, that launch released a `BOOT_COMPLETED`,
+and **no `PACKAGE_REMOVED` came with it.** A queue that releases what was withheld
+would have released both.
+
+What survives is narrower and fits all six rows: `BOOT_COMPLETED`'s reappearance is
+specific to that broadcast — the system telling a package that has just left the
+stopped state that boot is complete — rather than a replay of whatever it missed.
+Under that reading a one-shot package event in a stopped window is **lost for
+ever**, which is consistent with the silence here. It is a hypothesis, unverified,
+and it is now the one with the most rows behind it.
+
+**P20 is unaffected.** It asserts a correlation — reading present after a
+force-stop, absent after an ordinary death — and never depended on which mechanism
+produces it. The mechanism claim in §7b4 is withdrawn pending the ordering; the
+marker stands on the same evidence as before.
+
+#### The finding: comparison-based routes self-heal, event-based routes do not
+
+This is the asymmetry the two accounts together expose, and it is sharper than
+either.
+
+| route | kind | missed while stopped? |
+| --- | --- | --- |
+| `process.start` | compares the set against history | **no** — the next start catches it, whenever that is |
+| `settings.changed` | compares the set against history | no; it only ever cost promptness |
+| `signal:…PACKAGE_*` | reports an **event**, with no state behind it | **yes, permanently** |
+
+There is no installed-package set in the observation payload, so a package event
+has nothing to be compared against. Nothing recovers it later, and nothing records
+that it was missed.
+
+**And the same gap exists without any force-stop.** Comparison against history
+reports on **endpoints, not intervals.** An app installed, granted a notification
+listener, used, and uninstalled between two process starts returns the grant set to
+its previous value, and the next reading says `changed: false` — true about the two
+endpoints and silent about everything between them. The journal cannot separate
+*nothing happened* from *something happened and was undone*, which is the same
+family as recording an unreadable setting as an empty one and a lost history as an
+unchanged one. The broadcast routes were the only mitigation for it, and they are
+exactly the routes that are lossy.
+
+That is recorded as a limit, not fixed. The two candidate answers, neither
+implemented: **carry an installed-package set** in each observation, so a package
+change becomes a comparison like the others and the broadcast drops to
+promptness-only — which is the posture the design already claims for
+`settings.changed`; or **record the blind window explicitly**, so a reader can see
+where the loop was not watching rather than inferring safety from silence. The
+first is the architecturally consistent one. Both are design changes and need
+approval.
 
 ---
 
