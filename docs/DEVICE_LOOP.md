@@ -2496,6 +2496,93 @@ nothing else on the device can read app-private storage. It cost something today
 the export arrived only because the ANR dialog could be waited out — and it is
 recorded now rather than after it costs more.
 
+### 7b12. The fix, measured on the device by the device — 2026-09-28
+
+Pass 1's fix installed cleanly — the key matched, unlike pass 2's (§7b8) — and the
+journal it was fixing recorded the repair.
+
+#### The self-test passes, for the first time
+
+```
+probe.selftest  07:28:26
+  ok: true      failed: []      chainBaseline: true      chainBreaks: "4"
+  chain.noNewBreaks: true
+  encoder.canonical: true   encoder.payloadDigest: true   encoder.eventDigest: true
+  storage.appendSurvivesReopen: true
+  locale: en-IN   vm: Dalvik 2.1.0
+```
+
+Twelve self-tests are in this lane. **Eleven read `ok: false`, failing
+`chain.linksEndToEnd`; the twelfth is the first that has ever passed.** The old
+check name is gone from the payload, which is the confirmation §5j's fix landed
+rather than a reassurance that it did.
+
+**`chainBreaks: "4"` is the honest part.** The baseline captured the §5d break at
+line 4 rather than hiding it, and from here only a **new** break fails. The damage
+is still in the chain, still immutable, still exported. Nothing was repaired; what
+changed is that the check now asks a question whose answer can change.
+
+#### The launch cost, measured on the phone
+
+`probe.process.start` and `probe.selftest` are written back to back, and the
+self-test's dominant cost is one `chainBreaks()` pass over the lane. The gap between
+them is therefore a direct measurement of one full read — taken by the device, on
+every process start, for three days:
+
+| date | events in the lane | `process.start` → `selftest` |
+| --- | --- | --- |
+| 09-25 | 1,443 | 694 ms |
+| 09-25 | 1,447 | 3,345 ms |
+| 09-25 | 1,962 | 1,222 ms |
+| 09-26 | 3,020 | 3,594 ms |
+| 09-27 | 5,635 | **5,628 ms** |
+| 09-28 | 5,639 | 2,838 ms |
+| 09-28 | 5,648 | 5,562 ms |
+| 09-28 | 5,656 | 2,931 ms |
+| **09-28, new build** | **5,748** | **51 ms** |
+
+Roughly a millisecond per event, growing with the lane, exactly as an unbuffered
+per-byte read predicts — and **5,628 ms for the self-test alone already exceeds
+Android's five-second threshold**, with six or seven such passes in the launch path.
+Then 51 ms at a larger lane than any row above it. **A 55–110× improvement on the
+device**, against the 60× measured off it (§7b11).
+
+*(A 09-25 12:05 process start is left out of the table rather than dropped silently:
+it wrote no self-test at all, because that build predates `SelfTest`. Pairing it with
+the next process's result would have produced a 722-second row that measures nothing.)*
+
+#### What the fix did not establish
+
+**The encoder checks were already passing.** `encoder.canonical`,
+`encoder.payloadDigest` and `encoder.eventDigest` read `true` in the first self-test
+on 09-25 and in every one since, under `Dalvik 2.1.0` with `locale: en-IN` — which
+is not the test machine's, and which is what §7b said could only be asked on the
+device. That question was answered on **09-25**, not today, and today's pass adds
+nothing to it. Reading a newly-green screen as newly-green evidence would be the §5j
+error with the sign flipped.
+
+#### The app recorded its own absence
+
+```
+probe.gap.inferred  07:28:26
+  durationMs: 37,380      shortGap: true      confidence: "0.6"
+  detectedBy: "process-restart-after-unexplained-last-event"
+  lastEventType: "probe.heartbeat"
+```
+
+The 37.4 seconds it took to replace the app are in the journal as an inferred gap,
+with the confidence and the inference method named. P4's property — *the runtime can
+record that it was killed or deferred* — holding across its own upgrade.
+
+#### Why this one matters beyond the bug
+
+The defect passed **101 desktop checks** before the fix and after it. It was
+invisible to every test the project has, at every size those tests use, and it was
+lethal to usability at a size only a real run reaches. Nothing but a journal that had
+been carried for three days could have surfaced it — and then the same journal
+measured the repair, on the device, without anyone adding an instrument to do it.
+That is `DEVICE_LOOP.md` working as designed, on itself.
+
 ---
 
 ## 7a. Sequencing the pass-1 run
