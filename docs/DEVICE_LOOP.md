@@ -4416,3 +4416,74 @@ to the operator* and *available to anything distributed*.
 `QUERY_ALL_PACKAGES` lines deleted — the manifest already documents that as the
 one-step reversal — and see whether the block goes away. That would separate the
 permission from the receiver and the size in one install.
+
+### 7b39. The one-change build — `QUERY_ALL_PACKAGES` omitted — 2026-09-28
+
+§7b38 named the cheap next measurement and this is it: **the same code, built
+with the permission deleted, staged for one install.** The deletion is not a
+hand-edit — it is a build flag, `ORB_PACKAGE_SCAN=0`, so both variants stay
+reproducible and the manifest carries an XML comment where the permission was
+rather than losing the line silently.
+
+```
+ORB_PACKAGE_SCAN=0 ./build.sh
+→ QUERY_ALL_PACKAGES: omitted
+→ package: dev.orb.app  versionCode: 29843605  (same key, upgrades in place)
+→ aapt2 dump permissions: RECEIVE_BOOT_COMPLETED only
+```
+
+Same signing key as v5, so it **upgrades in place and keeps the lane**
+`orb-d7d5f6ec2ea184ae5b990ab7` — the journal is continuous across the change,
+which is what makes the degradation observable on one device rather than
+inferred across two.
+
+#### One variable, and it is genuinely one this time
+
+§7b38's comparison carried three confounds at once — the permission, a new
+`BOOT_COMPLETED` receiver, and 21→33 KB of growth. This build changes **only the
+permission**. The receiver is already present in v5 and stays; the code is
+byte-for-byte the same source; the APK is the same 33 KB. If v5 was blocked and
+this installs silently, the receiver and the size are cleared and
+`QUERY_ALL_PACKAGES` is left holding the result alone. If this is *also* blocked,
+the permission is exonerated and the receiver or the heuristic's memory of the
+package becomes the candidate.
+
+#### Two predictions, written before the install
+
+Stating them first is the point — a prediction recorded after the fact is not a
+test.
+
+1. **Play Protect lets it through silently.** This is the §7b38 thesis's
+   prediction: if `QUERY_ALL_PACKAGES` is what tripped the block, removing it
+   removes the block. A residual risk is named: Play Protect may remember the
+   package (`dev.orb.app` was flagged once) and re-flag on reputation rather than
+   on the current manifest, in which case a silent install cannot be read as
+   *the permission was the cause* — it would only show the block is not
+   permission-gated on re-install.
+2. **The package scan degrades honestly, with exactly one re-baseline.** The
+   runtime keeps the capability machinery; what changes is that the platform now
+   answers `getInstalledPackages` with the **visible** set (the `<queries>` admin
+   filter plus self) instead of all 484. The prediction, which the manifest
+   comment says has *never actually been run*: `GrantReader.packageScope` records
+   `visible`, `Grants.previous` refuses to diff across the scope change and
+   **re-baselines once**, and the journal shows a single `baseline: true` package
+   reading at the scope boundary — **not** two hundred `installedPackageLost`
+   entries for uninstalls that never happened.
+
+The second prediction is the one that matters for the architecture. It is the
+claim `Watch` and `Grants` have carried in a docstring since they were written —
+that a scope contraction is reported as a contraction of *what can be seen*, not
+as a mass uninstall — and it has only ever been argued. This install runs it.
+
+#### What a grant does under the omitted permission
+
+`PackageAccess.grant` still writes its event and still flips the flag, and the
+scan still runs. What it cannot do is make the platform return packages it is no
+longer permitted to see. So a grant here authorizes a **visible-scope** scan, and
+the record will say so: `installedPackageScope: "visible"`, not `"all"`. That is
+the correct shape — the capability gate governs *whether Orb asks*, the manifest
+governs *what the platform answers*, and conflating them was the AD-7 mistake in
+the first place. The grant is honoured; the answer is smaller; both are on the
+record.
+
+**Staged:** `orb-app-v6-noquery.apk`. Awaiting one install and one export.

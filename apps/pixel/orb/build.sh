@@ -13,6 +13,16 @@ BT="$SDK/build-tools/36.0.0"
 JAR="$SDK/platforms/android-$API/android.jar"
 
 PKG="${ORB_PROBE_PKG:-dev.orb.app}"
+# Whether this build asks for QUERY_ALL_PACKAGES at all. `0` omits it, which is
+# both the documented one-step reversal and §7b38's controlled experiment: the
+# permission is the only thing that changes, so a Play Protect verdict that moves
+# with it is evidence and one that does not is evidence too.
+SCAN="${ORB_PACKAGE_SCAN:-1}"
+if [ "$SCAN" = "0" ]; then
+  QUERY_ALL='    <!-- ORB_PACKAGE_SCAN=0: QUERY_ALL_PACKAGES deliberately omitted. -->'
+else
+  QUERY_ALL='    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />'
+fi
 LABEL="${ORB_PROBE_LABEL:-Orb}"
 # **There is no ORB_LANE here, and that is the point.** Pass 1 hardcoded its lane
 # and pass 2 made it a build flag; both put the lane's identity outside the
@@ -36,6 +46,7 @@ mkdir -p "$(dirname "$KEYSTORE")"
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 sed -e "s/@PKG@/$PKG/g" -e "s/@LABEL@/$LABEL/g" -e "s/@VERSION_CODE@/$VERSION_CODE/g" \
+  -e "s|@QUERY_ALL_PACKAGES@|$QUERY_ALL|" \
   AndroidManifest.xml > "$OUT/AndroidManifest.xml"
 
 # The journal itself comes from pass 1, taken at build time and never copied.
@@ -99,4 +110,5 @@ fi
 "$BT/apksigner" verify "$OUT/${PKG##*.}.apk" && echo "signature ok"
 ls -lh "$OUT/${PKG##*.}.apk"
 echo "package: $PKG  lane: minted at first run  versionCode: $VERSION_CODE"
+echo "QUERY_ALL_PACKAGES: $([ "$SCAN" = "0" ] && echo omitted || echo declared)"
 echo "signing key: $KEYSTORE"

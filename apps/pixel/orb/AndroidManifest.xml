@@ -17,9 +17,20 @@
 
   **So it is declared here and gated at runtime.** The manifest permission only
   makes the read *possible*; `PackageAccess` decides whether it *happens*, and
-  the grant, the refusal and the revocation are all events. Reverse the whole
-  thing by deleting those four lines: `GrantReader.packageScope` then records
-  `visible` and the signal degrades honestly instead of breaking or lying.
+  the grant, the refusal and the revocation are all events.
+
+  **And it is now a build flag** — `ORB_PACKAGE_SCAN=0` omits the permission
+  entirely. Two reasons, and the second was not anticipated:
+
+  1. `DEVICE_LOOP.md` §7b38: Play Protect blocked the build that first carried
+     this permission, having passed four previous builds of the same package
+     under the same key that carried none. Omitting it is the one-change
+     experiment that separates the permission from the receiver and the size.
+  2. The **honest degradation** this comment has always claimed —
+     `GrantReader.packageScope` records `visible`, and `Grants.previous` refuses
+     to diff across a scope change and re-baselines once instead of reporting two
+     hundred uninstalls that never happened — has **never actually been run**. A
+     claim that has only ever been argued is not a claim that has been tested.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@PKG@"
@@ -29,7 +40,7 @@
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+@QUERY_ALL_PACKAGES@
 
     <!--
       Without this, `queryBroadcastReceivers` for admin receivers sees some
