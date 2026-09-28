@@ -139,8 +139,15 @@ grants — on its own event type, `grants.packages`, and its own cadence. The re
 *event*, so missing the moment loses it for ever — which is what happened when an
 app was uninstalled while this one was force-stopped and the platform withheld the
 broadcast. A set compares, so a later scan catches what the missed broadcast would
-have said. That demotes the package broadcast from load-bearing to prompt, the
-posture `watchSettings` already had.
+have said.
+
+**And on 2026-09-28 the broadcast route was refuted outright** (§7b10): an install
+taken with the process alive, launched, and never force-stopped produced no reading
+at all, while the same receiver's `BOOT_COMPLETED` filter fired in the same export.
+So the scan is not a backstop behind a prompt signal — it is the whole mechanism,
+and `SCAN_INTERVAL_MS` is the detection latency for a new app rather than a
+fallback. The filter and its branch are kept and relabelled, so that a platform
+that ever starts delivering says so in the journal.
 
 **Why a scan and not a field on every observation.** Enumerating every package is
 hundreds of `PackageInfo` objects over a binder transaction; the three grant reads

@@ -55,8 +55,15 @@ final class Grants {
      * what happened on 2026-09-28 when an app was uninstalled while this one was
      * force-stopped and the platform withheld the broadcast (`DEVICE_LOOP.md`
      * §7b5, P19). A set compares, so a later scan catches what the missed
-     * broadcast would have said — which demotes the broadcast from load-bearing
-     * to prompt, the same posture `watchSettings` already has.
+     * broadcast would have said.
+     *
+     * **And the broadcast never arrives at all.** P19 was refuted on 2026-09-28
+     * (§7b10): an install with this process alive, launched, and never
+     * force-stopped produced no reading, while the same receiver's
+     * `BOOT_COMPLETED` filter fired in the same export. So this is not a set
+     * backing up a prompt signal — it is the **only** way a package change is
+     * ever noticed, and `Pass2.SCAN_INTERVAL_MS` is the detection latency for a
+     * new app rather than a fallback behind something faster.
      *
      * **Why it is a separate event and not a fourth field on every observation.**
      * Enumerating every package is hundreds of `PackageInfo` objects across a

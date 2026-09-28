@@ -34,12 +34,17 @@ public final class WakeReceiver extends BroadcastReceiver {
         }
         app.observe(because);
 
-        // A package broadcast scans **unconditionally**, whatever the interval
-        // says: this is the route that knows a package moved, and it is the one
-        // moment when a scan is certain to find something. Every other wake scans
-        // only if the last one is stale. That is the whole shape of this signal --
-        // the broadcast for promptness, the scan for correctness, and neither
-        // depending on the other (`DEVICE_LOOP.md` 7b7).
+        // A package broadcast would scan unconditionally, whatever the interval
+        // says, because it is the one moment a scan is certain to find something.
+        //
+        // **It has never happened.** P19 was refuted on 2026-09-28
+        // (`DEVICE_LOOP.md` 7b10): an install with this process alive and never
+        // force-stopped produced no reading, while the BOOT_COMPLETED filter on
+        // this same receiver fired in the same export. The branch below is kept
+        // deliberately, relabelled -- it costs one comparison, and if a future
+        // platform, a wider <queries>, or a context-registered receiver ever makes
+        // the route deliver, the reading appears in the journal and says so. A
+        // refuted route deleted is a refutation nobody can un-make.
         if (isPackageAction(intent.getAction())) {
             app.scanPackages(because);
         } else {

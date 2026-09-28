@@ -32,7 +32,7 @@ needs, including the author in three months.*
 | **P16** | A grant enabled while the app is not running is detected at the next process start, from history | **Held 2026-09-28, both directions.** First on the mirror case — two listeners turned off while the process was dead, next `process.start` read `changed: true`, named both in `notificationListenerLost`, 5 → 3, `baseline: false` (§7b2). Then as literally written — two listeners turned **on** while dead, named in `notificationListenerGained`, 3 → 5 (§7b3) |
 | **P17** | *(never predicted; measured)* A `signal:…BOOT_COMPLETED` reading means the device rebooted | **Refuted 2026-09-28** — delivered **four times** in one boot session, every event deriving the same boot instant to the millisecond. `elapsedRealtimeMs` is the only field that can date a boot. **Mechanism accounted for:** the operator force-stopped the app and reopened it; three of the four land mid-launch, and the one launch that followed an ordinary process death carries none (§7b2, §7b3, §7b4) |
 | **P18** | The settings watch reports a change while the process is alive, with no wake and no launch | **Held 2026-09-28** — the first `settings.changed` readings ever recorded: one `changed: false` 0.9 s after a launch, then `changed: true` 24 s later naming the listener that was re-enabled, 4 → 5. Accessibility and notification listeners only; **device admin has no URI** (§7b3) |
-| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Untested 2026-09-28, three attempts, all invalidated the same way.** Three uninstalls across two days and **not one broadcast reached the receiver** — each happened while the app was force-stopped, and a stopped package is excluded from broadcasts until launched. That is evidence about the procedure, not the route. The settling test involves no force-stop: open Orb, leave it, install something (§7b3, §7b5, §7b9) |
+| **P19** | A package broadcast reaches the manifest receiver and is read as `signal:…PACKAGE_ADDED:package:<name>` | **Refuted 2026-09-28.** An app was installed with the process **alive, launched three times and never force-stopped** — proven by `grants.process.start` appearing nowhere in the window — and no broadcast arrived, while the same receiver's `BOOT_COMPLETED` filter fired in the same file. **There is no prompt route for packages**, so the scan is the whole mechanism and §§7b5–7b9's "safety net" framing was wrong. The mechanism of the failure is unknown and recorded as unknown (§7b10) |
 | **P20** | A `signal:…BOOT_COMPLETED` reading at non-zero uptime marks a **force-stop** since the app last ran — and is absent after an ordinary process death | **Strengthened 2026-09-28, control half still open.** Now **five** deliveries after a stop — the fifth under a force-stop the operator declared in advance, 69 ms after the process start (§7b9) — against **one** launch after an ordinary death carrying none. A side effect of platform behaviour, not an API; the control half needs its own export. §7b4's guess at the *mechanism* is withdrawn — a `PACKAGE_REMOVED` in the same stopped window was **not** released at the next launch, so it is not a queue replay (§7b4, §7b5) |
 | **P21** | *(never predicted; structural)* Comparison against history reports on **endpoints, not intervals** | **Limit, recorded 2026-09-28, narrowed not closed.** A grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now compared against history, and on 2026-09-28 that recovery **ran for real**: an uninstall performed inside a force-stopped window reached no broadcast at all, and the next scan reported it — 484 → 482, both packages named, one alert under `packages-changed` (§7b9). What remains open is unchanged: an install *undone* before the next **scan** is still invisible, and §7b7 widened that window from the next wake to the scan interval in exchange for the battery it was costing (§7b5–§7b7, §7b9) |
 | **P22** | The installed-package set is readable, complete under `QUERY_ALL_PACKAGES`, and a package change is caught by comparison at the next **scan** | **Held 2026-09-28 on the device** — `scope: "all"`, **484 packages**, baseline on the first scan, and a second scan reading `baseline: false` **across an intervening observation**, which is `lastOfType(PACKAGES)` proven rather than argued (§7b8). Built as `dev.orb.pass2b` after the update to the installed pass 2 was refused for a signature mismatch. Earlier note: Built, 65 desktop checks and 657 TypeScript tests. Three readings settle it: a `grants.packages` event with `because: "operator.scan"` after pressing the button; `installedPackageBaseline: true` on the first one; then a named entry in `installedPackageGained`/`…Lost` with `scope: "all"` after an install taken with Orb opened first (§7b6, §7b7) |
@@ -1990,9 +1990,11 @@ clean.
 ever; a set compares, so the next process start catches what the missed broadcast
 would have said, whenever that start comes. §7b5's uninstall would be caught today
 — not at the moment it happened, but at all, which is the difference between a
-signal and a gap. It demotes `signal:…PACKAGE_*` from load-bearing to prompt, which
-is the posture `watchSettings` already had and the one this design says every route
-should have.
+signal and a gap. It was written to demote `signal:…PACKAGE_*` from load-bearing to
+prompt — the posture `watchSettings` already had. **§7b10 refuted that route
+entirely**, so what this actually did was replace a mechanism that never worked with
+one that does, and the scan interval is the detection latency rather than a
+fallback.
 
 **What it does not buy, stated in the code and again here.** It does not close the
 interval gap. An app installed, granted a listener, used and uninstalled between two
@@ -2332,6 +2334,86 @@ as `dismissed`.
 reason the answer is recorded at all: §7 R6 says false positives cost trust, and a
 rule nobody can measure for them is a rule nobody can improve. This one was true,
 and the record can now say so with a date.
+
+### 7b10. P19 refuted — the package broadcast never arrives — 2026-09-28
+
+An app was reinstalled with the process **alive and never force-stopped**, and no
+broadcast reached the receiver. P19 is refuted.
+
+```
+ 8  06:41:54  15h10m53s  process.start            <- the last process start in the file
+16  06:42:15  15h11m15s  observed  app.opened
+17  06:55:23  15h24m22s  observed  app.opened
+18  06:56:54  15h25m54s  observed  app.opened
+19  06:56:56  15h25m56s  packages  operator.scan   changed: TRUE  482 → 483
+                                   gained: com.ixigo
+20  06:57:02  export
+```
+
+**The process never restarted.** `grants.process.start` appears on lines 1 and 8 of
+the export and nowhere else, so one process ran continuously from 06:41:54 to
+06:57:02 — fifteen minutes spanning the install. `Pass2.onCreate` writes that event
+unconditionally, so its absence is proof rather than inference. The app was launched
+three times in the window, which clears any stopped state, and the operator
+force-stopped nothing.
+
+**The only `signal:` in the whole file is one `BOOT_COMPLETED`.** No
+`PACKAGE_ADDED`, under any data scheme, at any point.
+
+**And the same receiver demonstrably works.** `WakeReceiver` is registered once and
+its `BOOT_COMPLETED` filter fired at 15h10m54s in this very file. The class, the
+registration and the delivery path are all live; the package intent-filter beside it
+is what produces nothing.
+
+#### What this costs, stated plainly
+
+**There is no prompt route for packages. There never was one.** Every earlier note
+in this document describing the broadcast as *promptness* and the scan as a *safety
+net beneath it* is wrong, and the direction of the error matters: the scan is not a
+backstop, it is the **entire mechanism**. `SCAN_INTERVAL_MS` is therefore not a
+convenience, it is the **detection latency for a new app** — up to twelve hours,
+always, with nothing faster underneath it.
+
+**And §7b5's explanation was sufficient but not the cause.** I attributed the three
+earlier silences to the force-stop and the stopped-package exclusion. That fitted
+every fact available then, and it was wrong as a *diagnosis*: the route fails with
+no force-stop anywhere near it, so those tests would have produced nothing either
+way. The force-stop was never the reason. Recording that the explanation was
+consistent with the evidence and still not true is the point of §7 R5.
+
+#### The mechanism is unknown, and is recorded as unknown
+
+Three candidates fit, and this run distinguishes none of them:
+
+1. **Manifest receivers may no longer receive implicit package broadcasts.** Android
+   8 restricted implicit broadcasts to context-registered receivers with a published
+   list of exceptions; `BOOT_COMPLETED` is on that list and arrives here, which is
+   consistent.
+2. **Package visibility.** On API 30+ an app is told about packages it can see, and
+   this app declares `<queries>` for one intent only.
+3. Something specific to this platform build.
+
+The record says the route does not deliver on **`CP1A.260405.005`, API 36, target 36,
+2026-09-28**. It does not say why, and a guess dressed as a finding would be worth
+less than the refutation.
+
+#### What is kept, and why
+
+The package intent-filter stays in the manifest and `WakeReceiver.isPackageAction`
+stays in the code, both relabelled as **refuted and retained as a detector.** They
+cost one filter and one comparison; what they buy is that if a future Android, a
+different `<queries>` declaration or a context-registered receiver ever makes the
+route work, a `signal:…PACKAGE_ADDED:package:…` reading appears in the journal and
+says so. A refuted route deleted is a refutation nobody can un-make; kept and
+labelled, it is a standing measurement.
+
+#### The loop, twice more
+
+The reinstall raised a second package alert — `+ com.ixigo`, under
+`device-watch.packages-changed` — and the earlier one stayed answered. Three package
+changes have now gone reading → scan → alert, and two of the three were caught with
+**no broadcast of any kind involved**, which is now known to be the only way they
+could have been caught at all.
 
 ---
 
