@@ -4568,3 +4568,34 @@ than the whole installed life — which is precisely the trade `MOBILE_SENSING.m
 framed: *available to anything distributed* costs the breadth that *available to
 the operator* keeps. This build is the distributable half, and it now has device
 evidence that it degrades where the thesis said it would and nowhere else.
+
+#### The "exactly one" in "exactly one re-baseline" — proven by the second scan
+
+`orb-20260928-230744.txt` carries the lane seven events further, through a
+second visible-scope scan, and it closes the part of Prediction 2 the first scan
+could only assert. The first visible scan (event 28) re-baselined —
+`installedPackageBaseline: true` — because it crossed the `all → visible`
+boundary. The **second** visible scan (event 35) did **not**:
+
+```
+event 28  scope=visible  count=135  baseline=true   changed=false   ← boundary
+event 35  scope=visible  count=135  baseline=false  changed=false   ← normal diff
+```
+
+This is the difference between *re-baselines once* and *re-baselines forever*. A
+scope change that reset the baseline on every subsequent reading would be a
+permanent regression dressed as a one-time event — silence that never resolved.
+Instead, once both the stored and the current reading are `visible`,
+`Grants.previous` diffs them normally and reports `changed: false` against a real
+comparison. The boundary is a single event; steady state resumes immediately
+after it. The honest-degradation claim is now confirmed on both halves: one
+re-baseline at the contraction, ordinary diffing on either side of it.
+
+**Still pending on-device: the grant-scope fix.** These grant and revoke events
+(33, 34) still read `scope: "all installed packages on this device"` with **no
+`manifestScope` field** — the pre-fix build. So this export confirms the
+over-claim is still present exactly where §7b40 found it, and the v7 build that
+derives `manifestScope` from the manifest has not yet been installed. The fix is
+staged (`orb-app-v7-noquery-scopefix.apk`); its confirmation is the grant reading
+`manifestScope: "visible"` to match its own scan, and that reading is not yet in
+any export.
