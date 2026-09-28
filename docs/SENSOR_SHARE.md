@@ -54,6 +54,23 @@ adds a value, not a mechanism.
 
 ---
 
+> **§3 is falsified as written — measured 2026-09-28** (`DEVICE_LOOP.md` §7b33).
+> The clean split below — *record the reference now, resolve it later under a
+> declared Capability* — **is not available on Android.** The URI grant is scoped
+> to the receiving activity's lifetime, and a read attempted 9.5 s after the share
+> is refused outright: *"Permission Denial: opening provider … that is not
+> exported."* The **boundary** §3 draws is right; the **timing** it assumes is not.
+>
+> Pending a ruling, the recommendation is to resolve **during** the share, while
+> the grant is live — the share is itself the authorization event, and a person
+> handing something over deliberately is stronger consent than a prompt invented
+> afterwards.
+>
+> Also measured: **a reference is not a content identity.** The same photograph
+> shared twice produced two references, because Photos wraps a stable MediaStore
+> id in a per-share token. Anything deriving an identity from a reference must use
+> the embedded id and not the wrapper (`../contracts/Event.md` inv. 9).
+
 ## 3. The line that makes this safe: a share is a **reference**, not content
 
 Android hands over a `content://` URI, a URL, or text — **a pointer**. Turning
