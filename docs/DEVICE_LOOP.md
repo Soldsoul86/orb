@@ -4794,3 +4794,23 @@ stub is required; the meaning of flag bit 256; and how the platform behaves when
 a **second** assistant-capable app (the operator has ChatGPT, Claude, Perplexity
 and Google all registered) is invoked while this one is default — that is not a
 concern of the probe, only a fact of the device.
+
+#### Addendum, 2026-09-29 — a second export, two more invocations
+
+`orb-probea-20260929-125517.txt`: the same lane and install, 58 events (`verifyLane`
+accepts all of them), the first 47 unchanged, then two invocations:
+
+| App | structure | screenshot |
+| --- | --- | --- |
+| LinkedIn | 260 nodes, 34 with text, 529 characters | real capture (58 colours) |
+| A crypto exchange app | 60 nodes, **1 text node (20 characters)**, 27 descriptions, **2 web views** | **real capture** (45 colours, 74 % dark) |
+
+**P26's refuted half now has a second instance**: the exchange screen opted out of
+neither structure nor screenshot, and the platform delivered a genuine screenshot.
+Two financial apps, two intact screens; it is not one app's quirk. Under DR-14 both
+are outside the allow-list and would not be captured.
+
+**P29, closer but still not tested**: the exchange screen is mostly web views, so its
+structure is present and nearly empty of text — the shape P29 predicted, in an app
+that is not a game. A game itself is still untried.
+
