@@ -162,6 +162,10 @@ trust, local-first, minimized disclosure).
 - **A recorded routing names the exact model version**, because "the same model" is
   not stable over time. An interpretation attributed only to a family name is
   attributed to nothing that can be checked later.
+- **Consent is scoped to the provider, not the version** (DR-12, 2026-09-29). A
+  remote route's authorization names the recipient of the data; a new model
+  version from the same provider discloses to no one new and needs no fresh
+  consent. The record above stays exact; only the consent is per recipient.
 - The core obligation — *no hardcoded provider, a local route always available,
   disclosure minimized and permissioned and recorded, history untouched by swaps* —
   is frozen at v1.

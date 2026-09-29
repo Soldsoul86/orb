@@ -601,11 +601,13 @@ the router chooses *where*, it never acts on what it carries:
 
 ### What stays open
 
-- **Who holds the authorization** — the `Reasoner` that wanted the interpretation,
+- ~~**Who holds the authorization**~~ — **settled by DR-12 (2026-09-29): the
+  `Agent`.** — the `Reasoner` that wanted the interpretation,
   or an `Agent` above it. That is a Runtime Loop question about the caller, not a
   kernel question about the contracts, and both contracts are indifferent to the
   answer. It should not be left indefinite once the loop is written.
-- **Whether a route's Capability is declared per provider or per model version.**
+- ~~**Whether a route's Capability is declared per provider or per model version.**~~
+  **Settled by DR-12: per provider; the exact version is still recorded.**
   §5 of `ModelRouter.md` requires a recorded routing to name the exact model
   version; whether *authorization* must be that narrow is not settled here, and
   the honest answer may be that a model swap within a provider changes what is
@@ -726,6 +728,64 @@ name what it checked has not met it.
 Art. X §39 — implementations are replaceable, the kernel is not. Art. X §38's
 requirement of a new version for a **breaking** change is untouched; DR-11
 defines the boundary of "breaking" rather than moving it.
+
+---
+
+## DR-12 — The Agent carries a remote-model request; consent is per provider
+
+- **Status:** Decided · **Decided:** 2026-09-29, operator · **Bears on:**
+  `contracts/Reasoner.md` §2, `contracts/ModelRouter.md` §5, `contracts/Agent.md`,
+  DR-9 *What stays open*
+
+**The questions.** DR-9 settled that a remote model call is a `Capability` and
+that the `ModelRouter` resolves but never emits. It left two things open, and
+said the first *"should not be left indefinite once the loop is written"*:
+
+1. **Who carries the proposed disclosure through the route's `Capability`** — the
+   `Reasoner` that wanted the interpretation, or an `Agent` above it?
+2. **What a consent covers** — a provider, or each exact model version?
+
+**Ruled.**
+
+1. **The `Agent` carries it.** The `Reasoner` asks the `ModelRouter`, receives a
+   proposed disclosure (route + minimized content), and stops there. Binding that
+   proposal to the route's `Capability` and submitting it to `Policy` is the
+   Agent's work, exactly as for *send a message*.
+2. **Consent is per provider.** A standing authorization for a remote route names
+   the provider — the recipient of the data. A new model version from the same
+   provider needs no fresh consent, because it discloses to no one new. Every
+   routing still records the **exact model version** (`ModelRouter.md` §5): the
+   *record* stays as narrow as it was; only the *consent* is scoped to the
+   recipient.
+
+**Why the Agent.** The Execution domain keeps four verbs in four hands — decide,
+bind, permit, act — so that no component holds both a power and the rule over it.
+A `Reasoner` that carried its own proposal to a `Capability` would be the thinking
+layer holding a route to the outside world, which `Reasoner.md` §7 already calls
+overstepping (*"a Reasoner that performs effects has overstepped"*). With the
+Agent carrying it, Intelligence stays powerless: it can want a remote model, and
+nothing more.
+
+**Why per provider.** Consent is about *who receives your data*. A model version
+changes what answers you, not who holds what you sent. Requiring re-consent on
+every version bump would ask the same question about the same recipient again
+and again — the prompt nobody reads, which is how consent stops meaning anything.
+The provider changing **is** a new recipient, and needs its own authorization.
+
+### DR-11 check — run, not asserted
+
+Both are additions to Accepted contracts, so DR-11's condition applies: *no
+instance already in history may become invalid.* Checked 2026-09-29: every event
+type in `runtime/`, `packages/` and `apps/pixel/` source, and every device export
+received this session (45 files). **No routing, remote-disclosure or inference
+record exists anywhere.** No instance can be invalidated, because none exists.
+
+### What it does not change
+
+The `ModelRouter` still never emits and never authorizes. A local route still
+needs no authorization. A denial is still never rerouted. Whether a *family*
+rename by the same provider is a new recipient is not a question this answers —
+if it ever arises, the test is the one above: did the data go somewhere new?
 
 ---
 
