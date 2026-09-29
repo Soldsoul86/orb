@@ -445,3 +445,31 @@ never as a second Twin.
 **Decision owner:** operator (architecture). **Resolution:** explicit accept/reject when a
 facet-history need materializes.
 
+---
+
+## AD-11 — the Orb app's private storage is eligible for platform backup
+
+**Opened 2026-09-29.** Found while answering *what does Orb keep of a screenshot*.
+**Not verified to occur** — the exposure is a consequence of a manifest default, not
+something observed in a backup.
+
+**The finding.** `apps/pixel/orb/AndroidManifest.xml` does not set
+`android:allowBackup`, and its default is **true**. The app keeps three things in
+private storage (`getFilesDir()`): the journal, the sealed attachment blobs, **and
+the per-attachment keys** (`Attachments.java.in`, `attachment-keys/`). If the
+device's backup is on, Android's Auto Backup may copy all three off the phone
+together. That would put key and ciphertext side by side on a service the person
+does not control, which defeats two things at once: **local-first**, and the
+erasure guarantee — `ERASURE.md` §2a makes erasure *destroy the key*, and a
+backed-up copy of the key is a copy that destruction does not reach.
+
+**Why it is a debt and not fixed on the spot.** The fix is one manifest attribute
+and the choice it forces is real: `allowBackup="false"` also means a lost phone loses
+the journal, because Orb's own export to Downloads is then the only copy. That is
+consistent with the architecture (*the export is the durable artefact*, AD-9's
+note in `SETTLED.md`) but it is the operator's to accept.
+
+**Leading option.** `android:allowBackup="false"` and empty
+`dataExtractionRules`/`fullBackupContent` on every Orb build. **Revisit:** before any
+capture beyond what a person explicitly shares — i.e. before step 7's prototype
+stores a screen.

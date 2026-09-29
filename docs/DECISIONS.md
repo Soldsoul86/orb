@@ -907,6 +907,47 @@ records that its gate was accepted, not what its work is.
   whether an on-device model is usable from Orb. It is settled when that step is
   designed.
 
+
+## DR-14 — Payments apps are never captured by the assistant overlay
+
+- **Status:** Decided in part · **Decided:** 2026-09-29, operator · **Bears on:**
+  `DEVICE_LOOP.md` §7b42, the step-5 sensor declaration (not yet written)
+
+**The question.** The assist probe showed that Android hands an assistant an intact
+screenshot and full structure of any screen whose app did not opt out — including a
+payments screen (`DEVICE_LOOP.md` §7b42, P26). Which apps may Orb ever capture from?
+
+**Ruled.**
+
+1. **No payments app is captured.** The operator's reasoning: what a payment
+   amounts to can be derived from the text that arrives about it, so the payments
+   screen itself adds nothing worth the exposure.
+2. **Messaging, travel, content and work apps may be captured.**
+3. **Capture is per invocation.** Nothing here is continuous: the overlay opens when
+   the person invokes the assistant, and nothing is read otherwise.
+
+**Two things this ruling leans on, stated so they are not forgotten.**
+
+- *"Derived from the text"* presumes a text source. **Orb has none yet** — no
+  message, notification or SMS sensor exists — so today the payments facts are
+  simply not captured, not derived. The ruling is sound as an exclusion and is
+  not evidence that the derivation works.
+- The two protected-screen signals from §7b42 (`blockedNodes > 0`, a `uniform`
+  screenshot) are honoured **in addition**: an app that opts out is never
+  overridden, whatever category it is in.
+
+**Still open — step 5 decides these with the operator, they are not decided here.**
+
+- **How a payments app is recognised.** Android has no payments category; a
+  package list is the only mechanical route, and a list is only as good as its
+  last update.
+- **What an app on no list does.** Capture-by-default puts an unlisted banking app
+  in scope until someone adds it; capture-by-allow-list does not.
+- **What an invocation retains** — structure text, a screenshot, both, or neither
+  until *Remember* is tapped — and for how long.
+
+---
+
 ---
 
 ## Provenance
