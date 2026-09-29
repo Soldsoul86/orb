@@ -1,0 +1,11 @@
+package @PKG@;
+
+/** Entry point for the assist-probe desktop suite. */
+public final class Tests {
+    public static void main(String[] args) throws Exception {
+        PixelStatsTest.run();
+        FactsTest.run();
+        GuardTest.run();
+        System.exit(Harness.report());
+    }
+}

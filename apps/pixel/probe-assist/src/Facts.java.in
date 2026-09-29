@@ -1,0 +1,215 @@
+package @PKG@;
+
+import java.util.Map;
+import java.util.regex.Pattern;
+
+/**
+ * Every record this probe writes, and the only place it writes one.
+ *
+ * **No content can enter.** The methods below take numbers, booleans and — in one
+ * place — a package name that is validated against the shape of a package name.
+ * There is no parameter that accepts text, so a caller that wanted to record what
+ * was on the screen has nowhere to put it. That is the whole design: the probe is
+ * allowed to *receive* a screen (that is what it measures) and forbidden to
+ * *keep* any of it, and a rule enforced by the type of the arguments is stronger
+ * than one enforced by care. `FactsTest` also scans the glue's source to check it
+ * never writes a record any other way.
+ *
+ * The question the probe answers is *what does Android hand an assistant, and for
+ * which apps* (`DEVICE_LOOP.md` §7b41). What arrived, how much, and how fast are
+ * the answer; what it said is nobody's business, least of all a journal that
+ * cannot forget.
+ */
+final class Facts {
+    private Facts() {}
+
+    static final String READY = "assist.service.ready";
+    static final String SHUTDOWN = "assist.service.shutdown";
+    static final String SHOW_FAILED = "assist.show.failed";
+    static final String INVOKED = "assist.invoked";
+    static final String STRUCTURE = "assist.structure";
+    static final String CONTENT = "assist.content";
+    static final String SCREENSHOT = "assist.screenshot";
+    static final String CLOSED = "assist.closed";
+    static final String EXPORTED = "assist.export";
+
+    /** What a package name looks like. Anything else is not written down. */
+    private static final Pattern PACKAGE = Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+");
+
+    /** The only sources the probe names, so a source cannot carry anything else. */
+    static final String[] SOURCES = {
+        "assistGesture", "application", "activity", "pushToTalk", "notification", "automotive"
+    };
+
+    static boolean isPackageName(String value) {
+        return value != null && value.length() <= 255 && PACKAGE.matcher(value).matches();
+    }
+
+    /** A package name, or the fixed word `invalid` — never the value that failed. */
+    static String packageOrInvalid(String value) {
+        return isPackageName(value) ? value : "invalid";
+    }
+
+    static boolean isKnownSource(String name) {
+        for (String source : SOURCES) if (source.equals(name)) return true;
+        return false;
+    }
+
+    /** The service was bound by the system: this build holds the assistant role. */
+    static Map<String, Object> ready(boolean roleHeld, boolean activeService) {
+        Map<String, Object> p = Json.obj();
+        p.put("roleHeld", roleHeld);
+        p.put("activeService", activeService);
+        return p;
+    }
+
+    static Map<String, Object> shutdown() {
+        return Json.obj();
+    }
+
+    /**
+     * The system tried to show the session and could not. **An attempt that never
+     * arrived is a finding, not silence** — without this an unreachable assistant
+     * and an assistant nobody invoked would be the same empty journal.
+     */
+    static Map<String, Object> showFailed(int argKeys) {
+        Map<String, Object> p = Json.obj();
+        p.put("argKeys", (long) argKeys);
+        return p;
+    }
+
+    /**
+     * A session was shown.
+     *
+     * @param invocation an id the later records of this invocation carry
+     * @param flags the raw `showFlags`, kept so a source this build does not
+     *     decode is still on the record
+     * @param sources comma-joined names from {@link #SOURCES}; anything else is dropped
+     */
+    static Map<String, Object> invoked(
+            long invocation, int flags, boolean withAssist, boolean withScreenshot,
+            String sources, int argKeys) {
+        Map<String, Object> p = Json.obj();
+        p.put("invocation", invocation);
+        p.put("flags", (long) flags);
+        p.put("withAssist", withAssist);
+        p.put("withScreenshot", withScreenshot);
+        p.put("sources", cleanSources(sources));
+        p.put("argKeys", (long) argKeys);
+        return p;
+    }
+
+    /**
+     * The structure callback fired. Counts only — how much there was, never what it
+     * said.
+     *
+     * @param arrived false when the callback fired with no structure at all, which
+     *     is *the platform withheld it* and never the same as an empty screen
+     * @param packageName the app in front, or anything that is not a package name
+     *     (recorded as `invalid`)
+     */
+    static Map<String, Object> structure(
+            long invocation, boolean arrived, String packageName, int index, int count, boolean focused,
+            int windows, int nodes, int textNodes, long textChars, int descriptionNodes,
+            int maxDepth, int blockedNodes, int webViewNodes, int webDomainNodes,
+            long latencyMs) {
+        Map<String, Object> p = Json.obj();
+        p.put("invocation", invocation);
+        p.put("arrived", arrived);
+        p.put("package", packageOrInvalid(packageName));
+        p.put("index", (long) index);
+        p.put("count", (long) count);
+        p.put("focused", focused);
+        p.put("windows", (long) windows);
+        p.put("nodes", (long) nodes);
+        p.put("textNodes", (long) textNodes);
+        p.put("textChars", textChars);
+        p.put("descriptionNodes", (long) descriptionNodes);
+        p.put("maxDepth", (long) maxDepth);
+        p.put("blockedNodes", (long) blockedNodes);
+        p.put("webViewNodes", (long) webViewNodes);
+        p.put("webDomainNodes", (long) webDomainNodes);
+        p.put("latencyMs", latencyMs);
+        return p;
+    }
+
+    /**
+     * What the app chose to hand over deliberately (`AssistContent`). Presence only.
+     *
+     * @param arrived false when the callback fired with no content object
+     */
+    static Map<String, Object> content(
+            long invocation, boolean arrived, boolean webUri, boolean appProvidedWebUri, boolean intent,
+            boolean appProvidedIntent, long structuredDataChars, boolean clip, int dataKeys) {
+        Map<String, Object> p = Json.obj();
+        p.put("invocation", invocation);
+        p.put("arrived", arrived);
+        p.put("webUri", webUri);
+        p.put("appProvidedWebUri", appProvidedWebUri);
+        p.put("intent", intent);
+        p.put("appProvidedIntent", appProvidedIntent);
+        p.put("structuredDataChars", structuredDataChars);
+        p.put("clip", clip);
+        p.put("dataKeys", (long) dataKeys);
+        return p;
+    }
+
+    /**
+     * The screenshot callback fired. `arrived: false` is the platform passing null,
+     * which is a different fact from the callback never firing (that is recorded
+     * at close, `screenshotCallbacks: 0`).
+     */
+    static Map<String, Object> screenshot(long invocation, boolean arrived, PixelStats stats, long latencyMs) {
+        Map<String, Object> p = Json.obj();
+        p.put("invocation", invocation);
+        p.put("arrived", arrived);
+        p.put("width", (long) stats.width);
+        p.put("height", (long) stats.height);
+        p.put("sampled", (long) stats.sampled);
+        p.put("distinctColours", (long) stats.distinctColours);
+        p.put("darkPercent", (long) stats.darkPercent);
+        p.put("uniform", stats.uniform);
+        p.put("latencyMs", latencyMs);
+        return p;
+    }
+
+    /**
+     * The session closed, and what had arrived by then.
+     *
+     * **This is where absence becomes a measurement.** A callback count of zero
+     * here, on a session that was shown, is *the platform did not deliver it* — not
+     * *we did not look*. Before this record existed, both read the same.
+     *
+     * @param firstDrawMs milliseconds from `onShow` to the overlay's first frame, or
+     *     -1 if it never drew
+     */
+    static Map<String, Object> closed(
+            long invocation, int assistCallbacks, int screenshotCallbacks, long firstDrawMs,
+            long visibleMs) {
+        Map<String, Object> p = Json.obj();
+        p.put("invocation", invocation);
+        p.put("assistCallbacks", (long) assistCallbacks);
+        p.put("screenshotCallbacks", (long) screenshotCallbacks);
+        p.put("firstDrawMs", firstDrawMs);
+        p.put("visibleMs", visibleMs);
+        return p;
+    }
+
+    /** The operator exported the journal. Numbers only; the file's name is visible in Downloads. */
+    static Map<String, Object> exported(int eventsBefore) {
+        Map<String, Object> p = Json.obj();
+        p.put("eventsBefore", (long) eventsBefore);
+        return p;
+    }
+
+    private static String cleanSources(String sources) {
+        if (sources == null || sources.isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        for (String name : sources.split(",")) {
+            if (!isKnownSource(name)) continue;
+            if (out.length() > 0) out.append(',');
+            out.append(name);
+        }
+        return out.toString();
+    }
+}

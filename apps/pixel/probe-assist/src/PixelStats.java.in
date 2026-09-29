@@ -1,0 +1,92 @@
+package @PKG@;
+
+/**
+ * What can be said about a screenshot without keeping any of it.
+ *
+ * The probe needs to know one thing about the picture the platform hands an
+ * assistant: **did anything arrive that is not blank?** A window marked
+ * `FLAG_SECURE` is excluded from screenshots, and what the platform does in that
+ * case — no bitmap, a black one, a uniform one — is exactly the unknown
+ * (`DEVICE_LOOP.md` §7b41, P27). Three numbers answer it, and none of them is
+ * content: how many distinct colours a coarse grid of samples contains, what
+ * share of the samples are near-black, and whether every sample is the same.
+ *
+ * **A summary of a few hundred pixels is not the picture.** It cannot be turned
+ * back into one, and it is far too coarse to read text from. Nothing here retains
+ * the pixels it is given.
+ */
+final class PixelStats {
+    /** Samples per side. 32x32 = 1,024 pixels, however large the screen. */
+    static final int GRID = 32;
+
+    final int width;
+    final int height;
+    final int sampled;
+    final int distinctColours;
+    /** 0-100: how many samples had every colour channel below 16. */
+    final int darkPercent;
+    final boolean uniform;
+
+    private PixelStats(
+            int width, int height, int sampled, int distinctColours, int darkPercent, boolean uniform) {
+        this.width = width;
+        this.height = height;
+        this.sampled = sampled;
+        this.distinctColours = distinctColours;
+        this.darkPercent = darkPercent;
+        this.uniform = uniform;
+    }
+
+    /**
+     * Summarises a whole picture given as a row-major array of ARGB pixels.
+     *
+     * Kept for the desktop tests, which build small pictures. The phone never holds
+     * a whole screenshot as an array — a 1080x2400 one is ten megabytes to learn
+     * three numbers — and uses {@link #ofGrid} on a picture already scaled down.
+     */
+    static PixelStats of(int[] argb, int width, int height) {
+        if (width <= 0 || height <= 0 || argb == null || argb.length < width * height) {
+            return new PixelStats(Math.max(width, 0), Math.max(height, 0), 0, 0, 0, false);
+        }
+        int[] grid = new int[GRID * GRID];
+        for (int gy = 0; gy < GRID; gy++) {
+            int y = (int) (((long) gy * height) / GRID);
+            for (int gx = 0; gx < GRID; gx++) {
+                int x = (int) (((long) gx * width) / GRID);
+                grid[gy * GRID + gx] = argb[y * width + x];
+            }
+        }
+        return ofGrid(grid, width, height);
+    }
+
+    /**
+     * Summarises a picture that has already been reduced to {@code GRID x GRID}
+     * samples, remembering the size of the original.
+     *
+     * Colours are quantised to four bits per channel before counting, so
+     * compression noise does not make a flat colour look busy: two greys a shade
+     * apart are one colour here, and that is the point.
+     */
+    static PixelStats ofGrid(int[] grid, int width, int height) {
+        if (grid == null || grid.length != GRID * GRID) {
+            return new PixelStats(Math.max(width, 0), Math.max(height, 0), 0, 0, 0, false);
+        }
+        java.util.HashSet<Integer> seen = new java.util.HashSet<>();
+        int dark = 0;
+        for (int p : grid) {
+            int r = (p >> 16) & 0xff;
+            int g = (p >> 8) & 0xff;
+            int b = p & 0xff;
+            seen.add(((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4));
+            if (r < 16 && g < 16 && b < 16) dark++;
+        }
+        return new PixelStats(
+            width, height, grid.length, seen.size(), (int) ((100L * dark) / grid.length),
+            seen.size() == 1);
+    }
+
+    /** No picture arrived. Not the same as a blank one, and recorded as its own fact. */
+    static PixelStats none() {
+        return new PixelStats(0, 0, 0, 0, 0, false);
+    }
+}

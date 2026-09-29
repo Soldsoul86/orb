@@ -1,0 +1,90 @@
+package @PKG@;
+
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/** No record this probe writes can carry what was on a screen. */
+final class FactsTest {
+    static void run() {
+        packageNamesAreValidatedNotTrusted();
+        onlyKnownSourcesAreNamed();
+        everyRecordIsNumbersAndBooleans();
+        absenceIsItsOwnRecord();
+    }
+
+    private static void packageNamesAreValidatedNotTrusted() {
+        Harness.suite("a package name is written only if it is one");
+        for (String ok : new String[] {"com.whatsapp", "com.google.android.apps.maps", "dev.orb.probea", "in.redbus.android"}) {
+            Harness.check("accepts " + ok, Facts.isPackageName(ok));
+        }
+        for (String bad : new String[] {
+                "", "a", "hello world", "com..x", "WhatsApp: are you free tomorrow?",
+                "com.example/.Activity", "com.example.\nsecret", "x".repeat(300)}) {
+            Harness.check("rejects a value that is not one (" + bad.length() + " chars)", !Facts.isPackageName(bad));
+        }
+        Harness.check("null is not a package name", !Facts.isPackageName(null));
+
+        String secret = "my password is hunter2";
+        Map<String, Object> p = Facts.structure(1L, true, secret, 0, 1, true, 1, 10, 5, 100L, 1, 3, 0, 0, 0, 12L);
+        Harness.equal("a failed value is recorded as the fixed word", p.get("package"), "invalid");
+        Harness.check("and the value itself appears nowhere in the record",
+            !Json.canonical(p).contains("hunter2"));
+    }
+
+    private static void onlyKnownSourcesAreNamed() {
+        Harness.suite("an invocation's source can only be a known word");
+        Map<String, Object> p = Facts.invoked(9L, 7, true, true,
+            "assistGesture,my secret note,application,", 2);
+        Harness.equal("unknown entries are dropped", p.get("sources"), "assistGesture,application");
+        Harness.check("and never echoed", !Json.canonical(p).contains("secret"));
+        Harness.equal("the raw flags are kept for what this build does not decode", p.get("flags"), 7L);
+    }
+
+    private static void everyRecordIsNumbersAndBooleans() {
+        Harness.suite("every record is numbers and booleans, plus at most a package and known sources");
+        PixelStats stats = PixelStats.of(new int[16], 4, 4);
+        Map<?, ?>[] records = {
+            Facts.ready(true, true),
+            Facts.shutdown(),
+            Facts.showFailed(1),
+            Facts.invoked(1L, 3, true, false, "assistGesture", 0),
+            Facts.structure(1L, true, "com.whatsapp", 0, 1, true, 1, 2, 3, 4L, 5, 6, 7, 8, 9, 10L),
+            Facts.content(1L, true, true, false, true, false, 12L, true, 2),
+            Facts.exported(9),
+            Facts.screenshot(1L, true, stats, 30L),
+            Facts.closed(1L, 1, 1, 40L, 900L),
+        };
+        Set<String> allowedText = new HashSet<>(java.util.Arrays.asList("package", "sources"));
+        for (Map<?, ?> record : records) {
+            for (Map.Entry<?, ?> entry : record.entrySet()) {
+                Object value = entry.getValue();
+                boolean scalar = value instanceof Long || value instanceof Boolean;
+                boolean permittedText = value instanceof String && allowedText.contains(entry.getKey());
+                if (!(scalar || permittedText)) {
+                    Harness.check("field " + entry.getKey() + " is a number, a boolean or a permitted name", false);
+                    return;
+                }
+            }
+        }
+        Harness.check("all nine record types hold nothing but numbers, booleans and permitted names", true);
+    }
+
+    private static void absenceIsItsOwnRecord() {
+        Harness.suite("a screenshot that did not arrive is a record, not a silence");
+        Map<String, Object> none = Facts.screenshot(1L, false, PixelStats.none(), 25L);
+        Harness.equal("arrived: false is written down", none.get("arrived"), false);
+        Harness.equal("with nothing sampled", none.get("sampled"), 0L);
+        Harness.check("and it is not called blank", Boolean.FALSE.equals(none.get("uniform")));
+
+        Map<String, Object> missing = Facts.structure(1L, false, "com.example.app", 0, 1, false, 0, 0, 0, 0L, 0, 0, 0, 0, 0, 9L);
+        Harness.equal("a structure the platform withheld says arrived: false", missing.get("arrived"), false);
+        Harness.equal("and is not an empty screen, which would say true with zero nodes", missing.get("nodes"), 0L);
+        Harness.equal("content absent is its own record too",
+            Facts.content(1L, false, false, false, false, false, 0L, false, 0).get("arrived"), false);
+
+        Map<String, Object> closed = Facts.closed(1L, 0, 0, -1L, 300L);
+        Harness.equal("a session that received nothing says so at close", closed.get("assistCallbacks"), 0L);
+        Harness.equal("and one that never drew says -1, not zero", closed.get("firstDrawMs"), -1L);
+    }
+}

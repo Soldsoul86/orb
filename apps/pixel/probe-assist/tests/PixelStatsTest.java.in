@@ -1,0 +1,97 @@
+package @PKG@;
+
+/** What a screenshot summary can and cannot say. */
+final class PixelStatsTest {
+    static void run() {
+        blankPicturesAreRecognisedAsBlank();
+        aRealPictureIsNotBlank();
+        noiseInsideABucketIsOneColour();
+        aBadInputIsNotReportedAsBlank();
+        aPreScaledGridGivesTheSameAnswer();
+        anyShapeIsSampledTheSameWay();
+    }
+
+    private static int[] fill(int w, int h, int argb) {
+        int[] out = new int[w * h];
+        java.util.Arrays.fill(out, argb);
+        return out;
+    }
+
+    private static void blankPicturesAreRecognisedAsBlank() {
+        Harness.suite("a blank screenshot is recognised as blank");
+        PixelStats black = PixelStats.of(fill(200, 400, 0xff000000), 200, 400);
+        Harness.check("all black is uniform", black.uniform);
+        Harness.equal("with one colour", black.distinctColours, 1);
+        Harness.equal("and every sample dark", black.darkPercent, 100);
+
+        PixelStats white = PixelStats.of(fill(200, 400, 0xffffffff), 200, 400);
+        Harness.check("all white is uniform too", white.uniform);
+        Harness.equal("and none of it dark", white.darkPercent, 0);
+        Harness.equal("1,024 samples however large the picture", white.sampled, PixelStats.GRID * PixelStats.GRID);
+    }
+
+    private static void aRealPictureIsNotBlank() {
+        Harness.suite("a picture with content is not blank");
+        int w = 320, h = 640;
+        int[] image = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                // A gradient plus a block: what an app screen looks like to a coarse grid.
+                int shade = (x * 255) / w;
+                image[y * w + x] = (y < 100) ? 0xff204080 : 0xff000000 | (shade << 16) | (shade << 8) | shade;
+            }
+        }
+        PixelStats stats = PixelStats.of(image, w, h);
+        Harness.check("not uniform", !stats.uniform);
+        Harness.check("many colours", stats.distinctColours > 8);
+        Harness.equal("dimensions are carried", stats.width + "x" + stats.height, "320x640");
+    }
+
+    private static void noiseInsideABucketIsOneColour() {
+        Harness.suite("compression noise does not make a flat screen look busy");
+        int w = 128, h = 128;
+        int[] image = new int[w * h];
+        for (int i = 0; i < image.length; i++) {
+            int grey = 120 + (i % 5) - 2;
+            image[i] = 0xff000000 | (grey << 16) | (grey << 8) | grey;
+        }
+        PixelStats stats = PixelStats.of(image, w, h);
+        Harness.equal("a few shades apart is one colour", stats.distinctColours, 1);
+        Harness.check("so it is uniform", stats.uniform);
+    }
+
+    private static void aBadInputIsNotReportedAsBlank() {
+        Harness.suite("an unreadable picture is not a blank one");
+        PixelStats missing = PixelStats.of(null, 10, 10);
+        Harness.equal("no pixels: nothing sampled", missing.sampled, 0);
+        Harness.check("and not called uniform", !missing.uniform);
+
+        PixelStats tooShort = PixelStats.of(new int[5], 10, 10);
+        Harness.equal("too few pixels: nothing sampled", tooShort.sampled, 0);
+        Harness.check("and not called uniform", !tooShort.uniform);
+
+        PixelStats none = PixelStats.none();
+        Harness.equal("no picture at all", none.width + none.height + none.sampled, 0);
+        Harness.check("is not blank either", !none.uniform);
+    }
+
+    private static void aPreScaledGridGivesTheSameAnswer() {
+        Harness.suite("summarising a pre-scaled grid agrees with summarising the whole picture");
+        int w = 200, h = 400;
+        int[] image = fill(w, h, 0xff336699);
+        PixelStats whole = PixelStats.of(image, w, h);
+        PixelStats grid = PixelStats.ofGrid(fill(PixelStats.GRID, PixelStats.GRID, 0xff336699), w, h);
+        Harness.equal("same colour count", grid.distinctColours, whole.distinctColours);
+        Harness.equal("same darkness", grid.darkPercent, whole.darkPercent);
+        Harness.equal("the original's size is kept", grid.width + "x" + grid.height, "200x400");
+        Harness.check("a grid of the wrong size is not called blank", !PixelStats.ofGrid(new int[3], w, h).uniform);
+    }
+
+    private static void anyShapeIsSampledTheSameWay() {
+        Harness.suite("a picture of any shape can be sampled");
+        PixelStats tall = PixelStats.of(fill(7, 4000, 0xff123456), 7, 4000);
+        Harness.equal("a very narrow picture", tall.sampled, PixelStats.GRID * PixelStats.GRID);
+        PixelStats tiny = PixelStats.of(fill(1, 1, 0xff123456), 1, 1);
+        Harness.check("a single pixel is uniform", tiny.uniform);
+    }
+}

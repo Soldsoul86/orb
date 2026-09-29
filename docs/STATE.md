@@ -77,6 +77,7 @@ platform's or the framework's.
 | `apps/pixel/pass1` | ~1,650 | foreground-service and journal survival; the 21-hour run |
 | `apps/pixel/pass2` | ~730 | the grants signal; recording since 2026-09-26 |
 | `apps/pixel/probe-grants` | ~640 | the throwaway that answered P12–P14 |
+| `apps/pixel/probe-assist` | ~970 | Step 4: what Android hands an assistant app, per target app, metadata only (`DEVICE_LOOP.md` §7b41, P23–P29). Built, not yet run |
 
 ### What is not built at all
 

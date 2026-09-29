@@ -1,0 +1,49 @@
+package @PKG@;
+
+import android.app.role.RoleManager;
+import android.content.ComponentName;
+import android.os.Bundle;
+import android.service.voice.VoiceInteractionService;
+
+/**
+ * The service that makes this app selectable as the device's assistant.
+ *
+ * Its records answer the first two questions before any screen is involved: **did
+ * the platform bind it** (`assist.service.ready` — proof the role is held, P23) and
+ * **did an invocation fail to reach it** (`assist.show.failed`). Without the second,
+ * an assistant that cannot be reached and one nobody invoked would leave the same
+ * empty journal.
+ */
+public final class AssistService extends VoiceInteractionService {
+
+    @Override
+    public void onReady() {
+        super.onReady();
+        Journal journal = journal();
+        if (journal == null) return;
+
+        RoleManager roles = getSystemService(RoleManager.class);
+        boolean held = roles != null && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT);
+        boolean active = isActiveService(this, new ComponentName(this, AssistService.class));
+        journal.append(Facts.READY, Facts.ready(held, active));
+    }
+
+    @Override
+    public void onShutdown() {
+        super.onShutdown();
+        Journal journal = journal();
+        if (journal != null) journal.append(Facts.SHUTDOWN, Facts.shutdown());
+    }
+
+    @Override
+    public void onShowSessionFailed(Bundle args) {
+        super.onShowSessionFailed(args);
+        Journal journal = journal();
+        if (journal != null) journal.append(Facts.SHOW_FAILED, Facts.showFailed(args == null ? 0 : args.size()));
+    }
+
+    private Journal journal() {
+        Probe probe = Probe.get();
+        return probe == null ? null : probe.journal();
+    }
+}

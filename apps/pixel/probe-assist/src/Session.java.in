@@ -1,0 +1,354 @@
+package @PKG@;
+
+import android.app.assist.AssistContent;
+import android.app.assist.AssistStructure;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.service.voice.VoiceInteractionSession;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.util.Locale;
+
+/**
+ * One invocation of the assistant: what Android handed over, measured and not kept.
+ *
+ * **This class is allowed to receive a screen and forbidden to keep any of it.**
+ * Everything it learns is reduced to a number or a boolean before it reaches
+ * `Facts`, which has no parameter that accepts text. It calls a content accessor
+ * (`getText`, `getContentDescription`, `getWebUri`, …) only to take a **length** or
+ * test for **presence**, never to hold the value, and `GuardTest` fails the build
+ * on any line that does otherwise. Nothing is logged, no picture is written, and no
+ * second store exists: the journal is the record and it holds counts.
+ *
+ * What the overlay shows the operator is derived from the same numbers — never
+ * from the screen. It appears **before any data arrives** and fills in as
+ * callbacks land, which is also the measurement: `firstDrawMs` is how long the
+ * operator waited to see anything at all (P28).
+ */
+public final class Session extends VoiceInteractionSession {
+
+    /** How deep the walk goes before it stops counting. A real screen is nowhere near this. */
+    private static final int MAX_DEPTH = 400;
+
+    private long invocation;
+    private long shownAt;
+    private long firstDrawAt = -1;
+    private int assistCallbacks;
+    private int screenshotCallbacks;
+    private boolean closed = true;
+
+    private View root;
+    private TextView readout;
+    private final StringBuilder lines = new StringBuilder();
+
+    Session(Context context) {
+        super(context);
+    }
+
+    private Journal journal() {
+        Probe probe = Probe.get();
+        return probe == null ? null : probe.journal();
+    }
+
+    @Override
+    public View onCreateContentView() {
+        float density = getContext().getResources().getDisplayMetrics().density;
+        int pad = (int) (16 * density);
+
+        FrameLayout frame = new FrameLayout(getContext());
+        frame.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                hide();
+            }
+        });
+
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(pad, pad, pad, pad);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xF0202124);
+        background.setCornerRadius(24 * density);
+        card.setBackground(background);
+        // Swallow taps on the card so only the scrim closes the sheet.
+        card.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {}
+        });
+
+        TextView title = new TextView(getContext());
+        title.setText("Orb assist probe — metadata only");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(16);
+        card.addView(title);
+
+        readout = new TextView(getContext());
+        readout.setTextColor(0xFFC8CCD0);
+        readout.setTextSize(13);
+        readout.setPadding(0, pad / 2, 0, pad / 2);
+        card.addView(readout);
+
+        Button close = new Button(getContext());
+        close.setText("Close");
+        close.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                hide();
+            }
+        });
+        card.addView(close);
+
+        FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM);
+        int margin = (int) (8 * density);
+        at.setMargins(margin, margin, margin, margin);
+        frame.addView(card, at);
+
+        root = frame;
+        return frame;
+    }
+
+    @Override
+    public void onShow(Bundle args, int showFlags) {
+        super.onShow(args, showFlags);
+        invocation = SystemClock.elapsedRealtime();
+        shownAt = invocation;
+        firstDrawAt = -1;
+        assistCallbacks = 0;
+        screenshotCallbacks = 0;
+        closed = false;
+
+        boolean withAssist = (showFlags & SHOW_WITH_ASSIST) != 0;
+        boolean withScreenshot = (showFlags & SHOW_WITH_SCREENSHOT) != 0;
+        String sources = sourcesOf(showFlags);
+
+        Journal journal = journal();
+        if (journal != null) {
+            journal.append(Facts.INVOKED, Facts.invoked(
+                invocation, showFlags, withAssist, withScreenshot, sources, args == null ? 0 : args.size()));
+        }
+
+        lines.setLength(0);
+        line("shown · " + (sources.isEmpty() ? "source not decoded" : sources) + " · flags " + showFlags);
+        line(withAssist ? "system says it will send screen structure" : "system says it will NOT send screen structure");
+        line(withScreenshot ? "system says it will send a screenshot" : "system says it will NOT send a screenshot");
+        watchFirstDraw();
+    }
+
+    @Override
+    public void onHandleAssist(AssistState state) {
+        super.onHandleAssist(state);
+        assistCallbacks++;
+        long latency = SystemClock.elapsedRealtime() - shownAt;
+
+        AssistStructure structure = state.getAssistStructure();
+        AssistContent content = state.getAssistContent();
+        Bundle data = state.getAssistData();
+
+        Counts counts = new Counts();
+        String packageName = null;
+        if (structure != null) {
+            counts.windows = structure.getWindowNodeCount();
+            for (int i = 0; i < counts.windows; i++) {
+                walk(structure.getWindowNodeAt(i).getRootViewNode(), 1, counts);
+            }
+            ComponentName component = structure.getActivityComponent();
+            if (component != null) packageName = component.getPackageName();
+        }
+        // The platform also names the app in the assist bundle; a fallback for a
+        // callback that carried no structure.
+        if (packageName == null && data != null) packageName = data.getString(Intent.EXTRA_ASSIST_PACKAGE);
+
+        boolean hasContent = content != null;
+        long structuredChars = (hasContent && content.getStructuredData() != null)
+            ? content.getStructuredData().length() : 0L;
+
+        Journal journal = journal();
+        if (journal != null) {
+            journal.append(Facts.STRUCTURE, Facts.structure(
+                invocation, structure != null, packageName, state.getIndex(), state.getCount(),
+                state.isFocused(), counts.windows, counts.nodes, counts.textNodes, counts.textChars,
+                counts.descriptionNodes, counts.maxDepth, counts.blocked, counts.webViews,
+                counts.webDomains, latency));
+            journal.append(Facts.CONTENT, Facts.content(
+                invocation, hasContent,
+                hasContent && content.getWebUri() != null,
+                hasContent && content.isAppProvidedWebUri(),
+                hasContent && content.getIntent() != null,
+                hasContent && content.isAppProvidedIntent(),
+                structuredChars,
+                hasContent && content.getClipData() != null,
+                data == null ? 0 : data.size()));
+        }
+
+        if (structure == null) {
+            line("structure: NOT sent (" + latency + " ms)");
+        } else {
+            line(String.format(Locale.US, "structure: %d nodes · %d with text (%d chars) · %d blocked · %d ms",
+                counts.nodes, counts.textNodes, counts.textChars, counts.blocked, latency));
+        }
+        line(hasContent
+            ? "content: " + ((content.getWebUri() != null) ? "has a web address" : "no web address")
+            : "content: NOT sent");
+        updateReadout();
+    }
+
+    @Override
+    public void onHandleScreenshot(Bitmap screenshot) {
+        super.onHandleScreenshot(screenshot);
+        screenshotCallbacks++;
+        long latency = SystemClock.elapsedRealtime() - shownAt;
+        PixelStats stats = screenshot == null ? PixelStats.none() : summarise(screenshot);
+
+        Journal journal = journal();
+        if (journal != null) {
+            journal.append(Facts.SCREENSHOT, Facts.screenshot(invocation, screenshot != null, stats, latency));
+        }
+
+        if (screenshot == null) {
+            line("screenshot: NOT sent (" + latency + " ms)");
+        } else if (stats.sampled == 0) {
+            line("screenshot: sent, " + stats.width + "x" + stats.height + ", could not be summarised");
+        } else {
+            line(String.format(Locale.US, "screenshot: %dx%d · %d colours · %d%% dark · %s · %d ms",
+                stats.width, stats.height, stats.distinctColours, stats.darkPercent,
+                stats.uniform ? "BLANK" : "has content", latency));
+        }
+        updateReadout();
+    }
+
+    @Override
+    public void onHide() {
+        super.onHide();
+        close();
+    }
+
+    @Override
+    public void onDestroy() {
+        close();
+        super.onDestroy();
+    }
+
+    /** Writes what had arrived by the time the session ended — where absence is measured. */
+    private void close() {
+        if (closed) return;
+        closed = true;
+        Journal journal = journal();
+        if (journal == null) return;
+        long now = SystemClock.elapsedRealtime();
+        journal.append(Facts.CLOSED, Facts.closed(
+            invocation, assistCallbacks, screenshotCallbacks,
+            firstDrawAt < 0 ? -1L : firstDrawAt - shownAt, now - shownAt));
+    }
+
+    private void watchFirstDraw() {
+        if (root == null) {
+            updateReadout();
+            return;
+        }
+        final View target = root;
+        target.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                if (firstDrawAt < 0) firstDrawAt = SystemClock.elapsedRealtime();
+                ViewTreeObserver observer = target.getViewTreeObserver();
+                if (observer.isAlive()) observer.removeOnPreDrawListener(this);
+                return true;
+            }
+        });
+        updateReadout();
+    }
+
+    /**
+     * Reduces the screenshot to a 32x32 grid without ever holding it as an array —
+     * a full-size one is ten megabytes to learn three numbers. A picture that cannot
+     * be scaled (a hardware bitmap the platform will not read) is reported as sent
+     * and unsummarised, never as blank.
+     */
+    private static PixelStats summarise(Bitmap screenshot) {
+        int width = screenshot.getWidth();
+        int height = screenshot.getHeight();
+        try {
+            Bitmap small = Bitmap.createScaledBitmap(screenshot, PixelStats.GRID, PixelStats.GRID, false);
+            int[] grid = new int[PixelStats.GRID * PixelStats.GRID];
+            small.getPixels(grid, 0, PixelStats.GRID, 0, 0, PixelStats.GRID, PixelStats.GRID);
+            if (small != screenshot) small.recycle();
+            return PixelStats.ofGrid(grid, width, height);
+        } catch (RuntimeException error) {
+            return PixelStats.ofGrid(null, width, height);
+        }
+    }
+
+    /** Counts a screen's structure. Text is measured, never held. */
+    private static void walk(AssistStructure.ViewNode node, int depth, Counts counts) {
+        if (node == null || depth > MAX_DEPTH) return;
+        counts.nodes++;
+        if (depth > counts.maxDepth) counts.maxDepth = depth;
+
+        int textLength = node.getText() == null ? 0 : node.getText().length();
+        if (textLength > 0) {
+            counts.textNodes++;
+            counts.textChars += textLength;
+        }
+        int descriptionLength = node.getContentDescription() == null ? 0 : node.getContentDescription().length();
+        if (descriptionLength > 0) counts.descriptionNodes++;
+        if (node.getWebDomain() != null) counts.webDomains++;
+        if (node.isAssistBlocked()) counts.blocked++;
+        String className = node.getClassName();
+        if (className != null && className.contains("WebView")) counts.webViews++;
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            walk(node.getChildAt(i), depth + 1, counts);
+        }
+    }
+
+    private static String sourcesOf(int flags) {
+        StringBuilder out = new StringBuilder();
+        add(out, flags, SHOW_SOURCE_ASSIST_GESTURE, "assistGesture");
+        add(out, flags, SHOW_SOURCE_APPLICATION, "application");
+        add(out, flags, SHOW_SOURCE_ACTIVITY, "activity");
+        add(out, flags, SHOW_SOURCE_PUSH_TO_TALK, "pushToTalk");
+        add(out, flags, SHOW_SOURCE_NOTIFICATION, "notification");
+        add(out, flags, SHOW_SOURCE_AUTOMOTIVE_SYSTEM_UI, "automotive");
+        return out.toString();
+    }
+
+    private static void add(StringBuilder out, int flags, int bit, String name) {
+        if ((flags & bit) == 0) return;
+        if (out.length() > 0) out.append(',');
+        out.append(name);
+    }
+
+    private void line(String text) {
+        if (lines.length() > 0) lines.append('\n');
+        lines.append(text);
+    }
+
+    private void updateReadout() {
+        if (readout != null) readout.setText(lines.toString());
+    }
+
+    /** What a walk of one screen found. Numbers only. */
+    private static final class Counts {
+        int windows;
+        int nodes;
+        int textNodes;
+        long textChars;
+        int descriptionNodes;
+        int maxDepth;
+        int blocked;
+        int webViews;
+        int webDomains;
+    }
+}

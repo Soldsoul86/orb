@@ -4623,3 +4623,99 @@ itself. An in-place update that carried a code change to the grant path did not
 disturb the package comparison, because the two are independent: the scope of the
 *answer* is a manifest fact, the scope of the *grant record* is now the same
 manifest fact, and neither is a baseline event once the boundary is behind them.
+
+### 7b41. The assist probe — what Android hands an assistant app, measured before it is declared — 2026-09-29
+
+**Status: built, not yet run.** Predictions are written here before the first
+invocation so that the result can refute them. `apps/pixel/probe-assist`,
+package `dev.orb.probea`, 29 KB, no permissions.
+
+#### Why this comes before the sensor declaration
+
+The direction agreed for Android is an assistant overlay: invoke Orb from
+anywhere, see a small card, tap **Remember**. Whether that is a sensor at all —
+and what it may retain — depends on facts nobody in this repository has measured:
+what the platform actually delivers to an app that is *only selected* as the
+assistant, for which apps, how fast, and what it refuses. Declaring first would
+be writing a mandate from documentation. `SENSOR_SHARE.md` and `SENSOR_GRANTS.md`
+were written the other way round (measure, then declare) and both survived
+contact with real exports; this follows them.
+
+#### What it records — and the structural reason it cannot record more
+
+`assist.*` events, each **numbers and yes/no facts only**, plus at most one
+package name (the app that was on screen) and a fixed vocabulary of invocation
+sources:
+
+| Event | Answers |
+| --- | --- |
+| `assist.service.ready` | did the platform bind the service; is the role held (P23) |
+| `assist.show.failed` | an invocation that did not reach us — so "not reached" and "not tried" differ |
+| `assist.invoked` | the show flags, whether the platform asked for structure/screenshot, the invocation source |
+| `assist.structure` | `arrived`; package; node, text-node, description-node counts; **total characters** of text (a length, never the text); depth; nodes that opted out (`blockedNodes`); WebView and web-domain nodes; latency |
+| `assist.content` | `arrived`; whether a web URI / an intent / structured data / a clip was **present** (and whether the app supplied it); never their values |
+| `assist.screenshot` | `arrived`; size; a 32×32 sample summarised as colour count, dark percentage, `uniform` — enough to tell a real capture from a blanked one, not enough to reconstruct it |
+| `assist.closed` | callbacks received, time to first draw, time visible |
+| `assist.export` | the operator exported |
+
+**What it never records**: the text, descriptions, hints, URLs, intents, clip
+contents, view ids, or the picture. This is enforced by types, not by care:
+`Facts` — the only place a record is built — has no parameter that can carry text,
+and `GuardTest` (59 checks, all passing) fails the build if any other source file
+builds a record, logs, writes a file or a picture, keeps a second copy, uses a
+content accessor for anything but its length or presence, requests a permission,
+or puts a component in its own process (a lane has one writer). A record whose
+package name does not look like a package name is written as `invalid`, not as
+whatever it was.
+
+**One consequence to know about**: the export names the package of every app you
+invoke it on. That is metadata, but it *is* which apps you were using. Read the
+file before sharing it, and skip invoking on anything you would rather not list.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P23** | A sideloaded app with no permission can be **selected** as the default assistant, and the platform then binds it: `assist.service.ready` with `roleHeld: true`, `activeService: true` | The overlay direction is closed for a distributable build, before any screen is involved. If it is missing from the chooser, the probe includes the recognition service the docs list, so the platform's restriction — not an omission — is the cause |
+| **P24** | The system gesture reaches the session: `assist.invoked` with `withAssist: true` **and** `withScreenshot: true`, with no `assist.show.failed` | Either the user-facing "use text / use screenshot" settings gate delivery (test them off — see protocol) or the gesture cannot reach a non-default-signed assistant |
+| **P25** | For an ordinary app (a messaging app, Chrome, Settings) `assist.structure` arrives with `nodes > 0` and `textNodes > 0`, and `package` names the app that was on screen, not us | Structure is not a reliable input; Remember must come from the screenshot or from Share |
+| **P26** | A screen that opted out of capture (FLAG_SECURE — a payments or banking screen, Chrome incognito) is **withheld or blanked, not silently delivered**: the screenshot arrives `uniform: true` or not at all, and structure shows `blockedNodes > 0` or fewer text nodes | The platform delivers protected screens and **the sensitive-screen policy must be ours to enforce** — the larger finding, and the one that shapes step 5 |
+| **P27** | Chrome on a normal page supplies a web URI (`assist.content.webUri: true`) and web-domain nodes | Web pages remember as text only, with no source URL — the "where did this come from" lineage would have to be asked of the person |
+| **P28** | Structure and screenshot each arrive within **1,500 ms** of invocation, and the card first draws within **500 ms** | The card cannot honestly promise to be instant; it would have to show "reading…" and the design changes from a card to a two-stage one |
+| **P29** | An app that draws its own surface (a game, a video, some Flutter/Compose screens) arrives with `nodes > 0` but `textNodes ≈ 0` — the structure is present and useless, and the screenshot is the only signal | Nothing to plan for; the fallback is unnecessary, and this row closes cheaply |
+
+Two things are **deliberately not predicted**: the invocation `sources` value (the
+platform's vocabulary for *how* it was invoked is not documented well enough to
+guess; the probe records it and the result will be read as a fresh fact), and
+whether the phone would accept the assistant **without** the recognition stub. The
+stub is in the build because the documentation lists one and the answer is
+unconfirmed; that is a known uncertainty, recorded, and not needed to proceed.
+
+#### The operator's protocol
+
+1. Install `orb-assist-probe-v1.apk`. Note what Play Protect says — a screenshot
+   if it is anything but *looks safe* (§7b38 is why this matters).
+2. Open **Orb assist probe** → **Choose default assistant** → pick it. Come back.
+   The screen should read *assistant role held: yes* and *active service: yes*.
+   (If it is not in the list, that is P23's answer — export and stop.)
+3. Invoke the gesture you normally use for the assistant (long-press power or
+   home, or the corner swipe) on each of these, **one invocation each, a few
+   seconds apart**. Nothing needs to be tapped in the card.
+   1. a messaging app on a conversation
+   2. Chrome, an ordinary page
+   3. Chrome, an **incognito** tab
+   4. a payments or banking screen *(open a screen; do not sign in)*
+   5. a video or a game
+   6. the home screen
+   7. Settings
+4. Invoke once more anywhere, then in **Settings → Apps → Default apps → Digital
+   assistant app**, turn **Use text from screen** off and invoke again; turn it
+   back on and turn **Use screenshot** off and invoke again. Turn both back on.
+5. Back in the app: **Export journal**. The file is
+   `Downloads/orb-probea-<date>.txt`; Claude reads it from there.
+
+#### Reverting
+
+Settings → Apps → Default apps → **Digital assistant app** → choose your usual
+assistant (or *None*). Uninstalling the probe also reverts it — **export first**:
+the journal goes with the package.

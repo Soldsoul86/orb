@@ -1,0 +1,168 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.role.RoleManager;
+import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.Settings;
+import android.provider.MediaStore;
+import android.service.voice.VoiceInteractionService;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Three things: say whether this probe is the device's assistant, take the person
+ * to the system screen where that is chosen, and get the journal off the phone.
+ *
+ * **Nothing here can make the probe the assistant.** Only the person can, in system
+ * settings; this screen reads the result and opens the door. The probe never asks
+ * the platform to change a default on its own.
+ */
+public final class MainActivity extends Activity {
+    private TextView status;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Orb assist probe");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        Button choose = new Button(this);
+        choose.setText("Choose default assistant");
+        choose.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { openAssistantSettings(); }
+        });
+        root.addView(choose);
+
+        Button export = new Button(this);
+        export.setText("Export journal");
+        export.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { export(); }
+        });
+        root.addView(export);
+
+        status = new TextView(this);
+        status.setTextSize(12);
+        status.setTypeface(Typeface.MONOSPACE);
+        status.setTextIsSelectable(true);
+        root.addView(status);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    /** Re-read on every return: the person leaves for system settings and comes back. */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Probe app = Probe.get();
+        Journal journal = app == null ? null : app.journal();
+
+        RoleManager roles = getSystemService(RoleManager.class);
+        boolean held = roles != null && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT);
+        boolean active = VoiceInteractionService.isActiveService(this, new ComponentName(this, AssistService.class));
+
+        StringBuilder out = new StringBuilder("\n");
+        out.append("assistant role held    ").append(held ? "yes" : "no").append('\n');
+        out.append("active service         ").append(active ? "yes" : "no").append('\n');
+        if (journal == null) {
+            out.append("journal                unavailable\n");
+        } else {
+            try {
+                out.append("events                 ").append(journal.count()).append('\n');
+            } catch (IOException error) {
+                out.append("events                 read failed: ").append(error).append('\n');
+            }
+        }
+        out.append("\nThis probe records counts and yes/no facts about what the\n");
+        out.append("assistant gesture hands it. It never records what is on a screen.\n");
+        status.setText(out.toString());
+    }
+
+    /**
+     * The system screen where the default assistant is chosen. Falls back to the
+     * broader default-apps screen on a build that does not offer the first; if neither
+     * opens, the person is told, and nothing is retried in a way that could loop.
+     */
+    private void openAssistantSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_VOICE_INPUT_SETTINGS));
+        } catch (RuntimeException first) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+            } catch (RuntimeException second) {
+                status.setText("\ncould not open settings\nSettings > Apps > Default apps > Digital assistant app");
+            }
+        }
+    }
+
+    /**
+     * Writes the journal to Downloads, recording the export first so the copy holds
+     * the record of its own creation. `orb-probea-` in the name is the source's
+     * identity: four packages once wrote files nothing could tell apart (AD-8).
+     */
+    private void export() {
+        Probe app = Probe.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            status.setText("\njournal unavailable");
+            return;
+        }
+
+        try {
+            String name = "orb-probea-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".txt";
+            journal.append(Facts.EXPORTED, Facts.exported(journal.count()));
+            List<String> lines = journal.readLines();
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+            values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+            ContentResolver resolver = getContentResolver();
+            Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (target == null) {
+                status.setText("\nexport failed: no destination");
+                return;
+            }
+            try (OutputStream out = resolver.openOutputStream(target)) {
+                if (out == null) {
+                    status.setText("\nexport failed: destination not writable");
+                    return;
+                }
+                for (String line : lines) {
+                    out.write(line.getBytes(StandardCharsets.UTF_8));
+                    out.write('\n');
+                }
+            }
+            status.setText("\nexported " + lines.size() + " events\nDownloads/" + name);
+        } catch (IOException error) {
+            status.setText("\nexport failed: " + error);
+        }
+    }
+}

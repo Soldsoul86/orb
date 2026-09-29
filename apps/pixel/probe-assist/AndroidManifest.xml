@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb assist probe — DEVICE_LOOP.md §7b41, predictions P23-P29.
+
+  Requests nothing. The question is what the platform hands an app that is merely
+  *selected* as the assistant, so any permission line here would answer a different
+  question. This manifest has none, and GuardTest fails the build if one appears.
+
+  Every component runs in the application's one process. A lane is a hash chain with
+  a single writer; a second process would fork it. GuardTest checks for that too.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@PKG@"
+    android:versionCode="@VERSION_CODE@"
+    android:versionName="0.1-probea">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <application
+        android:name=".Probe"
+        android:label="@LABEL@"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".AssistService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".SessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true" />
+
+        <service
+            android:name=".RecognitionStub"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+    </application>
+</manifest>

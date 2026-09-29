@@ -1,0 +1,138 @@
+package @PKG@;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/**
+ * The probe may **receive** a screen and must never **keep** any of it.
+ *
+ * `Facts` makes that true by the types of its arguments. This checks that the rest
+ * of the code cannot go round it: it reads the platform glue's own source and
+ * fails on any construct that could write, log or persist what it was handed.
+ *
+ * Crude on purpose. A rule that has to be argued about will eventually be argued
+ * away; a failing test with the offending line printed will not.
+ */
+final class GuardTest {
+    /** Accessors that return what was on the screen. */
+    private static final Pattern CONTENT_ACCESSOR = Pattern.compile(
+        "\\.(getText|getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
+            + "|getWebUri|getStructuredData|getClipData|getIntent)\\(\\)");
+    /** What a use of one of them may look like: a length or a presence test, nothing else. */
+    private static final Pattern PERMITTED_USE = Pattern.compile("\\.length\\(\\)|[!=]= null");
+
+    static void run() throws IOException {
+        Path root = Paths.get(System.getProperty("probe.root", "."));
+        List<Path> glue = glue(root);
+        Harness.suite("the glue source is what is scanned");
+        Harness.check("found the platform classes (" + glue.size() + ")", glue.size() >= 5);
+
+        neverWritesARecordItself(glue);
+        neverLogs(glue);
+        onlyTakesLengthsAndPresence(glue);
+        neverKeepsAPicture(glue);
+        hasNoSecondStore(glue);
+        oneProcessOneWriter(root);
+    }
+
+    private static List<Path> glue(Path root) throws IOException {
+        List<Path> out = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(root.resolve("src"), "*.java.in")) {
+            for (Path p : stream) {
+                String name = p.getFileName().toString();
+                if (name.equals("Facts.java.in") || name.equals("PixelStats.java.in")) continue;
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    private static List<String> lines(Path file) throws IOException {
+        return Files.readAllLines(file, StandardCharsets.UTF_8);
+    }
+
+    private static boolean isComment(String line) {
+        String t = line.trim();
+        return t.startsWith("//") || t.startsWith("*") || t.startsWith("/*");
+    }
+
+    private static void scan(String suite, List<Path> glue, Pattern forbidden, String why) throws IOException {
+        Harness.suite(suite);
+        int bad = 0;
+        for (Path file : glue) {
+            int n = 0;
+            for (String line : lines(file)) {
+                n++;
+                if (isComment(line)) continue;
+                if (forbidden.matcher(line).find()) {
+                    bad++;
+                    Harness.check(file.getFileName() + ":" + n + " — " + why + ": " + line.trim(), false);
+                }
+            }
+        }
+        if (bad == 0) Harness.check(why + " — none in " + glue.size() + " files", true);
+    }
+
+    private static void neverWritesARecordItself(List<Path> glue) throws IOException {
+        scan("records are written by Facts and nowhere else", glue,
+            Pattern.compile("Json\\.obj\\(|\\.put\\(\""), "builds a record outside Facts");
+    }
+
+    private static void neverLogs(List<Path> glue) throws IOException {
+        scan("nothing is logged", glue,
+            Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast"),
+            "writes somewhere a screen's content could leak");
+    }
+
+    private static void onlyTakesLengthsAndPresence(List<Path> glue) throws IOException {
+        Harness.suite("screen content is only ever measured, never read");
+        int bad = 0;
+        int uses = 0;
+        for (Path file : glue) {
+            int n = 0;
+            for (String line : lines(file)) {
+                n++;
+                if (isComment(line) || !CONTENT_ACCESSOR.matcher(line).find()) continue;
+                uses++;
+                if (!PERMITTED_USE.matcher(line).find()) {
+                    bad++;
+                    Harness.check(file.getFileName() + ":" + n + " — uses screen content beyond a length or a presence test: " + line.trim(), false);
+                }
+            }
+        }
+        if (bad == 0) Harness.check("every use of a content accessor is a length or a null test (" + uses + " uses)", true);
+        Harness.check("the scan actually found accessors to check", uses > 0);
+    }
+
+    private static void neverKeepsAPicture(List<Path> glue) throws IOException {
+        scan("no picture is ever written", glue,
+            Pattern.compile("\\.compress\\(|FileOutputStream|openFileOutput|MediaStore\\.Images|copy\\(Bitmap"),
+            "could persist a screenshot");
+    }
+
+    private static void hasNoSecondStore(List<Path> glue) throws IOException {
+        scan("the journal is the only store", glue,
+            Pattern.compile("SharedPreferences|SQLite|getSharedPreferences|openOrCreateDatabase"),
+            "keeps a second copy of something");
+    }
+
+    /**
+     * Two processes would be two writers on one lane, and a single-writer chain
+     * cannot survive that. A voice-interaction sample from AOSP runs its services in
+     * their own processes; this build must not.
+     */
+    private static void oneProcessOneWriter(Path root) throws IOException {
+        Harness.suite("one process, one writer");
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8)
+            .replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("no component runs in its own process", !manifest.contains("android:process"));
+        Harness.check("no permission is requested", !manifest.contains("<uses-permission"));
+    }
+}

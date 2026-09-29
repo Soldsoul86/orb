@@ -1,0 +1,39 @@
+package @PKG@;
+
+import android.app.Application;
+import java.io.IOException;
+
+/**
+ * The one place the journal is opened.
+ *
+ * **One process, one writer.** A lane is a hash chain with a single writer, and two
+ * processes each opening it would fork it. The voice-interaction sample in AOSP
+ * runs its services in separate processes; this build deliberately does not, so the
+ * assistant service, the session and the screen all share the `Journal` held here.
+ * `GuardTest` fails the build if a component ever declares its own process.
+ */
+public final class Probe extends Application {
+    private static Probe instance;
+    private Journal journal;
+
+    static Probe get() {
+        return instance;
+    }
+
+    /** Null if the journal could not be opened; every caller checks and records nothing. */
+    Journal journal() {
+        return journal;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        instance = this;
+        try {
+            String install = Install.id(this);
+            journal = Journal.open(this, Install.lane(this), install);
+        } catch (IOException error) {
+            // No journal means no recording. Nothing invents one to write to.
+        }
+    }
+}

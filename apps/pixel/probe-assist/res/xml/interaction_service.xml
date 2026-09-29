@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares this app as a voice-interaction service (an "assistant").
+
+  supportsAssist is what asks the platform to hand over the screen's structure and
+  a screenshot when the gesture fires; without it this probe would measure nothing.
+  Keyguard launch is off: the probe is about a screen the person is looking at, and
+  a locked phone is a different, larger question.
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="@PKG@.SessionService"
+    android:recognitionService="@PKG@.RecognitionStub"
+    android:settingsActivity="@PKG@.MainActivity"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />
