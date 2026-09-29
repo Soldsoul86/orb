@@ -56,6 +56,10 @@ export function sealedStore(inner: JournalStore, keyring: PayloadKeyring): Journ
   }
 
   return {
+    // Erasing destroys the payload's key before the bytes are dropped, so every
+    // copy of the ciphertext — here, on a peer, in flash — becomes unreadable.
+    erasure: "key-destroyed",
+
     async append(lane: LaneId, events: readonly StoredEvent[]): Promise<void> {
       return inner.append(lane, await sealAll(events));
     },

@@ -175,7 +175,7 @@ export type {
   SyncPolicyInForce,
 } from "./sync.js";
 
-export type { JournalStore, PayloadRecord } from "./store.js";
+export type { ErasureGuarantee, JournalStore, PayloadRecord } from "./store.js";
 export { MemoryJournalStore } from "./store.js";
 export { FileJournalStore } from "./file-store.js";
 

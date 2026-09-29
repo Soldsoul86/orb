@@ -499,6 +499,7 @@ describe("the digest covers each part of the decision independently", () => {
     ["residue", (p) => ({ ...p, residue: [] })],
     ["holders", (p) => ({ ...p, holders: [{ holder: "mac-01", receipt: { lane: "pixel", throughHash: "h", count: 1 } }] })],
     ["witnessesAffected", (p) => ({ ...p, witnessesAffected: !p.witnessesAffected })],
+    ["medium", (p) => ({ ...p, medium: p.medium === "key-destroyed" ? "bytes-unlinked" : "key-destroyed" })],
     ["unavailable", (p) => ({ ...p, unavailable: [] })],
   ];
 

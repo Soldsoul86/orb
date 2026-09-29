@@ -8,8 +8,31 @@
 import type { AbsenceReason, LaneId, OrbEvent, StoredEvent } from "./types.js";
 import { detached, hasPayload } from "./types.js";
 
+/**
+ * What a store's erasure actually guarantees about the bytes it removes
+ * (`contracts/Storage.md` §7).
+ *
+ * - **`key-destroyed`** — the content is unreadable wherever its ciphertext went:
+ *   a peer's copy, a backup, residue in flash. Copies may linger; none can be read.
+ * - **`bytes-unlinked`** — this store no longer holds or returns the bytes, but the
+ *   medium beneath it may still retain readable copies: filesystem snapshots,
+ *   flash wear-levelling, freed blocks nobody wiped. Erasure that must hold
+ *   against the medium needs a key to destroy, not a file to rewrite.
+ *
+ * **No store here promises the bytes are physically gone from the medium, and
+ * none says so.** A store that could would add a third value. A store that
+ * cannot must never claim more than it does — the contract calls the opposite a
+ * breach, because the owner is told their content was destroyed.
+ *
+ * It describes `detach(…, "erased")`. A prune only unlinks, by design: a pruned
+ * payload may legitimately be fetched back.
+ */
+export type ErasureGuarantee = "key-destroyed" | "bytes-unlinked";
+
 /** Durable, append-only storage for one device's journal. */
 export interface JournalStore {
+  /** What erasing through this store guarantees. Declared, never assumed. */
+  readonly erasure: ErasureGuarantee;
   /**
    * Appends events to `lane` in the given order. Must be atomic per call and
    * durable before resolving: the journal treats a resolved append as history.
@@ -104,6 +127,8 @@ export interface PayloadRecord {
 
 /** In-memory store. Loses history on exit — for tests and ephemeral runtimes. */
 export class MemoryJournalStore implements JournalStore {
+  /** Objects are dropped and left to the collector, never wiped. */
+  readonly erasure = "bytes-unlinked" as const;
   readonly #lanes = new Map<LaneId, StoredEvent[]>();
   #closed = false;
 

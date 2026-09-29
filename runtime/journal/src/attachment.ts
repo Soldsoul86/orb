@@ -22,6 +22,7 @@ import { createHash, createHmac } from "node:crypto";
 import type { AttachmentKeyring, SealedAttachment } from "./attachment-keyring.js";
 import { hasPayload } from "./types.js";
 import type { AbsenceReason, StoredEvent } from "./types.js";
+import type { ErasureGuarantee } from "./store.js";
 
 /**
  * The scheme tag on every identity.
@@ -66,6 +67,12 @@ export type StoredAttachment =
  * inv. 7 buys, and handing one in here would spend it.
  */
 export interface AttachmentStore {
+  /**
+   * What `drop` guarantees about the bytes (`Storage.md` §7). An attachment's
+   * erasure is its key's destruction in the keyring; this says only what the
+   * store itself does to the ciphertext.
+   */
+  readonly erasure: ErasureGuarantee;
   put(address: string, sealed: SealedAttachment): Promise<void>;
   get(address: string): Promise<StoredAttachment>;
   /** Removes the bytes, recording why. inv. 6 — absence always carries a reason. */
@@ -76,6 +83,7 @@ export interface AttachmentStore {
 
 /** Sealed bytes in memory. For tests and ephemeral runtimes. */
 export class MemoryAttachmentStore implements AttachmentStore {
+  readonly erasure = "bytes-unlinked" as const;
   readonly #held = new Map<string, SealedAttachment>();
   readonly #gone = new Map<string, AbsenceReason>();
 

@@ -34,6 +34,14 @@ function laneFile(directory: string, lane: LaneId): string {
 }
 
 export class FileJournalStore implements JournalStore {
+  /**
+   * `detach` rewrites the lane to a new file and renames it into place, so the
+   * old bytes are unlinked, not overwritten. The filesystem frees their blocks;
+   * whether it, a snapshot or the flash controller keeps a readable copy is
+   * outside this store's reach. Wrap it in `sealedStore` for erasure that holds
+   * against the medium.
+   */
+  readonly erasure = "bytes-unlinked" as const;
   readonly #directory: string;
   readonly #handles = new Map<LaneId, FileHandle>();
   /** Serialises appends per lane so concurrent callers cannot interleave writes. */

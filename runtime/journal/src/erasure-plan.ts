@@ -20,6 +20,7 @@ import type { LaneId, StoredEvent } from "./types.js";
 import { indexLineage, descendantsOf, type Traversal } from "./lineage.js";
 import { latestCustody, type HeldCustody } from "./custody.js";
 import { hashPayload } from "./integrity.js";
+import type { ErasureGuarantee } from "./store.js";
 
 /** The nine points at which erasure must stop and ask. */
 export type DecisionPoint =
@@ -70,6 +71,16 @@ export interface ErasurePlan {
   readonly holders: readonly HeldCustody[];
   /** D7 — what an erased event still says about itself. */
   readonly residue: readonly EnvelopeResidue[];
+  /**
+   * D7 — what the storage medium can still hold once the erasure is done.
+   *
+   * `key-destroyed`: copies may linger and cannot be read. `bytes-unlinked`: Orb
+   * can no longer produce the content, but the disk or flash may still hold it.
+   * `unknown`: the caller did not say which store the erasure goes through —
+   * and then D7 is also in `unavailable`, because *we don't know* must never
+   * read as *nothing remains*.
+   */
+  readonly medium: ErasureGuarantee | "unknown";
   /** D8 — whether witness attestations need reconciling. */
   readonly witnessesAffected: boolean;
 
@@ -103,8 +114,14 @@ export function planErasure(input: {
    * recorded no inputs, and D3 says so rather than implying there are none.
    */
   readonly derived?: (event: StoredEvent) => boolean;
+  /**
+   * What the store this erasure goes through guarantees — `journal.erasure`,
+   * or the store's own `erasure`. Omit it and the plan says it does not know.
+   */
+  readonly medium?: ErasureGuarantee;
 }): ErasurePlan {
   const { events, lane, targets, derived } = input;
+  const medium = input.medium ?? "unknown";
   const index = indexLineage(events, derived ? { derived } : undefined);
   const fallout = descendantsOf(index, targets);
 
@@ -178,14 +195,24 @@ export function planErasure(input: {
     {
       point: "D9",
       reason:
-        "attachments are not implemented, so this plan cannot say whether any photograph, " +
-        "recording or voice note is attached to these events, nor whether erasing them " +
+        "this plan is not told which attachments these events reference, so it cannot say " +
+        "whether any photograph, recording or voice note is attached to them, nor whether erasing them " +
         "would destroy it. Under the ruling (`ERASURE.md` §2c) an attachment's key dies " +
         "only when no readable event still references it, so an erasure may leave the " +
         "attached content fully readable through another entry — and other devices may " +
         "hold entries this one cannot see. Assume nothing attached is destroyed.",
     },
   ];
+
+  if (medium === "unknown") {
+    unavailable.push({
+      point: "D7",
+      reason:
+        "the store this erasure goes through did not declare what its deletion guarantees " +
+        "(`Storage.md` §7), so this plan cannot say whether readable copies can survive on " +
+        "the disk or in flash. Assume they can.",
+    });
+  }
 
   // Two different ways the radius can be untrustworthy, and only one of them is
   // visible in the traversal itself.
@@ -251,6 +278,7 @@ export function planErasure(input: {
     fallout,
     holders,
     residue,
+    medium,
     // E1 changes no hash, no height and no count, so an attestation taken before
     // the erasure still reconciles against the lane afterwards. This is a
     // property of the ruling rather than a measurement, and it stops being true
@@ -287,6 +315,9 @@ export function decisionsRequired(plan: ErasurePlan): readonly DecisionPoint[] {
   if (plan.fallout.ids.length > 0) required.add("D3");
   if (plan.holders.length > 0) required.add("D5");
   if (plan.residue.length > 0) required.add("D7");
+  // Bytes that may survive on the medium are something the owner must be told,
+  // whatever the envelope residue: *gone from Orb* is not *gone*.
+  if (plan.medium === "bytes-unlinked") required.add("D7");
   // Anything that could not be computed is a decision the owner takes without
   // the facts, which is exactly when they most need telling.
   for (const gap of plan.unavailable) required.add(gap.point);
@@ -405,6 +436,9 @@ export function planDigest(plan: ErasurePlan): string {
       .map((held) => ({ holder: held.holder, through: held.receipt.throughHash }))
       .sort((a, b) => (a.holder < b.holder ? -1 : a.holder > b.holder ? 1 : 0)),
     witnessesAffected: plan.witnessesAffected,
+    // "Unreadable everywhere" and "Orb cannot produce it, the disk may" are
+    // different acts; consenting to one is not consenting to the other.
+    medium: plan.medium,
     unavailable: [...plan.unavailable.map((gap) => gap.point)].sort(),
   });
 }

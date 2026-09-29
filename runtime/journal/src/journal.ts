@@ -11,7 +11,7 @@ import type { LaneWatermark } from "./sync.js";
 import { newEventId } from "./ids.js";
 import { wrapPayload, isWrapped } from "./payload.js";
 import { coarseType, coarseSchema } from "./vocabulary.js";
-import type { JournalStore, PayloadRecord } from "./store.js";
+import type { ErasureGuarantee, JournalStore, PayloadRecord } from "./store.js";
 import { MemoryJournalStore } from "./store.js";
 import type { EventDraft, EventEnvelope, LaneId, OrbEvent, StoredEvent } from "./types.js";
 import { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
@@ -167,6 +167,14 @@ export class Journal {
     }
 
     this.#opened = true;
+  }
+
+  /**
+   * What erasing through this journal's store guarantees (`Storage.md` §7) —
+   * the value `planErasure` needs as `medium` to tell the owner what may remain.
+   */
+  get erasure(): ErasureGuarantee {
+    return this.#store.erasure;
   }
 
   /** The HLC this journal would extend. Exposed for diagnostics and tests. */
