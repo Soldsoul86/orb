@@ -56,7 +56,7 @@ it.
 
 ### What exists as code
 
-Roughly 11,800 lines of TypeScript and 7,600 of Java (measured 2026-09-29, after the trade-executor experiment was removed as not part of Orb). **304 tests, 0 failing**;
+Roughly 11,800 lines of TypeScript and 7,600 of Java (measured 2026-09-29, after the trade-executor experiment was removed as not part of Orb). **342 TypeScript tests, 0 failing** (plus 115 phone-side JVM checks for pass 1 and 60 for the assist probe);
 lint clean; every package compiles independently.
 
 **The kernel.**

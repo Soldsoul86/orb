@@ -129,6 +129,112 @@ Details are settled at each phase's own gate, not now.
 7. **Reflection + Continuous Learning** loop closure.
 8. **Apps** (`mac`, `pixel`) as device-native runtime hosts.
 
+
+---
+
+## The personal runtime on Android — audit and proposed order (2026-09-29)
+
+> Status: **proposed, for the operator's ordering.** It changes no architecture; it
+> orders work the architecture already permits. `DECISIONS.md` DR-13 opened this
+> work ("one step at a time, so no debts pile up"); DR-14 fixes what the assist
+> overlay may capture. Where a step needs a decision, the decision is named and is
+> the operator's.
+
+### What Orb does for a person today
+
+Two things, and only two. **It keeps what you deliberately share** — text, links,
+photographs — sealed on the phone under a key that can be destroyed, with a record of
+where it came from. **It tells you when something gains power over the phone** — an
+accessibility service, a notification listener, a device admin, a new app — and records
+your answer. It does not yet remember anything on its own, cannot be asked anything,
+and does nothing on your behalf. Every step below exists to move one of those three
+statements.
+
+### Audit — what was open, and where it now stands
+
+| Open item | State | Disposition |
+| --- | --- | --- |
+| Assist steps 1–4 (share sensor, grants declared, probe, its results) | **Done**, verified on device | closed |
+| Assist step 5 — declaration, retention, allow-list | DR-14 fixes *what* (no payments, allow-list, text only); *how an app is added* and *how long text lives* are **undecided** | next |
+| Assist step 6 — erase one capture on the phone | not started; the phone has no way to destroy an attachment key | must precede step 7 |
+| Assist step 7 — invoke → card → *Remember* | not started | after 5 and 6 |
+| Probe leftovers: settings-off behaviour, a game (P29), recognition-stub necessity, flag bit 256 | **untested / unknown**, none blocking | one short probe round, before step 7 |
+| `Shares` extraction on device | **closed** 2026-09-29 | closed |
+| An export cannot say which build wrote it | open — no version code in `orb.process.start` | small, do with the next app build |
+| AD-11 backup | fixed in the tree; on device with v8. **Unchecked:** device-to-device transfer; retired builds keep the default | finish the check |
+| Phone loss with backup off | the export in Downloads is the only copy until sync exists | needs a decision (below) |
+| AD-7 whole-package-list read outside the Capability boundary | **deferred** by DR-13 to the general Capability mechanism | waits for Phase 3c |
+| AD-6 source independence | reframed; revisit when two mobile sources report on one fact | **will bite** at the first second source |
+| AD-9 pass 1's chain break | parked; pass 1 is retired | none |
+| AD-1, AD-2, AD-3, AD-10 | open by design, **v2** | none for v1 |
+| P21 — a change undone between two scans is invisible | recorded limit | small, real; see track D |
+| 12-hour scan interval | a guess, now load-bearing (no prompt route exists) | a decision |
+| **Nothing after the journal is built** — Evidence Graph, Entities, Twin, Reasoner, Agent | contracts Accepted, no code; Phase 3c open | the largest item — track B |
+| **Where the brain runs on the phone** | the kernel is TypeScript; the phone runs Java capture code, and `DEVICE_LOOP.md` R2 names Kotlin as the production host. A laptop can never be required, so this cannot stay open | **decision, before track B** |
+| Whether the first reasoning step is local-only | proposed, unchecked (`DECISIONS.md`) | settles with the design of track B |
+| Order of further senses | open since DR-13 | decision, track C |
+| `STATE.md` counts stale (304 tests) | **fixed** in this change | closed |
+
+### The order
+
+**Track 0 — small closes (do first; each is under a day).**
+Version code in `orb.process.start`; the remaining AD-11 check; one short probe round
+for the untested rows. *Use:* an export you can trust to say what wrote it, a
+promise about backup that has actually been checked, and an overlay that behaves
+correctly when you have switched the screen-text setting off instead of pretending it
+captured something.
+
+**Track A — the assist overlay (agreed).**
+
+| Step | What it is | How it makes Orb useful |
+| --- | --- | --- |
+| **A5** | The written declaration: what the overlay reads, the allow-list and how you edit it, how long text lives | Turns "Orb reads my screen" from a worry into a promise with limits, and a promise the tests can enforce |
+| **A6** | Erase one capture on the phone — destroy its key | You can delete something Orb remembered and it is *actually* gone; without this, nothing may be stored from a screen |
+| **A7** | Invoke → card → *Remember* (text only, allow-listed apps, per invocation) | **The first daily use:** one gesture from a message, a page, a ticket, a work document — Orb keeps it with where it came from |
+| **A8** *(proposed, not yet agreed)* | **Recall** — a screen that lists and searches what you remembered, by app, date and text | Remembering with no way back is useless. Plain search, no AI needed, and it is what makes A7 worth using |
+
+**Track B — the missing middle (the brain).**
+
+| Step | What it is | How it makes Orb useful |
+| --- | --- | --- |
+| **B1** | **Decision:** where the reasoning layers run on the phone (Kotlin implementation of the kernel, or another route) and whether the first reasoning step is local-only | Everything below depends on it; without it the middle exists only on a laptop, which can never be required |
+| **B2** | Evidence Graph over Observations | Every captured thing becomes evidence with a source and lineage, so Orb can answer *where did I get this* — and it is where AD-6 is decided honestly |
+| **B3** | Entities and Relationships — people, places, organisations, dates | *Everything about Ravi*, *everything about this trip*; the step from a pile of notes to a memory |
+| **B4** | **The first workflow, chosen by you** — messaging, travel, content or work were named; a good first one is **commitments** ("I'll send it Friday") or **trips** (booking → dates → reminder) | **The first time Orb does something for you without being asked to remember it** |
+| **B5** | The Capability → Policy → permission gate for anything that *acts* (this is what resolves AD-7) | Orb may notify, remind or draft only with your permission, recorded, revocable; also the moment the package scan gets its proper gate |
+
+**Track C — more senses (order is yours to set).**
+Candidates named so far: photographs, voice notes, calendar, notifications, device
+context. Each is a source of *what happened* that needs no gesture from you. Two
+consequences to weigh before ordering: **payments are excluded from screen capture on
+the premise that they can be derived from text, and no text source exists yet** — so the
+notification or message sensor is what makes that premise true; and a notification
+listener is the very power the grants watch reports on, so Orb would be watching
+for something it holds itself, which it must record openly. Adding a second source
+for one fact is also when AD-6 stops being theoretical.
+
+**Track D — the protection signal, sharpened.**
+Decide the scan interval; record the blind window so *nothing happened* and *something
+happened and was undone* differ (P21); give the package scan its gate (with B5). *Use:*
+the alert you already have becomes one you can rely on, with a stated
+latency.
+
+**Track E — durability.**
+With platform backup off, **the phone is the only copy** until sync exists, and sync
+needs a second place to hold a journal. A laptop can never be required, so the
+candidates are a second phone or a zero-knowledge relay (`Synchronization`,
+`Encryption`). Until then, *export* is the backup, and a reminder to export is worth
+having. *Use:* losing a phone no longer loses the memory.
+
+**Recommended order:** Track 0 → A5 → A6 → A7 → A8, with **B1 decided in parallel**
+(it is a decision, not work) → B2 → one sensor from track C → B3 → B4 → B5. Tracks D
+and E interleave when their decision is taken. Nothing in v1 needs AD-1, AD-2, AD-3 or
+AD-10.
+
+**What would change this order:** if you would rather Orb *do* something before it
+remembers broadly, B4 can move forward using shares alone — at the cost of a narrower
+first workflow.
+
 ---
 
 ## Standing Rules Across All Phases
