@@ -112,7 +112,7 @@ the replicated event. The phone's event is never rewritten.
 
 **Two things are translated, and everything else stays an Event.** The grants
 readings (`grants.observed`, `grants.packages`) become Observations sourced
-`pass2@<install>`, and — since 2026-09-29 — each share (`orb.shared`) becomes one
+`orb.sensor.grants@<install>`, and — since 2026-09-29 — each share (`orb.shared`) becomes one
 sourced `orb.sensor.share@<install>` with confidence 100, its stored content
 referenced by identity (`docs/SENSOR_SHARE.md` §4a). The phone's process starts,
 process exits, capability grants, resolve attempts and exports are about Orb

@@ -99,8 +99,9 @@ describe("replication, then observation", () => {
     const mine = await j.readLane("mac");
     const observations = mine.filter((event) => readObservation(event) !== null);
     assert.equal(observations.length, 4);
-    // inv. 3: what perceived it was pass 2 on the phone, not the importer.
-    assert.equal(readObservation(observations[0]!)?.source, "pass2@Pixel 10a/stallion");
+    // inv. 3: what perceived it was the grants sensor on the phone, not the importer
+    // and not an app (`docs/SENSOR_GRANTS.md` §4).
+    assert.equal(readObservation(observations[0]!)?.source, "orb.sensor.grants@Pixel 10a/stallion");
   });
 
   test("each Observation cites the phone's own event", async () => {

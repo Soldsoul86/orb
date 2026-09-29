@@ -22,7 +22,7 @@
 import type { Journal, StoredEvent, OrbEvent } from "@orb/journal";
 import { hasPayload, unwrapPayload } from "@orb/journal";
 import { observationDraft, readObservation } from "@orb/observation";
-import type { DeviceAuthorityReading, KindReading } from "./reading.js";
+import { grantsSource, type DeviceAuthorityReading, type KindReading } from "./reading.js";
 import { SHARED_TYPE, SHARE_CONFIDENCE_PERCENT, shareFrom, shareSource } from "./share.js";
 
 /** The pass-2 event that carries a grant reading, written at every wake. */
@@ -162,10 +162,10 @@ const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
   ...READING_TYPES.map((type): [string, Translation] => [
     type,
     {
-      // Pass 2, on the phone that holds this lane — not the importer, which only
-      // carried it. (The label names the app that first wrote these readings; the
-      // consolidated app writes them too. `STATE.md` records that as a follow-up.)
-      source: (event) => `pass2@${event.device}`,
+      // The grants sensor, at the install that holds this lane — not the importer,
+      // which only carried it, and not an app: every build carrying the grants
+      // watch takes the same look (`docs/SENSOR_GRANTS.md` §4).
+      source: (event) => grantsSource(event.device),
       // There is no inference here: the value is what the OS returned, and a read
       // that failed is carried as `readable: false` rather than smeared into a
       // lower number. Uncertainty that has its own field does not belong in this

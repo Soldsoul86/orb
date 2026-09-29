@@ -869,7 +869,7 @@ in no register.
   no `confidence`**.
 - `packages/device-watch/src/import.ts` turns exactly two phone event types,
   `grants.observed` and `grants.packages`, into Observations (attributed
-  `pass2@<device>`). Nothing turns an `orb.shared` into one — nor a `grants.exits`,
+  `pass2@<device>`, since renamed `orb.sensor.grants@<device>`). Nothing turns an `orb.shared` into one — nor a `grants.exits`,
   an `orb.resolve.attempt` or an `orb.process.start`. Whether each of those is an
   Observation at all, or only device diagnostics, is decided as the next step
   reaches it.

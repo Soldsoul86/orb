@@ -63,11 +63,17 @@ is not an event envelope — a partly-imported chain is a gap that looks like
 history. `importExport` is idempotent: `replicate` skips by event id, translation
 skips readings already cited.
 
-The Observation's `source` is `pass2@<device>` for a grants reading and
-`orb.sensor.share@<device>` for a share — inv. 3 asks what *perceived* it, which
-was the phone, not the importer that carried it. (`pass2` names the app that first
-wrote grants readings; the consolidated app writes them too, so the label is
-stale — recorded in `STATE.md`.)
+The Observation's `source` is `orb.sensor.grants@<device>` for a grants reading
+and `orb.sensor.share@<device>` for a share — the convention is
+`orb.sensor.<name>@<install>` (`docs/SENSOR_GRANTS.md` §4). inv. 3 asks what
+*perceived* it: a sensor at an install, never an app and never the importer that
+carried the file. (Until 2026-09-29 grants readings were labelled `pass2@<device>`,
+which named a retired app.)
+
+```ts
+GRANTS_SENSOR = "orb.sensor.grants"
+grantsSource(device): string           // "orb.sensor.grants@<device>"
+```
 
 A share's `data` keeps the phone's own field names (`references`, `resolved`, …),
 its `attachments` holds the stored content's identity and never the bytes, its

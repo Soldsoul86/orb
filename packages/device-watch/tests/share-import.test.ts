@@ -240,6 +240,26 @@ describe("shares and grants readings share a lane without disturbing each other"
   });
 });
 
+describe("every source follows the one convention", () => {
+  const grants = () => readFile(join(here, "../../tests/fixtures/pass2-export.txt"), "utf8");
+
+  test("a source is `orb.sensor.<name>@<device>` — a sensor at an install, never an app", async () => {
+    const j = await desk();
+    await importExport(j, await grants());
+    await importExport(j, await fixture());
+
+    const sources = new Set((await shares(j)).map((observation) => observation.source));
+    assert.deepEqual(
+      [...sources].sort(),
+      [`orb.sensor.grants@Pixel 10a/stallion`, `orb.sensor.share@${INSTALL}`],
+    );
+    for (const source of sources) {
+      assert.match(source, /^orb\.sensor\.[a-z]+@.+$/);
+      assert.ok(!source.startsWith("pass"), "the label named a retired app");
+    }
+  });
+});
+
 describe("a payload that is not usable", () => {
   test("not an object is skipped rather than recorded as an empty share", () => {
     assert.equal(shareFrom(null), null);

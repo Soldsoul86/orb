@@ -12,6 +12,19 @@
  * written against the shape rather than against the pipe, so the pipe can be
  * either.
  */
+/**
+ * What perceived a grants reading (`docs/SENSOR_GRANTS.md` §2, §4).
+ *
+ * The sensor, not the app: the same look is taken by every build that carries the
+ * grants watch, and which app wrote a lane stays knowable from the replicated event.
+ */
+export const GRANTS_SENSOR = "orb.sensor.grants";
+
+/** The source of a grants reading: the sensor, at the install that holds the lane. */
+export function grantsSource(device: string): string {
+  return `${GRANTS_SENSOR}@${device}`;
+}
+
 export interface KindReading {
   readonly kind: string;
   /**
