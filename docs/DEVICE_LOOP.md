@@ -4626,7 +4626,7 @@ manifest fact, and neither is a baseline event once the boundary is behind them.
 
 ### 7b41. The assist probe — what Android hands an assistant app, measured before it is declared — 2026-09-29
 
-**Status: built, not yet run.** Predictions are written here before the first
+**Status: run 2026-09-29 — results in §7b42.** Predictions are written here before the first
 invocation so that the result can refute them. `apps/pixel/probe-assist`,
 package `dev.orb.probea`, 29 KB, no permissions.
 
@@ -4719,3 +4719,78 @@ unconfirmed; that is a known uncertainty, recorded, and not needed to proceed.
 Settings → Apps → Default apps → **Digital assistant app** → choose your usual
 assistant (or *None*). Uninstalling the probe also reverts it — **export first**:
 the journal goes with the package.
+
+### 7b42. The assist probe, run — the platform delivers, the app decides what is protected — 2026-09-29
+
+Export `orb-probea-20260929-122630.txt`: 47 events, one lane, **one install** with
+no restart; `verifyLane` (the TypeScript encoder re-deriving every envelope and
+payload hash) accepts all 47. Nine invocations, one `assist.service.ready`, one
+`assist.export`, **no `assist.show.failed`**. Every string in every payload is a
+package name or `assistGesture` — checked mechanically, not read by eye — so the
+"never records content" guarantee held on real data as well as in the tests.
+
+Which invocation was which app comes from the package field; that the
+Chrome-with-nothing-in-it invocation was the **incognito** tab comes from the
+operator's protocol order and from the pattern below, not from anything the probe
+recorded.
+
+#### Scoring
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **P23** | **Held** | `roleHeld: true`, `activeService: true`. A sideloaded app with no permission is selectable as the device assistant and is bound. The recognition stub was present, so *whether it is required* stays unanswered |
+| **P24** | **Held** for the default settings | all nine: `withAssist`, `withScreenshot`, `sources: "assistGesture"`, `assistCallbacks: 1`, `screenshotCallbacks: 1`. `flags` was **263** every time; 7 of it decodes to assist + screenshot + gesture, and the remaining **256 is a bit this build does not decode** — left as recorded. **The "text off / screenshot off" invocations in the protocol are not in the export** (every invocation has both), so what those settings change is **untested**, not refuted |
+| **P25** | **Held** | messaging app 415 nodes / 40 with text; YouTube 615 / 53; Settings 183 / 45; launcher 689–715 / 187–195; Chrome 4,702 / 1,592. `package` named the app on screen every time, never this probe. The same WhatsApp screen twice gave **415 nodes both times** — the structure is stable, not sampled |
+| **P26** | **Half held, half refuted — and the refuted half is the important one** | see below |
+| **P27** | **Half held** | Chrome supplied a web URI, **supplied by the app itself** (`appProvidedWebUri: true`), and 272 characters of structured data. So did YouTube (URI, 218 characters). **`webDomainNodes` was 0** even in Chrome (`webViewNodes: 1`): the per-node domain is not delivered here, only the page-level URI. WhatsApp: no URI, 73 characters of structured data |
+| **P28** | **Held with wide margin** | structure 5–268 ms (the 268 was the 4,702-node Chrome page), screenshot 7–162 ms, first draw 18–148 ms. Every figure is **inside the probe, from the start of the session** — the time from the gesture to the session starting is not measured and is not part of this claim |
+| **P29** | **Not tested** | no game or self-drawing app was used. One app (the payments app) shows the *shape* — 50 nodes, **0 text nodes**, 24 with descriptions — but it is not the case the prediction was about |
+
+#### P26 — what the platform protects, and what it does not
+
+Two screens, opposite results:
+
+| | structure | screenshot |
+| --- | --- | --- |
+| Chrome, the empty one (incognito) | **1 node, `blockedNodes: 1`, 0 text** | `uniform: true`, **1 colour, 100 % dark — blanked** |
+| The payments app (Google Pay), signed out | 50 nodes, 24 descriptions, 0 text nodes | `uniform: false`, **42 colours, 13 % dark — a real capture** |
+
+**The platform does not decide what is sensitive. The app does.** Incognito opted
+out twice, by two independent mechanisms (structure blocked, screenshot blanked);
+that is the app's doing, and it worked. The payments screen opted out of neither,
+and the platform handed over a genuine screenshot of it. I do not know which
+Google Pay screen was showing — the operator was told not to sign in — so this is
+**one screen, not a verdict on the app**: sign-in and payment screens of banking
+apps commonly do opt out, and this one evidently did not.
+
+Two consequences, both for step 5 and neither decided here:
+
+1. **Two signals are free and reliable.** `blockedNodes > 0` and a `uniform`
+   screenshot are how a protected screen presents on this device. A rule that
+   says *when either appears, retain nothing* costs nothing and matches what the
+   app asked for.
+2. **They are not enough.** A screen that is sensitive and did not opt out
+   arrives intact. Whether Orb needs its own rule for those — by package, by
+   category, by an explicit allow-list, or by the person's confirmation on
+   each capture — is a **policy decision, and the operator's**, and it is what
+   step 5 exists to put in front of them.
+
+#### What else the run showed
+
+- **Callbacks fire exactly once.** No invocation delivered a second structure or
+  screenshot, and none delivered neither.
+- **The card drew every time**, in under 150 ms, and stayed as long as it was left
+  (1.0–6.6 s).
+- **`intent: true` on all nine with `appProvidedIntent: false`**: the platform
+  supplies its own intent, so its presence says nothing about the app. Not a signal
+  to build on.
+- **WhatsApp supplied structured data** (73 characters) and no URI. What it is,
+  the probe does not record and does not need to.
+
+#### What is still open
+
+The text-off and screenshot-off behaviour; a self-drawing app (P29); whether the
+stub is required; the meaning of flag bit 256; and how the platform behaves when
+a **second** assistant-capable app (the operator has ChatGPT, Claude, Perplexity
+and Google all registered) is invoked while this one is default — that is not a
+concern of the probe, only a fact of the device.

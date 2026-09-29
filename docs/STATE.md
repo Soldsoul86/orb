@@ -77,7 +77,7 @@ platform's or the framework's.
 | `apps/pixel/pass1` | ~1,650 | foreground-service and journal survival; the 21-hour run |
 | `apps/pixel/pass2` | ~730 | the grants signal; recording since 2026-09-26 |
 | `apps/pixel/probe-grants` | ~640 | the throwaway that answered P12–P14 |
-| `apps/pixel/probe-assist` | ~970 | Step 4: what Android hands an assistant app, per target app, metadata only (`DEVICE_LOOP.md` §7b41, P23–P29). Built, not yet run |
+| `apps/pixel/probe-assist` | ~970 | Step 4: what Android hands an assistant app, per target app, metadata only (`DEVICE_LOOP.md` §7b41–§7b42, P23–P29). Run 2026-09-29 |
 
 ### What is not built at all
 
@@ -265,6 +265,7 @@ The section that matters most, and the one a summary is most tempted to shorten.
 | **the scan interval, now load-bearing** | 12 h was chosen as a fallback behind a prompt broadcast. That broadcast does not exist, so 12 h **is** the detection latency for a new app on this device. Whether that is acceptable is a decision, not a default |
 | **P21** | **a recorded limit, narrowed on 2026-09-28 and not closed.** Comparison reports on endpoints, not intervals: a grant given and withdrawn between two process starts reads `changed: false`, so *nothing happened* and *something happened and was undone* are the same record. The installed-package set is now carried and compared, so a **missed broadcast** is recoverable — an install *undone* before the next observation still is not. The second candidate, recording the blind window explicitly, is not implemented |
 | ~~**P22**~~ | **held 2026-09-28 on the device** — `scope: "all"`, 484 packages, baseline on the first scan, the operator button recorded as `operator.scan`, and a second scan comparing `baseline: false` across an intervening observation. What remains of it is P19's half: a named entry in `installedPackageGained` after an actual install |
+| **P23–P29** | **run 2026-09-29** (`DEVICE_LOOP.md` §7b42, `apps/pixel/probe-assist`). **Held:** selectable and bound with no permission (P23); the gesture reaches it with structure and screenshot (P24, default settings); ordinary apps deliver text and are correctly attributed (P25); latency 5–268 ms (P28). **Half:** Chrome supplies the page URI but no per-node domain (P27). **Refuted, and it matters:** a payments screen delivered a real screenshot — *the app decides what is protected, not the platform* (P26). **Untested:** the text/screenshot settings toggled off, a self-drawing app (P29), whether the recognition stub is required |
 | **the signing key** | the keystore in the build environment does not match the pass 2 installed on the phone. That install can never be upgraded, only removed, and its journal goes with it. The new build runs beside it as `dev.orb.pass2b` on lane `grants-b` |
 | **the scan interval** | 12 h is a guess, now tunable against a measurement: a scan costs **16.7 KB** (484 packages), 10.5× an observation, so at two scans a day the scans are 33 KB of the journal's 42 KB/day. Halving the interval roughly doubles the journal. Too long and an install sits unnoticed for half a day when the broadcast was silenced; too short and it costs battery and bytes for a set that rarely moves |
 | ~~**Attachment**~~ | **implemented 2026-09-26** — identity, blinded address, per-Attachment keys, the destruction guard. 20 tests, five controls |
