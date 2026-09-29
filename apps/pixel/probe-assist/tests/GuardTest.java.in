@@ -134,5 +134,6 @@ final class GuardTest {
             .replaceAll("(?s)<!--.*?-->", "");
         Harness.check("no component runs in its own process", !manifest.contains("android:process"));
         Harness.check("no permission is requested", !manifest.contains("<uses-permission"));
+        Harness.check("platform backup is off (AD-11)", manifest.contains("android:allowBackup=\"false\""));
     }
 }

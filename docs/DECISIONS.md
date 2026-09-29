@@ -911,7 +911,8 @@ records that its gate was accepted, not what its work is.
 ## DR-14 — Payments apps are never captured by the assistant overlay
 
 - **Status:** Decided in part · **Decided:** 2026-09-29, operator · **Bears on:**
-  `DEVICE_LOOP.md` §7b42, the step-5 sensor declaration (not yet written)
+  `DEVICE_LOOP.md` §7b42, `ARCHITECTURAL_DEBT.md` AD-11, the step-5 sensor
+  declaration (not yet written)
 
 **The question.** The assist probe showed that Android hands an assistant an intact
 screenshot and full structure of any screen whose app did not opt out — including a
@@ -936,17 +937,26 @@ payments screen (`DEVICE_LOOP.md` §7b42, P26). Which apps may Orb ever capture 
   screenshot) are honoured **in addition**: an app that opts out is never
   overridden, whatever category it is in.
 
-**Still open — step 5 decides these with the operator, they are not decided here.**
+**Also ruled, 2026-09-29, in answer to three questions.**
 
-- **How a payments app is recognised.** Android has no payments category; a
-  package list is the only mechanical route, and a list is only as good as its
-  last update.
-- **What an app on no list does.** Capture-by-default puts an unlisted banking app
-  in scope until someone adds it; capture-by-allow-list does not.
-- **What an invocation retains** — structure text, a screenshot, both, or neither
-  until *Remember* is tapped — and for how long.
+4. **Allow-list only.** Orb captures from an app only if the person has said yes to
+   it. An app on no list is never captured. This also removes the need to recognise
+   payments apps mechanically (Android has no payments category): a payments app is
+   excluded by never being allowed, and a new or unknown one is excluded the same way.
+5. **Text only is kept.** *Remember* keeps the screen's text and where it came from
+   (app, page address). **No screenshot is stored.** The screenshot the platform hands
+   over is used, if at all, to tell a blanked screen from a real one, and discarded.
+6. **Platform backup off now** (AD-11), before anything beyond a deliberate share is
+   captured.
 
----
+**Still open — step 5 writes these down with the operator, they are not decided here.**
+
+- How a person adds an app to the allow-list, and whether a brand-new install starts
+  empty (the consistent reading of ruling 4).
+- **How long kept text lives**, and what erasing one capture does (step 6).
+- Whether *text only* holds for an app that delivers no text (a payments-shaped
+  screen of 50 nodes and none with text was seen): the honest outcome is *nothing
+  kept, and the person told*, not a fallback to the picture — to be confirmed.
 
 ---
 

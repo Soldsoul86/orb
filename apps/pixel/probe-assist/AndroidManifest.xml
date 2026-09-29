@@ -18,6 +18,7 @@
 
     <application
         android:name=".Probe"
+        android:allowBackup="false"
         android:label="@LABEL@"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 

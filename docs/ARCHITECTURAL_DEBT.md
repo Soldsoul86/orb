@@ -449,7 +449,14 @@ facet-history need materializes.
 
 ## AD-11 — the Orb app's private storage is eligible for platform backup
 
-**Opened 2026-09-29.** Found while answering *what does Orb keep of a screenshot*.
+**Opened 2026-09-29. Fixed in the tree the same day (DR-14 ruling 6):** the `orb` and
+`probe-assist` manifests set `android:allowBackup="false"`, and `manifests.test.ts` fails if
+they stop. **On the device once `orb-app-v8-nobackup.apk` is installed.** Still open: whether
+device-to-device transfer is also excluded by that attribute alone on this Android
+version (unchecked), and the retired builds (`pass1`, `pass2b`, `probeg`) keep the
+default — they hold readings, not keys, and are being replaced by the app.
+
+Found while answering *what does Orb keep of a screenshot*.
 **Not verified to occur** — the exposure is a consequence of a manifest default, not
 something observed in a backup.
 

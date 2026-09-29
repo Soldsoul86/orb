@@ -53,8 +53,15 @@
         </intent>
     </queries>
 
+    <!--
+      allowBackup is off (AD-11). Its default is on, and this app keeps the journal,
+      the sealed attachments *and their keys* in private storage: a platform backup
+      would carry key and ciphertext off the phone together. Losing the phone then
+      loses the journal, and the export in Downloads is the copy that survives.
+    -->
     <application
         android:name=".Orb"
+        android:allowBackup="false"
         android:label="@LABEL@"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
