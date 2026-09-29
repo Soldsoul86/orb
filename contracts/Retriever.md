@@ -5,7 +5,7 @@ Contract:   Retriever
 Domain:     Intelligence
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: LiveContext, Evidence, DigitalTwin, Journal
 ```
 

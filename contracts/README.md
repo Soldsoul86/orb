@@ -94,10 +94,10 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 4. Intelligence
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [InferenceRecord](InferenceRecord.md) | State | Draft |
-| [Retriever](Retriever.md) | Service | Draft |
-| [Reasoner](Reasoner.md) | Service | Draft |
-| [Planner](Planner.md) | Service | Draft |
+| [InferenceRecord](InferenceRecord.md) | State | Accepted |
+| [Retriever](Retriever.md) | Service | Accepted |
+| [Reasoner](Reasoner.md) | Service | Accepted |
+| [Planner](Planner.md) | Service | Accepted |
 
 ### 5. Execution
 | Contract | Kind | Status |

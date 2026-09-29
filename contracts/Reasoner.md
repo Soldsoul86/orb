@@ -5,7 +5,7 @@ Contract:   Reasoner
 Domain:     Intelligence
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Retriever, DigitalTwin, Belief, Evidence, ModelRouter
 ```
 

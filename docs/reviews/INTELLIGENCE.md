@@ -6,6 +6,11 @@
 > the four contract specs (`InferenceRecord`, `Retriever`, `Reasoner`, `Planner`), and
 > all doc counts are updated to match.
 >
+> **Specs ratified 2026-09-29.** The four spec files were verified against the frozen
+> decisions and flipped Draft → Accepted (23 Accepted / 7 Draft kernel-wide). Two open
+> seams disclosed, neither blocking: the DR-9 carrier in `Reasoner` §3, and
+> `InferenceRecord` inv. 7's lineage check being *followed, not enforced*.
+>
 > Candidate contracts evaluated (per the directive, "do not assume all five belong"):
 > **Retriever, Reasoner, Planner, InferenceRecord, Claim** — plus the two contracts
 > the draft kernel parked in this domain, **Memory** and **Reflector**.
