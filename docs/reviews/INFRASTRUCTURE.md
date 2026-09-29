@@ -173,7 +173,7 @@ precisely what sync unblocks, and because the machinery passing its tests while
 being unreachable in practice is exactly the shape of thing this project keeps
 finding only on a real device.
 
-### What a reviewer should challenge
+### What a reviewer should challenge — adjudicated 2026-09-29
 
 1. **Who starts a sync?** Art. V §21 says the runtime owns scheduling and nothing
    wakes itself — so sync should be dispatched by the `Scheduler`. `KERNEL.md`'s
@@ -190,6 +190,34 @@ finding only on a real device.
    everything cryptographic to it. If the only use is "the transport is encrypted",
    the edge may belong to the transport rather than to sync — the same question
    already open against `Journal`'s edge.
+
+### Review verdict — `Synchronization`, 2026-09-29: ACCEPTED
+
+Faithful to `KERNEL.md`, consistent with Articles I, IV and VIII §30, and its
+semantics are demonstrated on real data by `importExport` (the contract is ahead of
+an automated transport, not ahead of its meaning). The four challenges:
+
+1. **Who starts a sync — fixed in-contract.** Sync must not wake itself (Art. V §21),
+   so `Synchronization.md` now carries **inv. 12 (never self-initiating)** and §2.1
+   states a session begins only on dispatch. The dispatch edge runs `Scheduler →
+   Sync`, so sync gains **no** new dependency — it is called, not calling. **Carried
+   to the `Scheduler` review:** `Scheduler.md` must list sync among the work it
+   dispatches; naming it on one side (done) satisfies the contract, but the reciprocal
+   entry is owed.
+2. **What bounds a session — made explicit.** §3 now states the **unit of resumption
+   is the lane**: a re-advertisement names the last event durably adopted and resumes
+   from the next; nothing finer is promised or needed because adoption is the
+   `Journal`'s atomic append.
+3. **Erasure confirmation record — resolved, and it always existed.** Per
+   `RECORDS.md` §1 a peer confirms by appending its own `orb.erasure` for the same
+   `{lane, hash}`; the reader `confirmationsFor(events, hash)` now exists in
+   `erasure.ts`, and `erasure-plan.ts`'s D5 reason already reads *the record type is
+   not missing; the transport is.* §7 now names the type and the reader.
+4. **`Encryption` edge — kept.** It is not merely "transport is encrypted": the
+   **zero-knowledge relay** guarantee (inv. 10) and the erasure reasoning that a
+   ciphertext-only copy is **inert once its key is destroyed** (§7) both rest on
+   `Encryption`. The transport is replaceable; that guarantee is not. In the kernel;
+   no change.
 ---
 
 ## Addendum — `ModelRouter` and `Encryption` drafted, 2026-09-28

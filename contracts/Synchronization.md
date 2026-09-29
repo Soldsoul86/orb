@@ -5,7 +5,7 @@ Contract:   Synchronization
 Domain:     Infrastructure
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Journal, Event, Encryption
 ```
 
@@ -69,9 +69,11 @@ not entitled to them.
 
 ## 2. Lifecycle
 
-1. **Discovery and transport.** Peers connect over any encrypted channel — a direct
-   local link, or a relay used purely as a dumb pipe. The relay is *replication,
-   never authority*: it moves ciphertext and holds no keys.
+1. **Discovery and transport.** A session begins only when the runtime **dispatches**
+   it — sync never wakes itself or polls (Art. V §21; the `Scheduler` owns when).
+   Peers then connect over any encrypted channel — a direct local link, or a relay
+   used purely as a dumb pipe. The relay is *replication, never authority*: it moves
+   ciphertext and holds no keys.
 2. **Advertisement.** Each peer states, per lane, how far it has seen. Because
    lanes are hash-chained, the gap that follows is unambiguous.
 3. **Transfer.** The peer sends the missing tail.
@@ -99,9 +101,11 @@ Three distinctions the diagram keeps apart:
 
 - **`idle` is not failure.** A peer that has not been reachable since Tuesday is a
   fact about the world, not an error state. See §7.
-- **Interrupted is not partial.** A transfer cut halfway adopts nothing. Resumption
-  re-advertises and starts from the true gap, so there is no half-applied tail to
-  reason about.
+- **Interrupted is not partial.** A transfer cut halfway adopts nothing. **The unit of
+  resumption is the lane:** a re-advertisement names the last event *durably adopted*
+  and transfer resumes from the next, so there is no half-applied tail to reason about.
+  Nothing finer than a lane is promised, and nothing finer is needed, because adoption
+  is the `Journal`'s atomic append — a partial batch was never adopted.
 - **`rejected` is not `repaired`.** A broken chain is refused whole. Patching it
   would be writing history on behalf of another device, which is the one thing a
   peer may never do.
@@ -129,6 +133,9 @@ Three distinctions the diagram keeps apart:
     plaintext (Art. IV §16). The mechanism is `Encryption`'s and is never
     re-implemented here.
 11. **Never decides.** Not truth, not precedence, not another device's retention.
+12. **Never self-initiating.** Sync is dispatched by the runtime `Scheduler`; it does
+    not wake itself or poll (Art. V §21). The dispatch edge runs `Scheduler → Sync`,
+    so sync gains no dependency on a scheduler — it is *called*, not *calling*.
 
 Upholds Constitution Articles I (History), IV (Distribution) and VIII §30 (the user
 is the root of trust).
@@ -191,10 +198,11 @@ Not guaranteed:
 - **An erasure that a peer does not confirm.** **Synchronization cannot make
   another device forget.** A peer may be offline, lost, or unwilling. What is
   available is: erase locally, declare it, propagate the declaration, and **record
-  which peers confirmed** — where a peer's confirmation is **its own erasure
-  declaration on its own lane**, the confirming device being `event.device` by the
-  same rule that keeps `holder` out of a custody receipt. No separate record type
-  exists or is needed (`../docs/reviews/RECORDS.md` §1). The honest statement is therefore never *"it is gone"*
+  which peers confirmed** — where a peer's confirmation is **its own `orb.erasure`
+  declaration on its own lane** naming the same `{lane, hash}`, the confirming device
+  being `event.device` by the same rule that keeps `holder` out of a custody receipt,
+  and read back by `confirmationsFor(events, hash)`. No separate record type exists or
+  is needed (`../docs/reviews/RECORDS.md` §1). The honest statement is therefore never *"it is gone"*
   but *"gone here; three of four peers confirmed; one has not been seen since
   Tuesday"* (`ERASURE.md`, D5). Where the peer only ever held ciphertext and the key
   is destroyed, its unconfirmed copy is inert — so the limit constrains bookkeeping
