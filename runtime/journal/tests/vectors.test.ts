@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, parse } from "node:path";
 
 import {
+  bookkeepingTypes,
   canonicalJson,
   coarseSchema,
   coarseType,
@@ -59,6 +60,8 @@ interface Vectors {
   readonly hash: string;
   readonly v2: V2Section;
   readonly v2Bookkeeping: V2Section;
+  /** Every type that keeps its real name under v2, sorted — shared with the phone. */
+  readonly bookkeepingTypes: readonly string[];
 }
 
 /**
@@ -88,6 +91,13 @@ interface V2Section {
 }
 
 describe("cross-implementation encoding", () => {
+  test("both implementations keep the same types legible under v2", async () => {
+    const vectors = JSON.parse(await readFile(await findVectors(), "utf8")) as Vectors;
+    // The whole list, not one example of it: a type kept fine on one side and
+    // coarsened on the other hashes differently, and nothing else would notice.
+    assert.deepEqual(bookkeepingTypes(), vectors.bookkeepingTypes);
+  });
+
   test("the TypeScript encoder matches the vectors the Java encoder produces", async () => {
     const vectors = JSON.parse(await readFile(await findVectors(), "utf8")) as Vectors;
 

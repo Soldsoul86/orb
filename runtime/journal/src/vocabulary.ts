@@ -69,6 +69,17 @@ export function isBookkeepingType(type: string): boolean {
   return BOOKKEEPING.has(type);
 }
 
+/**
+ * Every type that keeps its real name under v2, sorted.
+ *
+ * Exposed so the list itself — not one example of it — can be checked against
+ * `bookkeepingTypes` in the shared vectors. The phone once kept three while this
+ * file kept four; a single bookkeeping vector could not have caught it.
+ */
+export function bookkeepingTypes(): readonly string[] {
+  return [...BOOKKEEPING].sort();
+}
+
 /** What the envelope says, given what the event actually is. */
 export function coarseType(type: string): string {
   return isBookkeepingType(type) ? type : CONTENT_TYPE;

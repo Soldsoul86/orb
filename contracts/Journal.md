@@ -162,12 +162,17 @@ Upholds Constitution Articles I (History), IV (Distribution), and IX §33–§34
   so never needs to change to carry one.
 - **The envelope is versioned.** v1 carries the event's real type; **v2 coarsens it
   to `orb.content`** so the envelope discloses less (`ERASURE.md` §2a). Both are
-  implemented; v1 is the default. A journal must be able to read every version it
+  implemented: the TypeScript journal writes v2; the phone's journal writes v1 by
+  default and v2 when switched. A journal must be able to read every version it
   has ever written, for ever.
 - **Migrating a running device's envelope version is not a configuration change.**
   Machinery that finds an event by its fine type stops matching under v2 — silently,
   and in the direction that looks like nothing happening. Any such migration lands
   with a way to find that event that does not read the fine type off the line.
+  *Met on both sides as of 2026-09-29:* the TypeScript journal finds events by the
+  type it unwraps, and the phone's lookup reads the type from the event's structure
+  (`Journal.typeOf`) for v1 and v2 alike, refusing rather than skipping an event
+  whose type it cannot read.
 - The core obligation — *append-only, single-writer-per-lane, chained, replayable,
   envelope-never-absent* — is frozen at v1. Weakening it requires `Journal v2`
   alongside v1, never replacing it.

@@ -109,6 +109,7 @@ export {
   CONTENT_TYPE,
   CONTENT_SCHEMA,
   isBookkeepingType,
+  bookkeepingTypes,
   coarseType,
   coarseSchema,
 } from "./vocabulary.js";

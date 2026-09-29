@@ -90,5 +90,11 @@
     },
     "preimageCanonical": "{\"device\":\"Pixel 10a/stallion\",\"hlc\":{\"counter\":3,\"physical\":1790300066000},\"id\":\"01M3B90CADNB1PH0FQS6ZHQV5S\",\"lane\":\"pixel\",\"payloadHash\":\"5d64ed93a831ac18ef47039a66c7a513643a805fb663616db2b2b5d77b5bebbf\",\"previous\":null,\"type\":\"orb.custody.receipt\",\"v\":2,\"wallClock\":1790300066000}",
     "hash": "10508d2a3d079249ca549e294b72c40123a540f76e368202230dd0c205b67521"
-  }
+  },
+  "bookkeepingTypes": [
+    "orb.custody.receipt",
+    "orb.device.revoked",
+    "orb.erasure",
+    "orb.sync.policy"
+  ]
 }

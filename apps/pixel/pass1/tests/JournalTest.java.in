@@ -37,6 +37,108 @@ final class JournalTest {
         anUnreadableHeadIsDeclaredDiscontinuous();
         v2WritesACoarseEnvelope();
         v1IsWhatThisBuildWrites();
+        lookupsSurviveTheV2Envelope();
+        aTypeNamedInsideAPayloadIsNotAMatch();
+        anUnreadableTypeIsRefusedNotSkipped();
+        bookkeepingMatchesTheSharedList();
+    }
+
+    /**
+     * `Journal.md` §5: moving to v2 must not silently stop a lookup matching.
+     * Under v2 the envelope says only `orb.content`, and a lookup that read the
+     * type off the envelope would find nothing, for ever, while every caller
+     * treated that as "no earlier reading" and re-baselined.
+     */
+    private static void lookupsSurviveTheV2Envelope() throws IOException {
+        Harness.suite("a lookup finds the real type under v2, not the envelope's");
+        File dir = temp("v2-lookup");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        journal.append("grants.packages", beat(1));
+        journal.useEnvelopeVersion(2);
+        journal.append("grants.observed", beat(2));
+        journal.append("grants.packages", beat(3));
+
+        List<String> all = lines(dir);
+        Harness.equal("the v2 envelope names only content",
+            Journal.envelopeType(all.get(2)), Journal.CONTENT_TYPE);
+        Harness.equal("but the real type is still read", Journal.typeOf(all.get(2)), "grants.packages");
+        Harness.equal("and a v1 line reads as it always did", Journal.typeOf(all.get(0)), "grants.packages");
+
+        Map<String, String> packages = journal.lastOfType("grants.packages");
+        Harness.check("the lookup finds it", packages != null);
+        Harness.equal("the newest one, across the version switch", packages.get("line"), all.get(2));
+        Map<String, String> observed = journal.lastOfType("grants.observed");
+        Harness.equal("a type written only under v2 is found too",
+            observed == null ? null : observed.get("line"), all.get(1));
+        Harness.equal("last() reports the real type, not orb.content", journal.last().get("type"), "grants.packages");
+    }
+
+    /**
+     * The fault the old substring match had even under v1: a payload that merely
+     * contains `"type":"X"` looked like an event of type X.
+     */
+    private static void aTypeNamedInsideAPayloadIsNotAMatch() throws IOException {
+        Harness.suite("a payload that mentions a type is not an event of that type");
+        File dir = temp("decoy");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        Map<String, Object> decoy = Json.obj();
+        decoy.put("type", "grants.packages");
+        journal.append("orb.shared", decoy);
+        journal.useEnvelopeVersion(2);
+        journal.append("orb.shared", decoy);
+
+        Harness.check("no grants.packages event exists, so none is found",
+            journal.lastOfType("grants.packages") == null);
+        Map<String, String> shared = journal.lastOfType("orb.shared");
+        Harness.equal("the event is found by its own type, under v2 as well",
+            shared == null ? null : shared.get("line"), lines(dir).get(1));
+    }
+
+    /**
+     * A sealed v2 payload hides the real type from anything without the key.
+     * Nothing in this build writes one; the lookup must still not guess, and must
+     * not step over it to an older match as though it did not exist.
+     */
+    private static void anUnreadableTypeIsRefusedNotSkipped() throws IOException {
+        Harness.suite("an event whose type cannot be read stops the lookup");
+        File dir = temp("unreadable");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        journal.append("grants.packages", beat(1));
+        String sealed = "{\"device\":\"test-device\",\"hlc\":{\"counter\":0,\"physical\":2},"
+            + "\"id\":\"01SEALED\",\"integrity\":{\"hash\":\"h\",\"payloadHash\":\"p\",\"previous\":null},"
+            + "\"lane\":\"pixel\",\"payload\":\"c2VhbGVk\",\"schema\":{\"id\":\"orb.content\",\"version\":1},"
+            + "\"type\":\"orb.content\",\"v\":2,\"wallClock\":2}";
+        List<String> all = lines(dir);
+        all.add(sealed);
+        rewrite(dir, all);
+
+        Harness.equal("its type is unknown, not guessed", Journal.typeOf(sealed), null);
+        boolean refused = false;
+        try {
+            journal.lastOfType("grants.packages");
+        } catch (IOException expected) {
+            refused = true;
+        }
+        Harness.check("the lookup refuses rather than returning the older match", refused);
+    }
+
+    /**
+     * The phone once kept three names legible under v2 while TypeScript kept
+     * four. One shared list, checked from both sides, is what stops that.
+     */
+    private static void bookkeepingMatchesTheSharedList() throws IOException {
+        Harness.suite("the types that stay legible under v2 match TypeScript's");
+        List<String> ours = new ArrayList<>(Journal.bookkeepingTypes());
+        java.util.Collections.sort(ours);
+        Harness.equal("the same list as the shared vectors",
+            ours, java.util.Arrays.asList(Vectors.BOOKKEEPING_TYPES));
+
+        File dir = temp("revoked");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        journal.useEnvelopeVersion(2);
+        Map<String, Object> event = journal.append("orb.device.revoked", beat(1));
+        Harness.equal("a revocation keeps its name on a v2 envelope", event.get("type"), "orb.device.revoked");
+        Harness.check("and is found by it", journal.lastOfType("orb.device.revoked") != null);
     }
 
     /**

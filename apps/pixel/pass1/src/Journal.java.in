@@ -61,7 +61,14 @@ final class Journal {
      * exception is exactly the branch that would diverge unnoticed.
      */
     private static final List<String> BOOKKEEPING = Collections.unmodifiableList(
-        java.util.Arrays.asList("orb.custody.receipt", "orb.sync.policy", "orb.erasure"));
+        java.util.Arrays.asList(
+            "orb.custody.receipt", "orb.sync.policy", "orb.erasure",
+            // A peer must stop accepting a revoked device's writes without
+            // decrypting anything, so revocation stays legible like erasure.
+            // Missing here while the TypeScript list had it: the two diverged
+            // for exactly the branch this comment warns about. The shared
+            // vectors now pin the whole list (`bookkeepingTypes`).
+            "orb.device.revoked"));
 
     private final File file;
     private final String lane;
@@ -93,6 +100,11 @@ final class Journal {
     void useEnvelopeVersion(int version) {
         if (version != 1 && version != 2) throw new IllegalArgumentException("unknown envelope version");
         this.envelopeVersion = version;
+    }
+
+    /** The types that keep their real name under v2. Pinned by `bookkeepingTypes` in the vectors. */
+    static List<String> bookkeepingTypes() {
+        return BOOKKEEPING;
     }
 
     static boolean isBookkeeping(String type) {
@@ -333,12 +345,31 @@ final class Journal {
         return event;
     }
 
-    /** Reads the last event of a given type, or null. Used to reconstruct gaps. */
+    /**
+     * Reads the last event of a given type, or null. Used to reconstruct gaps.
+     *
+     * **Matches the event's real type, read from its structure** (`typeOf`), never
+     * a substring of the line. The substring match this replaced had two faults:
+     * it matched a payload that merely *contained* `"type":"X"`, and under a v2
+     * envelope it worked only by accident — the envelope says `orb.content`, and
+     * the real name was found inside the wrapped payload, which a sealed payload
+     * would hide. `Journal.md` §5: a version switch must not silently stop a
+     * lookup matching, because the failure looks like nothing happening.
+     *
+     * A line whose type cannot be read is **refused, not skipped**. Skipping it
+     * would return an older match, or none, as though the unreadable event did
+     * not exist — which is the silent failure the rule exists to prevent.
+     */
     synchronized Map<String, String> lastOfType(String type) throws IOException {
         List<String> lines = readLines();
         for (int i = lines.size() - 1; i >= 0; i--) {
             String line = lines.get(i);
-            if (!line.contains("\"type\":\"" + type + "\"")) continue;
+            String actual = typeOf(line);
+            if (actual == null) {
+                throw new IOException("cannot tell the type of event " + (i + 1)
+                    + " in " + file.getName() + "; refusing to skip it");
+            }
+            if (!actual.equals(type)) continue;
             Map<String, String> out = new java.util.HashMap<>();
             out.put("wallClock", extract(line, "\"wallClock\":"));
             out.put("line", line);
@@ -354,9 +385,52 @@ final class Journal {
         String line = lines.get(lines.size() - 1);
         Map<String, String> out = new java.util.HashMap<>();
         out.put("wallClock", extract(line, "\"wallClock\":"));
-        out.put("type", extractString(line, "\"type\":\""));
+        out.put("type", typeOf(line));
         out.put("line", line);
         return out;
+    }
+
+    private static final String WALL_CLOCK_KEY = ",\"wallClock\":";
+    private static final String V2_FIELD = ",\"v\":2";
+    private static final String TYPE_KEY = "\"type\":\"";
+
+    /**
+     * The type an event really is, read from one canonical line, v1 or v2 — or
+     * null when it cannot be read.
+     *
+     * Canonical JSON sorts keys, so the envelope's own fields sit at the end of
+     * the line in a fixed order: `..."type":"T","wallClock":N}` under v1 and
+     * `..."type":"E","v":2,"wallClock":N}` under v2. Reading from the end finds
+     * the envelope's type and never a `"type"` that happens to occur inside the
+     * payload. Under v2 a content event's envelope says only `orb.content`; its
+     * real type is the wrapped payload's last key, sitting directly before the
+     * envelope's schema. A payload that is not a wrapped object — sealed, say —
+     * has no readable type here, and that is reported as null, not guessed.
+     */
+    static String typeOf(String line) {
+        String envelope = envelopeType(line);
+        if (envelope == null || !CONTENT_TYPE.equals(envelope)) return envelope;
+        String tail = "},\"schema\":" + Json.canonical(coarseSchema(CONTENT_TYPE, Json.obj()))
+            + "," + TYPE_KEY + CONTENT_TYPE + "\"" + V2_FIELD + WALL_CLOCK_KEY;
+        int end = line.lastIndexOf(tail);
+        return end < 0 ? null : quotedBefore(line, end);
+    }
+
+    /** What the envelope itself says the type is, from the fixed tail of the line. */
+    static String envelopeType(String line) {
+        int end = line.lastIndexOf(WALL_CLOCK_KEY);
+        if (end < 0) return null;
+        if (line.startsWith(V2_FIELD, end - V2_FIELD.length())) end -= V2_FIELD.length();
+        return quotedBefore(line, end);
+    }
+
+    /** The string value of the `"type"` key whose closing quote sits just before `end`. */
+    private static String quotedBefore(String line, int end) {
+        if (end < 1 || line.charAt(end - 1) != '"') return null;
+        int key = line.lastIndexOf(TYPE_KEY, end - 1);
+        if (key < 0) return null;
+        String value = line.substring(key + TYPE_KEY.length(), end - 1);
+        return value.isEmpty() || value.indexOf('"') >= 0 ? null : value;
     }
 
     /**

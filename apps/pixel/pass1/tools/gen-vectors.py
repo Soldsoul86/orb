@@ -90,6 +90,12 @@ def main() -> None:
     print(method("payload", vectors["payload"]))
     print()
     print(method("preimageInput", vectors["preimageInput"]))
+    print()
+    # Every type that keeps its real name under v2, not only the one the v2
+    # bookkeeping vector exercises: the phone once had three while TypeScript had
+    # four, and a single example could not have caught it.
+    names = ", ".join(literal(name) for name in vectors["bookkeepingTypes"])
+    print(f"    static final String[] BOOKKEEPING_TYPES = {{ {names} }};")
 
     # The v2 sections. `fineType` rather than a coarse one on purpose: each
     # implementation must derive the envelope's type with its own coarsening
