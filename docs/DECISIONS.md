@@ -789,6 +789,119 @@ if it ever arises, the test is the one above: did the data go somewhere new?
 
 ---
 
+## DR-13 — The Phase 3b gate is accepted; three debts are parked, deferred and reframed
+
+- **Status:** Decided · **Decided:** 2026-09-29, operator · **Bears on:**
+  `ROADMAP.md` gate 3b, `ARCHITECTURAL_DEBT.md` AD-6, AD-7 and AD-9,
+  `SENSOR_SHARE.md`
+
+**The question.** All 30 kernel specifications were Accepted on 2026-09-29, and
+`ROADMAP.md` says a phase does not begin until the operator accepts the prior gate.
+The same review left three older debts open. What is decided about the gate, and
+about each of them?
+
+**Ruled.**
+
+1. **The Phase 3b gate is accepted.** 30 of 30 Accepted, and what is still open is
+   named in `STATE.md` and the reviews rather than hidden. Phase 3c is open. No
+   phase definition changes; this records that the gate was passed, and by whom.
+   The work that follows is the Android personal runtime, **one step at a time**:
+   a step is not finished until it is verified and whatever it leaves open is
+   written in a register. *("Complete one step at a time so no debts pile up.")*
+2. **AD-9 is parked.** Pass 1 is retired and nothing live is affected. Checked
+   2026-09-29 with `verifyLane` on the latest exports: `dev.orb.app` (43 events,
+   export of 2026-09-28 23:12) and pass 2 B (74) verify; pass 1 (5,877) is refused
+   as broken, consistent with the §5d break in `SETTLED.md`. Accepting a break
+   because a peer says it is old would let *declaring* a break become the attack —
+   `verifyLane` cannot tell a historical defect from tampering, and that is the
+   property the journal exists to have. The export stays the durable artefact.
+   **Reopen only if** someone needs pass 1's events inside a journal, or a live lane
+   ever acquires a break.
+3. **AD-7 waits for the general mechanism.** No special-case fix for the package
+   scan. What Orb needs is the whole chain once — *Capability declaration → Policy →
+   permission → Action or read → Journal* — built as part of Phase 3c, so that every
+   sensitive read goes through it. §7b36's half-payment stands and is not extended.
+4. **AD-6 is reframed: the primitive is source independence, not device
+   independence.** Independent keys, unconnected witness groups and corroborating
+   evidence are all one claim about *sources*; a device is one kind of source.
+   Proposed vocabulary for the design thread, **not contract text**: a relationship
+   between two sources is `same`, `derived`, `correlated`, `independent` or
+   `unknown`. Rules that carry over whatever the final shape:
+   - **`unknown` is the default, and unknown never raises confidence.** Only a
+     recorded `independent` may.
+   - **Software records and applies a relationship; it does not establish one.** It
+     is a claim carrying an asserter and a confidence, and the user may be the
+     asserter (Art. XI §43 — confidence, never presented as established).
+   - **Not a 31st contract.** An Event type, as the custody receipt, revocation and
+     `orb.intent.unbindable` are, and additive under DR-11.
+   - **How evidence combines stays with the `Reasoner`.** Evidence grounds and never
+     resolves; an independence claim is data the Reasoner reads, not a verdict.
+   - **A caution the vocabulary exists for.** A WhatsApp screenshot, a voice note
+     and a calendar entry saying the same thing are *not* three independent sources:
+     the calendar entry may be `derived` from the message, and the voice note from
+     reading it. Counted as independent, one fact is counted three times.
+
+   AD-6 stays **Open** as a design thread. **Revisit when** Orb first combines two or
+   more mobile sources about one fact, or before any tamper-evidence claim,
+   whichever comes first.
+
+### What follows, whether we like it or not
+
+- **Source identity is fixed at write time; relationships are not.** History is
+  immutable, so an observation written without a stable source can never gain one,
+  while a relationship between sources can be added later as a new event. That is
+  why AD-6 costs something now: each sensor must name its source when it writes.
+  **This adds nothing to any contract** — `Sensor.md` inv. 2 and `Observation.md`
+  inv. 3 already require it.
+- `ARCHITECTURAL_DEBT.md`, `ROADMAP.md`, `README.md`, `STATE.md` and `SETTLED.md`
+  are updated to say the above. AD-6, AD-7 and AD-9 stay in the debt register: none
+  is discharged, and each now carries this record's decision.
+
+### Found while writing this record
+
+The share sensor does not yet have the shape `SENSOR_SHARE.md` declares, and it was
+in no register.
+
+- `SENSOR_SHARE.md` §4 says the sensor emits an **Observation** carrying
+  `sensor: orb.sensor.share`, `reference`, `resolvable` and `confidence`.
+- What the phone writes (checked against the export above) is an **`orb.shared`
+  device event** with `references`, `resolved` and `referrer`, and **no `sensor` and
+  no `confidence`**.
+- `packages/device-watch/src/import.ts` turns exactly two phone event types,
+  `grants.observed` and `grants.packages`, into Observations (attributed
+  `pass2@<device>`). Nothing turns an `orb.shared` into one — nor a `grants.exits`,
+  an `orb.resolve.attempt` or an `orb.process.start`. Whether each of those is an
+  Observation at all, or only device diagnostics, is decided as the next step
+  reaches it.
+
+This is not a contract breach: the phone's events are not Observations yet. But it
+is exactly what AD-6 makes expensive. Today the record names the sending app only
+through `referrer`, which is what Android reported to the activity and is not
+verified (`SENSOR_SHARE.md` §5).
+
+**It is the next step, and it is owned here:** bring the phone's record and §4 into
+agreement — changing the record, or amending §4 deliberately to what was built — and
+give it an import path to an Observation with an explicit source. `STATE.md` records
+it until it is done. (Its row there also said *"Declared, no code"*, stale since the
+first `dev.orb.app` build; corrected.)
+
+### What it does not change
+
+The kernel stays thirty contracts and no contract text changes. AD-1, AD-2, AD-3 and
+AD-10 are untouched. The Phase 3c definition in `ROADMAP.md` is untouched — this
+records that its gate was accepted, not what its work is.
+
+### What is still open
+
+- The order of mobile sources after the share sensor (photos, voice, calendar,
+  notifications, device context) is not decided here.
+- Whether the first reasoning step runs **local-only** is *proposed, not decided*:
+  it would keep to local-first and need none of AD-7's machinery, but it is unchecked
+  whether an on-device model is usable from Orb. It is settled when that step is
+  designed.
+
+---
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

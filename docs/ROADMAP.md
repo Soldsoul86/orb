@@ -90,7 +90,8 @@ receives its own document under `contracts/` (e.g. `contracts/Event.md`) definin
 Semantics, Lifecycle, State transitions, Invariants, Versioning rules,
 Compatibility guarantees, Failure modes, and Examples.
 
-**Gate (3b):** every contract specification accepted.
+**Gate (3b):** every contract specification accepted. **Accepted 2026-09-29** — 30 of 30, by the
+operator (`DECISIONS.md` DR-13). Phase 3c is open.
 
 **3c — Implementation interfaces.** Only after every contract spec is accepted are
 implementation interfaces written in TypeScript or Kotlin. Each package carries

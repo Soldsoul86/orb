@@ -17,7 +17,7 @@ Its architecture is local-first, model-independent and built to evolve for decad
 
 **Phase 3 — Contracts.** All 30 kernel contract specifications in
 [`contracts/`](contracts/) are Accepted (2026-09-29), which meets the Phase 3b gate;
-Phase 3c begins once the operator accepts that gate. Phases 0–2 are complete:
+the operator accepted that gate on 2026-09-29 (`DR-13`), so Phase 3c is open. Phases 0–2 are complete:
 repository foundation, the architecture documents in [`docs/`](docs/), and the
 ratified [`CONSTITUTION.md`](CONSTITUTION.md).
 

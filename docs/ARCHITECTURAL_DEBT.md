@@ -121,7 +121,9 @@ durable reflection-state need materializes.
 
 ## AD-7 — `device-watch` reads a person's whole package list outside the Capability boundary
 
-- **Status:** Open · **Raised:** 2026-09-28, at the Execution contracts' acceptance
+- **Status:** Open · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
+  Capability → Policy → permission → Action/read → Journal mechanism in Phase 3c ·
+  **Raised:** 2026-09-28, at the Execution contracts' acceptance
 - **Domain:** Execution / Reality · **Kind (if adopted):** bring an existing read
   under `Capability`, not a new contract
 
@@ -215,7 +217,9 @@ the DAG is otherwise preserved.
 
 ## AD-6 — Independence is counted but never expressed
 
-- **Status:** Open · **Raised:** 2026-09-25, while turning the product promise
+- **Status:** Open · **Reframed 2026-09-29 (DR-13):** the primitive is *source* independence, not device
+  independence; design thread, revisit when two mobile sources first report on one fact ·
+  **Raised:** 2026-09-25, while turning the product promise
   into testable claims (`CLAIMS.md` C2c). **Widened the same day** when the same
   defect appeared a third time, in the Evidence Graph · **Revisit at:** before
   any multi-device custody claim is made publicly, before C2c is run, and before
@@ -375,6 +379,11 @@ its own, and two installs are two peers rather than a collision.
 
 **Opened 2026-09-28** (`DEVICE_LOOP.md` §7b26). **Debt, not a defect**: both
 behaviours are defensible, and nothing is silently wrong.
+
+**Parked 2026-09-29 (DR-13).** Pass 1 is retired; the current app and pass 2 B verify.
+Accepting an asserted break would weaken the property the journal exists to have.
+Reopen only if pass 1's events are ever needed inside a journal, or a live lane
+acquires a break.
 
 **The finding.** Pass 1's lane carries §5d's permanent break at index 4
 (`previous: "35"`). Two parts of Orb treat it differently:
