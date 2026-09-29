@@ -5,7 +5,7 @@ Contract:   Journal
 Domain:     Infrastructure
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Event, Storage, Encryption
 ```
 
@@ -145,7 +145,12 @@ it accepts an append it cannot chain.
 9. **Replication is idempotent** by event id, and refuses a batch that breaks the
    chain rather than accepting a fork.
 10. **Absence carries its reason**, and reasons never move backward.
-11. **Encrypted at rest** — delegated to `Encryption`, never re-implemented here.
+11. **Encrypted at rest, and erasable by key.** At-rest sealing is delivered
+    through `Storage` (`sealed-store.ts`), which uses `Encryption`; the journal's
+    *own* edge to `Encryption` is **erasure** — destroying a payload's key is what
+    makes an erased payload unreadable on a peer that already holds the bytes
+    (`attachment-keyring.ts`). At-rest is not the reason for the edge; erasure is.
+    Neither is re-implemented here.
 
 Upholds Constitution Articles I (History), IV (Distribution), and IX §33–§34.
 

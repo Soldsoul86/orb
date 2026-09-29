@@ -5,7 +5,7 @@ Contract:   Storage
 Domain:     Infrastructure
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Encryption
 ```
 
@@ -27,8 +27,9 @@ to, and *the payload is gone* means the bytes are actually gone.
 
 ## 1. Semantics
 
-A **Storage** is a Service that durably persists what the `Journal` gives it and
-returns it in the order it was given.
+A **Storage** is a Service that durably persists what it is given and returns it
+faithfully — the journal store in the order events were appended, the attachment
+store by address.
 
 It has **no opinion**. It does not validate a chain, does not order events, does
 not decide what may be detached, and does not know what a payload means. The
@@ -51,6 +52,29 @@ cache answers confidently.
 
 **Persisting projections is permitted, never required.** An implementation that
 folds from events on every read is a complete implementation of this contract.
+
+### Two shapes, one contract
+
+There are two durable stores, and they are the **same contract in two shapes**
+(ruled 2026-09-29, resolving `reviews/INFRASTRUCTURE.md` Gap 1):
+
+| store | keyed by | read shape |
+| --- | --- | --- |
+| **journal store** | lane | every event, in append order |
+| **attachment store** | blinded address | one sealed blob |
+
+They share every *durability* obligation — atomic, durable before resolving,
+bytes actually gone on `detach`/`drop`, absence carrying its reason, no opinion,
+encrypted at rest, interchangeable. They differ only where an invariant is about
+*sequence*: **append-only** and **append-order read-back** are the journal
+store's, because a lane is a chain and a blob is not.
+
+The split the ruling fixes: the attachment store holds the **bytes** and is
+Storage's; the `AttachmentKeyring` holds the **keys** and is `Encryption`'s.
+Reclaiming a byte frees space; destroying a key is what reaches the copy a peer
+already fetched. One durability, one cryptography — and keeping them in different
+contracts is why erasing an attachment is never a single store's promise to keep
+alone.
 
 ### Detach removes bytes
 
@@ -95,6 +119,11 @@ already told its callers the events exist.
 ---
 
 ## 4. Invariants
+
+Invariants **1, 4 and 5** are the *journal store's* — they are about a lane being
+an ordered chain of envelopes. The rest bind **every** store, the attachment
+store included. The attachment store's own form of invariant 5 is that the event
+*referencing* a dropped attachment survives; only the bytes go.
 
 1. **The journal store is append-only.** Existing bytes of an event's envelope are
    never rewritten, and no event is removed.
@@ -188,6 +217,12 @@ Not guaranteed:
   a legitimate implementation of everything except invariant 3, and the test suite
   that uses it is the evidence that the journal's semantics do not depend on the
   engine — which is invariant 11 stated as a build artefact.
+- **`AttachmentStore` / `MemoryAttachmentStore`.** The second shape: sealed heavy
+  content keyed by a blinded address — `put` / `get` / `drop` / `addresses`. It
+  never sees an identity (`attachment.ts` inv. 7), shares the durability
+  obligations, and is where a shared photo's bytes live *beside* the lane rather
+  than in it. Its keys are `Encryption`'s, not its own — which is the whole of
+  the Gap-1 split.
 - **The phone's store.** `Journal.java.in` writes the same line format to app-private
   storage in Java, with no shared code. Two engines, two languages, one format
   (`Journal.md` §8).

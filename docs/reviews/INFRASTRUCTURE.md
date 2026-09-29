@@ -2,8 +2,9 @@
 
 > Phase 3b architectural review. The Infrastructure domain answers: **what does
 > every runtime depend on, and what must never change beneath it?** **Status:
-> partial — `Journal.md`, `Storage.md` and `Synchronization.md` drafted 2026-09-28,
-> all unreviewed.** `ModelRouter` and `Encryption` have no specification.
+> `Journal` and `Storage` reviewed and ACCEPTED 2026-09-29** (verdict at foot);
+> `Synchronization.md` drafted 2026-09-28, unreviewed.** `ModelRouter` and `Encryption`
+> are drafted (addendum below), unreviewed. `ModelRouter` and `Encryption` have no specification.
 > Every contract in this domain is a Service.
 
 ---
@@ -47,7 +48,7 @@ who meets `detach` without it will conclude the journal deletes history.
 
 ## Gaps found between the kernel and the implementation
 
-### 1. `Storage` is one kernel contract and three ports in the code
+### 1. `Storage` is one kernel contract and three ports in the code — ~~open~~ **resolved 2026-09-29**
 
 `KERNEL.md` names a single `Storage`. `runtime/journal` has **`JournalStore`,
 `AttachmentStore` and `AttachmentKeyring`**, and the third is arguably
@@ -59,6 +60,14 @@ by pretending the others do not exist. **A reviewer should decide** whether
 attachments are a second tier of this contract, a separate contract, or
 `Encryption`'s. Answering it by drafting was not open to me: it changes the kernel's
 shape, and Art. X says the kernel grows by addition, never by a silent re-reading.
+
+**Ruled (operator, 2026-09-29): the attachment store is a *second store of the
+same `Storage` contract*, not a new kernel contract.** It shares Storage's durability
+obligations and differs only in shape — address-keyed, not lane-ordered — so
+`Storage.md` §1 now carries a two-shapes split, and its append-only / append-order
+invariants are marked as the journal store's alone. The `AttachmentKeyring` is
+`Encryption`'s, already stated in `Encryption.md` §1/§3/§4. The kernel stays thirty
+contracts; the change is a scope clause, not a new entry.
 
 ### 2. The projection half of `Storage` has no implementation, and may need none
 
@@ -305,3 +314,40 @@ that should be recorded so the next writer does not re-open it.
    and its future writes are not accepted. *Which* contract defines the revocation
    record, and how a peer learns of it, is unspecified — the same shape of gap as
    erasure confirmation in the previous addendum.
+
+
+---
+
+## Review verdict — `Journal` and `Storage`, 2026-09-29
+
+**Both Accepted.** Faithful to `KERNEL.md` (kind, purpose, dependencies match),
+consistent with Articles I, IV, VIII, IX §33–34 and X §40, and — the bar this
+project holds — describing code that exists and passes (672 tests green;
+`FileJournalStore`, `MemoryJournalStore`, `verifyLane`, `evaluatePrune`,
+`store.ts`'s split comment all real).
+
+The five reviewer challenges, adjudicated:
+
+1. **Journal's direct `Encryption` edge — kept, now documented.** At-rest sealing
+   is delivered through `Storage`, and the hash chain uses `node:crypto`
+   directly, so the edge is neither of those. Its real work is **erasure**:
+   destroying a payload's key is what reaches a copy a peer already holds
+   (`attachment-keyring.ts`). `Journal.md` inv. 11 now says so, so the edge is no
+   longer "a paragraph of justification." Removing it would be a kernel change and
+   is not recommended.
+2. **`Storage` inv. 6 (detach reclaims bytes) as an absolute — accepted.** A store
+   that cannot destroy bytes must declare itself not erasure-capable (§7) rather
+   than report success. The impossibility is made loud, not silently false. Known
+   limitation, correctly handled.
+3. **`Journal` §7 break-never-repaired → no lane-retirement contract — not a
+   blocker.** Journal is correct that a break is permanent (Art. I). The missing
+   retirement contract is a future need to log if ever felt, not a defect here.
+4. **Neither mentions size/growth — accepted.** Performance is out of `Storage`'s
+   scope (§6); growth is bounded in-contract by `detach` (prune) + projections
+   (cache). The pass-1 ANR was an implementation defect, fixed and in `SETTLED.md`.
+5. **Gap 1 (attachment durability) — resolved above**, and it was the only
+   Accept-blocker (Journal depends on Storage).
+
+Gap 3 — the v2 envelope migration landmine — is already captured correctly in
+`Journal.md` §5 and survives into the accepted contract, which was the finding
+most worth keeping.

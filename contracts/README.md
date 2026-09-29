@@ -116,8 +116,8 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 6. Infrastructure
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [Journal](Journal.md) | Service | Draft |
-| [Storage](Storage.md) | Service | Draft |
+| [Journal](Journal.md) | Service | Accepted |
+| [Storage](Storage.md) | Service | Accepted |
 | [Synchronization](Synchronization.md) | Service | Draft |
 | [ModelRouter](ModelRouter.md) | Service | Draft |
 | [Encryption](Encryption.md) | Service | Draft |
