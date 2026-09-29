@@ -31,28 +31,15 @@ for (const dir of workspaceDirs()) {
  * ------------------------------------------------------------------ */
 
 /** Files permitted to read process.env — configuration is centralised. */
-const ENV_ALLOWLIST = [
-  "apps/executor/src/config.ts",
-  // The entry point only forwards `process.env` into `loadConfig`.
-  "apps/executor/src/main.ts",
-];
+const ENV_ALLOWLIST = [];
 
 /** Files permitted to use non-deterministic sources directly. */
 const NONDETERMINISM_ALLOWLIST = [
-  "packages/hyperliquid/src/signing.ts", // nonces
-  "packages/hyperliquid/src/ws.ts", // reconnect jitter
   "runtime/journal/src/ids.ts",
 ];
 
 /** Domain cores that must stay pure: no I/O, no clock, no randomness. */
-const FUNCTIONAL_CORE = [
-  "packages/trade-executor/src/signal/",
-  "packages/trade-executor/src/risk/",
-  "packages/trade-executor/src/position/state-machine.ts",
-  "packages/hyperliquid/src/decimal.ts",
-  "packages/hyperliquid/src/format.ts",
-  "packages/hyperliquid/src/msgpack.ts",
-];
+const FUNCTIONAL_CORE = [];
 
 const RULES = [
   {
@@ -82,7 +69,7 @@ const RULES = [
     id: "centralised-config",
     test: (line, file) =>
       /process\.env\b/.test(line) && !ENV_ALLOWLIST.includes(file),
-    message: "read configuration through apps/executor/src/config.ts, never process.env directly",
+    message: "never read process.env directly — configuration is injected by the host",
   },
   {
     id: "no-vendor-sdk",

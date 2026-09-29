@@ -8,19 +8,9 @@ Licensed under the Apache License, Version 2.0. See LICENSE for the full text.
 ---
 
 Third-party dependencies are licensed by their respective owners and are not
-covered by the copyright above. Those pulled in at build or run time include:
+covered by the copyright above. Those pulled in at build time are:
 
   - TypeScript                    Apache-2.0  (build)
   - @types/node                   MIT         (build)
-  - @noble/curves                 MIT         (runtime, @orb/hyperliquid)
-  - @noble/hashes                 MIT         (runtime, @orb/hyperliquid)
 
-Everything in this repository is Apache-2.0. The GPL-3.0 proving toolchain
-(snarkjs, circomlibjs, circom) that previously qualified this notice left with
-the payment circuit, which now lives at github.com/Soldsoul86/allowance.
-
-@orb/hyperliquid carries two MIT dependencies (@noble/curves, @noble/hashes)
-for signing, which combine with Apache-2.0 without qualification.
-
-@orb/journal and @orb/trade-executor have no third-party runtime dependencies
-at all.
+No package in this repository has a third-party runtime dependency.

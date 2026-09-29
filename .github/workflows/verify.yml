@@ -31,5 +31,3 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Hard exit demonstration
-        run: node scripts/simulate-hard-exit.mjs

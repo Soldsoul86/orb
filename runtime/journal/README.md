@@ -6,8 +6,7 @@ Append-only, hash-chained, HLC-ordered history. Everything else in the runtime
 is a projection of what passes through here, and any projection can be deleted
 and rebuilt by replaying it.
 
-This is the first executable component of Orb (ROADMAP Phase 4), and the
-substrate the Hyperliquid trade executor records its audit trail on.
+This is the first executable component of Orb (ROADMAP Phase 4).
 
 ## Quick start
 

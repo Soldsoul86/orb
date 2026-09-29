@@ -56,7 +56,7 @@ it.
 
 ### What exists as code
 
-Roughly 24,000 lines of TypeScript and 3,000 of Java. **627 tests, 0 failing**;
+Roughly 11,800 lines of TypeScript and 7,600 of Java (measured 2026-09-29, after the trade-executor experiment was removed as not part of Orb). **304 tests, 0 failing**;
 lint clean; every package compiles independently.
 
 **The kernel.**
@@ -68,20 +68,7 @@ lint clean; every package compiles independently.
 | `packages/connector` | ~550 | connector Sensors: the call, the synthesis, the outcome ladder |
 | `packages/device-watch` | ~700 | the first closed loop: import, projection, one rule, an alert, an answer |
 
-**Amendment one — the Hyperliquid trade executor.** *Entry may come from the
-signal provider; exit authority belongs to the executor.* Signal-agnostic: once a
-position is open it never depends on the signal source to tell it when to leave.
-This is the first real Capability — something Orb *does*, under a policy, with
-every decision journaled.
-
-| | | |
-| --- | --- | --- |
-| `packages/trade-executor` | ~7,700 | the execution engine |
-| `packages/hyperliquid` | ~2,850 | signing, REST, WebSocket |
-| `apps/executor` | ~2,950 | runtime host, production safety interlock, authenticated signal API |
-| `tests/` | ~1,100 | acceptance scenarios |
-
-**Amendment two — the device loop.** No Gradle and no libraries anywhere in it:
+**The device loop.** No Gradle and no libraries anywhere in it:
 an instrument that pulled in a framework could not say whether a death was the
 platform's or the framework's.
 

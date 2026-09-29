@@ -255,10 +255,7 @@ a standing authorization whose only justification is convenience.
   human — and it is **void** where the justification is that asking each time would
   be tedious. The shape of the rule is identical in both cases; what differs is
   whether the argument exists, which is why §4.10 makes the argument part of what is
-  authorized rather than commentary on it. A reference implementation of the
-  mechanism exists outside the repository as `@allowance/policy`'s `WINDOW_BUDGET`
-  and `APPROVAL_THRESHOLD` (`CAPABILITY_MODEL.md` §5); the mechanism was never the
-  question.
+  authorized rather than commentary on it.
 - **Ask, then act on silence.** "If a high-impact event is followed by five
   minutes without motion, ask me. If I do not answer within sixty seconds, call
   my emergency contact." The silence window is part of what was authorized, and

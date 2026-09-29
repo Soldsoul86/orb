@@ -80,19 +80,6 @@ Authorization scales with consequence and reversibility:
 - Financial actions and anything that moves money or sends communications on the
   user's behalf are irreversible-tier by default.
 
-**A reference implementation exists, outside this repository.**
-[`@allowance/policy`](https://github.com/Soldsoul86/allowance) implements this
-tier's authorization requirement for money movement: its `WINDOW_BUDGET` and
-`APPROVAL_THRESHOLD` rules are per-scope authorization in the sense used above
-— a scope's budget is never authorization for another scope — and
-`APPROVAL_THRESHOLD` expresses the human confirmation this section requires as
-a rule rather than as configuration.
-
-It is worth reading as a worked example of what this section asks for. It is
-**not** wired into Orb, and it is not a `Capability`, because that contract
-does not exist yet. Nothing here currently authorises an irreversible action
-per action; see `ARCHITECTURAL_DEBT.md`.
-
 ---
 
 ## 6. Local-First Capabilities
