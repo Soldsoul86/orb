@@ -5,13 +5,18 @@ Contract:   Scheduler
 Domain:     Execution
 Kind:       Service
 Version:    v1
-Status:     Draft
-Depends on: Agent, Policy
+Status:     Accepted
+Depends on: Agent
 ```
 
 > The Scheduler owns *when*. It never owns *what*, and never owns *whether*. It is
 > the component that makes Art. V §21 and §23 structural rather than aspirational.
 > See `../docs/RUNTIME_LOOP.md` §5–§9 and `../docs/AGENT_RUNTIME.md`.
+
+> **No `Policy` dependency (corrected 2026-09-29).** The scheduler consults no
+> permission — it owns *when*, never *whether* — and `Policy` is State that never
+> schedules, referenced by value where it is read at all. The `KERNEL.md` edge was
+> removed, the same correction as AD-5 and DR-9.
 
 **Why a permanent kernel contract?** Because three constitutional properties are
 otherwise unenforceable. *The runtime owns execution and agents do not wake randomly*
@@ -125,7 +130,10 @@ truth), and IX §33 (no duplicate sources of truth).
   existing class never changes** — a task recorded as deferred under one ranking
   must still be explainable under it years later, and a silent reordering would
   rewrite why something waited.
-- **New kinds of schedulable work** are added freely.
+- **New kinds of schedulable work** are added freely — including **maintenance work
+  such as `Synchronization`**, whose *when* the scheduler owns (`Synchronization.md`
+  inv. 12). Sync is dispatched like any other work, carried through an `Agent`, so it
+  adds no dependency here: the scheduler owns the timing, not the replication.
 - The core obligation — *the runtime owns scheduling; priority orders, never omits;
   deferred is never dropped; no durable state* — is frozen at v1. Weakening any of
   it requires `Scheduler v2` alongside v1, never replacing it.
@@ -169,6 +177,10 @@ Not guaranteed:
   **Starvation must be legible**: a reader must be able to tell *deferred for an
   hour* from *deferred for a month*, because the second is a finding about the
   device and the first is a Tuesday.
+  **The mechanism is the projection itself:** because the queue is derived from
+  history, a pending task's *age* is `now` minus the timestamp of the event that
+  made it pending — no separate wait-counter, read the same way the cadence reads
+  `lastOfType`. Legibility is a property of deriving the queue, not an extra record.
 - **Queue lost.** Re-derived from history. Nothing is lost, because nothing was
   only in the queue. If re-derivation produces different pending work than before
   the loss, the difference is a defect in derivation, not in the queue.
@@ -206,6 +218,11 @@ it was derived from.
 - **Backpressure that is not a denial.** A burst of sensing saturates the Extract
   stage. Understanding is not starved, no work is discarded, and nothing about the
   burst is recorded as a permission decision — because none was made.
+- **Sync on the scheduler's clock.** `Synchronization` never wakes itself
+  (`Synchronization.md` inv. 12); the scheduler decides when a sync runs and dispatches
+  it as maintenance work through an `Agent`. The scheduler owns *when*; sync owns the
+  replication and decides nothing about history. This is the reciprocal the sync review
+  left owing, now named on this side.
 - **An idempotent redispatch.** `raiseAlerts` in `packages/device-watch` folds the
   alerts it already raised out of the projection before raising more, so running it
   twice raises once (`../docs/DEVICE_LOOP.md` §7b2). That is what makes retry safe

@@ -105,8 +105,8 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 | [Capability](Capability.md) | Service | Accepted |
 | [Action](Action.md) | State | Accepted |
 | [Policy](Policy.md) | State | Accepted |
-| [Scheduler](Scheduler.md) | Service | Draft |
-| [Agent](Agent.md) | Service | Draft |
+| [Scheduler](Scheduler.md) | Service | Accepted |
+| [Agent](Agent.md) | Service | Accepted |
 
 > `Action` and `Policy` declare narrower dependencies than `KERNEL.md` lists for
 > them: both name Capabilities by **value** rather than depending on the

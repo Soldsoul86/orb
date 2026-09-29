@@ -4,9 +4,8 @@
 > affect the world, and who says it may?** **Status: Accepted 2026-09-28** — one
 > operator ruling taken, one kernel correction applied, four amendments made.
 > Specs: `../../contracts/{Capability,Action,Policy}.md` — 1 Service, 2 State.
-> **Addendum 2026-09-28:** `Scheduler.md` and `Agent.md` were written the same day
-> and are **Draft, unreviewed**. The domain now has 5 specifications of 5; three are
-> Accepted. See *Addendum* below.
+> **Addendum 2026-09-29:** `Scheduler` and `Agent` reviewed and **Accepted** —
+> the domain is now **5 of 5 Accepted**. Verdict at foot.
 
 ---
 
@@ -170,7 +169,7 @@ if the world ever reveals one, is a separate Observation from a `Sensor`. A
 `SETTLED.md` row records the old wording so it cannot return later looking like a
 fix.
 
-### What a reviewer should challenge
+### What a reviewer should challenge — adjudicated 2026-09-29
 
 1. **`Scheduler` depends on `Agent` and `Policy`** per `KERNEL.md`, and the draft
    keeps both. But the contract states that the scheduler never consults permission
@@ -186,3 +185,34 @@ fix.
 4. **Whether `Scheduler` and `Agent` should be one contract.** They are drafted as
    two because §21 separates who wakes from who works, but a reviewer who thinks the
    kernel should get smaller rather than larger is entitled to ask.
+
+### Review verdict — `Scheduler` and `Agent`, 2026-09-29: ACCEPTED
+
+Both faithful to `KERNEL.md` and Articles V, VI §25–26, VII and IX §33, and both
+backed by device evidence — `device-watch` is a stateless, history-derived,
+Agent-shaped loop and pass-1/pass-2's cadence-from-`lastOfType` is a degenerate
+scheduler with no durable queue. The four challenges:
+
+1. **`Scheduler → Policy` — dropped (operator ruling, 2026-09-29).** `Policy` is State
+   that *never schedules* and the `Scheduler` *never consults permission*, so the edge
+   joined two contracts that each disclaim it — the AD-5 / DR-9 shape. `KERNEL.md` and
+   `Scheduler.md` now read **`Depends on: Agent`**, with the correction noted in both.
+   Policy is referenced by value where read at all, never as an edge.
+2. **Starvation legibility — mechanism named.** `Scheduler.md` §7 now states it: because
+   the queue is a projection, a pending task's age is `now` minus the triggering event's
+   timestamp in history — read like the cadence reads `lastOfType`, no wait-counter. The
+   obligation now carries its derivation.
+3. **Unbindable record — resolved, and it exists.** `RECORDS.md` §3 places it as its own
+   type `orb.intent.unbindable` (not `InferenceRecord` — the reasoning already happened;
+   not `Action` — no Capability was invoked), implemented in `unbindable.ts`. `Agent.md`
+   §7 already states it correctly. *Could not bind* is not *chose not to act*.
+4. **One contract or two — two.** Art. V §21 (*no agent wakes or schedules itself*) **is**
+   the who-wakes / who-works split; merging them would put scheduling inside the worker,
+   which §21 forbids. The separation is the enforcement, not an accident — kept.
+
+Reciprocal from the `Synchronization` review discharged: `Scheduler.md` §5/§8 now name
+sync as maintenance work whose *when* the scheduler owns, carried through an `Agent` so
+no dependency is added.
+
+**With these, all five Execution contracts are Accepted — the domain is complete.**
+Kernel-wide: 19 Accepted / 11 Draft.

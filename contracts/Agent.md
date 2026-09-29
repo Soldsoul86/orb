@@ -5,7 +5,7 @@ Contract:   Agent
 Domain:     Execution
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Scheduler, Reasoner, Planner, Capability
 ```
 

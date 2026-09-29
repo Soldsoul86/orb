@@ -761,7 +761,13 @@ loop.
 - No stage is skipped — priority orders, never omits.
 - Work is deferred under device constraints, never dropped.
 
-**Dependencies** — Agent, Policy.
+**Dependencies** — Agent.
+
+> **Correction (2026-09-29).** The `Policy` edge was removed. The `Scheduler`
+> never consults permission (it owns *when*, never *whether*), and `Policy` is
+> State that *never schedules* — so the edge joined two contracts that each
+> disclaim it. Same shape as AD-5's two removed edges and DR-9's dropped
+> `ModelRouter → Policy`; Policy is referenced by value, never as an edge.
 
 ## Agent
 *Kind — Service.*
