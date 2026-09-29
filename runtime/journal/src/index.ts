@@ -20,7 +20,14 @@ export type {
   Integrity,
   AbsenceReason,
 } from "./types.js";
-export { hasPayload, isErased, JournalIntegrityError, RetentionError } from "./types.js";
+export {
+  derivation,
+  hasPayload,
+  isErased,
+  JournalIntegrityError,
+  RetentionError,
+  UngroundedDerivationError,
+} from "./types.js";
 
 export {
   canonicalJson,

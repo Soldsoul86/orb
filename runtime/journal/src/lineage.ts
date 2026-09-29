@@ -22,9 +22,11 @@
  * A derivation that did not is invisible to any traversal, and nothing in the
  * structure forces `causes` to be complete — see `docs/ERASURE.md` §3. That is a
  * rule an honest implementation keeps, not an invariant, and the coarse envelope
- * type (§2b) means the journal itself can no longer check it: it cannot tell an
- * observation, which legitimately cites nothing, from a conclusion, which must
- * cite something.
+ * type (§2b) means nothing downstream of the append can check it: it cannot tell
+ * an observation, which legitimately cites nothing, from a conclusion, which
+ * must cite something. The append itself can, for a draft its producer declares
+ * a derivation (`derivation(…)`), and refuses one that cites nothing; an
+ * undeclared or incomplete one still passes.
  */
 import type { StoredEvent } from "./types.js";
 

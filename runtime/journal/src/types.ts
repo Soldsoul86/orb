@@ -225,6 +225,46 @@ export interface EventDraft<Payload = unknown> {
   readonly schema: SchemaRef;
   readonly payload: Payload;
   readonly causes?: readonly string[];
+  /**
+   * Declares this event a **derivation** — a conclusion computed from other
+   * events — so the journal refuses it unless `causes` names at least one of them.
+   *
+   * Checked at append and **never stored**: history keeps no new field, and the
+   * envelope still says nothing about lineage (`docs/ERASURE.md` §2b). The check
+   * has to happen here because this is the last moment anything can tell a
+   * conclusion from an observation — once coarsened, the envelope only says
+   * *content*. A derivation that cites nothing sits on erased content forever,
+   * invisible to every walk (`ERASURE.md` §3; `InferenceRecord.md` inv. 7).
+   *
+   * Build one with `derivation(…)`, which also makes empty `causes` a type error.
+   */
+  readonly derivation?: true;
+}
+
+/**
+ * Raised when a draft declared a derivation but names nothing it was built from.
+ *
+ * Refuses the whole batch: a conclusion that cannot say what it rests on must
+ * not enter history, because nothing can find it again when that ground is erased.
+ */
+export class UngroundedDerivationError extends Error {
+  override readonly name = "UngroundedDerivationError";
+  constructor(message: string, readonly detail: Readonly<Record<string, unknown>> = {}) {
+    super(message);
+  }
+}
+
+/**
+ * A derivation draft: `causes` must name at least one event, checked twice — by
+ * the type here, and by the journal at append, for callers that build drafts
+ * some other way.
+ */
+export function derivation<Payload>(
+  draft: Omit<EventDraft<Payload>, "causes" | "derivation"> & {
+    readonly causes: readonly [string, ...string[]];
+  },
+): EventDraft<Payload> {
+  return { ...draft, derivation: true };
 }
 
 /** Raised when an append would violate an append-only or integrity invariant. */

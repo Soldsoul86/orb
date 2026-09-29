@@ -990,10 +990,12 @@ short and looks complete. Short is the dangerous direction. Given no predicate a
 all, D3 now says *the check did not run* rather than returning a clean-looking
 answer.
 
-**What is still not prevented.** Nothing stops the append. The contracts state
-the obligation, and the preview detects a breach after the fact; neither is
-enforcement, and §0a's distinction applies — this is followed, not enforced,
-until payload schema validation exists. `ungrounded` is deliberately kept apart
+**What is still not prevented.** Since 2026-09-29 the journal refuses a
+*declared* derivation that cites nothing (`derivation(…)`), before anything is
+written. A conclusion that is never declared a derivation, or whose causes are
+incomplete, still gets through; the preview detects the first after the fact.
+So §0a's distinction still applies — this is policy with a gate, not an
+invariant. `ungrounded` is deliberately kept apart
 from `unresolved` for the same reason the two must not be confused: a dangling
 cause is a partial replica and syncing repairs it, while a derivation that
 recorded nothing will sit on erased content forever.
@@ -1415,8 +1417,8 @@ After it, and after AD-6:
    three contracts now say lineage lives in `causes`, frozen at v1;
    `EVIDENCE_GRAPH.md` inv. 2 is sharpened to match; and `planErasure` reports a
    derivation that cites nothing rather than returning a short radius that looks
-   complete. Still **followed, not enforced** — nothing stops the append until
-   payload schema validation exists. See §3.
+   complete. **Gated since 2026-09-29:** the journal refuses a declared
+   derivation that cites nothing; an undeclared one still passes. See §3.
 3. **Erasure as a Capability.** It is the canonical irreversible Action: wholly
    local, needing no external service, and impossible to undo. That makes it the
    natural first test of `CLAIMS.md` C1's consent gate — the six routes an agent

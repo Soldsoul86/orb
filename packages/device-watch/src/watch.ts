@@ -12,7 +12,7 @@
  * the same thing twice.** The answers are also read, and recorded, and — by
  * DR-8 — used for nothing else yet.
  */
-import { hasPayload, unwrapPayload, type Journal, type OrbEvent } from "@orb/journal";
+import { derivation, hasPayload, unwrapPayload, type Journal, type OrbEvent } from "@orb/journal";
 import {
   ALERT_ANSWERED_SCHEMA,
   ALERT_ANSWERED_TYPE,
@@ -54,14 +54,17 @@ export async function raiseAlerts(journal: Journal): Promise<readonly OrbEvent<A
       lost: change.lost,
       observation: change.observation,
     };
-    const event = await journal.appendOne({
-      type: ALERT_RAISED_TYPE,
-      schema: ALERT_RAISED_SCHEMA,
-      payload,
-      // The alert is derived from the reading, and says so in the journal's own
-      // lineage rather than only in its payload.
-      causes: [change.observation],
-    });
+    // The alert is derived from the reading, and says so in the journal's own
+    // lineage rather than only in its payload. Declared a derivation, so the
+    // journal refuses it if that lineage is ever missing.
+    const event = await journal.appendOne(
+      derivation({
+        type: ALERT_RAISED_TYPE,
+        schema: ALERT_RAISED_SCHEMA,
+        payload,
+        causes: [change.observation],
+      }),
+    );
     raised.push(event as OrbEvent<AlertRaised>);
   }
   return raised;

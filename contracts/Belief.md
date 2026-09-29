@@ -117,14 +117,18 @@ justified it.
    *"references the Facts and Evidence it rests on"* is satisfied by `causes`; a payload field alone
    does not satisfy it.
 
-**Followed, not enforced.** The journal cannot check this. A v2 envelope says
-only that an event is content, so it cannot tell an observation — which
-legitimately cites nothing — from a conclusion, which must cite something
-(`ERASURE.md` §2b). The check belongs in whatever appends, or in payload schema
-validation, and neither exists yet. `planErasure` reports a derivation citing
-nothing as `ungrounded` and refuses to call its blast radius an answer, which
-catches a breach after the fact and does not prevent one. Recorded as policy
-rather than claimed as an invariant, the way `ERASURE.md` §0a requires.
+**Enforced where declared; still policy, not invariant.** A producer marks a
+derivation as it builds it (`derivation(…)` in `@orb/journal`), and the journal
+refuses a marked derivation whose `causes` is empty — the whole batch, before
+anything is written (added 2026-09-29). That is the only moment the check can
+run: once coarsened, a v2 envelope says only that an event is content, so nothing
+downstream can tell an observation — which legitimately cites nothing — from a
+conclusion, which must cite something (`ERASURE.md` §2b). **Still not
+prevented:** a conclusion appended without being declared a derivation, and a
+derivation whose `causes` are present but incomplete. `planErasure` still reports
+a derivation citing nothing as `ungrounded`, which catches the first after the
+fact. So this stays recorded as policy rather than claimed as an invariant, the
+way `ERASURE.md` §0a requires — but the policy now has a gate.
 
 Upholds Constitution Articles II (Truth and Interpretation), III (Models and
 Reasoning), and I (History).

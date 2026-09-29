@@ -14,7 +14,7 @@ import { coarseType, coarseSchema } from "./vocabulary.js";
 import type { ErasureGuarantee, JournalStore, PayloadRecord } from "./store.js";
 import { MemoryJournalStore } from "./store.js";
 import type { EventDraft, EventEnvelope, LaneId, OrbEvent, StoredEvent } from "./types.js";
-import { hasPayload, JournalIntegrityError, RetentionError } from "./types.js";
+import { hasPayload, JournalIntegrityError, RetentionError, UngroundedDerivationError } from "./types.js";
 import { latestCustody } from "./custody.js";
 import { evaluatePrune, type RetentionPolicy } from "./retention.js";
 import { syncPolicyInForce, type SyncPolicyInForce } from "./sync.js";
@@ -210,6 +210,19 @@ export class Journal {
     // back: the event it wrote. Collapsing them into one would mean either the
     // caller seeing the wrapper or the store holding the fine type, and both
     // were the point of the migration.
+    // Refused before anything is ticked or written, so a batch with one
+    // ungrounded conclusion appends nothing at all.
+    for (const [index, draft] of drafts.entries()) {
+      if (draft.derivation !== true) continue;
+      const causes = draft.causes ?? [];
+      if (causes.length === 0 || causes.some((cause) => typeof cause !== "string" || cause === "")) {
+        throw new UngroundedDerivationError(
+          `draft ${index} (${draft.type}) is a derivation that names nothing it was built from`,
+          { index, type: draft.type, causes },
+        );
+      }
+    }
+
     const stored: OrbEvent[] = [];
     const events: OrbEvent[] = [];
     let previous = this.#head;
