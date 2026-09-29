@@ -1,8 +1,10 @@
 # Sensor Declaration — Share to Orb
 
-> Status: **declaration, 2026-09-28.** No code. Written first so the posture meets
-> Orb's own rules before a line of Kotlin exists — which is the test `AD-7` failed
-> by being decided in a manifest at build time.
+> Status: **declaration, 2026-09-28; built and imported as Observations,
+> 2026-09-29.** The phone records a share (`apps/pixel/orb`, `Shares.java.in`), and
+> the desktop turns it into an Observation (`packages/device-watch`, §4a). Written
+> first so the posture meets Orb's own rules before a line of code existed — which
+> is the test `AD-7` failed by being decided in a manifest at build time.
 >
 > Contracts it stands on, **all Accepted**: `Sensor`, `Observation`, `Event`,
 > `Evidence`, `Entity`, `Capability`, `Policy`, `Action`.
@@ -113,19 +115,84 @@ discipline.
 
 ## 4. What the Observation carries
 
+*Corrected 2026-09-29 to what the phone actually writes* (`DECISIONS.md` DR-13).
+The first draft of this table named fields the phone never used (`sensor`,
+`reference`, `resolvable`, `confidence`). History cannot be edited, so the shipped
+names stand and this table follows them.
+
+At the Observation level:
+
 | Field | Value | Note |
 | --- | --- | --- |
-| `sensor` | `orb.sensor.share` | inv. 3, always attributed |
-| `because` | `user.shared` | |
-| `mimeType` | as declared by the sender | *declared*, never verified by the sensor |
-| `referrer` | the calling package, or `unknown` | §5 |
-| `reference` | the URI or the text itself | never the resolved bytes |
-| `resolvable` | `true` / `false` + `AbsenceReason` | §6 |
-| `confidence` | see §7 | inv. 7 |
-| `itemCount` | 1, or n for `SEND_MULTIPLE` | |
+| `source` | `orb.sensor.share@<install>` | inv. 3, always attributed — **derived** from the event's type and device, see §4a |
+| `confidencePercent` | `100` | §7: the occurrence, never the content |
+| `attachments` | `["sha256:…"]` when the content was read | by identity, never inlined — inv. 5 |
 
-Placement in time and device comes from the envelope (inv. 4), not from fields —
-the same rule that keeps the custody receipt's holder out of its payload.
+And in its `data`, under the phone's own names:
+
+| Field | Value | Note |
+| --- | --- | --- |
+| `because` | `user.shared` | |
+| `shareReadable` | `false` when the phone could not read the intent | *cannot check*, never *nothing was shared*; when false, nothing below is present |
+| `action` | `android.intent.action.SEND` / `SEND_MULTIPLE` | |
+| `mimeType` | as declared by the sender | *declared*, never verified by the sensor |
+| `referrer` | the calling package as Android reported it, or `unknown` | §5; **unverified** |
+| `itemCount` | 1, or n for `SEND_MULTIPLE`, 0 if nothing nameable arrived | |
+| `references` | what was handed over, colon-joined; for text, the text itself | never the resolved bytes; **carried whole, never split** — a URI and a sentence both contain colons |
+| `resolved` | `true` / `false` | §6 |
+| `absenceReason` | `unfetched` while unresolved | omitted once the content is held |
+| `resolveOutcome` | `stored`, `held`, `refused`, `failed`, `openedNull`, `tooLarge`, `readFailed`, `sealFailed`, `noReference`, `notAContentUri` | every outcome is recorded, including refusals |
+| `resolveDetail` | the platform's message, when there is one | |
+| `attachmentBytes` | size of the held content | the identity itself is in `attachments` |
+
+Placement in time and device comes from the envelope and from `causes` (inv. 4),
+not from fields — the same rule that keeps the custody receipt's holder out of its
+payload. The phone's own `elapsedRealtimeMs` is deliberately not copied: it places
+the event on the phone, and the Observation reaches it through `causes`.
+
+### 4a. From the phone's event to the Observation
+
+The phone does not write an Observation. It writes an **`orb.shared` device
+event**, and the desktop importer (`importExport`, `packages/device-watch/src/
+share.ts`) translates it. The first draft of this document described the
+Observation as if the phone wrote it directly, and never said how one became the
+other; this is that.
+
+- **A translation, not a move.** The phone's event is replicated verbatim and stays
+  exactly as written. The Observation is a new event in the desk's own lane whose
+  `causes` is the phone's event id, so lineage is in the journal's structure and
+  not only in prose.
+- **The source is derived, and that is enough.** The event's type (`orb.shared`)
+  names the sensor and its `device` names the install. Both are fixed when the
+  event is written and never change, so source identity is **fixed at write time**
+  — the property `AD-6` needs — without a new field. A `sensor` field in the
+  payload would repeat what the type already says (Art. IX §33), and every share
+  already recorded would lack it.
+- **The phone's names are kept.** Renaming `references` or `resolved` going
+  forward would mean two record shapes to read for ever.
+- **The referrer is data; it is not the source.** The sensor is the doorway; the
+  sending app is where the content came from. Whether shares from two different
+  apps are independent is `AD-6`'s question, and is not answered by changing what
+  the source is called.
+- **The same photograph shared twice is two Observations** (§8 rule 3). Both carry
+  the same attachment identity, which is exactly how a later reader can tell they
+  are one photograph shared twice.
+- **A share that cannot be read is still an Observation** — the hand-off happened
+  — carrying `shareReadable: false` and nothing else.
+
+**Only occurrences in the world are Observations.** `Observation.md`:
+*Observations originate from reality, Events from runtime activity.* The phone also
+writes `orb.process.start`, `grants.exits`, `grants.capability.granted` and
+`.revoked`, `grants.watch.failed`, `orb.chain.discontinuity`, `orb.export` and
+`orb.resolve.attempt`. All of them are about Orb itself, so they stay **Events** —
+present in the replicated lane and translated into nothing. (`grants.observed` and
+`grants.packages` are readings of the OS's state and are translated, as
+`pass2@<install>`.)
+
+**Drift is tested for.** The fixture the importer is tested against is generated by
+`Shares.java.in`, the class the phone runs, and a test reads that file's source: a
+field the phone starts writing fails the build until the importer decides whether
+to map it, attach it or exclude it.
 
 ---
 
@@ -227,13 +294,13 @@ makes it reachable on a peer's disk too.
 `Evidence`, `Entity`, `Capability`, `Policy`, `Action` — the full set this
 declaration touches, all accepted.
 
-**Would block on Draft contracts the moment it did more.** Linking a share to a
-person needs `Relationship`; turning it into a commitment needs `Goal` or
-`Project`; extracting anything from it needs `Reasoner`, `InferenceRecord` and
-`ModelRouter`. All Draft.
+**Doing more is now a matter of code, not of contracts.** When this was written
+the interpretation contracts were Draft; **all thirty are Accepted (2026-09-29)**.
+Linking a share to a person (`Relationship`), turning it into a commitment (`Goal`
+or `Project`) and extracting anything from it (`Reasoner`, `InferenceRecord`,
+`ModelRouter`) are unbuilt, not blocked.
 
-That split is not an obstacle — **it is the recommendation.** Build exactly the
-half that is accepted: the observation layer, complete and honest, with nothing
-claimed about meaning. The interpretation layer arrives when its contracts are
-accepted, and the history recorded in the meantime is already in the right shape
-to be interpreted, because it was recorded without interpretation.
+The recommendation stands, and it is what was built: **the observation layer,
+complete and honest, with nothing claimed about meaning.** Interpretation is a
+later step, and the history recorded meanwhile is already in the right shape for
+it, because it was recorded without interpretation.

@@ -1,0 +1,104 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Writes an export containing every shape of share the phone can record, for the
+ * TypeScript importer to be tested against.
+ *
+ * The same discipline as `GenExport`: the records come out of **`Shares`, the
+ * class the phone runs**, so the test checks the TypeScript reader against the
+ * Java writer rather than against someone's idea of what the writer produces.
+ * Only the *inputs* are synthetic — invented URIs, an invented hash, an invented
+ * install — so nothing here identifies a real device or a real photograph. (A
+ * real content hash is a confirmation oracle for that photograph, and does not
+ * belong in a repository.)
+ *
+ * Two of these shapes have been seen on a real device across `dev.orb.app`
+ * v1–v7: an unresolved share (before resolution existed) and a stored one. The
+ * other four are shapes the code can write and no export has yet contained: a
+ * refused grant (the refusals in real exports came from the probe, not from a
+ * share), several items, plain text, and an intent it could not read.
+ */
+public final class GenShareExport {
+    /** Fabricated. Same shape as a real identity (`sha256:` + 64 hex), no real content behind it. */
+    private static final String HASH =
+        "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
+    private static long clock = 1000;
+
+    public static void main(String[] args) throws Exception {
+        File dir = Files.createTempDirectory("orb-gen-share").toFile();
+        String install = "orb-000000000000000000000001";
+        Journal journal = Journal.open(new Context(dir), install, install);
+
+        // Not a share, and must not become one: runtime activity, not an occurrence.
+        Map<String, Object> start = Json.obj();
+        start.put("androidRelease", "16");
+        start.put("sdkInt", 36L);
+        start.put("elapsedRealtimeMs", tick());
+        journal.append("orb.process.start", start);
+
+        // 1. Shared, nothing read (the first builds, and any share whose grant
+        //    was not used). `resolved: false` with `unfetched`.
+        Map<String, Object> unresolved = Shares.declared(
+            "android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/photo-1"));
+        record(journal, unresolved);
+
+        // 2. The grant was refused: a permission, not an availability, problem.
+        Map<String, Object> refused = Shares.declared(
+            "android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/photo-2"));
+        Shares.refused(refused, "Permission Denial: opening provider from ProcessRecord{...}");
+        record(journal, refused);
+
+        // 3. Read and held: the content is here, and named by identity.
+        Map<String, Object> held = Shares.declared(
+            "android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/photo-3"));
+        Shares.outcome(held, "held", null, HASH, 3642498L);
+        record(journal, held);
+
+        // 4. Several items: all recorded as references, only the first resolved.
+        List<String> three = Arrays.asList(
+            "content://com.example.gallery.provider/0/1/photo-4",
+            "content://com.example.gallery.provider/0/1/photo-5",
+            "content://com.example.gallery.provider/0/1/photo-6");
+        Map<String, Object> several = Shares.declared(
+            "android.intent.action.SEND_MULTIPLE", "image/*", "android-app://com.example.gallery", three);
+        Shares.outcome(several, "stored", null, HASH, 2048L);
+        record(journal, several);
+
+        // 5. Plain text: the text *is* the content, and Android named no referrer.
+        //    It contains a colon on purpose — the references field is colon-joined,
+        //    so the importer must carry it whole and never try to split it.
+        Map<String, Object> text = Shares.declared(
+            "android.intent.action.SEND", "text/plain", null,
+            Arrays.asList("Meeting with Ravi is Friday: 3:00 pm"));
+        Shares.outcome(text, Shares.unresolvableOutcome(Shares.firstReference(text)), null, null, 0L);
+        record(journal, text);
+
+        // 6. An intent the activity could not read. Not "nothing was shared".
+        record(journal, Shares.unreadable());
+
+        for (String line : journal.readLines()) System.out.println(line);
+    }
+
+    /** Stamped and appended exactly as `ShareActivity` does it. */
+    private static void record(Journal journal, Map<String, Object> payload) {
+        payload.put("elapsedRealtimeMs", tick());
+        journal.append("orb.shared", payload);
+    }
+
+    private static long tick() {
+        clock += 1000;
+        return clock;
+    }
+}

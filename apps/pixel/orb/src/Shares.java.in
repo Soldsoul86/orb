@@ -1,0 +1,145 @@
+package @PKG@;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * What a share is recorded as — the part of `ShareActivity` that touches no Android.
+ *
+ * Split out for the reason `Grants` is split from `GrantReader`: the shape of a
+ * record is an agreement between this file and the desktop importer
+ * (`packages/device-watch/src/share.ts`), and an agreement is only tested if the
+ * side that writes it can be run without a phone. `packages/device-watch/tools/
+ * gen-share-export.sh` runs *this class* to produce the fixture the importer is
+ * tested against, so the test checks the pair rather than someone's idea of what
+ * this file writes.
+ *
+ * **Moved, not changed.** Every rule below was in `ShareActivity` first, with the
+ * same comments, and the record it produces is the one already written on a real
+ * device (`DEVICE_LOOP.md` §7b31–§7b35). Nothing in it inspects content:
+ * `SENSOR_SHARE.md` §8 forbids a sensor that sniffs bytes to correct a wrong
+ * `mimeType`, because that is interpreting.
+ */
+final class Shares {
+    private Shares() {}
+
+    /**
+     * A share whose intent this activity could not read.
+     *
+     * Not an empty share. *Cannot check* is not *nothing was shared*, and rendering
+     * it that way is the `Readable: false` error one signal over.
+     */
+    static Map<String, Object> unreadable() {
+        Map<String, Object> payload = Json.obj();
+        payload.put("because", "user.shared");
+        payload.put("shareReadable", false);
+        return payload;
+    }
+
+    /**
+     * What the hand-off was, as the sender declared it. Nothing is resolved yet.
+     *
+     * @param action the intent's action, already stringified (`"null"` if absent)
+     * @param mimeType what the sender declared, or null; never verified here
+     * @param referrer who Android says initiated the share, or null
+     * @param references what was handed over, in the order the sender gave it
+     */
+    static Map<String, Object> declared(
+            String action, String mimeType, String referrer, List<String> references) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("because", "user.shared");
+        payload.put("shareReadable", true);
+        payload.put("action", action);
+
+        // Declared by the sender, never verified here.
+        payload.put("mimeType", mimeType == null ? "unknown" : mimeType);
+
+        // Android may or may not say who initiated the share, and absent is an
+        // ordinary outcome rather than a failure. `unknown` is recorded rather
+        // than the field being omitted: dropping it would make "we do not know
+        // where this came from" and "it came from nowhere" the same record, and
+        // later make a referrer a fact nobody observed.
+        payload.put("referrer", referrer == null ? "unknown" : referrer);
+
+        payload.put("itemCount", (long) references.size());
+        // The pointers, not the bytes. `Observation.md` inv. 5 — references,
+        // never copies — satisfied by construction rather than by discipline.
+        payload.put("references", String.join(":", references));
+        // Nothing has been resolved, and the record says so rather than leaving
+        // a reader to assume either way. Resolution is a declared Capability
+        // (`SENSOR_SHARE.md` §3) and has not happened.
+        payload.put("resolved", false);
+        payload.put("absenceReason", "unfetched");
+        return payload;
+    }
+
+    /**
+     * The first reference in a declared record, or the empty string.
+     *
+     * Only the first item is ever resolved: a multi-item share is recorded in full
+     * as references, but resolving all of them is more content than one tap
+     * authorizes comfortably, and the count is on the record for a reader to
+     * notice.
+     */
+    static String firstReference(Map<String, Object> payload) {
+        Object first = payload.get("references");
+        String reference = first instanceof String ? (String) first : "";
+        int end = reference.indexOf(':', reference.indexOf("://") + 3);
+        if (end > 0) reference = reference.substring(0, end);
+        return reference;
+    }
+
+    /**
+     * Why a reference is not even attempted, or null when it is worth opening.
+     *
+     * **Only `content://`.** A `file://` reference would be a path this app has no
+     * business reading, and an `http(s)` one is a fetch — a different Capability
+     * at a higher tier (DR-9), not this one. Text and links are not resolved, and
+     * that is a decision rather than a gap: text *is* the content already, and a
+     * link is a fetch.
+     */
+    static String unresolvableOutcome(String reference) {
+        if (reference.isEmpty()) return "noReference";
+        if (!reference.startsWith("content://")) return "notAContentUri";
+        return null;
+    }
+
+    /**
+     * Writes down what happened when resolution was attempted.
+     *
+     * Every outcome is recorded, including the refusals: `resolved: false` with a
+     * reason is a finding, and silently leaving the field as it was would make
+     * *not attempted* and *attempted and refused* the same record.
+     *
+     * @param identity the stored content's identity, or null when nothing is held
+     */
+    static void outcome(
+            Map<String, Object> payload, String outcome, String detail, String identity, long bytes) {
+        payload.put("resolveOutcome", outcome);
+        if (detail != null) payload.put("resolveDetail", detail);
+        if (identity != null) {
+            payload.put("resolved", true);
+            payload.put("attachment", identity);
+            payload.put("attachmentBytes", bytes);
+            // The absence reason was set optimistically by `declared`; the
+            // content is here now and leaving it would be a false statement
+            // about what this device holds.
+            payload.remove("absenceReason");
+        }
+    }
+
+    /**
+     * The grant was not live after all. Worth distinguishing from a read failure:
+     * one is a permission, the other is availability.
+     */
+    static void refused(Map<String, Object> payload, String message) {
+        payload.put("resolveOutcome", "refused");
+        payload.put("resolveDetail", String.valueOf(message));
+    }
+
+    /** The read failed for a reason other than a refusal. */
+    static void failed(Map<String, Object> payload, Exception error) {
+        payload.put("resolveOutcome", "failed");
+        payload.put("resolveDetail", error.getClass().getName() + ": " + error.getMessage());
+    }
+}

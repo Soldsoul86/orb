@@ -53,6 +53,9 @@ parseExport(text: string): readonly StoredEvent[]
 importExport(journal, text): Promise<ImportResult>
 GRANTS_OBSERVED_TYPE = "grants.observed"   // the three grants, every wake
 GRANTS_PACKAGES_TYPE = "grants.packages"   // the package set, on a scan
+SHARED_TYPE          = "orb.shared"        // one hand-off from the phone's share sheet
+SHARE_SENSOR         = "orb.sensor.share"  // the source, as `orb.sensor.share@<device>`
+shareFrom(payload): ShareTranslation | null // the mapping, exposed for tests
 ```
 A pass-2 export becomes a replica of the phone's lane plus Observations in this
 device's lane. `parseExport` throws `ImportError` naming the line on anything that
@@ -60,8 +63,17 @@ is not an event envelope — a partly-imported chain is a gap that looks like
 history. `importExport` is idempotent: `replicate` skips by event id, translation
 skips readings already cited.
 
-The Observation's `source` is `pass2@<device>` — inv. 3 asks what *perceived* it,
-which was pass 2 on the phone, not the importer that carried it.
+The Observation's `source` is `pass2@<device>` for a grants reading and
+`orb.sensor.share@<device>` for a share — inv. 3 asks what *perceived* it, which
+was the phone, not the importer that carried it. (`pass2` names the app that first
+wrote grants readings; the consolidated app writes them too, so the label is
+stale — recorded in `STATE.md`.)
+
+A share's `data` keeps the phone's own field names (`references`, `resolved`, …),
+its `attachments` holds the stored content's identity and never the bytes, its
+`confidencePercent` is 100 for the *occurrence* and never the content, and
+`references` is carried whole — it is colon-joined and never split. The full
+field-by-field mapping is `docs/SENSOR_SHARE.md` §4 and §4a.
 `confidencePercent` is 100: there is no inference, the value is what the OS
 returned, and a read that failed is carried as `readable: false` rather than
 smeared into a lower number.

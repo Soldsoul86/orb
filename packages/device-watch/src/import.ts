@@ -14,8 +14,8 @@
  * (`Journal.java.in`: re-derivation needs a JSON parser the probe does not
  * have), so this is a check the phone structurally cannot perform on itself.
  *
- * Then, and only then, each reading becomes an Observation in *this* device's
- * lane, citing the replicated event. That is the second step of the loop drawn
+ * Then, and only then, each reading — and each share — becomes an Observation in
+ * *this* device's lane, citing the replicated event. That is the second step of the loop drawn
  * in `DECISIONS.md` DR-8 — Journal, then Observation — and it is a translation
  * rather than a move: the phone's event stays exactly as the phone wrote it.
  */
@@ -23,6 +23,7 @@ import type { Journal, StoredEvent, OrbEvent } from "@orb/journal";
 import { hasPayload, unwrapPayload } from "@orb/journal";
 import { observationDraft, readObservation } from "@orb/observation";
 import type { DeviceAuthorityReading, KindReading } from "./reading.js";
+import { SHARED_TYPE, SHARE_CONFIDENCE_PERCENT, shareFrom, shareSource } from "./share.js";
 
 /** The pass-2 event that carries a grant reading, written at every wake. */
 export const GRANTS_OBSERVED_TYPE = "grants.observed";
@@ -135,7 +136,58 @@ export async function importExport(journal: Journal, text: string): Promise<Impo
   return { lanes: [...byLane.keys()], replicated, observed };
 }
 
-/** Turns replicated readings into Observations, once each. */
+/**
+ * What can be translated, by the event type that carries it.
+ *
+ * **Only occurrences in the world are Observations.** `Observation.md`:
+ * *Observations originate from reality, Events from runtime activity.* The phone
+ * also writes `orb.process.start`, `grants.exits`, `grants.capability.*`,
+ * `grants.watch.failed`, `orb.chain.discontinuity`, `orb.export` and
+ * `orb.resolve.attempt` — all of them about Orb itself — and they stay Events, in
+ * the replicated lane and nowhere else. `SENSOR_SHARE.md` §4a.
+ */
+interface Translation {
+  /** What perceived it (inv. 3): the sensor, on the phone that holds this lane. */
+  readonly source: (event: StoredEvent) => string;
+  /** Confidence in the occurrence, as the integer percent the journal can carry. */
+  readonly confidencePercent: number;
+  /** The Observation's data and attachments, or null when the payload is not usable. */
+  readonly translate: (payload: unknown) => {
+    readonly data: unknown;
+    readonly attachments?: readonly string[];
+  } | null;
+}
+
+const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
+  ...READING_TYPES.map((type): [string, Translation] => [
+    type,
+    {
+      // Pass 2, on the phone that holds this lane — not the importer, which only
+      // carried it. (The label names the app that first wrote these readings; the
+      // consolidated app writes them too. `STATE.md` records that as a follow-up.)
+      source: (event) => `pass2@${event.device}`,
+      // There is no inference here: the value is what the OS returned, and a read
+      // that failed is carried as `readable: false` rather than smeared into a
+      // lower number. Uncertainty that has its own field does not belong in this
+      // one.
+      confidencePercent: 100,
+      translate: (payload) => {
+        const reading = readingFrom(payload);
+        return reading === null ? null : { data: reading };
+      },
+    },
+  ]),
+  [
+    SHARED_TYPE,
+    {
+      source: (event) => shareSource(event.device),
+      confidencePercent: SHARE_CONFIDENCE_PERCENT,
+      translate: (payload) => shareFrom(payload),
+    },
+  ],
+]);
+
+/** Turns replicated events into Observations, once each. */
 async function observeReadings(journal: Journal, lanes: readonly string[]): Promise<number> {
   const cited = new Set<string>();
   for (const event of await journal.readLane(journal.lane)) {
@@ -146,27 +198,25 @@ async function observeReadings(journal: Journal, lanes: readonly string[]): Prom
   let observed = 0;
   for (const lane of lanes) {
     for (const event of await journal.readLane(lane)) {
-      if (!READING_TYPES.includes(event.type)) continue;
+      const translation = TRANSLATIONS.get(event.type);
+      if (translation === undefined) continue;
       // A replicated envelope whose payload this device does not hold cannot be
       // read, and is left for a later import rather than recorded as an empty
       // reading.
       if (!hasPayload(event) || cited.has(event.id)) continue;
 
-      const reading = readingFrom(unwrapPayload((event as OrbEvent).payload));
-      if (reading === null) continue;
+      const translated = translation.translate(unwrapPayload((event as OrbEvent).payload));
+      if (translated === null) continue;
 
       await journal.appendOne(
         observationDraft(
           {
-            // inv. 3: what perceived this. Pass 2, on the phone that holds this
-            // lane — not the importer, which only carried it.
-            source: `pass2@${event.device}`,
-            // There is no inference here: the value is what the OS returned, and
-            // a read that failed is carried as `readable: false` rather than
-            // smeared into a lower number. Uncertainty that has its own field
-            // does not belong in this one.
-            confidencePercent: 100,
-            data: reading,
+            source: translation.source(event),
+            confidencePercent: translation.confidencePercent,
+            data: translated.data,
+            ...(translated.attachments !== undefined && translated.attachments.length > 0
+              ? { attachments: translated.attachments }
+              : {}),
           },
           [event.id],
         ),

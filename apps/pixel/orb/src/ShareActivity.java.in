@@ -71,51 +71,18 @@ public final class ShareActivity extends Activity {
     }
 
     /**
-     * What the hand-off was, as the sender declared it.
-     *
-     * Nothing here inspects content. `SENSOR_SHARE.md` §8: a sensor that sniffed
-     * the bytes to correct a wrong `mimeType` would be **interpreting**, which
-     * `Sensor.md` §1 forbids — record the declaration, and let a later stage
-     * disagree with it in its own record.
+     * What the hand-off was, as the sender declared it — built by `Shares`, which
+     * touches no Android, so the same code can be run off the phone to produce the
+     * fixture the desktop importer is tested against.
      */
     private Map<String, Object> record(Intent intent) {
-        Map<String, Object> payload = Json.obj();
-        payload.put("because", "user.shared");
-
-        if (intent == null) {
-            // Not an empty share. A share whose intent this activity could not
-            // read is *cannot check*, and rendering it as "nothing was shared"
-            // is the `Readable: false` error one signal over.
-            payload.put("shareReadable", false);
-            return payload;
-        }
-        payload.put("shareReadable", true);
-        payload.put("action", String.valueOf(intent.getAction()));
-
-        // Declared by the sender, never verified here.
-        String declared = intent.getType();
-        payload.put("mimeType", declared == null ? "unknown" : declared);
-
-        // Android may or may not say who initiated the share, and absent is an
-        // ordinary outcome rather than a failure. `unknown` is recorded rather
-        // than the field being omitted: dropping it would make "we do not know
-        // where this came from" and "it came from nowhere" the same record, and
-        // later make a referrer a fact nobody observed.
+        if (intent == null) return Shares.unreadable();
         Uri referrer = getReferrer();
-        payload.put("referrer", referrer == null ? "unknown" : referrer.toString());
-
-        List<String> references = references(intent);
-        payload.put("itemCount", (long) references.size());
-        // The pointers, not the bytes. `Observation.md` inv. 5 — references,
-        // never copies — satisfied by construction rather than by discipline.
-        payload.put("references", String.join(":", references));
-        // Nothing has been resolved, and the record says so rather than leaving
-        // a reader to assume either way. Resolution is a declared Capability
-        // (`SENSOR_SHARE.md` §3) and has not happened.
-        payload.put("resolved", false);
-        payload.put("absenceReason", "unfetched");
-
-        return payload;
+        return Shares.declared(
+            String.valueOf(intent.getAction()),
+            intent.getType(),
+            referrer == null ? null : referrer.toString(),
+            references(intent));
     }
 
     /**
@@ -134,43 +101,24 @@ public final class ShareActivity extends Activity {
      * and *attempted and refused* the same record.
      */
     private void resolve(Intent intent, Map<String, Object> payload) {
-        Object first = payload.get("references");
-        String reference = first instanceof String ? (String) first : "";
-        int end = reference.indexOf(':', reference.indexOf("://") + 3);
-        if (end > 0) reference = reference.substring(0, end);
-
-        if (reference.isEmpty() || !reference.startsWith("content://")) {
-            // Text and links are not resolved, and that is a decision rather
-            // than a gap: text *is* the content already, and a link is a fetch.
-            payload.put("resolveOutcome", reference.isEmpty() ? "noReference" : "notAContentUri");
+        String reference = Shares.firstReference(payload);
+        String unresolvable = Shares.unresolvableOutcome(reference);
+        if (unresolvable != null) {
+            Shares.outcome(payload, unresolvable, null, null, 0L);
             return;
         }
 
         try (InputStream in = getContentResolver().openInputStream(Uri.parse(reference))) {
             if (in == null) {
-                payload.put("resolveOutcome", "openedNull");
+                Shares.outcome(payload, "openedNull", null, null, 0L);
                 return;
             }
             Attachments.Stored stored = Attachments.store(this, in);
-            payload.put("resolveOutcome", stored.outcome);
-            if (stored.detail != null) payload.put("resolveDetail", stored.detail);
-            if (stored.identity != null) {
-                payload.put("resolved", true);
-                payload.put("attachment", stored.identity);
-                payload.put("attachmentBytes", stored.bytes);
-                // The absence reason was set optimistically by `record`; the
-                // content is here now and leaving it would be a false statement
-                // about what this device holds.
-                payload.remove("absenceReason");
-            }
+            Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
         } catch (SecurityException refused) {
-            // The grant was not live after all. Worth distinguishing from a
-            // read failure: one is a permission, the other is availability.
-            payload.put("resolveOutcome", "refused");
-            payload.put("resolveDetail", String.valueOf(refused.getMessage()));
+            Shares.refused(payload, refused.getMessage());
         } catch (Exception error) {
-            payload.put("resolveOutcome", "failed");
-            payload.put("resolveDetail", error.getClass().getName() + ": " + error.getMessage());
+            Shares.failed(payload, error);
         }
     }
 

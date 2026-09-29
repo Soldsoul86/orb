@@ -110,6 +110,16 @@ only. An edited payload passes the phone's check and fails this one.
 Only then does each reading become an Observation in *this* device's lane, citing
 the replicated event. The phone's event is never rewritten.
 
+**Two things are translated, and everything else stays an Event.** The grants
+readings (`grants.observed`, `grants.packages`) become Observations sourced
+`pass2@<install>`, and — since 2026-09-29 — each share (`orb.shared`) becomes one
+sourced `orb.sensor.share@<install>` with confidence 100, its stored content
+referenced by identity (`docs/SENSOR_SHARE.md` §4a). The phone's process starts,
+process exits, capability grants, resolve attempts and exports are about Orb
+itself: runtime activity, not occurrences in the world, so they arrive in the
+replica and become nothing else. The projection reads only readings shaped like
+grants, so shares and grants share a lane without disturbing each other (tested).
+
 **Idempotent twice over, by different mechanisms.** `replicate` skips by event id;
 translation skips readings an Observation already cites. So re-importing the same
 file is a no-op, and importing a *longer* export of the same lane adds only its

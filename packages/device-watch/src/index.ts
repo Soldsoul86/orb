@@ -27,6 +27,17 @@ export {
   parseExport,
 } from "./import.js";
 export type { ImportResult } from "./import.js";
+export {
+  SHARED_TYPE,
+  SHARE_CONFIDENCE_PERCENT,
+  SHARE_FIELDS_ATTACHED,
+  SHARE_FIELDS_EXCLUDED,
+  SHARE_FIELDS_MAPPED,
+  SHARE_SENSOR,
+  shareFrom,
+  shareSource,
+} from "./share.js";
+export type { ShareReading, ShareTranslation } from "./share.js";
 export { changeKey, project } from "./projection.js";
 export type { AuthorityChange, DeviceAuthority, Holding } from "./projection.js";
 export { CHANGE_RULE, PACKAGE_RULE, ruleFor, alertsFor } from "./rules.js";
