@@ -5,7 +5,7 @@ Contract:   Encryption
 Domain:     Infrastructure
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: None. The cryptographic substrate.
 ```
 
@@ -164,8 +164,12 @@ afterwards.
     it holds.
 11. **Encryption decides nothing.** It enforces decisions made elsewhere and makes
     none of its own.
-12. **Depends on nothing.** Opening data requires no other service to be running
-    (§6).
+12. **Depends on no other Orb Service.** Opening data requires no Orb contract to be
+    running (§6). Key custody may sit behind a **platform facility** — a hardware
+    keystore where the device offers one (§2.4) — which is a device *port*, not a
+    Service dependency: the claim is that no layer of Orb must be alive to decrypt,
+    not that the CPU and its keystore are absent. The same distinction keeps the
+    keyring a port rather than a contract edge.
 
 Upholds Constitution Articles I §2 (history never edited, reordered or deleted —
 by making erasure expressible without touching the sequence), IV §14 (equal peers,

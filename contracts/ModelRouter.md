@@ -5,7 +5,7 @@ Contract:   ModelRouter
 Domain:     Infrastructure
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Encryption
 ```
 
@@ -79,6 +79,12 @@ they accept. **A router that assumed a capability would degrade silently** — t
 request would succeed, the answer would be worse, and nothing would say so. So a
 route's capabilities are established by asking, and what was established is recorded
 with the interpretation that depended on it.
+
+**The bound on "rechecked, not remembered":** every interpretation records the
+capability *established for the request that produced it*, and none inherits a prior
+request's. How often the wire is actually queried is an implementation's to optimise;
+what the contract fixes is that no interpretation rests on a capability it did not
+establish — which is the answer to "how often" that a contract can honestly give.
 
 ---
 

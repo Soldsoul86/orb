@@ -126,9 +126,9 @@ implementer will meet it before writing the migration rather than after.
 
 ## Phase position
 
-Twelve contracts Accepted, fifteen Draft, **three with no specification**:
-`Synchronization`, `ModelRouter`, `Encryption`. Phase 3b's gate is every
-specification accepted, so nothing here opens Phase 3c.
+**Infrastructure is complete: all five Accepted 2026-09-29.** Across the kernel,
+**17 Accepted / 13 Draft** — Phase 3b's gate is every specification accepted, so the
+remaining thirteen (other domains) are what stands between here and Phase 3c.
 
 
 ---
@@ -318,7 +318,7 @@ assuming an unapproved document is how a proposal becomes architecture by
 accident. If it is approved, the router contract needs a pass; if it is rejected,
 that should be recorded so the next writer does not re-open it.
 
-### What a reviewer should challenge
+### What a reviewer should challenge — adjudicated 2026-09-29
 
 1. ~~**Gap 4 first.** One egress or two.~~ **Settled, DR-9** — one. What remains
    reviewable is the *price*: irreversible tier means routine remote reasoning
@@ -342,6 +342,46 @@ that should be recorded so the next writer does not re-open it.
    and its future writes are not accepted. *Which* contract defines the revocation
    record, and how a peer learns of it, is unspecified — the same shape of gap as
    erasure confirmation in the previous addendum.
+
+### Review verdict — `ModelRouter` and `Encryption`, 2026-09-29: ACCEPTED
+
+Both faithful to `KERNEL.md` and consistent with Articles III, VI §25–26 and VIII
+§30–32. `Encryption`'s claims are backed by running code (`attachment-keyring.ts`'s
+three states and re-mint refusal, blinded addressing, sealed-store); `ModelRouter` is a
+forward contract — its own examples make its *absence* from the first working loop the
+evidence that intelligence is optional (Art. III §11). The five challenges:
+
+1. **DR-9 price — noted, not a blocker.** One egress; the reviewable part is that
+   irreversible tier makes routine remote reasoning depend on a standing per-scope
+   authorization. A reviewer who finds that too heavy disputes the tier, not the
+   contract; nothing to change here.
+2. **Recheck bound — added.** `ModelRouter.md` §1 now bounds *rechecked, not
+   remembered*: **every interpretation records the capability established for the
+   request that produced it, and none inherits a prior request's.** Wire frequency is
+   an implementation's to optimise; the contract fixes that no interpretation rests on
+   an unestablished capability — the same move as `Synchronization`'s resumption bound.
+3. **Depends-on-nothing vs hardware custody — scoped.** `Encryption.md` inv. 12 now
+   reads *no other Orb **Service***: a hardware keystore is a device **port**, not a
+   contract edge, so the no-dependency claim (and Art. X §40's spirit) holds — the
+   claim was always that no *layer of Orb* need be alive to decrypt, never that the
+   platform is absent.
+4. **Confirmation oracle — accepted as named, and salting is foreclosed.** `payloadHash`
+   commits to plaintext, which is a confirmation oracle for guessable content, and the
+   contract names it (§1, §6) rather than hiding it. Salting would break content-addressed
+   agreement across devices and implementations — a property `Attachment` (inv. 8) and
+   `PARTIAL_REPLICATION.md` §3 already **Accepted** depend on — so *name it* is not one
+   option of two but the only one consistent with the accepted architecture. Blinded
+   addressing already closes the address-level oracle; this residue is bounded to
+   low-entropy plaintext and disclosed. Ratifying `Encryption` ratifies this cost knowingly.
+5. **Revocation record — resolved, and it exists.** Per `RECORDS.md` §2 the type is
+   `orb.device.revoked` (implemented in `revocation.ts`), naming the revoked device and
+   **the point in its lane acceptance stops**. It is the one record where a device speaks
+   about another, resolved by *the authority is the user, not the device*. `Encryption.md`
+   §7 already states both limits (a revoked device still writes its own lane; it cannot be
+   reliably told), which is the honest *revoked, and four of five peers have seen it*.
+
+**With these two, all five Infrastructure contracts are Accepted — the domain is
+complete.** Phase 3b continues in the other domains (17 Accepted / 13 Draft overall).
 
 
 ---

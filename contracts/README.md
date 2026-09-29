@@ -119,5 +119,5 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 | [Journal](Journal.md) | Service | Accepted |
 | [Storage](Storage.md) | Service | Accepted |
 | [Synchronization](Synchronization.md) | Service | Accepted |
-| [ModelRouter](ModelRouter.md) | Service | Draft |
-| [Encryption](Encryption.md) | Service | Draft |
+| [ModelRouter](ModelRouter.md) | Service | Accepted |
+| [Encryption](Encryption.md) | Service | Accepted |
