@@ -5,7 +5,7 @@ Contract:   LiveContext
 Domain:     Identity
 Kind:       Service
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: DigitalTwin
 ```
 
@@ -35,6 +35,11 @@ Digital Twin for the present moment or task — the Entities, active Goals, and 
 most relevant now — and offers it to retrieval and planning. It answers *"what should
 influence the decision in front of us right now?"* It holds no durable state: every
 frame is recomputed; nothing it produces is truth.
+
+**The boundary with `Retriever` (Identity follow-up Q2, settled in the Intelligence
+review):** LiveContext assembles the *frame* — what is salient now; the `Retriever` ranks
+history *within* that frame. LiveContext never ranks history, and the Retriever never
+decides the situation.
 
 When a frame must be preserved (for example, to explain a decision later), LiveContext
 **emits a `ContextSnapshot`** — the immutable record. The Service performs the

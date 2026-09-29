@@ -5,7 +5,7 @@ Contract:   DigitalTwin
 Domain:     Identity
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Entity, Fact, Belief, Relationship, Project, Goal, ContextSnapshot, IdentityEvolution
 ```
 
@@ -45,7 +45,9 @@ Multiple identities — professional self, parent, investor, writer, researcher 
 modelled as **facets**: recomputed, role-scoped *views* of the one model, never
 separate twins. A facet is a derived projection (a filter over the shared
 constituents), not its own contract; modelling personas as separate twins would make
-replay intractable, so the kernel forbids it.
+replay intractable, so the kernel forbids it. **Confirmed 2026-09-29 (follow-up Q1):**
+facets stay derived in v1; promotion to a contract, should facets ever need their own
+history, is tracked as `ARCHITECTURAL_DEBT.md` AD-10.
 
 A DigitalTwin is **not edited directly**. It is never written as a record; it is
 *projected* from its constituents, which are themselves derived from observations,

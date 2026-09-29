@@ -506,3 +506,35 @@ assert its own breaks into legitimacy.
 
 **Discharged when** one policy governs both, or the two are deliberately
 different with the reason written down.
+
+
+---
+
+## AD-10 — Promotion of Twin facets to a contract
+
+- **Status:** Open · **Raised:** Phase 3b, Identity domain review (follow-up Q1) ·
+  **Decided:** 2026-09-29, operator — keep derived for v1 · **Revisit at:** if facets need
+  their own creation events or evolution history (no earlier than **v2**)
+- **Domain:** Identity · **Kind (if adopted):** State
+
+**Question.** Should a facet of the one `DigitalTwin` — the professional self, the parent,
+the investor — be its own State contract, or remain a derived view?
+
+**Why it might be needed.** A derived facet has no lifecycle of its own. Nothing can record
+*the day the investor facet began*, and an `IdentityEvolution` can only ever be about the
+Twin's constituents, never about a facet as such. If "when did this side of me appear, and
+why" becomes a question Orb must answer, a derived view cannot answer it.
+
+**Why deferred / current decision.** A facet is a recomputed, role-scoped projection — a
+filter over the Twin's shared constituents (`DigitalTwin.md` §1, inv. 6). It holds nothing
+the constituents do not, so it replays for free and adds no source of truth. Promoting it
+now would grow the kernel to 31 for a need no one has yet had. Modelling personas as
+**separate twins** remains forbidden either way — it makes replay intractable.
+
+**Leading option.** Keep facets derived. Promote only when a concrete need for
+facet-level history appears, and then as a State contract that `DigitalTwin` depends on —
+never as a second Twin.
+
+**Decision owner:** operator (architecture). **Resolution:** explicit accept/reject when a
+facet-history need materializes.
+

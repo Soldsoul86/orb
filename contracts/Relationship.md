@@ -5,7 +5,7 @@ Contract:   Relationship
 Domain:     Identity
 Kind:       State
 Version:    v1
-Status:     Draft
+Status:     Accepted
 Depends on: Entity, Belief
 ```
 

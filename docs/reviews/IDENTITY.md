@@ -2,8 +2,7 @@
 
 > Phase 3b architectural review. The Identity domain answers: **given everything
 > Orb has learned, what context should influence future decisions?** **Status:
-> Accepted (review round 2) — reviewer decisions applied; held for confirmation of
-> three follow-ups.** Specs: `../../contracts/{DigitalTwin,Relationship,Project,Goal,
+> Accepted (review round 2); all three follow-ups confirmed; specs ratified 2026-09-29.** Specs: `../../contracts/{DigitalTwin,Relationship,Project,Goal,
 > ContextSnapshot,LiveContext,IdentityEvolution}.md`. Now **7 contracts** (5 State,
 > 1 Service, plus DigitalTwin) — the domain grew by two on purpose (see *Decisions*).
 
@@ -421,8 +420,17 @@ removed `Memory` and `Reflector` and added `InferenceRecord` — net **30 contra
 State, 13 Service**. The two Identity follow-ups that carried forward, Q2 and Q3, were
 both resolved there.)*
 
-**Held for confirmation of the three follow-ups above** (facet promotion; LiveContext↔
-Retriever boundary; IdentityEvolution↔InferenceRecord reference) — none blocks
+~~**Held for confirmation of the three follow-ups above**~~ — **all three confirmed,
+2026-09-29.** Q2 (LiveContext↔Retriever) and Q3 (IdentityEvolution references
+`InferenceRecord`) were settled in the Intelligence review; **Q1 confirmed by the
+operator: facets stay a derived view in v1**, promotion tracked as `ARCHITECTURAL_DEBT.md`
+AD-10. The seven specs were verified against the round-2 decisions (acyclic State graph,
+no State→Service edge, replay test in each, no stale `Memory`/`Reflector` references)
+and flipped Draft → Accepted. **With them every kernel specification is Accepted — the
+Phase 3b gate condition is met (30 / 0).**
+
+*(Original hold, kept for the record:)* facet promotion; LiveContext↔
+Retriever boundary; IdentityEvolution↔InferenceRecord reference — none blocks
 acceptance. The LiveContext↔Retriever boundary and the `InferenceRecord` contract carry
 forward into the **Intelligence** domain review.
 

@@ -83,13 +83,13 @@ State (17) and Service (13), grouped by domain. Status tracks Phase 3b review.
 ### 3. Identity
 | Contract | Kind | Status |
 | --- | --- | --- |
-| [DigitalTwin](DigitalTwin.md) | State | Draft |
-| [Relationship](Relationship.md) | State | Draft |
-| [Project](Project.md) | State | Draft |
-| [Goal](Goal.md) | State | Draft |
-| [ContextSnapshot](ContextSnapshot.md) | State | Draft |
-| [LiveContext](LiveContext.md) | Service | Draft |
-| [IdentityEvolution](IdentityEvolution.md) | State | Draft |
+| [DigitalTwin](DigitalTwin.md) | State | Accepted |
+| [Relationship](Relationship.md) | State | Accepted |
+| [Project](Project.md) | State | Accepted |
+| [Goal](Goal.md) | State | Accepted |
+| [ContextSnapshot](ContextSnapshot.md) | State | Accepted |
+| [LiveContext](LiveContext.md) | Service | Accepted |
+| [IdentityEvolution](IdentityEvolution.md) | State | Accepted |
 
 ### 4. Intelligence
 | Contract | Kind | Status |
