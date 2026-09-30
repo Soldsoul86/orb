@@ -1,0 +1,43 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * What `orb.process.start` records — the part of `Orb` that touches no Android.
+ *
+ * Split out for the reason `Shares` and `Grants` are: the record is an agreement
+ * with the desktop side, and an agreement is only tested if the side that writes it
+ * can run without a phone. The fixture generator runs *this class*.
+ *
+ * **The build is on the record.** An export used to say which phone wrote it and
+ * nothing about which build, so "this is v8" rested on the order of events
+ * (`STATE.md`, step-2 follow-up). `versionCode` and `versionName` close that.
+ * `versionCode` is **-1 when the platform would not say**, never 0 or absent:
+ * *cannot check* is not *no version* (`SETTLED.md`, `Readable: false`).
+ */
+final class Start {
+    private Start() {}
+
+    /** The platform would not report the build's version. */
+    static final long VERSION_UNREADABLE = -1L;
+
+    static Map<String, Object> record(
+        String androidRelease, long sdkInt, String securityPatch, String fingerprintBuild,
+        String model, String device, long elapsedRealtimeMs,
+        long versionCode, String versionName
+    ) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("androidRelease", androidRelease);
+        payload.put("sdkInt", sdkInt);
+        payload.put("securityPatch", securityPatch);
+        payload.put("fingerprintBuild", fingerprintBuild);
+        payload.put("model", model);
+        payload.put("device", device);
+        // Wall clock minus this is the boot instant, and it is the only field
+        // that can date a boot (§7b2, §7b4 — P17 was refuted on exactly this).
+        payload.put("elapsedRealtimeMs", elapsedRealtimeMs);
+        payload.put("versionCode", versionCode);
+        payload.put("versionName", versionName == null ? "" : versionName);
+        return payload;
+    }
+}

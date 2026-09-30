@@ -55,11 +55,19 @@ final class Facts {
         return false;
     }
 
-    /** The service was bound by the system: this build holds the assistant role. */
-    static Map<String, Object> ready(boolean roleHeld, boolean activeService) {
+    /**
+     * The service was bound by the system: this build holds the assistant role.
+     *
+     * `versionCode` says which build; `recognitionStub` says whether this build
+     * shipped the do-nothing recognition service — the one variable the "does a
+     * phone assistant need one" experiment changes (`DEVICE_LOOP.md` §7b43).
+     */
+    static Map<String, Object> ready(boolean roleHeld, boolean activeService, long versionCode, boolean recognitionStub) {
         Map<String, Object> p = Json.obj();
         p.put("roleHeld", roleHeld);
         p.put("activeService", activeService);
+        p.put("versionCode", versionCode);
+        p.put("recognitionStub", recognitionStub);
         return p;
     }
 

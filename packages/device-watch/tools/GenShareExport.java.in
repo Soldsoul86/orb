@@ -39,10 +39,9 @@ public final class GenShareExport {
         Journal journal = Journal.open(new Context(dir), install, install);
 
         // Not a share, and must not become one: runtime activity, not an occurrence.
-        Map<String, Object> start = Json.obj();
-        start.put("androidRelease", "16");
-        start.put("sdkInt", 36L);
-        start.put("elapsedRealtimeMs", tick());
+        Map<String, Object> start = Start.record(
+            "16", 36L, "2026-01-01", "TEST.000000.000", "Test phone", "test",
+            tick(), 1234L, "0.1-test");
         journal.append("orb.process.start", start);
 
         // 1. Shared, nothing read (the first builds, and any share whose grant

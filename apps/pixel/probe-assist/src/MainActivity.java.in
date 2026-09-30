@@ -123,7 +123,7 @@ public final class MainActivity extends Activity {
 
     /**
      * Writes the journal to Downloads, recording the export first so the copy holds
-     * the record of its own creation. `orb-probea-` in the name is the source's
+     * the record of its own creation. the package suffix in the name is the source's
      * identity: four packages once wrote files nothing could tell apart (AD-8).
      */
     private void export() {
@@ -135,7 +135,8 @@ public final class MainActivity extends Activity {
         }
 
         try {
-            String name = "orb-probea-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".txt";
+            // The package's own suffix, so the two variants' files cannot be mistaken for each other.
+            String name = "orb-" + getPackageName().substring(getPackageName().lastIndexOf('.') + 1) + "-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".txt";
             journal.append(Facts.EXPORTED, Facts.exported(journal.count()));
             List<String> lines = journal.readLines();
 

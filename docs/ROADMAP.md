@@ -158,10 +158,10 @@ statements.
 | Assist step 5 — declaration, retention, allow-list | DR-14 fixes *what* (no payments, allow-list, text only); *how an app is added* and *how long text lives* are **undecided** | next |
 | Assist step 6 — erase one capture on the phone | not started; the phone has no way to destroy an attachment key | must precede step 7 |
 | Assist step 7 — invoke → card → *Remember* | not started | after 5 and 6 |
-| Probe leftovers: settings-off behaviour, a game (P29), recognition-stub necessity, flag bit 256 | **untested / unknown**, none blocking | one short probe round, before step 7 |
+| Probe leftovers: settings-off behaviour, a game (P29), recognition-stub necessity, flag bit 256 | probe round **built 2026-09-30** with predictions P30–P33 (`DEVICE_LOOP.md` §7b43); flag 256 is not a public constant and is recorded as unknown | run it |
 | `Shares` extraction on device | **closed** 2026-09-29 | closed |
-| An export cannot say which build wrote it | open — no version code in `orb.process.start` | small, do with the next app build |
-| AD-11 backup | fixed in the tree; on device with v8. **Unchecked:** device-to-device transfer; retired builds keep the default | finish the check |
+| An export cannot say which build wrote it | **fixed in the tree 2026-09-30** (`DEVICE_LOOP.md` §7b43): `versionCode` in `orb.process.start`; confirmed on the device when the first v9 export carries it | confirm on export |
+| AD-11 backup | **finished in the tree 2026-09-30:** `allowBackup="false"` alone does not stop device-to-device transfer on Android 12+ (Android's own wording), so both builds now carry `dataExtractionRules` excluding every domain from both sections, with a test. Retired builds keep the default | on device with v9 |
 | Phone loss with backup off | the export in Downloads is the only copy until sync exists | needs a decision (below) |
 | AD-7 whole-package-list read outside the Capability boundary | **deferred** by DR-13 to the general Capability mechanism | waits for Phase 3c |
 | AD-6 source independence | reframed; revisit when two mobile sources report on one fact | **will bite** at the first second source |

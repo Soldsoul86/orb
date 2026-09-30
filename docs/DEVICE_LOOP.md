@@ -4814,3 +4814,78 @@ are outside the allow-list and would not be captured.
 structure is present and nearly empty of text — the shape P29 predicted, in an app
 that is not a game. A game itself is still untried.
 
+
+### 7b43. Track 0 — the build on the record, transfer closed, and the four untested rows — 2026-09-30
+
+Three small closes from the roadmap (`ROADMAP.md`, *The personal runtime on Android*),
+done together because none of them is large and all three are checked on one
+install.
+
+#### 0a. `orb.process.start` names its build
+
+`versionCode` and `versionName` are now in the start event, built by `Start.java.in`
+(the pure part of `Orb`, as `Shares` is of `ShareActivity`), so the fixture the
+importer is tested against is written by the same class. `versionCode` is **-1 when
+the platform will not say** — never 0, never absent. Three tests: the phone's own
+record carries a numeric `versionCode`; `Orb` builds the record only through
+`Start`; the unreadable value is -1. **Check on the device:** the first export
+after installing `orb-app-v9-version.apk` should carry `versionCode: 29845625`.
+
+#### 0b. AD-11 finished — `allowBackup="false"` was not enough
+
+Android's own text (`developer.android.com/identity/data/autobackup`): *"For apps
+targeting Android 12 (API level 31) or higher … on devices from some device
+manufacturers, specifying `android:allowBackup="false"` disables cloud-based backup
+and restore … but doesn't disable device-to-device transfers for the app."* The
+unchecked half of AD-11 was therefore a real gap, not a formality. Both builds now
+declare `android:dataExtractionRules`, excluding every domain (`root`, `file`,
+`database`, `sharedpref`, `external`) from **both** `cloud-backup` and
+`device-transfer`. A test reads the manifest and the rules and fails if a domain is
+dropped from either section (mutation-checked: removing `file` from
+`device-transfer` fails it). **Not verifiable from a phone's own data** — nothing on
+the phone reports what a transfer would have carried; this is closed by the
+platform's documented behaviour plus the test, not by an observation. The retired
+builds (`pass1`, `pass2`, `pass2b`, `probeg`) keep the default and hold readings,
+not keys.
+
+#### 0c. The four untested rows
+
+| Row | Disposition |
+| --- | --- |
+| Flag bit 256 (every invocation carries `flags: 263` = 7 + 256) | **Not a public constant in API 36** (`VoiceInteractionSession` defines 1, 2, 4, 8, 16, 32, 64, 128). Constant across all eleven invocations, nothing in this design depends on it; recorded as unknown, not chased |
+| "Use text from screen" / "Use screenshot" off | **Measured now** — P31, P32 |
+| A game (P29) | **Measured now** — P33 |
+| Is the recognition stub required | **Measured now** — P30. A second build, `dev.orb.probena`, ships without it (`ORB_PROBE_STUB=0`); its own package so a *fresh* install is what is tested, not whether an old selection survives |
+
+`assist.service.ready` now carries `versionCode` and `recognitionStub` so each export
+says which variant produced it. The export file is named by the package suffix
+(`orb-probea-…` or `orb-probena-…`).
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P30** | The build **without** the recognition stub is listed as a selectable assistant, is bound (`assist.service.ready` with `roleHeld: true`, `recognitionStub: false`) and receives an invocation | The platform requires a recognition service; the stub stays, and "an assistant with nothing to declare" is not possible on this device |
+| **P31** | With **Use text from screen** off, an invocation still reaches the session but **no structure with nodes arrives** (`assist.structure` `arrived: false`, or `assistCallbacks: 0` in `assist.closed`); the screenshot still arrives | The setting does not gate delivery to this kind of assistant — then it is **not a control the person has**, and the retention rules cannot lean on it |
+| **P32** | With **Use screenshot** off, no screenshot arrives (`arrived: false` or `screenshotCallbacks: 0`); structure still arrives | Same consequence for the screenshot |
+| **P33** | In a game, structure arrives with `nodes > 0` and **fewer than 5 text nodes**, and the screenshot is a real capture | Games deliver text: nothing to plan for, and P29 closes cheaply |
+
+#### The operator's protocol
+
+1. Install `orb-app-v9-version.apk` (updates Orb in place). Open it once.
+2. Install `orb-assist-probe-v2-nostub.apk` (a **new** app, *Orb assist probe (no
+   stub)*). Open it → **Choose default assistant** → is it in the list? If it is
+   not, take a screenshot of the list and skip to step 6 with the other probe.
+3. Select it, return to the app. It should read *assistant role held: yes*.
+4. On **one messaging screen** (the same one each time), invoke the gesture: once as
+   it is; then **Use text from screen** off (Settings → Apps → Default apps →
+   Digital assistant app) and invoke; turn it back on; **Use screenshot** off and
+   invoke; turn it back on.
+5. Open any **game** and invoke once. Then **Export journal**.
+6. *(Only if step 2 failed.)* Install `orb-assist-probe-v2.apk` (updates the first
+   probe in place, keeping its journal), choose it as the assistant, and do steps 4–5
+   with it.
+7. Reverting: Settings → Default apps → Digital assistant app → your usual one.
+   Export first if you uninstall — the journal goes with the app.
+
+Also export Orb itself once (step 1's check).

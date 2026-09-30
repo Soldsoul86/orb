@@ -1,6 +1,8 @@
 package @PKG@;
 
 import android.app.Application;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.SystemClock;
 import java.io.IOException;
@@ -93,16 +95,18 @@ public final class Orb extends Application {
      * handset.
      */
     private void recordStart() {
-        Map<String, Object> payload = Json.obj();
-        payload.put("androidRelease", Build.VERSION.RELEASE);
-        payload.put("sdkInt", (long) Build.VERSION.SDK_INT);
-        payload.put("securityPatch", Build.VERSION.SECURITY_PATCH);
-        payload.put("fingerprintBuild", Build.DISPLAY);
-        payload.put("model", Build.MODEL);
-        payload.put("device", Build.DEVICE);
-        // Wall clock minus this is the boot instant, and it is the only field
-        // that can date a boot (§7b2, §7b4 — P17 was refuted on exactly this).
-        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
-        journal.append(STARTED, payload);
+        long versionCode = Start.VERSION_UNREADABLE;
+        String versionName = "";
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            versionCode = info.getLongVersionCode();
+            versionName = info.versionName;
+        } catch (PackageManager.NameNotFoundException | RuntimeException unreadable) {
+            // Recorded as unreadable, not as a version; see `Start`.
+        }
+        journal.append(STARTED, Start.record(
+            Build.VERSION.RELEASE, (long) Build.VERSION.SDK_INT, Build.VERSION.SECURITY_PATCH,
+            Build.DISPLAY, Build.MODEL, Build.DEVICE, SystemClock.elapsedRealtime(),
+            versionCode, versionName));
     }
 }

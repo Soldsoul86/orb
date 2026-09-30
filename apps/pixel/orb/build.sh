@@ -60,10 +60,17 @@ for source in src/*.java.in \
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
 
+# Resources: the data-extraction rules (AD-11). Compiled first, then linked.
+mkdir -p "$OUT/res/xml"
+for xml in res/xml/*.xml; do
+  sed -e "s/@PKG@/$PKG/g" "$xml" > "$OUT/res/xml/$(basename "$xml")"
+done
+"$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/res.zip"
 "$BT/aapt2" link \
   -o "$OUT/base.apk" \
   -I "$JAR" \
   --manifest "$OUT/AndroidManifest.xml" \
+  -R "$OUT/res.zip" \
   --min-sdk-version 34 \
   --target-sdk-version "$API"
 

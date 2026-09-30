@@ -45,7 +45,7 @@ final class FactsTest {
         Harness.suite("every record is numbers and booleans, plus at most a package and known sources");
         PixelStats stats = PixelStats.of(new int[16], 4, 4);
         Map<?, ?>[] records = {
-            Facts.ready(true, true),
+            Facts.ready(true, true, 7L, false),
             Facts.shutdown(),
             Facts.showFailed(1),
             Facts.invoked(1L, 3, true, false, "assistGesture", 0),

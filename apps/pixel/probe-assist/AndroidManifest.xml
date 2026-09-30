@@ -19,6 +19,7 @@
     <application
         android:name=".Probe"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="@LABEL@"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
@@ -48,6 +49,7 @@
             android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:exported="true" />
 
+        <!-- STUB:BEGIN -->
         <service
             android:name=".RecognitionStub"
             android:exported="true">
@@ -58,5 +60,6 @@
                 android:name="android.speech"
                 android:resource="@xml/recognition_service" />
         </service>
+        <!-- STUB:END -->
     </application>
 </manifest>

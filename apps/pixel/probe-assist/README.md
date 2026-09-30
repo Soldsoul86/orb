@@ -40,3 +40,11 @@ ANDROID_HOME=/path/to/sdk bash apps/pixel/probe-assist/build.sh    # APK
 Its own package (`dev.orb.probea`) and its own throwaway key (`keys/`, ignored by
 git), so it can be installed beside every other Orb app and removed without
 touching them.
+
+## Variants
+
+`ORB_PROBE_STUB=0` builds `dev.orb.probena`, identical except that it ships **without**
+the do-nothing recognition service — the one variable the "does a phone assistant need
+one" experiment changes (`DEVICE_LOOP.md` §7b43). It is its own package so a fresh
+install is what is tested. `assist.service.ready` records `recognitionStub` and
+`versionCode`, and the export file is named by the package suffix.

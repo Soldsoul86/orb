@@ -14,8 +14,19 @@ API=36
 BT="$SDK/build-tools/36.0.0"
 JAR="$SDK/platforms/android-$API/android.jar"
 
-PKG="${ORB_PROBE_PKG:-dev.orb.probea}"
-LABEL="${ORB_PROBE_LABEL:-Orb assist probe}"
+# ORB_PROBE_STUB=0 builds the variant without the do-nothing recognition service.
+# It is the one variable that experiment changes (DEVICE_LOOP.md 7b43), so it gets its
+# own package and label rather than upgrading the stubbed install in place: what is
+# being asked is whether a *fresh* install is listed and bound, not whether an old
+# selection survives.
+STUB="${ORB_PROBE_STUB:-1}"
+if [ "$STUB" = "0" ]; then
+  PKG="${ORB_PROBE_PKG:-dev.orb.probena}"
+  LABEL="${ORB_PROBE_LABEL:-Orb assist probe (no stub)}"
+else
+  PKG="${ORB_PROBE_PKG:-dev.orb.probea}"
+fi
+LABEL="${LABEL:-${ORB_PROBE_LABEL:-Orb assist probe}}"
 # Minutes since the epoch: versionCode is a signed 32-bit int, so a plain
 # timestamp overflows it and a yymmddHHMM stamp passes 2^31 in this decade.
 VERSION_CODE="${ORB_VERSION_CODE:-$(( $(date -u +%s) / 60 ))}"
@@ -29,6 +40,9 @@ rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 sed -e "s/@PKG@/$PKG/g" -e "s/@LABEL@/$LABEL/g" -e "s/@VERSION_CODE@/$VERSION_CODE/g" \
   AndroidManifest.xml > "$OUT/AndroidManifest.xml"
+if [ "$STUB" = "0" ]; then
+  sed -i '/STUB:BEGIN/,/STUB:END/d' "$OUT/AndroidManifest.xml"
+fi
 
 # `Install` from the app, and `Journal`, `Json`, `Hlc`, `Ids` from pass 1 -- taken,
 # not copied, so the probe records with the code that would actually ship.
@@ -36,13 +50,16 @@ for source in src/*.java.in ../orb/src/Install.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in; do
   name="$(basename "$source" .java.in)"
+  if [ "$STUB" = "0" ] && [ "$name" = "RecognitionStub" ]; then continue; fi
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
 
 # Resources: the two service declarations. Compiled first, then linked.
 mkdir -p "$OUT/res/xml"
 for xml in res/xml/*.xml; do
+  if [ "$STUB" = "0" ] && [ "$(basename "$xml")" = "recognition_service.xml" ]; then continue; fi
   sed -e "s/@PKG@/$PKG/g" "$xml" > "$OUT/res/xml/$(basename "$xml")"
+  if [ "$STUB" = "0" ]; then sed -i '/recognitionService/d' "$OUT/res/xml/$(basename "$xml")"; fi
 done
 "$BT/aapt2" compile --dir "$OUT/res" -o "$OUT/res.zip"
 "$BT/aapt2" link \

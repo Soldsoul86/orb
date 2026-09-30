@@ -451,9 +451,11 @@ facet-history need materializes.
 
 **Opened 2026-09-29. Fixed in the tree the same day (DR-14 ruling 6):** the `orb` and
 `probe-assist` manifests set `android:allowBackup="false"`, and `manifests.test.ts` fails if
-they stop. **On the device once `orb-app-v8-nobackup.apk` is installed.** Still open: whether
-device-to-device transfer is also excluded by that attribute alone on this Android
-version (unchecked), and the retired builds (`pass1`, `pass2b`, `probeg`) keep the
+they stop. **On the device once `orb-app-v8-nobackup.apk` is installed.** **Device-to-device transfer
+was checked 2026-09-30 and the attribute alone is not enough:** Android documents that on
+Android 12+ `allowBackup="false"` may stop cloud backup and not transfer. Both builds now
+declare `dataExtractionRules` excluding every domain from both sections, with a test
+(`DEVICE_LOOP.md` §7b43). Still open: the retired builds (`pass1`, `pass2b`, `probeg`) keep the
 default — they hold readings, not keys, and are being replaced by the app.
 
 Found while answering *what does Orb keep of a screenshot*.

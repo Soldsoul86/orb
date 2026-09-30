@@ -20,7 +20,7 @@ rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 for source in "$PIXEL"/pass1/src/Journal.java.in "$PIXEL"/pass1/src/Json.java.in \
               "$PIXEL"/pass1/src/Hlc.java.in "$PIXEL"/pass1/src/Ids.java.in \
-              "$PIXEL"/orb/src/Shares.java.in tools/GenShareExport.java.in; do
+              "$PIXEL"/orb/src/Shares.java.in "$PIXEL"/orb/src/Start.java.in tools/GenShareExport.java.in; do
   name="$(basename "$source" .java.in)"
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done

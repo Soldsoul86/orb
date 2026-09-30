@@ -12,7 +12,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { Journal, MemoryJournalStore, verifyLane } from "@orb/journal";
+import { Journal, MemoryJournalStore, unwrapPayload, verifyLane } from "@orb/journal";
 import { readObservation, type Observation } from "@orb/observation";
 import {
   SHARED_TYPE,
@@ -273,5 +273,28 @@ describe("a payload that is not usable", () => {
 
   test("a missing reason is `unknown`, not an invented one", () => {
     assert.equal(shareFrom({})?.data.because, "unknown");
+  });
+});
+
+describe("the process start names the build that wrote it", () => {
+  test("the phone's own record carries a numeric versionCode and a versionName", async () => {
+    const start = parseExport(await fixture()).find((event) => event.type === "orb.process.start")!;
+    const payload = unwrapPayload(start.payload) as Record<string, unknown>;
+    assert.equal(typeof payload["versionCode"], "number");
+    assert.equal(typeof payload["versionName"], "string");
+  });
+
+  test("and the app builds that record through Start, so the fixture and the phone cannot differ", async () => {
+    const orb = await readFile(join(here, "../../../../apps/pixel/orb/src/Orb.java.in"), "utf8");
+    assert.match(orb, /Start\.record\(/);
+    // Nothing else writes the start event's fields by hand.
+    assert.doesNotMatch(orb, /payload\.put\("androidRelease"/);
+  });
+
+  test("an unreadable version is -1, never 0 and never absent", async () => {
+    const start = await readFile(join(here, "../../../../apps/pixel/orb/src/Start.java.in"), "utf8");
+    assert.match(start, /VERSION_UNREADABLE\s*=\s*-1L/);
+    const orb = await readFile(join(here, "../../../../apps/pixel/orb/src/Orb.java.in"), "utf8");
+    assert.match(orb, /long versionCode = Start\.VERSION_UNREADABLE/);
   });
 });

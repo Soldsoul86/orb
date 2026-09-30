@@ -62,6 +62,7 @@
     <application
         android:name=".Orb"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="@LABEL@"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 

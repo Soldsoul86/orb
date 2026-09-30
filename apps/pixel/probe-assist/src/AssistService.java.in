@@ -2,6 +2,7 @@ package @PKG@;
 
 import android.app.role.RoleManager;
 import android.content.ComponentName;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.service.voice.VoiceInteractionService;
 
@@ -25,7 +26,7 @@ public final class AssistService extends VoiceInteractionService {
         RoleManager roles = getSystemService(RoleManager.class);
         boolean held = roles != null && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT);
         boolean active = isActiveService(this, new ComponentName(this, AssistService.class));
-        journal.append(Facts.READY, Facts.ready(held, active));
+        journal.append(Facts.READY, Facts.ready(held, active, versionCode(), hasRecognitionStub()));
     }
 
     @Override
@@ -40,6 +41,28 @@ public final class AssistService extends VoiceInteractionService {
         super.onShowSessionFailed(args);
         Journal journal = journal();
         if (journal != null) journal.append(Facts.SHOW_FAILED, Facts.showFailed(args == null ? 0 : args.size()));
+    }
+
+    /** -1 when the platform will not say; never 0. */
+    private long versionCode() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
+        } catch (PackageManager.NameNotFoundException | RuntimeException unreadable) {
+            return -1L;
+        }
+    }
+
+    /**
+     * Whether this build shipped the recognition stub. By name and not by class, so the
+     * variant built without it still compiles.
+     */
+    private boolean hasRecognitionStub() {
+        try {
+            getPackageManager().getServiceInfo(new ComponentName(getPackageName(), getPackageName() + ".RecognitionStub"), 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException | RuntimeException absent) {
+            return false;
+        }
     }
 
     private Journal journal() {
