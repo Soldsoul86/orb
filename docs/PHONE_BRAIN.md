@@ -147,10 +147,9 @@ record 01M3…V2AD
 **The erase confirmations say what stays — which they did not before.** Erasing destroys the words' key; the
 **Observation stays** (v19's export proved it: the Observation of an erased capture remained). So both erase
 dialogs (Recall and *Kept by Orb*) gain: *"Orb keeps its record that this happened — when, from which app, how
-much text — but not the words."* and, if the graph finds things built on the item, *"N things Orb worked out
-from it will also be listed for you to review."* — no: **nothing is worked out yet**, so only the first sentence
-is written now; the second is added when something derives from an item, and a test fails if the dependents
-list is non-empty and the dialog does not say so.
+much text — but not the words."* **Nothing is derived from items yet**, so that is the only sentence written now.
+When something does derive from an item the dialog must say so; a test fails if the graph reports dependents
+beyond the item's own Observation and the dialog does not mention them.
 
 **Shape.** One new Java file, `Provenance.java.in`: **the only caller of `dev.orb.brain.Evidence`**, as `Observe`
 is the only caller of the Observer. It builds the graph from the journal's lines when a dialog opens (never to
