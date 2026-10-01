@@ -5072,7 +5072,7 @@ Track 0 is closed. 0c's remaining unknowns are the ones deliberately left: flag 
 
 ### 7b46. Step 6 — the phone can destroy a key — 2026-10-01
 
-**Status: built and tested off the phone; partly run on it (§7b47).** Predictions are written
+**Status: built, tested off the phone, and verified on it (§7b47–§7b49).** Predictions are written
 here before the first erasure. `orb-app-v10-erase.apk`.
 
 #### What it does, in one paragraph
@@ -5252,3 +5252,25 @@ should record `resolveOutcome: erased`.
 
 The one erased row's status in the new screen (*the content stays while N other items still
 keep it*) matches the data. Nothing in these exports contradicts a prediction.
+
+### 7b49. Step 6 closed — all five predictions held on the device — 2026-10-01
+
+Export `orb-20261001-092217.txt` (78 events, `verifyLane`-clean). The other file uploaded with
+it, `…091819.txt`, is byte-identical to the earlier export of that name.
+
+| | Prediction | Evidence |
+| --- | --- | --- |
+| **P34** | the screen lists the sealed shares, two rows for a photograph shared twice | the screen listed every sealed share, duplicates as separate rows; no text share (§7b47–§7b48) |
+| **P35** | erasing one of several citations keeps the content | event 71; the dialog said *kept by 2 other items*; keys held and destroyed unchanged at 5 and 1 (§7b48) |
+| **P36** | erasing the last citation destroys the key | events 74–76 declare the remaining three; **`attachmentKeysHeld` 5 → 4 and `attachmentsDestroyed` 1 → 2** (event 78) — the key is gone, in the store's own count |
+| **P37** | the same bytes again are refused, as *erased* | event 77: `resolveOutcome: erased`, `absenceReason: erased`, `resolved: false`, and **no attachment named** |
+| **P38** | shared text is not listed | none appeared |
+
+`erasedHashes` returns all five declared hashes, each naming a real event and each confirmed by
+the phone. The sequence is the one `Attachment.md` inv. 8 describes — kept while anything
+readable still cites it, destroyed with the last, not undone by the same bytes — **observed on a
+real phone**, and visible in its own export.
+
+**Step 6 is closed.** What it leaves open is registered, not hidden: AD-12 (only sealed
+attachments are erasable; the desk does not yet honour a declaration; flash may hold stale
+copies of a deleted key).

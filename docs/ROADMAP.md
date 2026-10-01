@@ -156,7 +156,7 @@ statements.
 | --- | --- | --- |
 | Assist steps 1–4 (share sensor, grants declared, probe, its results) | **Done**, verified on device | closed |
 | Assist step 5 — declaration, retention, allow-list | **written 2026-10-01** (`SENSOR_ASSIST.md`; DR-14 rulings 7–9): empty allow-list edited from an Orb screen, text kept until deleted, a capture needs structure *and* screenshot. **Three proposals await a yes** (payments floor, descriptions excluded, 3 s timeout) | confirm §10 |
-| Assist step 6 — erase one capture on the phone | **built 2026-10-01** (`DEVICE_LOOP.md` §7b46): declare-then-destroy, a tombstone so the same bytes cannot undo it, a *Kept by Orb* screen; 39 phone-side and 355 TypeScript tests, cross-checked against a fixture the phone's own code wrote. **Not yet run on the device** (P34–P38). Its boundary is AD-12: only sealed attachments are erasable | run it |
+| Assist step 6 — erase one capture on the phone | **closed 2026-10-01** (`DEVICE_LOOP.md` §7b46–§7b49): all five predictions held on the device — kept while another item cites it, key destroyed with the last (`attachmentKeysHeld` 5→4, `attachmentsDestroyed` 1→2), the same bytes refused as `erased`. Boundary: AD-12 | closed |
 | Assist step 7 — invoke → card → *Remember* | not started | after 5 and 6 |
 | Probe leftovers: settings-off behaviour, a game (P29), recognition-stub necessity, flag bit 256 | **closed 2026-10-01** (`DEVICE_LOOP.md` §7b44–§7b45): the stub is **required** (P30 refuted); text off withholds structure and screenshot; flags are not a promise; a game gives no text; screenshot-off alone not measured and not needed; flag 256 unknown by design | closed |
 | `Shares` extraction on device | **closed** 2026-09-29 | closed |
