@@ -22,6 +22,7 @@ import java.util.Set;
  */
 public final class AllowActivity extends Activity {
     private LinearLayout list;
+    private TextView paymentsNote;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -44,6 +45,10 @@ public final class AllowActivity extends Activity {
             + "Orb never remembers payments apps, whatever this list says.\n");
         root.addView(note);
 
+        paymentsNote = new TextView(this);
+        paymentsNote.setTextSize(12);
+        root.addView(paymentsNote);
+
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         root.addView(list);
@@ -61,6 +66,16 @@ public final class AllowActivity extends Activity {
 
     private void render() {
         list.removeAllViews();
+        java.util.Set<String> upi = UpiApps.handlers(this);
+        if (upi == null) {
+            paymentsNote.setText("\nOrb could not check which apps are payments apps, so it treats every app as one until it can.\n");
+        } else if (upi.isEmpty()) {
+            paymentsNote.setText("\nNo app on this phone handles a UPI payment link.\n");
+        } else {
+            StringBuilder names = new StringBuilder("\nTreated as payments apps (they handle UPI links, so Orb never remembers from them):\n");
+            for (String name : upi) names.append("  ").append(name).append('\n');
+            paymentsNote.setText(names.toString());
+        }
         Orb app = Orb.get();
         final Journal journal = app == null ? null : app.journal();
         if (journal == null) {
@@ -82,7 +97,7 @@ public final class AllowActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(0, 20, 0, 20);
-            row.addView(text(pkg));
+            row.addView(text(AssistPolicy.isPaymentsApp(pkg, upi) ? pkg + "  (a payments app: never remembered)" : pkg));
             Button remove = new Button(this);
             remove.setText("Remove");
             remove.setOnClickListener(new View.OnClickListener() {

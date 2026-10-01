@@ -1,0 +1,49 @@
+package @PKG@;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.net.Uri;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Which apps on this phone handle a UPI payment link — the apps that are payments apps.
+ *
+ * Asks Android once and holds nothing: the answer is recomputed each time it is needed, so an app
+ * installed or updated since is judged as it is now. The link is only *resolved*, never opened; no
+ * app is started and nothing is sent. The manifest declares exactly this one query
+ * (`<data scheme="upi" host="pay">`), not a list of installed apps, so Orb learns about the apps that
+ * answer it and no others.
+ */
+final class UpiApps {
+    private UpiApps() {}
+
+    /** A made-up payment request, used only to ask who would handle it. Never launched. */
+    private static final String PROBE = "upi://pay?pa=orb@invalid&pn=Orb&am=1&cu=INR";
+
+    /** The packages that handle `upi://pay`, or **null if Android would not say** — which counts as a payments app. */
+    static Set<String> handlers(Context context) {
+        try {
+            Intent probe = new Intent(Intent.ACTION_VIEW, Uri.parse(PROBE));
+            List<ResolveInfo> found = context.getPackageManager()
+                .queryIntentActivities(probe, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL));
+            Set<String> packages = new HashSet<>();
+            for (ResolveInfo info : found) {
+                if (info.activityInfo != null && info.activityInfo.packageName != null) {
+                    packages.add(info.activityInfo.packageName);
+                }
+            }
+            return packages;
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+    }
+
+    /** Whether this app is a payments app, now. */
+    static boolean isPayments(Context context, String packageName) {
+        return AssistPolicy.isPaymentsApp(packageName, handlers(context));
+    }
+}

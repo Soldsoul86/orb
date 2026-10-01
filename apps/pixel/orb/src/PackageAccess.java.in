@@ -92,8 +92,8 @@ final class PackageAccess {
         // independently (`installedPackageScope`); this only stops the two
         // records from contradicting each other.
         payload.put("scope", all ? "all installed packages on this device"
-                                  : "packages visible without QUERY_ALL_PACKAGES");
-        payload.put("manifestScope", all ? "all" : "visible");
+                                  : "packages visible without QUERY_ALL_PACKAGES, plus UPI payment handlers");
+        payload.put("manifestScope", all ? "all" : "visible+upi");
         payload.put("by", "operator");
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(type, payload);

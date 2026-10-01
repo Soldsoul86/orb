@@ -49,15 +49,18 @@ final class Capture {
         Map<String, Object> append(String type, Map<String, Object> payload);
     }
 
-    static Result remember(Context context, final Journal journal, ScreenText text, String packageName, long versionCode) {
+    static Result remember(Context context, final Journal journal, ScreenText text, String packageName, long versionCode, boolean paymentsApp) {
         return remember(context, journal, new Recorder() {
             @Override public Map<String, Object> append(String type, Map<String, Object> payload) {
                 return journal.append(type, payload);
             }
-        }, text, packageName, versionCode);
+        }, text, packageName, versionCode, paymentsApp);
     }
 
-    static Result remember(Context context, Journal journal, Recorder recorder, ScreenText text, String packageName, long versionCode) {
+    static Result remember(Context context, Journal journal, Recorder recorder, ScreenText text, String packageName, long versionCode, boolean paymentsApp) {
+        // Asked again at the moment of keeping, by the caller: an app may have been updated into a
+        // payments app, or removed from the list, since the card opened.
+        if (paymentsApp) return new Result(NOT_ALLOWED);
         try {
             if (!AllowList.isAllowed(journal.readLines(), packageName)) return new Result(NOT_ALLOWED);
         } catch (IOException unreadable) {

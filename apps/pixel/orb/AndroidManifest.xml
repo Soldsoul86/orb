@@ -51,6 +51,16 @@
         <intent>
             <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
         </intent>
+        <!--
+          Which apps on this phone handle a UPI payment link. Not a list of installed apps: only
+          those that answer upi://pay become visible, and Orb uses them for one thing, to refuse
+          to remember from a payments app whatever it is called (DR-14 ruling 1). Every UPI app,
+          banks' included, has to handle this link, so it finds apps no list of names would.
+        -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" android:host="pay" />
+        </intent>
     </queries>
 
     <!--

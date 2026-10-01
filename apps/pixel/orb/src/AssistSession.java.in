@@ -57,6 +57,10 @@ public final class AssistSession extends VoiceInteractionSession {
     private boolean structureArrived;
     private String packageName;
     private boolean allowed;
+    /** A payments app — the name floor or an app that handles a UPI payment link — judged when the card opened. */
+    private boolean paymentsApp;
+    /** The person has tapped *Allow* once and is being asked to confirm. */
+    private boolean confirmingAllow;
     /** What the screen said — memory only, emptied by `end()`. */
     private ScreenText pending;
 
@@ -156,6 +160,8 @@ public final class AssistSession extends VoiceInteractionSession {
         structureArrived = false;
         packageName = null;
         allowed = false;
+        paymentsApp = false;
+        confirmingAllow = false;
         if (pending != null) pending.discard();
         pending = null;
         screenshotDone = false;
@@ -185,7 +191,9 @@ public final class AssistSession extends VoiceInteractionSession {
         if (packageName == null && data != null) packageName = data.getString(Intent.EXTRA_ASSIST_PACKAGE);
 
         if (structureArrived && packageName != null) {
-            allowed = isAllowed(packageName);
+            // What the app *does* as well as what it is called: a UPI handler is a payments app.
+            paymentsApp = UpiApps.isPayments(getContext(), packageName);
+            allowed = !paymentsApp && isAllowed(packageName);
             if (allowed) pending = ScreenReader.read(structure, content);
         }
         settle(false);
@@ -226,6 +234,7 @@ public final class AssistSession extends VoiceInteractionSession {
         in.structureArrived = structureArrived;
         in.packageName = packageName;
         in.allowed = allowed;
+        in.paymentsApp = paymentsApp;
         in.passwordFields = pending == null ? 0 : pending.passwordFields;
         in.screenshotArrived = screenshotArrived;
         in.blockedNodes = pending == null ? 0 : pending.blocked;
@@ -250,8 +259,11 @@ public final class AssistSession extends VoiceInteractionSession {
         Journal journal = journal();
         if (journal != null) journal.append(AssistFacts.DECLINED, AssistFacts.declined(outcome, versionCode()));
         boolean canAllow = outcome.equals(AssistPolicy.NOT_ALLOWED) && packageName != null
-            && !AssistPolicy.isFloor(packageName) && AllowList.isPackageName(packageName);
-        show(words(outcome), canAllow, false);
+            && !paymentsApp && AllowList.isPackageName(packageName);
+        if (canAllow) allowButton.setText("Allow " + packageName);
+        show(paymentsApp && outcome.equals(AssistPolicy.NOT_ALLOWED)
+            ? "Orb never remembers payments apps. Nothing was read."
+            : words(outcome), canAllow, false);
     }
 
     private static String words(String reason) {
@@ -289,13 +301,28 @@ public final class AssistSession extends VoiceInteractionSession {
         }
     }
 
+    /**
+     * Two taps, on purpose. The first names the app and asks again; only the second writes
+     * anything. One stray tap on a card that appeared over another app cannot widen what Orb reads.
+     */
     private void allowThisApp() {
-        // The package is on the screen for the person to see, and recorded only because
-        // they chose to allow it. The floor is checked again here, not only on show.
-        if (packageName == null || AssistPolicy.isFloor(packageName) || !AllowList.isPackageName(packageName)) {
+        // Asked again now, not only when the card opened: an app can be a payments app by the time
+        // the person taps.
+        if (packageName == null || !AllowList.isPackageName(packageName)
+            || UpiApps.isPayments(getContext(), packageName)) {
+            confirmingAllow = false;
             show("Orb never remembers payments apps.", false, false);
             return;
         }
+        if (!confirmingAllow) {
+            confirmingAllow = true;
+            message.setText("Allow Orb to remember the text of " + packageName + "?\n\n"
+                + "Only when you invoke Orb and tap Remember. You can remove it any time in Orb → Apps Orb may remember from.");
+            allowButton.setText("Yes, allow " + packageName);
+            closeButton.setText("No");
+            return;
+        }
+        confirmingAllow = false;
         Journal journal = journal();
         if (journal == null || journal.append(AllowList.ALLOWED, AssistFacts.grant(packageName)) == null) {
             show("Could not save that. Nothing changed.", false, false);
@@ -307,7 +334,8 @@ public final class AssistSession extends VoiceInteractionSession {
     private void remember() {
         Journal journal = journal();
         if (journal == null || packageName == null || pending == null) return;
-        Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode());
+        Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode(),
+            UpiApps.isPayments(getContext(), packageName));
         // Kept or not, the text leaves memory now.
         pending.discard();
         pending = null;

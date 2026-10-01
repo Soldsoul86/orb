@@ -968,6 +968,17 @@ suggestions".**
     test (`DEVICE_LOOP.md` §7b51, *The password test*): the password's characters never appeared, but a
     row of mask dots did — its length, and the fact that there is one.
 
+11. **Payments apps are recognised by what they do, not only by name** *(2026-10-01, the operator's yes to the
+    recommendation)*: any app that handles a UPI payment link (`upi://pay`) is a payments app and is never
+    remembered from, whatever it is called; the name list stays as a backstop for what UPI does not cover
+    (an exchange, a card wallet). **If Android will not answer, every app is treated as a payments app** —
+    *cannot check* is a reason to keep nothing. The manifest gains **one narrow query** (who answers that
+    link), not a list of installed apps, which is the secure alternative to enumerating every app.
+12. **Allowing an app takes two taps and names the app** *(same date)*: the button reads *Allow
+    `com.example.app`*, the first tap asks again, only the second writes the allowance, and the payments
+    check is re-run at both taps, so a stray tap on a card that appeared over another app cannot widen what
+    Orb reads.
+
 All of it is mechanism in `SENSOR_ASSIST.md`. **Not ruled, and written there as
 proposals:** a short list of payments packages that cannot be allowed; excluding
 accessibility descriptions; the decision timeout.

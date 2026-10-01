@@ -68,6 +68,22 @@ final class AssistPolicy {
     }
 
     /**
+     * Whether an app is a payments app — **by what it does, not only by what it is called**.
+     *
+     * Every UPI payments app, banks' included, has to handle the `upi://pay` link, so the apps that
+     * answer it (`UpiApps`) are payments apps whatever their names. The name list stays as a
+     * backstop for what UPI does not cover (a crypto exchange, a card wallet). **If the answer
+     * cannot be had (`upiHandlers` is null) the app is treated as a payments app:** *cannot check*
+     * is a reason to keep nothing, never a pass.
+     */
+    static boolean isPaymentsApp(String packageName, Set<String> upiHandlers) {
+        if (packageName == null) return false;
+        if (isFloor(packageName)) return true;
+        if (upiHandlers == null) return true;
+        return upiHandlers.contains(packageName);
+    }
+
+    /**
      * Whether an input type is a password field. Counted as nothing and, once text is kept,
      * dropped — **even if the platform delivered it**, because *"the platform probably
      * blanked it"* is an assumption and this is a rule (`SENSOR_ASSIST.md` §6).
@@ -107,6 +123,8 @@ final class AssistPolicy {
         boolean structureArrived;
         String packageName;
         boolean allowed;
+        /** A payments app — the name floor or an app that handles a UPI payment link. Never captured. */
+        boolean paymentsApp;
         /** Password fields found on the screen (by what they say they are, or a run of mask characters). */
         int passwordFields;
         boolean screenshotArrived;
@@ -120,7 +138,7 @@ final class AssistPolicy {
         // 1. Did the structure arrive? (Includes the person having switched text off.)
         if (!in.structureArrived) return NO_STRUCTURE;
         // 2. Is the app allowed? Decided before anything about the screen is considered.
-        if (in.packageName == null || !in.allowed || isFloor(in.packageName)) return NOT_ALLOWED;
+        if (in.packageName == null || !in.allowed || in.paymentsApp || isFloor(in.packageName)) return NOT_ALLOWED;
         // 2b. A password field on the screen: a login screen. Skipping the field would still keep
         //    the username and the rest of a page whose point is a secret, so nothing is kept at all
         //    (the operator's ruling, 2026-10-01). Decided without waiting for the screenshot.

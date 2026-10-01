@@ -101,7 +101,7 @@ final class GrantReader {
     }
 
     /**
-     * Which look the package list was: `all` or `visible`.
+     * Which look the package list was: `all` or `visible+upi` (the visible set plus the UPI handlers).
      *
      * `QUERY_ALL_PACKAGES` is a normal, install-time permission, so on a build
      * that declares it this is granted without anyone being asked — and on a
@@ -118,7 +118,11 @@ final class GrantReader {
     private static String packageScope(Context context) {
         try {
             int state = context.checkSelfPermission("android.permission.QUERY_ALL_PACKAGES");
-            return state == PackageManager.PERMISSION_GRANTED ? "all" : "visible";
+            // `visible+upi`: what a build without QUERY_ALL_PACKAGES can see, plus the apps that
+            // handle a UPI payment link (the manifest's narrow query). It is a *different set* from
+            // the plain `visible` earlier builds recorded, so the scope changes — and the comparison
+            // re-baselines once, rather than reporting the payments apps as new installs.
+            return state == PackageManager.PERMISSION_GRANTED ? "all" : "visible+upi";
         } catch (Throwable error) {
             return "unknown";
         }

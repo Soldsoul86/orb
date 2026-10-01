@@ -95,10 +95,11 @@ it; an app on no list — a new bank app, anything unknown — is never captured
 - **A refused capture does not log which app it was.** When an app is not allowed, the
   decline records the *reason* and **never the package** (§6) — a record of "Orb declined
   an app" naming a payments app would itself be the leak the ruling forbids.
-- **A floor under the list (proposed, §10).** DR-14 ruling 1 says no payments app is
-  ever captured; a person could still tick one by mistake. A short, versioned list of
-  well-known payments packages that **cannot be allowed** would make the ruling
-  enforceable rather than hoped for. It is a list, so it is imperfect and says so.
+- **A floor under the list, in two parts** *(ruled 2026-10-01, DR-14 rulings 11–12).* An app that **handles a UPI
+  payment link** is a payments app and is never captured or allowed, **whatever it is called** — asked of Android
+  each time, so an app updated into a payments app is judged as it is now; if Android will not answer, every app
+  is treated as one. The **name list** stays as a backstop for what UPI does not cover (an exchange, a wallet).
+  Allowing an app takes **two taps** and names the app.
 
 ## 5. The decision, in order
 

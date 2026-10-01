@@ -90,7 +90,7 @@ final class CaptureTest {
         Harness.suite("remembering: sealed on disk, recorded in the clear without the text");
         ScreenText mine = screen("meet ravi at 4", "bring the contract");
         mine.setWebUri("https://example.test/thread/9");
-        Capture.Result first = Capture.remember(context, journal, mine, "com.example.chat", 7L);
+        Capture.Result first = Capture.remember(context, journal, mine, "com.example.chat", 7L, false);
         Harness.equal("stored", first.outcome, Capture.STORED);
         Harness.equal("one capture event", count(journal, AssistFacts.CAPTURED), 1);
         Harness.check("the text is on no disk file in the clear", !onDisk(dir, "meet ravi".getBytes(StandardCharsets.UTF_8)));
@@ -107,17 +107,25 @@ final class CaptureTest {
         Harness.suite("the same screen twice is one Attachment, two citations");
         ScreenText twin = screen("meet ravi at 4", "bring the contract");
         twin.setWebUri("https://example.test/thread/9");
-        Capture.Result again = Capture.remember(context, journal, twin, "com.example.chat", 7L);
+        Capture.Result again = Capture.remember(context, journal, twin, "com.example.chat", 7L, false);
         Harness.equal("the second is held, not written again", again.outcome, Capture.HELD);
         Harness.equal("and both are recorded", count(journal, AssistFacts.CAPTURED), 2);
 
+        Harness.suite("a payments app is refused at the moment of keeping, even if it is on the list");
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.upiapp"));
+        int beforeUpi = count(journal, AssistFacts.CAPTURED);
+        Capture.Result upi = Capture.remember(context, journal, screen(null, "paid ravi"), "com.example.upiapp", 7L, true);
+        Harness.equal("refused", upi.outcome, Capture.NOT_ALLOWED);
+        Harness.equal("and nothing recorded", count(journal, AssistFacts.CAPTURED), beforeUpi);
+        Harness.equal("and nothing sealed", Attachments.counts(context)[0], 1L);
+
         Harness.suite("an app that is not allowed is refused at the moment of keeping");
-        Capture.Result refused = Capture.remember(context, journal, screen("secret"), "com.other.app", 7L);
+        Capture.Result refused = Capture.remember(context, journal, screen("secret"), "com.other.app", 7L, false);
         Harness.equal("refused", refused.outcome, Capture.NOT_ALLOWED);
         Harness.equal("and nothing recorded or sealed", count(journal, AssistFacts.CAPTURED), 2);
         journal.append(AllowList.DISALLOWED, AssistFacts.revoke("com.example.chat"));
         Harness.equal("an app removed since the card opened is refused too",
-            Capture.remember(context, journal, screen("new text"), "com.example.chat", 7L).outcome, Capture.NOT_ALLOWED);
+            Capture.remember(context, journal, screen("new text"), "com.example.chat", 7L, false).outcome, Capture.NOT_ALLOWED);
         journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
 
         Harness.suite("an erased screen is not kept again");
@@ -127,7 +135,7 @@ final class CaptureTest {
         Harness.equal("both citations erased: the key is destroyed", Attachments.state(context, items.get(0).identity), Attachments.DESTROYED_STATE);
         ScreenText same = screen("meet ravi at 4", "bring the contract");
         same.setWebUri("https://example.test/thread/9");
-        Capture.Result back = Capture.remember(context, journal, same, "com.example.chat", 7L);
+        Capture.Result back = Capture.remember(context, journal, same, "com.example.chat", 7L, false);
         Harness.equal("the identical text is refused as erased", back.outcome, "erased");
         Harness.equal("and recorded as a failure that names no app", count(journal, AssistFacts.CAPTURE_FAILED), 1);
         Map<String, Object> failed = AssistFacts.captureFailed("erased", 7L);
@@ -144,19 +152,19 @@ final class CaptureTest {
                 return AssistFacts.CAPTURED.equals(type) ? null : other.append(type, payload);
             }
         };
-        Capture.Result lost = Capture.remember(context2, other, failing, screen("will not be recorded"), "com.example.chat", 7L);
+        Capture.Result lost = Capture.remember(context2, other, failing, screen("will not be recorded"), "com.example.chat", 7L, false);
         Harness.equal("reported as a journal failure", lost.outcome, Capture.JOURNAL_FAILED);
         long[] counts = Attachments.counts(context2);
         Harness.equal("no key left behind", counts[0], 0L);
         Harness.equal("and no marker: nothing was promised", counts[1], 0L);
         Harness.check("and no ciphertext", !onDisk(dir2, "will not be recorded".getBytes(StandardCharsets.UTF_8)));
-        Capture.Result retry = Capture.remember(context2, other, screen("will not be recorded"), "com.example.chat", 7L);
+        Capture.Result retry = Capture.remember(context2, other, screen("will not be recorded"), "com.example.chat", 7L, false);
         Harness.equal("so the same text can be kept once the journal works", retry.outcome, Capture.STORED);
 
         Harness.suite("content other events already cite is never rolled back");
-        Capture.Result kept = Capture.remember(context2, other, screen("cited elsewhere"), "com.example.chat", 7L);
+        Capture.Result kept = Capture.remember(context2, other, screen("cited elsewhere"), "com.example.chat", 7L, false);
         Harness.equal("kept", kept.outcome, Capture.STORED);
-        Capture.Result twice = Capture.remember(context2, other, failing, screen("cited elsewhere"), "com.example.chat", 7L);
+        Capture.Result twice = Capture.remember(context2, other, failing, screen("cited elsewhere"), "com.example.chat", 7L, false);
         Harness.equal("a failing record for already-held content", twice.outcome, Capture.JOURNAL_FAILED);
         Harness.equal("leaves the earlier citation's key in place", Attachments.counts(context2)[0], 2L);
     }

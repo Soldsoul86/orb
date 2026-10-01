@@ -63,9 +63,9 @@ final class RecallTest {
         Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
         journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
         journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.mail"));
-        Capture.remember(context, journal, screen(null, "meet ravi at 4", "bring the contract"), "com.example.chat", 7L);
-        Capture.remember(context, journal, screen("https://example.test/m/1", "invoice due friday"), "com.example.mail", 7L);
-        Capture.remember(context, journal, screen(null, "dinner with ravi on sunday"), "com.example.chat", 7L);
+        Capture.remember(context, journal, screen(null, "meet ravi at 4", "bring the contract"), "com.example.chat", 7L, false);
+        Capture.remember(context, journal, screen("https://example.test/m/1", "invoice due friday"), "com.example.mail", 7L, false);
+        Capture.remember(context, journal, screen(null, "dinner with ravi on sunday"), "com.example.chat", 7L, false);
         // A photograph share is sealed too, but it is not text and is not Recall's.
         java.util.Map<String, Object> share = Json.obj();
         share.put("attachment", "sha256:" + "d".repeat(64));
@@ -101,8 +101,8 @@ final class RecallTest {
         Harness.equal("its app leaves the filter", Recall.apps(journal), java.util.Arrays.asList("com.example.chat"));
 
         Harness.suite("an item declared erased is hidden even while its content is still held");
-        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L);
-        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L);
+        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L, false);
+        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L, false);
         Harness.equal("both are listed", Recall.search(context, journal, "same words", null).entries.size(), 2);
         Erasure.Item twin = null;
         for (Erasure.Item item : Erasure.items(journal.readLines())) if (!item.erased && item.packageName != null && Recall.open(context, item.identity) != null
@@ -113,7 +113,7 @@ final class RecallTest {
         Harness.equal("but the erased one is no longer a result", Recall.search(context, journal, "same words", null).entries.size(), 1);
 
         Harness.suite("a destroyed marker wins over a key that is still on disk (the crash window)");
-        Capture.remember(context, journal, screen(null, "half erased"), "com.example.chat", 7L);
+        Capture.remember(context, journal, screen(null, "half erased"), "com.example.chat", 7L, false);
         String identity = null;
         for (Erasure.Item item : Erasure.items(journal.readLines())) if (!item.erased && Recall.open(context, item.identity) != null
                 && Recall.open(context, item.identity).body.equals("half erased")) identity = item.identity;

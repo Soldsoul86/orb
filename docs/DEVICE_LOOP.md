@@ -5641,3 +5641,53 @@ tightened).
 7. **Export and share journal** (counts only).
 
 If nothing is listed, invoke Orb on an allowed app and **Remember** something first.
+
+### 7b53. Payments apps by what they do, and a two-tap Allow — 2026-10-01
+
+**Status: built, 241 phone-side checks (was 223), not yet run on the device.** `orb-app-v17-upi.apk`.
+Recall's first export (`orb-20261001-133211.txt`, 151 events, `verifyLane`-clean) is read first.
+
+#### Recall on the device
+
+v16 is installed (event 143). The operator captured a long Chrome page (**1,181 elements, 36,924
+characters** — the preview cuts at 400 and says how much more), allowed and captured the Claude app,
+then **erased the large capture** (event 150): `attachmentsDestroyed` **11 → 12** and the held count 6. So
+**P56 held** on the real phone — erasing from Recall destroyed the key. P52–P55 and P57 are visible only
+on the phone (and the screen cannot be screenshotted by design); no complaint came back.
+
+#### What changed
+
+1. **UPI handlers are payments apps.** Every UPI app — banks' included — has to handle `upi://pay`, so the
+   apps that answer it are refused whatever their names (`UpiApps` asks `PackageManager`, resolving a
+   made-up link that is **never launched**). The name list is kept as a backstop. **If Android will not say,
+   every app is treated as payments**: tested (mutation-checked) as *cannot check is not a pass*. The check
+   runs when the card opens, **again at the *Allow* tap, and again at the *Remember* tap**, so an app updated
+   into a payments app between the steps is refused.
+2. **The manifest gains one narrow query** — who handles `upi://pay` — and **no list of installed apps** (a
+   guard test asserts no `<package>` entries and no `QUERY_ALL_PACKAGES`). Only apps that answer it become
+   visible to Orb, and only to be refused.
+3. **The package scan re-baselines once, quietly.** The visible set now includes the UPI handlers, so its
+   scope label changes from `visible` to **`visible+upi`**; the comparison's existing rule (a scope change is
+   a baseline, not a diff) means **the first scan after the update reports no "new apps"**. The *Apps Orb may
+   remember from* screen now lists the apps treated as payments on this phone.
+4. **Allow takes two taps and names the app**: *Allow com.example.app*, then *Allow Orb to remember the text of
+   com.example.app? … Yes, allow com.example.app / No*. Only the second writes anything.
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P58** | On PhonePe / Google Pay / any UPI app the card says *Orb never remembers payments apps. Nothing was read.* with no Allow button — **and the same for a bank app the name list never heard of** | the UPI check is not finding apps |
+| **P59** | *Apps Orb may remember from* lists the packages treated as payments on this phone; they are the UPI apps you have installed | the query is not resolving |
+| **P60** | On an unallowed ordinary app (WhatsApp after removing it, say) the card shows **Allow com.whatsapp**; one tap shows the confirmation naming the app; **No** leaves nothing written; a second *Allow* tap writes `orb.assist.allowed` | the two-tap flow is wrong |
+| **P61** | The first package scan after installing reports `installedPackageScope: "visible+upi"` and **`installedPackageBaseline: true`** with **no gained packages** — and no alert | the re-baseline did not take and the UPI apps would be reported as new installs |
+| **P62** | An ordinary allowed app (WhatsApp) still captures normally | the UPI rule over-reaches |
+
+#### The operator's protocol
+
+1. Install `orb-app-v17-upi.apk`. Open Orb → **Apps Orb may remember from** and read the payments list. *(P59)*
+2. Invoke Orb on **PhonePe or Google Pay**, then on **any other bank or payments app** you have. *(P58)*
+3. Orb → **Apps Orb may remember from** → remove WhatsApp. Open a WhatsApp chat and invoke Orb: tap **Allow
+   com.whatsapp**, then **No**; invoke again, **Allow**, then **Yes, allow**. *(P60)*
+4. Invoke on WhatsApp again and **Remember** something non-private. *(P62)*
+5. Orb → **Scan installed packages now**, then **Export and share journal**. *(P61)*
