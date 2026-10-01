@@ -57,7 +57,7 @@ A third is a limit, not a defect: **corroboration needs two sources** reporting 
 - Device check: an export shows `orb.observation` events citing `orb.assist.captured` /
   `orb.shared` events, `verifyLane`-clean, and importing it creates **no duplicates**.
 
-### B2b — The graph *(design proposed 2026-10-01; awaiting approval)*
+### B2b — The graph *(approved 2026-10-01 — "Yes to both"; TypeScript reference built, Kotlin port not started)*
 
 **What exists, and what it means for this step.** `runtime/journal/src/lineage.ts` already
 indexes `causes` and answers *what was built on this* (`descendantsOf`) and *what is this built on*
@@ -90,6 +90,9 @@ second structure**: nothing new is stored and no traversal is rewritten in TypeS
 a recording time of *today*; the capture it cites happened weeks ago. A window query uses the
 **earliest cited device event's** clock (the occurrence). An Observation with no readable cause falls
 back to its own recording time and is **flagged** (`occurredAtKnown: false`), never silently mixed in.
+
+**Built (TypeScript):** `runtime/evidence`, 28 checks, mutation-checked (`TESTS.md` there). Forward questions
+are stricter than `lineage.ts`: an event that cannot say what it cites is named in `unresolved`.
 
 **Where.** TypeScript first, as the reference: a new package `runtime/evidence`
 (`buildGraph(events)` over `indexLineage`, with README/DESIGN/API/TESTS). Then the Kotlin port in
