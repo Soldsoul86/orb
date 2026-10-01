@@ -5347,3 +5347,23 @@ floor and a record built in glue each fail a named check.
 8. Orb → **Export and share journal**.
 
 To go back to your usual assistant: Settings → Default apps → Digital assistant app.
+
+#### Part 1 on the device — first results (export `orb-20261001-102138.txt`, 87 events, `verifyLane`-clean)
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **P39** | **Held** | Orb offered and chosen as the assistant; the card reads *Orb*. (The first invocation answered as the old probe — the default had not been switched — which is why the probe's card appeared until Orb was chosen) |
+| **P40** | **Held** | event 84 `orb.assist.declined`, `reason: notAllowed`, with **only** `reason` and `versionCode` — no app named |
+| **P41** | **Half held** | event 85 `orb.assist.allowed` names `com.whatsapp`, written when the person tapped *Allow*. The *would keep N text elements* card and `orb.assist.simulated` are **not yet seen** |
+| **P42** | **Held** | event 86, a second `notAllowed` decline with no app named — the operator confirms it was **PhonePe**, refused correctly (no Allow button) |
+
+Run on the real export: `AllowList.allowed` returns `[com.whatsapp]` and `isAllowed` is true, so
+the projection reads the phone's own lines correctly.
+
+**A cost of the design, now observed:** because a decline never names the app, event 86 could
+not be attributed from the file — it took the operator's word. That is the trade DR-14 chose
+(a record of "declined PhonePe" would itself be the leak), and it is the right one, but it
+means a surprising decline is diagnosed by asking, not by reading.
+
+**Still to run:** P41's second half, P43 (a protected screen in an allowed app), P44 (text
+switch off) and P45 (the counts against the probe's).
