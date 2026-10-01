@@ -6055,7 +6055,7 @@ The operator made a backup (a second one, at v23), took **Clear storage**, opene
 
 ### 7b59. The package set stops moving when nothing was installed — Track D — 2026-10-01
 
-**Status: built, not yet run on the device.** `orb-app-v24-declared.apk`. Design: `docs/SENSOR_GRANTS.md` §9.
+**Status: verified on the device — P93–P97 held** (the first v24 scan was refused because a restore grants nothing; after the operator re-granted, every prediction held except one wrong number of mine: the count went *up* to 153, not down). `orb-app-v24-declared.apk`. Design: `docs/SENSOR_GRANTS.md` §9.
 
 #### The defect, from the operator's own export (`orb-20261001-191418.txt`, nine package scans)
 
@@ -6121,4 +6121,14 @@ Not done in v24 so as not to change the build mid-test; bundled with the next ch
   actually has, and the new one is stable. **Google Photos and Chrome are in the baseline** (both have launchers) — they can no longer appear as gained or lost, which is the point; and the system packages that used to pad the list are gone (4 `com.android.*` remain: Chrome, Settings, STK, Play).
 - **Step 3 was done, but the scan after it is missing.** The Photos share (`…863908767`) and the Chrome capture (`…863931785`) are in the export; **no scan follows them**, so **P95 is not yet shown** — the export ends with the interactions and an export. By construction neither can flap now (both are launcher apps in the set); the check is to scan after them and see gained/lost empty.
 - **Still open:** P95 (scan after the interactions), P96 (a second scan hours later, identical), P97 (install a small app → the only entry in gained; uninstall → the only entry in lost).
+
+#### v24, the rest (five exports, 277 → 285 events, all `verifyLane`-clean) — **P95, P96, P97 held**
+
+| | What the exports show |
+| --- | --- |
+| **P95** | After the Photos share and the Chrome capture, the next scan (`…864186487`) reports **`gained: []`, `lost: []`**, 153 packages, `baseline: false`. Neither app moved. |
+| **P96** | A second scan **58 minutes later** (`…867678685`): **identical — 153, nothing gained or lost.** |
+| **P97** | The operator installed a notes app. The next scan: **`gained: ['easynotes.notes.notepad.notebook.privatenotes.note']`, count 154 — the only entry.** After uninstalling it, the next scan: **`lost: ['easynotes…note']`, count 153 — the only entry.** A real install and a real uninstall are each caught, alone. |
+
+**Track D's package signal is closed for this phone:** the set no longer moves with interaction, and it still catches what was really installed or removed. Still stated, not fixed: an app with no launcher icon that is neither UPI nor a device admin is outside this set (the grants watch covers what protects the person); the 12-hour scan interval is still a guess and a decision for the operator; P21 (a change undone between two scans is invisible) stands.
 
