@@ -33,13 +33,16 @@ final class Recall {
     /** One remembered screen, as a list row. */
     static final class Entry {
         final String hash;
+        /** The event id, for asking where this came from. */
+        final String id;
         final String identity;
         final long wallClock;
         final String packageName;
         final String snippet;
 
-        Entry(String hash, String identity, long wallClock, String packageName, String snippet) {
+        Entry(String hash, String id, String identity, long wallClock, String packageName, String snippet) {
             this.hash = hash;
+            this.id = id;
             this.identity = identity;
             this.wallClock = wallClock;
             this.packageName = packageName;
@@ -141,7 +144,7 @@ final class Recall {
                 Doc doc = parse(bytes);
                 if (doc == null) { results.unreadable++; continue; }
                 if (matches(doc, item.packageName, query)) {
-                    results.entries.add(new Entry(item.hash, item.identity, item.wallClock, item.packageName, snippet(doc, query)));
+                    results.entries.add(new Entry(item.hash, item.id, item.identity, item.wallClock, item.packageName, snippet(doc, query)));
                 }
             } catch (Exception corrupt) {
                 results.unreadable++;

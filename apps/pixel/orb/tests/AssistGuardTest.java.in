@@ -145,7 +145,21 @@ final class AssistGuardTest {
                 if (text.contains("dev.orb.brain")) brainUsers.add(file.getFileName().toString());
             }
         }
-        Harness.equal("only Observe calls the brain", brainUsers, java.util.Arrays.asList("Observe.java.in"));
+        Harness.equal("only Observe and Provenance call the brain", new java.util.TreeSet<>(brainUsers),
+            new java.util.TreeSet<>(java.util.Arrays.asList("Observe.java.in", "Provenance.java.in")));
+        String provenance = new String(Files.readAllBytes(root.resolve("src/Provenance.java.in")), StandardCharsets.UTF_8);
+        Harness.check("Observe writes and never reads the graph; Provenance reads and never writes",
+            !observe.contains("Evidence.build") && provenance.contains("Evidence.build(") && !provenance.contains("journal.append(")
+            && !provenance.contains("Observer."));
+        Harness.check("Provenance never refers to Attachments, Recall or Android",
+            !provenance.contains("Attachments") && !provenance.contains("Recall.") && !provenance.contains("android."));
+        Harness.check("nor logs", !Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast").matcher(provenance).find());
+        String recallActivity = new String(Files.readAllBytes(root.resolve("src/RecallActivity.java.in")), StandardCharsets.UTF_8);
+        Harness.check("the Where from? window is secure, like the screen it opens from",
+            recallActivity.contains("provenance.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE"));
+        Harness.check("and every erase confirmation says what stays",
+            recallActivity.contains("Provenance.eraseNote(")
+            && new String(Files.readAllBytes(root.resolve("src/ItemsActivity.java.in")), StandardCharsets.UTF_8).contains("Provenance.eraseNote("));
         Harness.check("Observe never refers to Attachments", !observe.contains("Attachments"));
         Harness.check("nor to Android", !observe.contains("android."));
         Harness.check("nor logs", !Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast").matcher(observe).find());

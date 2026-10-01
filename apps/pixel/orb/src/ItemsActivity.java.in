@@ -153,7 +153,8 @@ public final class ItemsActivity extends Activity {
         }
         new AlertDialog.Builder(this)
             .setTitle("Erase this?")
-            .setMessage(words + "\n\nOther devices may hold copies of the record that this phone cannot see.")
+            .setMessage(words + "\n\n" + Provenance.eraseNote(journal, item.type, item.id)
+                + "\n\nOther devices may hold copies of the record that this phone cannot see.")
             .setNegativeButton("Keep", null)
             .setPositiveButton("Erase", new android.content.DialogInterface.OnClickListener() {
                 @Override public void onClick(android.content.DialogInterface dialog, int which) { run(item); }

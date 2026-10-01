@@ -118,7 +118,7 @@ it"; cycles cannot loop it.
 | Cost grows with the journal | Linear per question; fine at hundreds of events; recorded as a debt to revisit with AD-13's reasoning (an in-memory index, never on disk) |
 | The graph leaks | Output type has no field for content; a guard test, as for the translation |
 
-### B2c — Where did this come from? *(design proposed 2026-10-01; awaiting approval)*
+### B2c — Where did this come from? *(approved 2026-10-01 — "Yes, build it as designed"; built, not yet run on the device)*
 
 **What the operator sees.** In Recall, an item's detail has the words and **Erase**. It gains a third button,
 **Where from?**, which opens a small secure window in plain English:
@@ -158,8 +158,9 @@ dropped when the dialog closes — nothing is stored. `Erasure.Item` and `Recall
 graph is keyed by id, Erasure by hash).
 
 **One source of truth for "kept by others".** The erase confirmation keeps deciding from `Erasure.plan` (tested,
-verified on the device). The graph's `holding` is shown beside it, and **a test asserts the two agree** on every
-fixture — two paths to one number is a drift, and a test is how it is caught.
+verified on the device), and **that same count is what the window shows** — *not* the graph's `holding` beside it, as first
+designed: two numbers on one screen for one fact is how they drift. **A test asserts the graph's live holders equal it** on every
+item — two paths to one number is a drift, and a test is how it is caught.
 
 **Invariants.** The window shows the app, times, counts and a short id — **no words, no address, no attachment
 identity**; it is `FLAG_SECURE` like the screen it opens from (guard test, as for the other dialogs). Only

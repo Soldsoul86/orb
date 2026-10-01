@@ -1,0 +1,176 @@
+package @PKG@;
+
+import java.io.IOException;
+import java.text.DateFormat;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * Where something Orb kept came from, in plain words — the one place the phone asks the Evidence
+ * Graph (`runtime/brain`, `docs/PHONE_BRAIN.md` B2c).
+ *
+ * The graph is **built when a window opens and dropped when it closes**: nothing is stored beside
+ * the journal, so nothing here can outlive an erase. It is asked a few questions and the answers are
+ * turned into plain facts for a screen to draw. The facts hold the app, times, counts and a short id —
+ * **no words, no address, no attachment identity**: this file never opens an Attachment and cannot
+ * reach what a screen said.
+ *
+ * **Two rules the numbers keep.** *When it happened* is the capture's own clock, never the Observation's
+ * (an Observation written at back-fill time is written long after the occurrence). And *built on this:
+ * nothing yet* is said only when the graph's answer is **closed** — an incomplete history is never read
+ * as an empty one.
+ *
+ * **One source of truth for "kept by others".** The count shown comes from `Erasure`, which decides
+ * erasures and was verified on the device. The graph's own count of what holds the same content is
+ * checked against it in tests, not shown beside it: two numbers for one fact is how they drift.
+ */
+final class Provenance {
+    private Provenance() {}
+
+    /** Observations written within this long of the event are not worth a second time on the screen. */
+    static final long SAME_MOMENT_MS = 60_000L;
+
+    /** The share event's type. `SHARED` is the writer's; a test asserts the two spellings are one. */
+    static final String SHARED = "orb.shared";
+
+    static final class Facts {
+        /** "capture", "share" or "other". */
+        String kind = "other";
+        String app;
+        long happened = -1L;
+        /** When Orb noted it, or -1 when that is within a minute of it happening (nothing to add). */
+        long noted = -1L;
+        boolean observed;
+        /** Records, besides this item's own Observation, that rest on it. */
+        int builtOn;
+        /** The graph could see everything it needed. False means every "nothing" above is a lower bound. */
+        boolean closed;
+        int unreadableLines;
+        /** Live items (this one included) that keep the same sealed content — from `Erasure`. */
+        int sameContent;
+        String shortId;
+        /** The provenance reader could not run. Nothing else here is meaningful then. */
+        boolean failed;
+    }
+
+    /** What the graph says about the item with this event id. Never throws. */
+    static Facts of(Journal journal, String eventId) {
+        Facts f = new Facts();
+        if (journal == null || eventId == null) { f.failed = true; return f; }
+        List<String> lines;
+        try {
+            lines = journal.readLines();
+        } catch (IOException unreadable) {
+            f.failed = true;
+            return f;
+        }
+        try {
+            dev.orb.brain.EvidenceGraph graph = dev.orb.brain.Evidence.build(lines);
+            dev.orb.brain.GraphNode node = graph.node(eventId);
+            if (node == null) { f.failed = true; return f; }
+
+            f.shortId = shortId(eventId);
+            f.kind = node.getType().equals(AssistFacts.CAPTURED) ? "capture" : node.getType().equals(SHARED) ? "share" : "other";
+            f.happened = node.getRecordedAt();
+            f.unreadableLines = graph.getUnreadableLines().size();
+
+            dev.orb.brain.Answer<List<dev.orb.brain.GraphNode>> observations = graph.observationsOf(eventId);
+            dev.orb.brain.Answer<List<dev.orb.brain.GraphNode>> dependents = graph.dependentsOf(eventId);
+            f.closed = observations.getClosed() && dependents.getClosed();
+            f.observed = !observations.getValue().isEmpty();
+            if (f.observed) {
+                long written = observations.getValue().get(0).getRecordedAt();
+                if (Math.abs(written - f.happened) > SAME_MOMENT_MS) f.noted = written;
+            }
+            // Everything built on it, except the Observations that cite it directly (that is the
+            // item's own record of having happened, not something worked out from it).
+            int direct = observations.getValue().size();
+            f.builtOn = Math.max(0, dependents.getValue().size() - direct);
+        } catch (RuntimeException | LinkageError unavailable) {
+            // The graph could not run (a missing class is a LinkageError, not an exception).
+            return failedFacts();
+        }
+
+        for (Erasure.Item item : Erasure.items(lines)) {
+            if (item.id != null && item.id.equals(eventId)) {
+                f.app = item.packageName;
+                int same = 0;
+                for (Erasure.Item other : Erasure.items(lines)) {
+                    if (!other.erased && other.identity.equals(item.identity)) same++;
+                }
+                f.sameContent = same;
+            }
+        }
+        return f;
+    }
+
+    private static Facts failedFacts() {
+        Facts f = new Facts();
+        f.failed = true;
+        return f;
+    }
+
+    static String shortId(String id) {
+        return id.length() <= 8 ? id : id.substring(0, 4) + "…" + id.substring(id.length() - 4);
+    }
+
+    /** The window's text. [when] formats times; passed in so a test is not at the mercy of a locale. */
+    static String render(Facts f, DateFormat when) {
+        if (f.failed) {
+            return "Orb could not work out where this came from. Nothing was changed.";
+        }
+        boolean share = f.kind.equals("share");
+        StringBuilder out = new StringBuilder();
+        out.append(share ? "You shared this to Orb." : "You asked Orb to remember this screen.").append('\n');
+        if (f.app != null) out.append("App:  ").append(f.app).append('\n');
+        out.append("It happened:  ").append(when.format(new Date(f.happened))).append('\n');
+        if (!f.observed) {
+            out.append(f.closed
+                ? "Orb has not recorded this as an observation yet.\n"
+                : "Orb could not tell whether this was recorded as an observation.\n");
+        } else if (f.noted >= 0) {
+            out.append("Orb noted it:  ").append(when.format(new Date(f.noted))).append('\n');
+        }
+        out.append("Built on this:  ").append(builtOn(f)).append('\n');
+        out.append(share ? "Same content kept:  " : "Same words kept:  ")
+            .append(f.sameContent).append(f.sameContent == 1 ? " time" : " times").append('\n');
+        if (f.shortId != null) out.append("record ").append(f.shortId);
+        return out.toString();
+    }
+
+    private static String builtOn(Facts f) {
+        if (!f.closed) {
+            return "Orb could not read part of its history"
+                + (f.unreadableLines > 0 ? " (" + f.unreadableLines + " line" + (f.unreadableLines == 1 ? "" : "s") + ")" : "")
+                + ", so this may be incomplete" + (f.builtOn > 0 ? " — at least " + f.builtOn : "") + ".";
+        }
+        return f.builtOn == 0 ? "nothing yet" : f.builtOn + (f.builtOn == 1 ? " thing" : " things");
+    }
+
+    /**
+     * What erasing leaves behind, for the confirmation — **true whatever the graph says**: the record
+     * of the event stays in the journal, the words (or the file) do not. Said by kind of item.
+     */
+    static String stays(String itemType) {
+        return SHARED.equals(itemType)
+            ? "Orb keeps its record that this was shared — when, where from, and what it pointed to — but not the file's content."
+            : "Orb keeps its record that this happened — when, from which app, how much text — but not the words.";
+    }
+
+    /**
+     * The sentence for an erase confirmation, with a second one when the graph finds records resting on
+     * the item, or cannot say. Never throws; if the graph cannot run it still says what stays.
+     */
+    static String eraseNote(Journal journal, String itemType, String eventId) {
+        String stays = stays(itemType);
+        Facts f = of(journal, eventId);
+        if (f.failed) return stays;
+        String note = stays;
+        if (f.builtOn > 0) {
+            note += " " + f.builtOn + " other record" + (f.builtOn == 1 ? "" : "s")
+                + " Orb holds rest" + (f.builtOn == 1 ? "s" : "") + " on it.";
+        }
+        if (!f.closed) note += " Orb could not read part of its history, so there may be more that rests on it.";
+        return note;
+    }
+}

@@ -1,0 +1,188 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+
+/** Where a kept thing came from, in words — and that those words are true, complete only when they can be, and content-free. */
+final class ProvenanceTest {
+    private ProvenanceTest() {}
+
+    private static final long WEEK = 7L * 24 * 3600 * 1000;
+
+    private static SimpleDateFormat when() {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f;
+    }
+
+    private static ScreenText screen(String... lines) {
+        ScreenText s = new ScreenText();
+        for (String l : lines) s.add(l);
+        return s;
+    }
+
+    private static String idOf(String line) {
+        return line.replaceAll("^.*?\"id\":\"([0-9A-Z]{26})\".*$", "$1");
+    }
+
+    private static File laneFile(File dir) {
+        File[] files = dir.listFiles();
+        if (files != null) for (File f : files) if (f.isFile() && f.length() > 0 && f.getName().endsWith(".jsonl")) return f;
+        return null;
+    }
+
+    private static void rewrite(File file, List<String> lines) throws Exception {
+        Files.write(file.toPath(), (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void run() throws Exception {
+        File dir = Files.createTempDirectory("orb-prov").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Capture.remember(context, journal, screen("call priya about the invoice", "the lift code is 4471"), "com.example.chat", 7L, false);
+        Capture.remember(context, journal, screen("call priya about the invoice", "the lift code is 4471"), "com.example.chat", 7L, false);
+        Capture.remember(context, journal, screen("a different screen"), "com.example.chat", 7L, false);
+        Map<String, Object> share = Json.obj();
+        share.put("because", "share");
+        share.put("references", "content://x/1");
+        journal.append("orb.shared", share);
+        Harness.equal("every kept thing is observed", Observe.run(journal).written, 4);
+
+        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        Erasure.Item first = items.get(0);
+        Harness.check("an item carries its event id", first.id != null && first.id.length() == 26);
+
+        Harness.suite("where a capture came from");
+        Provenance.Facts f = Provenance.of(journal, first.id);
+        Harness.equal("a capture", f.kind, "capture");
+        Harness.equal("from the allowed app", f.app, "com.example.chat");
+        Harness.equal("it happened when the capture was written", f.happened, first.wallClock);
+        Harness.equal("observed", f.observed, true);
+        Harness.equal("noted at the same moment, so there is nothing to add", f.noted, -1L);
+        Harness.equal("nothing built on it", f.builtOn, 0);
+        Harness.equal("and the answer is complete", f.closed, true);
+        Harness.equal("the same words are kept twice", f.sameContent, 2);
+        Harness.equal("a short id", f.shortId, first.id.substring(0, 4) + "…" + first.id.substring(22));
+        String text = Provenance.render(f, when());
+        Harness.check("it says what happened", text.startsWith("You asked Orb to remember this screen.\nApp:  com.example.chat\nIt happened:  "));
+        Harness.check("built on this: nothing yet", text.contains("Built on this:  nothing yet\n"));
+        Harness.check("the same words kept 2 times", text.contains("Same words kept:  2 times\n"));
+        Harness.check("with its record id at the foot", text.endsWith("record " + f.shortId));
+        Harness.check("and no second time when there is nothing to add", !text.contains("Orb noted it"));
+
+        Harness.suite("a share says so");
+        Erasure.Item shared = null;
+        Provenance.Facts sf = null;
+        for (String line : journal.readLines()) if ("orb.shared".equals(Journal.typeOf(line))) sf = Provenance.of(journal, idOf(line));
+        Harness.equal("a share", sf.kind, "share");
+        Harness.check("in its own words", Provenance.render(sf, when()).startsWith("You shared this to Orb.\n"));
+
+        Harness.suite("when it happened is not when Orb wrote it down");
+        File lane = laneFile(dir);
+        List<String> lines = new ArrayList<>(journal.readLines());
+        String capLine = null;
+        int capIndex = -1;
+        for (int i = 0; i < lines.size(); i++) if (first.id.equals(idOf(lines.get(i))) && AssistFacts.CAPTURED.equals(Journal.typeOf(lines.get(i)))) { capLine = lines.get(i); capIndex = i; }
+        long written = first.wallClock;
+        lines.set(capIndex, capLine.replace("\"wallClock\":" + written, "\"wallClock\":" + (written - 3 * WEEK)));
+        rewrite(lane, lines);
+        Provenance.Facts old = Provenance.of(journal, first.id);
+        Harness.equal("it happened three weeks before", old.happened, written - 3 * WEEK);
+        Harness.equal("and Orb noted it later", old.noted > old.happened + 2 * WEEK, true);
+        String oldText = Provenance.render(old, when());
+        Harness.check("both times are shown", oldText.contains("It happened:  ") && oldText.contains("Orb noted it:  "));
+        Harness.check("the first is earlier than the second", oldText.indexOf("It happened") < oldText.indexOf("Orb noted it"));
+        lines.set(capIndex, capLine);
+        rewrite(lane, lines);
+
+        Harness.suite("not yet observed is said, not guessed");
+        Capture.remember(context, journal, screen("brand new words"), "com.example.chat", 7L, false);
+        Erasure.Item fresh = Erasure.items(journal.readLines()).get(3);
+        Provenance.Facts unobserved = Provenance.of(journal, fresh.id);
+        Harness.equal("not observed", unobserved.observed, false);
+        Harness.equal("and the history is complete, so that is true", unobserved.closed, true);
+        Harness.check("it says so", Provenance.render(unobserved, when()).contains("Orb has not recorded this as an observation yet."));
+        Harness.equal("the pass then records it", Observe.run(journal).written, 1);
+        Harness.equal("and it is observed", Provenance.of(journal, fresh.id).observed, true);
+
+        Harness.suite("the same words: one source of truth, cross-checked against the graph");
+        int checked = 0;
+        List<String> now = journal.readLines();
+        dev.orb.brain.EvidenceGraph graph = dev.orb.brain.Evidence.build(now);
+        for (Erasure.Item item : Erasure.items(now)) {
+            if (item.erased) continue;
+            Erasure.Plan plan = Erasure.plan(now, item.hash);
+            int live = 0;
+            for (dev.orb.brain.GraphNode holder : graph.holding(item.identity).getValue()) {
+                String cause = holder.getCauses().get(0);
+                for (Erasure.Item other : Erasure.items(now)) if (other.id.equals(cause) && !other.erased) live++;
+            }
+            Harness.equal("the graph's live holders equal Erasure's: " + item.id.substring(20), live, 1 + plan.others);
+            Harness.equal("and so does what is shown", Provenance.of(journal, item.id).sameContent, 1 + plan.others);
+            checked++;
+        }
+        Harness.check("every live item was checked", checked == 4);
+
+        Harness.suite("an erased copy no longer counts as kept");
+        Erase.execute(context, journal, first.hash);
+        Harness.equal("the other copy now says kept once", Provenance.of(journal, items.get(1).id).sameContent, 1);
+        Harness.equal("and the graph still knows both were observed (history stays)", Provenance.of(journal, first.id).observed, true);
+
+        Harness.suite("what erasing says it leaves is true, whatever the graph says");
+        String capStays = Provenance.stays(AssistFacts.CAPTURED);
+        Harness.check("for a capture", capStays.contains("keeps its record that this happened") && capStays.contains("but not the words"));
+        Harness.check("for a share", Provenance.stays("orb.shared").contains("that this was shared") && Provenance.stays("orb.shared").contains("not the file's content"));
+        Harness.equal("a plain erase note is just that sentence", Provenance.eraseNote(journal, AssistFacts.CAPTURED, items.get(1).id), capStays);
+
+        Harness.suite("if something is built on it, the erase note says so");
+        String obsLine = null;
+        for (String line : journal.readLines()) if ("orb.observation".equals(Journal.typeOf(line)) && line.contains("\"causes\":[\"" + items.get(1).id + "\"]")) obsLine = line;
+        Map<String, Object> conclusion = Json.obj();
+        conclusion.put("because", "test");
+        journal.append("test.conclusion", conclusion, Arrays.asList(idOf(obsLine)));
+        Provenance.Facts built = Provenance.of(journal, items.get(1).id);
+        Harness.equal("one record rests on it", built.builtOn, 1);
+        Harness.check("the window says one thing", Provenance.render(built, when()).contains("Built on this:  1 thing\n"));
+        String note = Provenance.eraseNote(journal, AssistFacts.CAPTURED, items.get(1).id);
+        Harness.check("and the erase note mentions it", note.contains("1 other record Orb holds rests on it."));
+
+        Harness.suite("a damaged history is never read as an empty one");
+        try (FileOutputStream out = new FileOutputStream(laneFile(dir), true)) {
+            out.write("{this is not json\n".getBytes(StandardCharsets.UTF_8));
+        }
+        Provenance.Facts damaged = Provenance.of(journal, items.get(1).id);
+        Harness.equal("not closed", damaged.closed, false);
+        Harness.equal("one line counted", damaged.unreadableLines, 1);
+        Harness.check("built on this is not 'nothing'", !Provenance.render(damaged, when()).contains("Built on this:  nothing yet"));
+        Harness.check("it says the history could not be read", Provenance.render(damaged, when()).contains("could not read part of its history (1 line)"));
+        Harness.check("the erase note says there may be more", Provenance.eraseNote(journal, AssistFacts.CAPTURED, items.get(1).id).contains("there may be more"));
+
+        Harness.suite("it cannot work out something it cannot find");
+        Harness.equal("no journal", Provenance.of(null, "x").failed, true);
+        Harness.equal("no such event", Provenance.of(journal, "01NOSUCHEVENT0000000000000").failed, true);
+        Harness.check("it says so and changes nothing", Provenance.render(Provenance.of(null, "x"), when()).contains("Nothing was changed."));
+        Harness.equal("an erase note still says what stays", Provenance.eraseNote(null, AssistFacts.CAPTURED, "x"), capStays);
+
+        Harness.suite("it carries no content");
+        String everything = Provenance.render(f, when()) + Provenance.render(old, when()) + Provenance.render(damaged, when())
+            + Provenance.eraseNote(journal, AssistFacts.CAPTURED, items.get(1).id);
+        for (String word : new String[] {"priya", "invoice", "lift code", "4471", "different screen", "brand new", "sha256", "content://"}) {
+            Harness.check("\"" + word + "\" is not in anything shown", !everything.contains(word));
+        }
+
+        Harness.suite("the share type is spelled once");
+        String orbSource = new String(Files.readAllBytes(java.nio.file.Paths.get(System.getProperty("orb.root", "."), "src/Orb.java.in")), StandardCharsets.UTF_8);
+        Harness.check("Orb's writer and Provenance agree", orbSource.contains("SHARED = \"" + Provenance.SHARED + "\""));
+    }
+}

@@ -5820,3 +5820,57 @@ screen text, so those three rest on the operator's word, not on the journal.
 
 **What this closes:** AD-14 item 3 — Kotlin runs on the phone. B2a is done. Next is B2b, the graph.
 
+
+### 7b56. Where did this come from? — B2c, the first caller of the graph — 2026-10-01
+
+**Status: built, not yet run on the device.** `orb-app-v20-provenance.apk`. v19 is §7b55 (verified).
+
+#### What changed (`docs/PHONE_BRAIN.md` B2c)
+
+1. **Recall's item detail has a third button, *Where from?*.** It opens a secure window: *You asked Orb to remember this
+   screen · App · It happened (the capture's own clock) · Orb noted it (only when it differs by more than a minute — a
+   back-filled item) · Built on this (“nothing yet” only when the graph's answer is complete) · Same words kept N times ·
+   a short record id.* No words, no address, no identity.
+2. **Both erase confirmations (Recall and *Kept by Orb*) now say what stays**, which they never did: *Orb keeps its record
+   that this happened — when, from which app, how much text — but not the words* (for a share: *…that this was shared —
+   when, where from, and what it pointed to — but not the file's content*). That is true whatever the graph says, because the
+   event stays in the journal; v19's export showed the Observation of an erased capture remained. If records rest on the
+   item, or the history cannot be read, the note says so.
+3. **`Provenance.java.in`** is the only file that asks the graph (a guard test), builds it when a window opens and drops it,
+   and never refers to Attachments, Recall or Android. `Erasure.Item` and `Recall.Entry` carry the event id.
+
+**One deviation from the design, on purpose.** The design said the graph's count of what holds the same content would be
+*shown beside* Erasure's. It is **not shown**: *Same words kept* comes from `Erasure`, which decides erasures and was verified
+on the device, and a test asserts the graph's live holders equal it on every item. Two numbers on one screen for one fact is how
+they drift; one source with the other as a cross-check is how they are kept honest.
+
+#### Checked before the device
+
+- 366 phone-side checks (was 299): the new `ProvenanceTest` covers a capture and a share; **a capture whose record was
+  written weeks after it happened** (both times shown, the occurrence first); not yet observed (said, not guessed); the same-
+  words count against `Erasure.plan` and the graph on every live item; an erased copy no longer counting; the erase note with
+  something built on the item; **a damaged history never read as empty**; no journal / no such event; and that nothing shown holds
+  a word of the screen or an identity.
+- Mutation-checked (Provenance): using the Observation's time as the occurrence, never showing the second time, counting the
+  Observation as something built on the item, counting erased copies, dropping the incompleteness note, and forcing `closed` each fail named checks.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P74** | *Where from?* on an item kept **before v19** shows *It happened* earlier than *Orb noted it* | the occurrence time is not being used |
+| **P75** | On an item kept **after** v20 only *It happened* is shown | the one-minute rule is wrong |
+| **P76** | *Same words kept N times* equals the number the erase dialog implies (*kept by N−1 other items*) | the two sources disagree |
+| **P77** | The erase dialog says Orb keeps its record but not the words, and after erasing the next export **still holds that item's Observation** | the sentence is untrue — it must never be |
+| **P78** | *Built on this* says *nothing yet* | the graph found a dependent that should not exist |
+| **P79** | The window cannot be screenshotted and shows no word of the item | a leak |
+| **P80** | Nothing crashes: the Kotlin graph runs on the phone (its first on-device run) | the window says *Orb could not work out where this came from* |
+
+#### The operator's protocol
+
+1. Install `orb-app-v20-provenance.apk` over v19. Orb → **What Orb remembered**, open an item you kept **before** v19
+   (any from 29 Sep – 1 Oct afternoon) and tap **Where from?**. Try to screenshot it. *(P74, P78, P79, P80)*
+2. In an allowed app, invoke Orb and **Remember** something non-private; open it in Recall → **Where from?**. *(P75)*
+3. Open an item whose words were kept more than once, tap **Erase** and read the dialog; do **not** confirm yet. Compare with
+   *Where from?* on the same item. *(P76, P77)*
+4. Erase one item, then **Export and share journal**. *(P77)*

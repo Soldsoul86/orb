@@ -194,10 +194,34 @@ public final class RecallActivity extends Activity {
             .setNegativeButton("Erase", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int which) { confirmErase(entry); }
             })
+            .setNeutralButton("Where from?", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { whereFrom(entry); }
+            })
             .create();
         // The words on screen are the person's own: no screenshots, no recording, no assistant.
         dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         dialog.show();
+    }
+
+    /**
+     * Where this came from, in plain words: the app, when it happened, when Orb noted it, what rests on it.
+     * No words of the item, no address, no identity — and a secure window like the one it was opened from.
+     */
+    private void whereFrom(Recall.Entry entry) {
+        Journal journal = journal();
+        String text = Provenance.render(Provenance.of(journal, entry.id),
+            new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault()));
+        TextView view = new TextView(this);
+        view.setTextSize(14);
+        view.setPadding(48, 24, 48, 24);
+        view.setText(text);
+        AlertDialog provenance = new AlertDialog.Builder(this)
+            .setTitle("Where from?")
+            .setView(view)
+            .setPositiveButton("Close", null)
+            .create();
+        provenance.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        provenance.show();
     }
 
     private void confirmErase(final Recall.Entry entry) {
@@ -215,7 +239,7 @@ public final class RecallActivity extends Activity {
             : "Nothing else keeps these words. Their key will be destroyed and they can never be read again. This cannot be undone.";
         new AlertDialog.Builder(this)
             .setTitle("Erase this?")
-            .setMessage(words)
+            .setMessage(words + "\n\n" + Provenance.eraseNote(journal, AssistFacts.CAPTURED, entry.id))
             .setNegativeButton("Keep", null)
             .setPositiveButton("Erase", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int which) { erase(entry); }

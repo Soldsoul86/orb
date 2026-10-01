@@ -10,6 +10,7 @@ public final class Tests {
         CaptureTest.run();
         RecallTest.run();
         ObserveTest.run();
+        ProvenanceTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

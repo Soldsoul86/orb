@@ -47,12 +47,16 @@ final class Erasure {
     private static final Pattern ATTACHMENT = Pattern.compile("\"attachment\":\"(sha256:[0-9a-f]{64})\"");
     private static final Pattern ENVELOPE_HASH = Pattern.compile("\"integrity\":\\{\"hash\":\"([0-9a-f]{64})\"");
     private static final Pattern PAYLOAD_HASH = Pattern.compile("\"hash\":\"([0-9a-f]{64})\"");
+    /** The event's own id: 26 characters of Crockford base32. The schema's `"id":"orb.…"` is not one. */
+    private static final Pattern EVENT_ID = Pattern.compile("\"id\":\"([0-9A-Z]{26})\"");
     private static final Pattern WALL_CLOCK = Pattern.compile("\"wallClock\":(\\d+)");
     private static final Pattern BYTES = Pattern.compile("\"attachmentBytes\":(\\d+)");
 
     /** One remembered item as the journal shows it. */
     static final class Item {
         final String hash;
+        /** The event's id — what the graph is keyed by (Erasure itself is keyed by envelope hash). */
+        final String id;
         final String type;
         final String identity;
         final long bytes;
@@ -61,8 +65,9 @@ final class Erasure {
         /** The app a capture came from, or null (a share has none). */
         final String packageName;
 
-        Item(String hash, String type, String identity, long bytes, long wallClock, boolean erased, String packageName) {
+        Item(String hash, String id, String type, String identity, long bytes, long wallClock, boolean erased, String packageName) {
             this.packageName = packageName;
+            this.id = id;
             this.hash = hash;
             this.type = type;
             this.identity = identity;
@@ -129,7 +134,8 @@ final class Erasure {
             String hash = envelopeHash(line);
             if (identity == null || hash == null) continue;
             int payload = line.indexOf("\"payload\":");
-            out.add(new Item(hash, type, identity, number(BYTES, line, payload),
+            Matcher idMatcher = EVENT_ID.matcher(line);
+            out.add(new Item(hash, idMatcher.find() ? idMatcher.group(1) : null, type, identity, number(BYTES, line, payload),
                 number(WALL_CLOCK, line, 0), erased.contains(hash), AllowList.packageOf(line)));
         }
         return out;
