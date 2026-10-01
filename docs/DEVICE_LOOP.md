@@ -5694,7 +5694,7 @@ on the phone (and the screen cannot be screenshotted by design); no complaint ca
 
 ### 7b54. v17 on the device, and a named exception for WhatsApp — 2026-10-01
 
-**Status: built, 256 phone-side checks (was 241), not yet run on the device.** `orb-app-v18-exception.apk`.
+**Status: verified on the device (P63–P67 held), 256 phone-side checks.** `orb-app-v18-exception.apk`.
 The v17 export (`orb-20261001-145626.txt`) is read first.
 
 #### What v17 showed
@@ -5731,6 +5731,16 @@ cannot-check rule fails two checks.
 | **P65** | After that, Remember on a WhatsApp chat keeps the text as before | the exception does not reach the capture check |
 | **P66** | On **PhonePe / Google Pay** the card still says *never* and offers no Allow (they are on the name floor) | the floor is not holding |
 | **P67** | The *Apps Orb may remember from* list marks WhatsApp as allowed by exception, and **Remove** ends it | the label or the revocation is wrong |
+
+#### Result — all five held (`orb-20261001-162423.txt`, 185 events, `verifyLane`-clean)
+
+v18 is installed (`orb.process.start`, versionCode 29847449). After it: a `notAllowed` decline (WhatsApp before the
+exception, no app named), **one** `orb.assist.allowed` for `com.whatsapp` **with `paymentsException: true`**
+(so the *No* branch wrote nothing — P64), then `orb.assist.captured` for `com.whatsapp` (**658 characters, no
+password fields** — P65, the exception reaches the capture check), then another `notAllowed` decline (the
+PhonePe / Google Pay refusal — P66). The card wording (P63), the warning and the *Apps Orb may remember from*
+label and Remove (P67) were seen on the phone; the operator reports *everything checks out*. An export cannot show
+screen text, so those three rest on the operator's word, not on the journal.
 
 #### The operator's protocol
 
