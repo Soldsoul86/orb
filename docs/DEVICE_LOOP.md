@@ -4986,3 +4986,74 @@ back -1, and that is itself the answer.
 One round, on **WhatsApp, the same chat each time**: text on, screenshot on → text on,
 **screenshot off** → text off → back to both on. Then export. That measures P32
 directly and checks P31 against a recorded switch state.
+
+### 7b45. The settings round, with the switches recorded — 2026-10-01
+
+Export `orb-probea-20261001-084402.txt`: 113 events, `verifyLane`-clean, continuing the
+same lane. **v3 is the build that answered** — `assist.service.ready` carries
+`versionCode: 29847068` and `recognitionStub: true` — so every invocation below names
+the state of the system's text switch instead of leaving it to inference. Four
+invocations on two apps.
+
+| Invocation | `textSetting` | Structure | Screenshot | `argKeys` | `flags` |
+| --- | --- | --- | --- | --- | --- |
+| 1 — WhatsApp | **1** (on) | arrived, 373 nodes, 32 with text | arrived, real | 7 | 263 |
+| 2 — same chat | **0** (off) | **`arrived: false`**, no package | **no callback at all** (`screenshotCallbacks: 0`) | **6** | 263 |
+| 3 — a mobile game | 1 | arrived, **7 nodes, 0 with text** | arrived, real (217 colours) | 7 | 263 |
+| 4 — the same game | 1 | arrived, 7 nodes, 0 text | arrived, real (193 colours) | 7 | 263 |
+
+#### Scoring
+
+- **P31 — held in full, now against a recorded switch.** Text off means no structure
+  **and** no screenshot. The earlier reading (§7b44) was made from the pattern; this
+  is the same pattern with the switch's value beside it. `flags` stayed 263 and
+  `withAssist`/`withScreenshot` stayed true on the invocation where nothing arrived:
+  **the flags are not a promise and must never be read as one.** The signatures of
+  "the person withheld it" are `arrived: false` and `argKeys: 6`.
+- **The operator's report** — *use screenshot cannot be turned on while use text from
+  screen is off* — **is the same fact seen from the settings screen**: the screenshot
+  switch depends on the text switch, as the probe saw it depend on arrival.
+- **P32 (screenshot off, text on) — not measured, and not needed.** The screenshot
+  switch's own value reads **-2 (absent)**: the platform has no stored row under the key
+  this build asks for, which is consistent with a switch never moved from its default
+  and says nothing about whether the key is the right one. **No invocation had text on
+  and the screenshot withheld.** What step 5 needs does not depend on it — see below.
+- **P33 and P29 — held.** A game that does *not* opt out delivers a structure that is
+  present and empty of text (7 nodes, none with text) and a genuine screenshot. This is
+  the first game that did not block itself (the chess app of §7b44 did). **For an
+  overlay that keeps text only, a game is a screen with nothing to keep.**
+
+#### A pattern worth keeping, recorded as a pattern and not a rule
+
+A **late, null screenshot callback** appeared again (event 98, 9.0 s after its
+invocation, `arrived: false`), landing at the instant the *next* invocation began. That
+is the second time, and **both times the next invocation was the first one made with the
+text switch off** (§7b44, event 86 → 87; here 98 → 99); the invocations between the
+other transitions had none. Two instances are a coincidence-sized sample. What is firm
+and enough to build on: a screenshot callback can arrive after its session closed and
+carry nothing, so a callback is matched to an invocation by the id it carries, never by
+"the latest one".
+
+#### What this settles for step 5
+
+1. **Arrival is the only signal.** The flags and the setting say what was *permitted*;
+   only what arrived says what was *delivered*, and only a delivered screen can be
+   remembered.
+2. **A rule that does not need P32.** The screenshot is needed for one thing even though
+   no screenshot is stored: it is how a screen that protected itself from capture *without*
+   marking its structure blocked is told from an ordinary one (a blanked, uniform
+   image). So a capture should require **both** to have arrived, and treat a missing
+   screenshot as *cannot check*, not as *fine*. If the person turns the screenshot off,
+   Orb keeps nothing from that invocation and says why. That holds whatever P32 turns out
+   to be.
+3. **Text-only memory has a natural empty case.** A game, or any screen whose structure
+   arrives with no text, leaves nothing to keep; the right outcome is *nothing kept, and
+   the person told* — not a fallback to the picture (DR-14 ruling 5).
+
+#### Track 0 — where it stands
+
+0a closed (§7b44). 0b closed (§7b43; documented behaviour plus a test, not observable
+from a phone). 0c: P31, P33 and P29 answered; P32 not measured and not needed; flag 256
+unknown by design. **One fact is still missing:** whether the stub-less build was *absent
+from the chooser* or *never selected* (P30). The platform never bound it; the data
+cannot say why.
