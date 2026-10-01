@@ -57,14 +57,63 @@ A third is a limit, not a defect: **corroboration needs two sources** reporting 
 - Device check: an export shows `orb.observation` events citing `orb.assist.captured` /
   `orb.shared` events, `verifyLane`-clean, and importing it creates **no duplicates**.
 
-### B2b — The graph *(after B2a is verified on the phone)*
+### B2b — The graph *(design proposed 2026-10-01; awaiting approval)*
 
-A projection, never stored: nodes (Observation, Source, device event), edges (`derivedFrom`,
-`attributedTo`; `supports`/`contradicts` read-only), and three questions — *provenance walk*,
-*everything from this source in a time window*, and *forward lineage* (what cites this) for
-erasure. A reference implementation in TS beside it, joined by vectors the same way. A root that
-is not held comes back **not closed**, never an empty answer that looks like "nothing was built on it"
-(`ERASURE.md` §3).
+**What exists, and what it means for this step.** `runtime/journal/src/lineage.ts` already
+indexes `causes` and answers *what was built on this* (`descendantsOf`) and *what is this built on*
+(`ancestorsOf`), safely (visited set, `closed` only when nothing cited was missing, "cannot say" for
+an event whose lineage is unreadable). The graph is therefore **a typed view over that lineage, not a
+second structure**: nothing new is stored and no traversal is rewritten in TypeScript.
+
+**Shape.**
+- **Nodes are events** (`EVIDENCE_GRAPH.md` inv. 1: every node is backed by exactly one event). A node
+  is typed by what the event is: an *Observation*, a *device event* an Observation cites, or *other*.
+- **One edge, `derivedFrom`, and it is exactly `causes`.** No edge exists that a `causes` entry does not
+  ground (inv. 2).
+- **Source and attachment are values on an Observation, not nodes** — `Observation.md`'s own attribution
+  note says the source is *a value, not a kernel contract*. `attributedTo` and `holds` are therefore
+  lookups (`fromSource`, `holding`), computed from the Observation's `source` and `attachments`.
+- **`supports` / `contradicts` are not read.** *Correction to the 2026-10-01 plan:* the Evidence
+  contract defines their meaning but **no event shape exists in code**, so reading them would mean
+  inventing one. The shape is defined by the first thing that produces Evidence (which needs a second
+  source — AD-6); until then the graph has provenance edges only, and says so.
+
+**Questions it answers** (each returns `closed`, and what it could not see):
+1. `provenance(id)` — the chain back from an event to what it rests on, each step typed.
+2. `observationsOf(eventId)` — the Observations that cite a device event (was it observed, and as what).
+3. `dependentsOf(id)` — everything built on it, typed (the erase dialog's "what depended on this").
+4. `fromSource(sensor, window)` — Observations by sensor, in a time window.
+5. `holding(attachmentIdentity)` — which Observations hold this sealed content (two captures of one
+   screen are two Observations, one attachment).
+
+**Time means when it happened, not when it was written.** An Observation made at back-fill time carries
+a recording time of *today*; the capture it cites happened weeks ago. A window query uses the
+**earliest cited device event's** clock (the occurrence). An Observation with no readable cause falls
+back to its own recording time and is **flagged** (`occurredAtKnown: false`), never silently mixed in.
+
+**Where.** TypeScript first, as the reference: a new package `runtime/evidence`
+(`buildGraph(events)` over `indexLineage`, with README/DESIGN/API/TESTS). Then the Kotlin port in
+`runtime/brain` reading the phone's lines, **held to the TypeScript by vectors** whose inputs are the
+phone-written fixtures — and run over the operator's real export, as B2a was. **No new APK is needed for
+B2b**: it is a library nothing in the app calls yet. The on-device check comes with B2c, which is its first
+caller.
+
+**Invariants.** A pure function of the journal; rebuilt per question, never stored (a stored graph would
+outlive an erase); carries no payload content — an Observation's *recorded* clear body (app, counts,
+flags) and identities only, never anything from inside a sealed attachment; a root the journal does not
+hold comes back `closed: false` and **named**, never an empty answer that looks like "nothing was built on
+it"; cycles cannot loop it.
+
+**Risks.**
+
+| Risk | Held by |
+| --- | --- |
+| A second lineage walk drifting from `lineage.ts` | TypeScript *delegates* to it; Kotlin's walk is held to TypeScript's by vectors over real journals |
+| "When" answered with recording time | The occurrence rule above, with a test where the two differ by weeks |
+| An empty answer read as "nothing depends on this" | `closed` and `unresolved` on every answer; a test with a missing cause |
+| A v2 event whose payload is not held | Reported as *cannot say*, as `lineage.ts` already does |
+| Cost grows with the journal | Linear per question; fine at hundreds of events; recorded as a debt to revisit with AD-13's reasoning (an in-memory index, never on disk) |
+| The graph leaks | Output type has no field for content; a guard test, as for the translation |
 
 ### B2c — Visible in Recall *(after B2b)*
 
