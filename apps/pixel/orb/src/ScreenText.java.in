@@ -23,6 +23,8 @@ final class ScreenText {
     int textNodes;
     long textChars;
     int blocked;
+    /** Password fields left out — a count, so a screen's login-ness is visible without its contents. */
+    int passwordFields;
 
     /** One element's text, trimmed; blank text is nothing. */
     void add(CharSequence text) {
@@ -33,6 +35,11 @@ final class ScreenText {
         body.append(trimmed);
         textNodes++;
         textChars += trimmed.length();
+    }
+
+    /** A password field was on the screen. Counted; nothing about it is read. */
+    void notePassword() {
+        passwordFields++;
     }
 
     /** A node the app marked as not for assistants. Counted; its text is never added. */
@@ -84,5 +91,6 @@ final class ScreenText {
         textNodes = 0;
         textChars = 0;
         blocked = 0;
+        passwordFields = 0;
     }
 }

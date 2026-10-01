@@ -14,8 +14,10 @@ import android.app.assist.AssistStructure;
  *
  * **Text only.** It takes `getText()` and the page address. It never asks for a description,
  * a hint, a view id or a web domain, so none can be kept by accident. **A password field is
- * skipped by input type** — even if the platform delivered its text, because "it was
- * probably blanked already" is an assumption and this is a rule.
+ * skipped by what the field says it is** — its input type, its autofill hints, its HTML `type` —
+ * even if the platform delivered its text, because "it was probably blanked already" is an
+ * assumption and this is a rule. Chrome's web fields may carry no Android input type, which is why
+ * the other two are read.
  */
 final class ScreenReader {
     private ScreenReader() {}
@@ -35,12 +37,25 @@ final class ScreenReader {
         return text;
     }
 
+    /** The HTML `type` attribute of a web field, or null. Describes the field, not its contents. */
+    private static String htmlType(AssistStructure.ViewNode node) {
+        android.view.ViewStructure.HtmlInfo info = node.getHtmlInfo();
+        if (info == null || info.getAttributes() == null) return null;
+        for (android.util.Pair<String, String> attribute : info.getAttributes()) {
+            if (attribute != null && "type".equalsIgnoreCase(attribute.first)) return attribute.second;
+        }
+        return null;
+    }
+
     private static void walk(AssistStructure.ViewNode node, int depth, ScreenText text) {
         if (node == null || depth > MAX_DEPTH) return;
         if (node.isAssistBlocked()) {
             // The app said no. Counted so the decision can see it; its text is not read.
             text.noteBlocked();
-        } else if (!AssistPolicy.isPasswordInput(node.getInputType())) {
+        } else if (AssistPolicy.isPasswordField(node.getInputType(), node.getAutofillHints(), htmlType(node))) {
+            // A password field: counted, its text never read.
+            text.notePassword();
+        } else {
             text.add(node.getText());
         }
         for (int i = 0; i < node.getChildCount(); i++) walk(node.getChildAt(i), depth + 1, text);

@@ -72,7 +72,7 @@ final class Capture {
 
         Map<String, Object> payload = AssistFacts.captured(
             packageName, text.textNodes, text.textChars, text.hasWebUri(),
-            stored.identity, stored.bytes, stored.outcome, versionCode);
+            stored.identity, stored.bytes, stored.outcome, versionCode, text.passwordFields);
         if (recorder.append(AssistFacts.CAPTURED, payload) == null) {
             // Only content this call just wrote; content other events already cite stays.
             if (stored.outcome.equals(STORED)) {

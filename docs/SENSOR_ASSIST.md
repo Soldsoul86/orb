@@ -153,9 +153,10 @@ The sealed document is a versioned header (`orb.screen.text.v1`), the address li
 the text — **no time, no app, no counts beside it**, so identical screens are one Attachment
 under one key and nothing about *when* or *where* sits next to the words.
 
-**Excluded in v1:** accessibility descriptions, hints, view ids, and any node the build can
-tell is a password field — dropped even if the platform delivered it, not assumed
-blanked already. The picture is never kept.
+**Excluded in v1:** accessibility descriptions, hints, view ids, and any node that **describes itself as a
+password field** — by its input type, its autofill hints or its HTML `type` (Chrome's web fields may carry no
+Android input type) — dropped even if the platform delivered it, not assumed blanked already, and **counted**
+(`passwordFields`) so a login screen is visible without its contents. The picture is never kept.
 
 **`orb.assist.declined`** — `reason` from §5, the build's `versionCode`, and **no
 package**. **`orb.assist.captureFailed`** — when the person asked to keep and Orb could not

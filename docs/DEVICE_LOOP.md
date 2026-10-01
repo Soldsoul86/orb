@@ -5508,3 +5508,38 @@ login screen. Both are visible only on the phone.
 Part 2 is closed for what the export can show. Step 7 is built end to end: **invoke → card → preview →
 Remember**, text only, sealed, erasable, refused when erased, and nothing kept from a payments app, a
 protected screen or an app that was not allowed.
+
+#### The password test, and what it found (export `orb-20261001-115501.txt`, 121 events, `verifyLane`-clean)
+
+The operator ran the Wi-Fi *Add network* screen (three captures of the same page: 10 text elements, 93
+characters each time — `stored`, then `held` twice) and a GitHub login page in Chrome (one capture, 36
+elements, 812 characters, a page address supplied). **The preview that decides P51 was not captured**, and
+**the export cannot decide it**: it holds counts, and nothing in a count says whether a password field's
+contents were among the characters. So P51 is still **open**.
+
+**What this exposed in the design.** The rule skipped a password field *by Android input type only*. A
+web page in Chrome may not carry an Android input type at all — its fields describe themselves through
+**autofill hints** (`current-password`, `new-password`) and an **HTML `type="password"`** attribute — so
+for Chrome the first rule might never have fired. That is a gap in the design, found by asking for
+evidence the export could not give, not by a failure.
+
+**v14 (`orb-app-v14-passwords.apk`) closes the gap in the open:**
+
+- a field is a password if its **input type**, its **autofill hints** (anything containing *password*) or
+  its **HTML `type`** says so — any one is enough; reading only how a field *describes* itself, never what
+  is in it (10 new off-device checks);
+- every skipped field is **counted**: `orb.assist.captured` now carries `passwordFields`, and the card says
+  *"(1 password field left out)"* — so a login page's login-ness is visible **in the export** without its
+  contents, and the person sees it before tapping;
+- the importer maps the new field (the drift guard forces the decision), and 166 phone-side / 366
+  TypeScript tests pass.
+
+**How the next export settles it:** a login page that was captured should show `passwordFields ≥ 1`. If
+it shows 0 on a page with a typed password, the field is not describing itself as a password to any of
+the three rules, and the fix is a stronger one (below).
+
+**One decision for the operator, not taken here:** should Orb **decline a screen that has a password field
+at all** (a new reason, *login screen*)? Skipping the field keeps the password out but still keeps the
+username and the rest of a login page. Declining is simpler and safer; it also means a login page can never
+be remembered. Recommended, because a login page is rarely something worth remembering and always something
+worth not leaking — but it changes the decision order of `SENSOR_ASSIST.md` §5, so it waits for a yes.

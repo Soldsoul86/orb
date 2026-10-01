@@ -72,6 +72,18 @@ final class AssistTest {
         Harness.check("a plain number is not", !AssistPolicy.isPasswordInput(0x02));
         Harness.check("no input type is not", !AssistPolicy.isPasswordInput(0));
 
+        Harness.suite("a password field is recognised by what it says it is, not by its input type alone");
+        Harness.check("autofill hint: password", AssistPolicy.isPasswordField(0, new String[] {"password"}, null));
+        Harness.check("autofill hint: current-password (what a web page sends)", AssistPolicy.isPasswordField(0, new String[] {"username", "current-password"}, null));
+        Harness.check("autofill hint: new-password", AssistPolicy.isPasswordField(0, new String[] {"new-password"}, null));
+        Harness.check("html type password", AssistPolicy.isPasswordField(0, null, "password"));
+        Harness.check("html type, any case and padding", AssistPolicy.isPasswordField(0, null, "  Password "));
+        Harness.check("input type still counts", AssistPolicy.isPasswordField(0x81, null, null));
+        Harness.check("a username field is not a password field", !AssistPolicy.isPasswordField(0, new String[] {"username"}, "text"));
+        Harness.check("an ordinary field is not", !AssistPolicy.isPasswordField(0x01, null, null));
+        Harness.check("nothing known is not", !AssistPolicy.isPasswordField(0, null, null));
+        Harness.check("a null hint in the list is tolerated", !AssistPolicy.isPasswordField(0, new String[] {null}, null));
+
         Harness.suite("the allow-list is what the events add up to");
         File dir = Files.createTempDirectory("orb-allow").toFile();
         Context context = new Context(dir);
@@ -112,15 +124,16 @@ final class AssistTest {
 
         Harness.suite("what a capture records in the clear");
         String id = "sha256:" + "c".repeat(64);
-        Map<String, Object> cap = AssistFacts.captured("com.whatsapp", 40L, 605L, false, id, 700L, "stored", 7L);
+        Map<String, Object> cap = AssistFacts.captured("com.whatsapp", 40L, 605L, false, id, 700L, "stored", 7L, 2L);
         for (Object value : cap.values()) {
             Harness.check("every value is a number, a boolean or a short word",
                 value instanceof Long || value instanceof Boolean || value instanceof String);
         }
         Harness.equal("the sealed identity is carried", cap.get("attachment"), id);
-        Harness.equal("an invalid package is not echoed", AssistFacts.captured("not a package", 1L, 1L, false, id, 1L, "stored", 1L).get("package"), "invalid");
-        Harness.equal("an invalid identity is not echoed", AssistFacts.captured("com.whatsapp", 1L, 1L, false, "free text", 1L, "stored", 1L).get("attachment"), "invalid");
-        Harness.equal("an unknown outcome is not echoed", AssistFacts.captured("com.whatsapp", 1L, 1L, false, id, 1L, "my secret", 1L).get("resolveOutcome"), "other");
+        Harness.equal("an invalid package is not echoed", AssistFacts.captured("not a package", 1L, 1L, false, id, 1L, "stored", 1L, 0L).get("package"), "invalid");
+        Harness.equal("an invalid identity is not echoed", AssistFacts.captured("com.whatsapp", 1L, 1L, false, "free text", 1L, "stored", 1L, 0L).get("attachment"), "invalid");
+        Harness.equal("an unknown outcome is not echoed", AssistFacts.captured("com.whatsapp", 1L, 1L, false, id, 1L, "my secret", 1L, 0L).get("resolveOutcome"), "other");
+        Harness.equal("the count of left-out password fields is recorded", cap.get("passwordFields"), 2L);
         Harness.check("no field is able to carry the text", !cap.containsKey("text") && !cap.containsKey("body") && !cap.containsKey("uri"));
     }
 }

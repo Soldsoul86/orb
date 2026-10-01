@@ -38,6 +38,7 @@ export const ASSIST_FIELDS_MAPPED = [
   "resolveOutcome",
   "attachmentBytes",
   "versionCode",
+  "passwordFields",
 ] as const;
 
 /** Fields that become `attachments` — by identity, never copied into `data` (inv. 5). */
@@ -59,6 +60,8 @@ export interface AssistReading {
   readonly attachmentBytes?: number;
   /** The build that wrote the record. */
   readonly versionCode?: number;
+  /** How many password fields were on the screen and left out. A count; nothing about them was read. */
+  readonly passwordFields?: number;
 }
 
 export interface AssistTranslation {
@@ -87,6 +90,7 @@ export function assistFrom(payload: unknown): AssistTranslation | null {
   const resolveOutcome = text("resolveOutcome");
   const attachmentBytes = count("attachmentBytes");
   const versionCode = count("versionCode");
+  const passwordFields = count("passwordFields");
 
   const data: AssistReading = {
     because: text("because") ?? "unknown",
@@ -97,6 +101,7 @@ export function assistFrom(payload: unknown): AssistTranslation | null {
     ...(resolveOutcome === undefined ? {} : { resolveOutcome }),
     ...(attachmentBytes === undefined ? {} : { attachmentBytes }),
     ...(versionCode === undefined ? {} : { versionCode }),
+    ...(passwordFields === undefined ? {} : { passwordFields }),
   };
 
   const identity = text("attachment");

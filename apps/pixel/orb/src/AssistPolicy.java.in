@@ -80,6 +80,26 @@ final class AssistPolicy {
         return false;
     }
 
+    /**
+     * Whether a field is a password, from everything a node says about itself — **not the input
+     * type alone**. A web page in Chrome may not carry an Android input type at all, so the
+     * autofill hints (`password`, `current-password`, `new-password`) and the HTML
+     * `type="password"` attribute count too. Any one is enough; a missed password is the
+     * expensive mistake, and a wrongly skipped ordinary field costs one line of text.
+     *
+     * This reads how a field *describes* itself, never what is in it.
+     */
+    static boolean isPasswordField(int inputType, String[] autofillHints, String htmlType) {
+        if (isPasswordInput(inputType)) return true;
+        if (htmlType != null && htmlType.trim().equalsIgnoreCase("password")) return true;
+        if (autofillHints != null) {
+            for (String hint : autofillHints) {
+                if (hint != null && hint.toLowerCase().contains("password")) return true;
+            }
+        }
+        return false;
+    }
+
     /** What arrived, and what the person has allowed. Plain values; no content. */
     static final class Input {
         boolean structureArrived;

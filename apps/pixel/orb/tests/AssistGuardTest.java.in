@@ -88,7 +88,8 @@ final class AssistGuardTest {
         forbidIn(source, Arrays.asList("ScreenReader"), "reads more than text and the address",
             Pattern.compile("\\.(getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
                 + "|getStructuredData|getClipData|getIntent|getText)\\(\\)\\s*[^;]*;?\\s*$"), true);
-        Harness.check("and refuses a password field by input type", reader.contains("isPasswordInput"));
+        Harness.check("and refuses a password field by what it says it is, never reading its text",
+            reader.contains("isPasswordField(") && reader.contains("notePassword()"));
 
         Harness.suite("the buffer is plain Java");
         Harness.check("ScreenText imports nothing from Android", !source.get("ScreenText").contains("import android"));

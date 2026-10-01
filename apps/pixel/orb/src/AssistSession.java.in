@@ -235,6 +235,8 @@ public final class AssistSession extends VoiceInteractionSession {
             long hidden = pending.hiddenBy(PREVIEW_CHARS);
             show("Orb will keep this text from the screen:\n\n" + pending.preview(PREVIEW_CHARS)
                 + (hidden > 0 ? "\n\n(+" + hidden + " more characters)" : "")
+                + (pending.passwordFields > 0 ? "\n\n(" + pending.passwordFields + " password field"
+                    + (pending.passwordFields == 1 ? "" : "s") + " left out)" : "")
                 + "\n\nIt is sealed on this phone, and you can erase it in Orb → Kept by Orb.", false, true);
             closeButton.setText("Don't keep");
             return;
