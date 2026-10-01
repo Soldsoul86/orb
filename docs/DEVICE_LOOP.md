@@ -5964,7 +5964,7 @@ not *remembered* (Recall lists screen text only), so a person could not see what
 
 ### 7b58. Back up and restore — Track E, Step 1 — 2026-10-01
 
-**Status: built, not yet run on the device.** `orb-app-v22-backup.apk`. v21 is §7b57 (verified). Design: `docs/DURABILITY.md`.
+**Status: verified on the device — P87–P91 held** (P92, the refusal on a non-fresh install, is tested but not reported); the first v22 run needed a visibility fix, `orb-app-v23-backup-visible.apk`, recorded at the end of this section. `orb-app-v22-backup.apk`. v21 is §7b57 (verified). Design: `docs/DURABILITY.md`.
 The finding that prompted it: an export carries the journal's clear record only — never the sealed words, pictures or keys — so
 losing the phone lost the memory, and a fresh Orb could not read an export at all.
 
@@ -6039,4 +6039,17 @@ losing the phone lost the memory, and a fresh Orb could not read an export at al
 **P89 held.** On v23 the operator chose the real backup (14 items, pictures included, 11.9 MB) and the check reported it **good**, changing nothing — so the file written by the
 phone decrypts and verifies on the same phone, through the real file picker and the real key derivation. The v22 "nothing happening" was the visibility defect recorded above, not a fault
 in the check. **Still open:** P90–P92 — a real restore after *Clear storage*, which is the test that makes the backup a backup. An export cannot show what the check box said; this rests on the operator's word.
+
+#### Result: the real restore (`orb-20261001-191418.txt`, 263 events, `verifyLane`-clean) — **P90 and P91 held**
+
+The operator made a backup (a second one, at v23), took **Clear storage**, opened a fresh Orb, restored from the file and exported again. The export shows:
+
+- **The same lane.** Every event is on `orb-d7d5f6ec2ea184ae5b990ab7` — the identity the phone had before the wipe. The history **continued**; it did not start over, and nothing forked.
+- **The record of it.** One **`orb.restored`** (the backup's creation time, **14 items, pictures included**), written at the start that followed the restore, and the chain verifies from the first event to the last under the TypeScript verifier.
+- **Everything came back that should.** The journal is whole (263 events: 22 captures, 18 shares, 40 Observations, 22 erasures, the one earlier `orb.backup`); **no unobserved event, no `orb.observe.failed`**. And the store's state is **identical across the wipe**: `attachmentKeysHeld` **14** and `attachmentsDestroyed` **14** before the clear, and the same after — the 14 sealed items are back under their keys, and the 14 destroyed identities are still destroyed.
+- **The operator's report:** *"All steps working fine, the restore and clear worked as it supposed to"* — Recall, the pictures and the erased item (still gone) were checked on the phone; an export cannot show those, so they rest on that word.
+- One expected thing, worth stating: the **second backup's own `orb.backup` record is not in the restored journal**, because a backup is a snapshot taken before it is recorded (design: the record is written only once the file is whole). It is the first `orb.backup` that remains.
+- **P92** (restore refused on an Orb that has its own history) was not reported; it is covered by tests and stays unconfirmed on the device.
+
+**The backup is now a backup.** Losing this phone no longer loses what Orb remembered, provided the file and the passphrase are kept off it.
 

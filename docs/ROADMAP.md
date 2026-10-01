@@ -223,7 +223,7 @@ latency.
 With platform backup off, **the phone is the only copy** until sync exists, and sync
 needs a second place to hold a journal. A laptop can never be required, so the
 candidates are a second phone or a zero-knowledge relay (`Synchronization`,
-`Encryption`). Until then, ~~*export* is the backup~~ — **corrected 2026-10-01: an export carries the journal only, never the sealed words, pictures or keys (`DURABILITY.md` §1)**, so it is a record for a laptop and not a way to get a phone's memory back; a passphrase-protected backup file is **built (Step 1, awaiting the device)**; automatic backup into a chosen folder is Step 2. *Use:* losing a phone no longer loses the memory.
+`Encryption`). Until then, ~~*export* is the backup~~ — **corrected 2026-10-01: an export carries the journal only, never the sealed words, pictures or keys (`DURABILITY.md` §1)**, so it is a record for a laptop and not a way to get a phone's memory back; a passphrase-protected backup file is **built and restored on the device (Step 1)**; automatic backup into a chosen folder is Step 2. *Use:* losing a phone no longer loses the memory.
 
 **Recommended order:** Track 0 → A5 → A6 → A7 → A8, with **B1 decided in parallel**
 (it is a decision, not work) → B2 → one sensor from track C → B3 → B4 → B5. Tracks D
