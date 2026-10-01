@@ -99,6 +99,11 @@ final class Install {
         return id(context);
     }
 
+    /** Lets go of the remembered identity, so the next call reads the file again — after a restore replaced it. */
+    static synchronized void forget() {
+        cached = null;
+    }
+
     /** Whether an identity exists yet — a first run has not minted one. */
     static boolean minted(Context context) {
         return new File(context.getFilesDir(), FILE).exists();

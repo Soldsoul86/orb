@@ -1,0 +1,327 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** The backup: ciphertext throughout, a faithful round trip, erasure honoured, and a refusal for anything that is not exactly right. */
+final class BackupTest {
+    private BackupTest() {}
+
+    private static final char[] PASS = "correct horse battery".toCharArray();
+    private static final String WORDS = "call priya about the invoice";
+    private static final String MORE = "the lift code is 4471";
+
+    private static ScreenText screen(String... lines) {
+        ScreenText s = new ScreenText();
+        for (String l : lines) s.add(l);
+        return s;
+    }
+
+    private static Context fresh(String name) throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory(name).toFile();
+        Context c = new Context(dir);
+        Journal j = Journal.open(c, Install.lane(c), Install.id(c));
+        j.append("orb.process.start", Json.obj());
+        return c;
+    }
+
+    private static Journal journalOf(Context c) throws Exception {
+        return Journal.open(c, Install.lane(c), Install.id(c));
+    }
+
+    private static byte[] backup(Context c, boolean pictures, char[] pass) throws Exception {
+        Journal j = journalOf(c);
+        Backup.Plan plan = Backup.plan(c, j.readLines(), pictures);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Backup.write(plan, out, pass);
+        return out.toByteArray();
+    }
+
+    private static boolean contains(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            if (contains(Files.readAllBytes(child.toPath()), needle)) return true;
+        }
+        return false;
+    }
+
+    private static String reasonOf(Context c, byte[] file, char[] pass) throws Exception {
+        try {
+            Backup.restore(c, journalOf(c).readLines(), new ByteArrayInputStream(file), pass);
+            return "restored";
+        } catch (Backup.Failure f) {
+            return f.reason;
+        }
+    }
+
+    private static byte[] laneBytes(Context c) throws Exception {
+        File[] files = c.getExternalFilesDir(null).listFiles();
+        for (File f : files) if (f.getName().endsWith(".lane.jsonl")) return Files.readAllBytes(f.toPath());
+        return null;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the passphrase");
+        Harness.check("too short is refused", Backup.checkPassphrase("short".toCharArray(), "short".toCharArray()) != null);
+        Harness.check("two different entries are refused", Backup.checkPassphrase(PASS, "another phrase here".toCharArray()) != null);
+        Harness.equal("a long enough, matching phrase is fine", Backup.checkPassphrase(PASS, PASS.clone()), null);
+
+        // A populated install: two screens (one twice), a picture, a file, one erased item, and a destroyed identity.
+        Context a = fresh("orb-bak-a");
+        String laneA = Install.lane(a);
+        Journal ja = journalOf(a);
+        ja.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Capture.remember(a, ja, screen(WORDS, MORE), "com.example.chat", 7L, false);
+        Capture.remember(a, ja, screen(WORDS, MORE), "com.example.chat", 7L, false);
+        Capture.remember(a, ja, screen("a screen I will erase"), "com.example.chat", 7L, false);
+        byte[] picture = new byte[100 * 1024];
+        for (int i = 0; i < picture.length; i++) picture[i] = (byte) (i * 31 + 7);
+        Attachments.Stored shared = Attachments.store(a, new ByteArrayInputStream(picture));
+        Map<String, Object> share = Shares.declared("android.intent.action.SEND", "image/png", "android-app://x", Arrays.asList("content://1"));
+        Shares.outcome(share, shared.outcome, null, shared.identity, shared.bytes);
+        ja.append("orb.shared", share);
+        List<Erasure.Item> items = Erasure.items(ja.readLines());
+        Erase.execute(a, ja, items.get(2).hash);        // the third: nothing else keeps it, so its key is destroyed
+        Observe.run(ja);
+
+        Harness.suite("what a backup holds");
+        Backup.Plan plan = Backup.plan(a, ja.readLines(), true);
+        Harness.equal("the words (kept twice, one sealed item) and the picture", plan.items, 2);
+        Harness.equal("nothing missing", plan.missing, 0);
+        Backup.Plan wordsOnly = Backup.plan(a, ja.readLines(), false);
+        Harness.equal("without pictures, only the words", wordsOnly.items, 1);
+        Harness.equal("and the picture is counted as left out", wordsOnly.skippedPictures, 1);
+        boolean erasedKeyIn = false;
+        for (Backup.Entry e : plan.entries) if (e.name.startsWith("key/") && e.file != null && !e.file.exists()) erasedKeyIn = true;
+        Harness.check("no entry for an erased item's key", !erasedKeyIn && plan.entries.stream().filter(e -> e.name.startsWith("key/")).count() == 2);
+        Harness.check("the destruction marker is in", plan.entries.stream().anyMatch(e -> e.name.startsWith("destroyed/")));
+
+        Harness.suite("it is ciphertext throughout");
+        byte[] file = backup(a, true, PASS);
+        Harness.check("a file", file.length > 100 * 1024);
+        for (String secret : new String[] {WORDS, "priya", "invoice", MORE, "4471", "com.example.chat", "orb.assist.captured", "sha256:", "image/png", "orb.sensor", laneA}) {
+            Harness.check("\"" + secret + "\" is not in the file", !contains(file, secret.getBytes(StandardCharsets.UTF_8)));
+        }
+        Harness.check("the passphrase is not in the file", !contains(file, new String(PASS).getBytes(StandardCharsets.UTF_8)));
+        Harness.check("nor on any disk file of the install", !onDisk(a.getFilesDir(), new String(PASS).getBytes(StandardCharsets.UTF_8)));
+        ByteArrayOutputStream once = new ByteArrayOutputStream();
+        ByteArrayOutputStream twice = new ByteArrayOutputStream();
+        Backup.write(plan, once, PASS);
+        Backup.write(plan, twice, PASS);
+        Harness.check("the very same plan, written twice, gives two different files", !Arrays.equals(once.toByteArray(), twice.toByteArray()));
+        Harness.check("because the salt is fresh each time", !Arrays.equals(Arrays.copyOfRange(once.toByteArray(), 13, 29), Arrays.copyOfRange(twice.toByteArray(), 13, 29)));
+        Harness.check("it begins with the format's name and nothing about whose it is", new String(file, 0, 6, StandardCharsets.UTF_8).equals("ORBBAK"));
+
+        Harness.suite("a round trip: a lost phone, a new one, the same memory");
+        byte[] journalBefore = laneBytes(a);
+        Context b = fresh("orb-bak-b");
+        Harness.check("the new install has its own, different identity", !Install.lane(b).equals(laneA));
+        Backup.Restored restored = Backup.restore(b, journalOf(b).readLines(), new ByteArrayInputStream(file), PASS);
+        Harness.equal("two items came back", restored.items, 2);
+        Harness.equal("with pictures", restored.pictures, true);
+        Install.forget();
+        Harness.equal("this install is now the old one", Install.lane(b), laneA);
+        Harness.check("its journal is byte-identical", Arrays.equals(laneBytes(b), journalBefore));
+        Harness.equal("and there is one lane file, not two", b.getExternalFilesDir(null).listFiles((d, n) -> n.endsWith(".lane.jsonl")).length, 1);
+        Journal jb = journalOf(b);
+        Harness.check("the chain links", jb.verify().startsWith("ok"));
+        Erasure.Item words = null;
+        Erasure.Item pic = null;
+        for (Erasure.Item i : Erasure.items(jb.readLines())) {
+            if (i.erased) continue;
+            if (AssistFacts.CAPTURED.equals(i.type) && words == null) words = i;
+            if (Provenance.SHARED.equals(i.type)) pic = i;
+        }
+        Harness.check("the words open", new String(Recall.open(b, words.identity).body).contains(WORDS));
+        Harness.check("the picture opens, byte for byte", Arrays.equals(Recall.openBytes(b, pic.identity), picture));
+        Harness.equal("the erased item's key did not come back", Attachments.counts(b)[0], 2L);
+        Harness.equal("and its destruction did", Attachments.counts(b)[1], 1L);
+        Erasure.Item erased = Erasure.items(jb.readLines()).get(2);
+        Harness.check("it still cannot be read", Recall.openBytes(b, erased.identity) == null);
+        Attachments.Stored again = Attachments.store(b, new ByteArrayInputStream(screen("a screen I will erase").document()));
+        Harness.equal("and a destroyed identity cannot be re-minted after a restore", again.outcome, "erased");
+        Harness.check("a restore recorded nothing yet (that is the next start's job)", Backup.last(jb.readLines()) == null);
+        Backup.noteRestored(b, jb);
+        Harness.equal("and the next start records it", Json.canonical(Json.obj()).length() > 0 && journalOf(b).readLines().get(journalOf(b).readLines().size() - 1).contains(Backup.RESTORED), true);
+
+        Harness.suite("without pictures, the picture is honestly absent");
+        byte[] light = backup(a, false, PASS);
+        Context c = fresh("orb-bak-c");
+        Backup.restore(c, journalOf(c).readLines(), new ByteArrayInputStream(light), PASS);
+        Install.forget();
+        Journal jc = journalOf(c);
+        Erasure.Item picC = null;
+        for (Erasure.Item i : Erasure.items(jc.readLines())) if (Provenance.SHARED.equals(i.type)) picC = i;
+        Harness.check("it is still listed (the journal says it was shared)", picC != null);
+        Harness.check("but it cannot be opened — and says so rather than showing nothing", Recall.openBytes(c, picC.identity) == null);
+
+        Harness.suite("anything not exactly right changes nothing and says why");
+        Context d = fresh("orb-bak-d");
+        byte[] laneBefore = laneBytes(d);
+        String idBefore = Install.lane(d);
+        Harness.equal("a wrong passphrase", reasonOf(d, file, "not the passphrase!".toCharArray()), Backup.WRONG_OR_DAMAGED);
+        for (int at : new int[] {14, 40, 200, file.length / 2, file.length - 5}) {
+            byte[] flipped = file.clone();
+            flipped[at] ^= 1;
+            Harness.equal("one flipped bit at " + at + (at < 33 ? " (in the header)" : ""), reasonOf(d, flipped, PASS), Backup.WRONG_OR_DAMAGED);
+        }
+        // A file whose first chunk ends exactly at a record boundary: cut there, it would parse cleanly if only
+        // the tag did not also say "this was not the last".
+        Backup.Plan crafted = new Backup.Plan();
+        byte[] first = new byte[Backup.CHUNK - (1 + 2 + "manifest".length() + 8)];
+        crafted.entries.add(new Backup.Entry("manifest", null, first));
+        crafted.entries.add(new Backup.Entry("journal", null, new byte[] {1, 2, 3}));
+        ByteArrayOutputStream craftedOut = new ByteArrayOutputStream();
+        Backup.write(crafted, craftedOut, PASS);
+        byte[] craftedFile = craftedOut.toByteArray();
+        byte[] cut = Arrays.copyOf(craftedFile, 33 + 4 + Backup.CHUNK + 16);
+        Harness.equal("cut at a chunk boundary where the plaintext still parses", reasonOf(d, cut, PASS), Backup.WRONG_OR_DAMAGED);
+        Harness.equal("uncut, the same file reaches the content checks and is refused there", reasonOf(d, craftedFile, PASS), Backup.BAD_CONTENT);
+        // Names are a whitelist: a path out of the staging area is refused before anything is written.
+        Backup.Plan evil = new Backup.Plan();
+        evil.entries.add(new Backup.Entry("../../escaped", null, new byte[] {9}));
+        ByteArrayOutputStream evilOut = new ByteArrayOutputStream();
+        Backup.write(evil, evilOut, PASS);
+        Harness.equal("a record named to escape the staging area", reasonOf(d, evilOut.toByteArray(), PASS), Backup.BAD_CONTENT);
+        Harness.check("and nothing was written outside it", !new File(d.getFilesDir().getParentFile(), "escaped").exists() && !new File(d.getFilesDir(), "escaped").exists());
+        Harness.equal("a truncated file", reasonOf(d, Arrays.copyOf(file, file.length - 100), PASS), Backup.WRONG_OR_DAMAGED);
+        Harness.equal("a file cut exactly at a chunk boundary", reasonOf(d, Arrays.copyOf(file, 33 + 4 + Backup.CHUNK + 16), PASS), Backup.WRONG_OR_DAMAGED);
+        byte[] appended = Arrays.copyOf(file, file.length + 1);
+        Harness.equal("something appended", reasonOf(d, appended, PASS), Backup.WRONG_OR_DAMAGED);
+        Harness.equal("an empty file", reasonOf(d, new byte[0], PASS), Backup.NOT_A_BACKUP);
+        Harness.equal("a file that is not one", reasonOf(d, "this is not a backup file at all, just text....".getBytes(StandardCharsets.UTF_8), PASS), Backup.NOT_A_BACKUP);
+        byte[] weak = file.clone();
+        weak[9] = 0; weak[10] = 0; weak[11] = 0x03; weak[12] = (byte) 0xe8;   // iterations = 1000
+        Harness.equal("a header asking for a weak key", reasonOf(d, weak, PASS), Backup.WEAK_KDF);
+        byte[] absurd = file.clone();
+        absurd[9] = 0x7f;
+        Harness.equal("a header asking for absurd work", reasonOf(d, absurd, PASS), Backup.UNSUPPORTED);
+        byte[] newer = file.clone();
+        newer[7] = 2;
+        Harness.equal("a version it does not know", reasonOf(d, newer, PASS), Backup.UNSUPPORTED);
+        Harness.check("and through all of it the install is untouched", Arrays.equals(laneBytes(d), laneBefore) && Install.lane(d).equals(idBefore));
+        Harness.check("with nothing left staged", !new File(d.getFilesDir(), "backup-staging").exists());
+
+        Harness.suite("a backup that opens but is not a whole, honest one is refused after decrypting and before replacing");
+        List<String> aLines = ja.readLines();
+        String manifestText = "orb.backup.v1\nlane:" + laneA + "\ncreated:1\nitems:0\npictures:0\n";
+        byte[] secretBytes = Files.readAllBytes(Attachments.addressSecretFile(a).toPath());
+        for (int variant = 0; variant < 4; variant++) {
+            Backup.Plan p = new Backup.Plan();
+            List<String> j = new ArrayList<>(aLines);
+            String lane = laneA;
+            if (variant == 1) java.util.Collections.swap(j, 1, 2);                      // a journal whose chain does not link
+            if (variant == 2) lane = "orb-000000000000000000000000";                    // an identity that is not the manifest's
+            StringBuilder joined = new StringBuilder();
+            for (String line : j) joined.append(line).append('\n');
+            p.entries.add(new Backup.Entry("manifest", null, manifestText.getBytes(StandardCharsets.UTF_8)));
+            p.entries.add(new Backup.Entry("install.id", null, lane.getBytes(StandardCharsets.UTF_8)));
+            p.entries.add(new Backup.Entry("address.secret", null, secretBytes));
+            p.entries.add(new Backup.Entry("journal", null, joined.toString().getBytes(StandardCharsets.UTF_8)));
+            if (variant == 3) p.entries.add(new Backup.Entry("key/" + "ab".repeat(32), null, new byte[32]));   // a key with no sealed item
+            ByteArrayOutputStream o = new ByteArrayOutputStream();
+            Backup.write(p, o, PASS);
+            String why = variant == 0 ? "a whole one is accepted" : variant == 1 ? "a journal that does not link"
+                : variant == 2 ? "an identity that is not the manifest's" : "a key with no sealed item";
+            Context target = fresh("orb-bak-v" + variant);
+            String expect = variant == 0 ? "restored" : Backup.BAD_CONTENT;
+            Harness.equal(why, reasonOf(target, o.toByteArray(), PASS), expect);
+            if (variant != 0) Harness.check("   …and the fresh install is as it was", new File(target.getFilesDir(), "backup-staging").exists() == false);
+        }
+
+        Harness.suite("a backup can be proved good without touching anything");
+        Context chk = fresh("orb-bak-chk");
+        byte[] chkLane = laneBytes(chk);
+        Backup.Restored good = Backup.check(chk, new ByteArrayInputStream(file), PASS);
+        Harness.equal("it says how many items", good.items, 2);
+        Harness.equal("and that pictures are in", good.pictures, true);
+        Harness.check("and when it was made", good.created > 0);
+        Harness.check("the install is untouched", Arrays.equals(laneBytes(chk), chkLane));
+        Harness.check("nothing is left staged", !new File(chk.getFilesDir(), "backup-check").exists() && !new File(chk.getFilesDir(), "backup-staging").exists());
+        Harness.check("it works on an install that has its own history too", Backup.check(a, new ByteArrayInputStream(file), PASS).items == 2);
+        try {
+            Backup.check(chk, new ByteArrayInputStream(file), "not the passphrase!".toCharArray());
+            Harness.check("a wrong passphrase is refused", false);
+        } catch (Backup.Failure f) {
+            Harness.equal("a wrong passphrase is refused", f.reason, Backup.WRONG_OR_DAMAGED);
+        }
+        Harness.check("and that leaves nothing staged either", !new File(chk.getFilesDir(), "backup-check").exists());
+
+        Harness.suite("a restore is refused on an install that has its own history");
+        Context e = fresh("orb-bak-e");
+        Journal je = journalOf(e);
+        je.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        byte[] laneE = laneBytes(e);
+        Harness.equal("not fresh", reasonOf(e, file, PASS), Backup.NOT_FRESH);
+        Harness.check("and nothing changed", Arrays.equals(laneBytes(e), laneE));
+        Harness.check("only start-up records count as nothing", Backup.isFresh(journalOf(fresh("orb-bak-f")).readLines()));
+        Harness.check("an unrecognisable line is not fresh", !Backup.isFresh(Arrays.asList("{not json")));
+
+        Harness.suite("a swap that was interrupted is finished at the next start");
+        Context g = fresh("orb-bak-g");
+        // Stage everything, mark it complete, and stop before anything moved: as a kill between verify and swap would.
+        File staging = new File(g.getFilesDir(), "backup-staging");
+        Context probe = fresh("orb-bak-h");
+        Backup.restore(probe, journalOf(probe).readLines(), new ByteArrayInputStream(file), PASS);
+        Install.forget();
+        Harness.equal("a probe restore completed once", Install.lane(probe), laneA);
+        Harness.check("finishRestore with nothing staged does nothing", rolls(g));
+        Context k = fresh("orb-bak-k");
+        File kStaging = new File(k.getFilesDir(), "backup-staging");
+        Harness.check("an unverified staging area is simply cleared", clears(k, kStaging));
+
+        Harness.suite("the copy path a real phone takes for the journal");
+        File src = new File(g.getFilesDir(), "src.bin");
+        File dst = new File(g.getFilesDir(), "sub/dst.bin");
+        Files.write(src.toPath(), "payload".getBytes(StandardCharsets.UTF_8));
+        Files.write((dst.getParentFile().mkdirs() ? dst : dst).toPath(), "old".getBytes(StandardCharsets.UTF_8));
+        Backup.moveInto(src, dst, false);
+        Harness.check("copied over what was there", new String(Files.readAllBytes(dst.toPath()), StandardCharsets.UTF_8).equals("payload"));
+        Harness.check("the source is gone and no temporary is left", !src.exists() && !new File(dst.getParentFile(), "dst.bin.restoring").exists());
+
+        Harness.suite("the record of a backup is the number and not the secret");
+        Map<String, Object> facts = Backup.facts("Downloads/orb-backup.orbbak", 2, 12345L, true);
+        String factsText = Json.canonical(facts);
+        Harness.check("it says when-ish and how much", factsText.contains("\"items\":2") && factsText.contains("\"bytes\":12345"));
+        Harness.check("and carries no passphrase, salt or key", !factsText.contains("salt") && !factsText.contains("pass") && !factsText.contains("key\""));
+        ja.append(Backup.TYPE, facts);
+        long[] last = Backup.last(ja.readLines());
+        Harness.check("the last backup is read from the journal alone", last != null && last[1] == 2);
+        Harness.equal("none, if there never was one", Backup.last(Arrays.asList("{\"type\":\"orb.export\"}")), null);
+    }
+
+    private static boolean rolls(Context c) throws Exception {
+        Install.forget();
+        String before = Install.lane(c);
+        Backup.finishRestore(c);
+        Install.forget();
+        return Install.lane(c).equals(before);
+    }
+
+    private static boolean clears(Context c, File staging) throws Exception {
+        staging.mkdirs();
+        Files.write(new File(staging, "journal").toPath(), "partial".getBytes(StandardCharsets.UTF_8));
+        Backup.finishRestore(c);
+        return !staging.exists();
+    }
+}

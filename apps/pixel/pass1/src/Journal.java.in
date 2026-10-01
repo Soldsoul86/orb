@@ -473,7 +473,11 @@ final class Journal {
      * the same place.
      */
     synchronized List<Integer> chainBreaks() throws IOException {
-        List<String> lines = readLines();
+        return chainBreaksOf(readLines());
+    }
+
+    /** The same check over lines held elsewhere — a backup being verified before anything is replaced. */
+    static List<Integer> chainBreaksOf(List<String> lines) {
         List<Integer> breaks = new ArrayList<>();
         String previous = null;
 

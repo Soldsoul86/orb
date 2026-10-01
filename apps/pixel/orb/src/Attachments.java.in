@@ -336,6 +336,12 @@ final class Attachments {
         return secret;
     }
 
+    /** Where the three kinds of file live, for the backup that copies them and the restore that puts them back. */
+    static File keysDir(Context context) { return dir(context, KEYS); }
+    static File blobsDir(Context context) { return dir(context, BLOBS); }
+    static File destroyedDir(Context context) { return dir(context, DESTROYED); }
+    static File addressSecretFile(Context context) { return new File(context.getFilesDir(), ADDRESS_SECRET); }
+
     private static File dir(Context context, String name) {
         File dir = new File(context.getFilesDir(), name);
         if (!dir.exists()) dir.mkdirs();

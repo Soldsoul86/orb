@@ -548,3 +548,24 @@ C is the one to refuse unless a way to erase *within* an index is found.
 
 **Revisit when:** the first Kotlin piece is on the device (item 3 closes); the APK size matters (item 2); or
 a second source for the compiler's checksum exists (item 1).
+
+
+## AD-15 — the backup's limits, stated
+
+**Opened 2026-10-01** (`DURABILITY.md`, `DEVICE_LOOP.md` §7b58). Debts, not defects; each is a choice with a cost.
+
+1. **PBKDF2 is the weakest part.** The key is PBKDF2-HMAC-SHA256 at 600,000 iterations because the platform has it and nothing has to be added. A
+   memory-hard function (Argon2, scrypt) resists a graphics-card attacker far better. **Revisit** when one can be added without a library the build
+   cannot vouch for, and **at the latest before backups leave the phone automatically** (Step 2), because an automatic copy in a synced folder is a
+   target that stays.
+2. **A backup keeps what was erased after it.** Until the person deletes the file. Orb says so where the backup is made; the *Erase* dialog does not claim
+   to reach backups. (`ERASURE.md` §2a: *a backed-up key is an un-erased payload* — the limit is stated, scoped and in the person's hands.)
+3. **A forgotten passphrase is unrecoverable, and no hint is kept.** A hint is a weakened passphrase; the cost is a lost phone *and* a lost passphrase
+   losing everything.
+4. **Restore makes this phone the old install**, and refuses unless the install is fresh. Two live phones on one lane would fork history; the fresh guard and the
+   warning stop the honest case, and the laptop importer refuses two chains under one lane for the rest. A restore as a *new lane that imports the old* is the
+   cleaner model and a much larger change (multi-lane reading across Recall, Erasure and Provenance).
+5. **The process is closed after a restore**, because it still holds the old identity and journal; a background append in the moment between the swap and the
+   close would write a stray file under the old lane name. Harmless, but real.
+6. **A restore grants nothing** — the package-scan permission is not restored. Conservative on purpose; it costs the person one tap.
+7. **Not testable off the phone:** the file picker, `MediaStore` Downloads, and the swap across the real filesystems. The device check is one real restore.

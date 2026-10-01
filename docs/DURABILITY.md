@@ -1,6 +1,6 @@
 # Durability — Track E: losing the phone must not lose the memory
 
-> Status: **design proposed 2026-10-01; awaiting the operator's decisions** (§6). Nothing is built.
+> Status: **operator approved the plan 2026-10-01 ("Yes, start Step 1"); Step 1 built, not yet run on the device** (`DEVICE_LOOP.md` §7b58, `orb-app-v22-backup.apk`). Step 2 (automatic, into a chosen folder) is not started.
 > Bears on `ROADMAP.md` Track E, `ARCHITECTURAL_DEBT.md` AD-11 and AD-12, `ERASURE.md` §2a ("a backed-up key is an
 > un-erased payload"), `Synchronization.md`, `Encryption.md`. A laptop can never be required.
 

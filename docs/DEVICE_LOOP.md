@@ -5961,3 +5961,61 @@ not *remembered* (Recall lists screen text only), so a person could not see what
 - P82–P84 and P86 (draws and scrolls; screenshot blocked; reopens; search greyed) are the operator's report. **The decode and draw ran on the phone
   without incident**, which was the one thing no test off the phone could show.
 
+
+### 7b58. Back up and restore — Track E, Step 1 — 2026-10-01
+
+**Status: built, not yet run on the device.** `orb-app-v22-backup.apk`. v21 is §7b57 (verified). Design: `docs/DURABILITY.md`.
+The finding that prompted it: an export carries the journal's clear record only — never the sealed words, pictures or keys — so
+losing the phone lost the memory, and a fresh Orb could not read an export at all.
+
+#### What changed
+
+1. **A backup file you hold.** *Back up and restore* (main screen) → **Back up now…** writes `orb-backup-<time>.orbbak` to Downloads: the journal,
+   this install's identity and address secret, **every sealed item that has not been erased with its key**, and the destruction markers. Encrypted with
+   AES-256-GCM in 64 KiB chunks, each authenticated with the header, its position and whether it is the last; the key is PBKDF2-HMAC-SHA256 of a
+   passphrase (≥ 12 characters, typed twice) at 600,000 iterations with a random salt. **Pictures can be left out** (a checkbox). The passphrase is
+   typed, used and overwritten: never stored, logged, journaled or sent, no hint kept, and the prompt is `FLAG_SECURE`.
+2. **The record is a number, not a secret.** `orb.backup` (when, items, bytes, whether pictures, KDF iterations) is written **only after the file is whole**
+   (a partial file is deleted); the *Last backup* line on the main screen is read from the journal alone — *never*, a date, or *N days ago — back up again* after 7.
+3. **Check a backup file…** opens a backup and proves it whole **without changing anything on this phone**, so a backup can be shown good *before* a phone is wiped.
+4. **Restore from a backup…**, only on a **fresh** install (otherwise refused: two histories on one phone). It decrypts and verifies the whole file in a staging
+   area first — every chunk, the manifest, the identity, the journal's chain, every key paired with its item — and only then swaps; if the process dies midway,
+   the next start finishes it **before opening the identity or journal** (`Backup.finishRestore`). On success this phone becomes the old install; Orb closes and
+   must be opened again; the next start writes `orb.restored`. **Declared erasures replay at that start**, so anything erased after the backup is destroyed again.
+5. **A restore never grants anything.** The package-scan permission and Android's "default assistant" choice are the person's to give again.
+
+#### Checked before the device
+
+- 517 phone-side checks (was 417): **ciphertext throughout** (no word, URL, app, identity or passphrase in the file; two backups of the same data differ);
+  **a faithful round trip** — a second install, a lost phone's memory: the journal byte-identical, the words and the picture opening byte for byte, the erased item's
+  key not coming back and its identity still not re-mintable; without pictures the picture is honestly absent; **fails closed** on a wrong passphrase, a flipped bit
+  in the header or anywhere, a truncated file, **a file cut exactly at a chunk boundary where the plaintext still parses**, something appended, a weak or absurd KDF
+  header, a newer version, a path-escaping record name, a journal that does not link, an identity that is not the manifest's, a key without its item — each leaves the
+  install untouched and nothing staged; refused on a non-fresh install; the copy path a real phone takes for the journal (different filesystem); and a guard that the
+  passphrase is overwritten, cleared from its field, and appears in no log, preference or intent.
+- **Mutation-checked, thirteen ways:** dropping the KDF floor, ignoring the *last chunk* flag in the tag, the fresh-install check, the erased-item filter, the destruction markers, the record-name whitelist, the old-lane cleanup, the salt, the pictures choice, the journal chain check, the key-and-item pairing, the manifest identity and the iteration ceiling each fail named checks (or hang/crash a run, for the ones that would grind). **Two survived at first and were fixed:** a fixed salt (the test compared two backups that already differed by timestamp — now the same plan is written twice and the salts compared) and the iteration ceiling (caught only as a hang, which is detection but not a clean failure).
+- **Not testable off the phone:** the file picker, Downloads via `MediaStore`, the process closing after a restore, and a restore across the real filesystems.
+  **Those, and one real restore, are the device check** — and the point of the check is that a backup that was never restored is not a backup.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P87** | *Back up and restore* shows **Last backup: never**; *Back up now…* with a passphrase writes a file to Downloads and the line then shows today | the screen or the record is wrong |
+| **P88** | The file opens in no viewer and contains no readable word (try opening it as text) | plaintext in the file |
+| **P89** | *Check a backup file…* on it with the right passphrase says **good**, with the item count; a wrong passphrase says it cannot open it; nothing changes | the check is wrong |
+| **P90** | After **Clear storage** on Orb, opening Orb shows a fresh install (new identity, *Last backup: never*); *Restore* there with the file and passphrase says **Restored N items** and closes | the swap fails on the real filesystems |
+| **P91** | Reopened, Recall shows what was remembered, the words open, the pictures open, the erased item is still gone, and the next export has an `orb.restored` event and the same lane as before | the restore is not faithful |
+| **P92** | *Restore* on an Orb that has its own history is refused with an explanation | the fresh guard is not holding |
+
+#### The operator's protocol — **read the warning first**
+
+1. Install `orb-app-v22-backup.apk` over v21. **Back up and restore → Back up now…** with a passphrase you will keep somewhere that is **not this phone**. *(P87)*
+2. **Copy the `.orbbak` file off the phone** (Drive, a laptop, another phone). Try to open it as text: it should be unreadable. *(P88)*
+3. **Check a backup file…** → choose it → passphrase → it must say *good*. Try a wrong passphrase once. *(P89)*
+4. **Only then**, to test a restore: Android Settings → Apps → Orb → Storage → **Clear storage** (this wipes Orb's data on the phone; the file in Downloads and your copy stay). Open Orb. *(P90)*
+5. **Back up and restore → Restore from a backup…** → choose the file → passphrase. It should say *Restored* and close. Open Orb again. *(P90, P91)*
+6. Check Recall, a picture, *Kept by Orb*, and **Export and share journal**; send the export. *(P91)*
+7. Optionally, on an Orb that already holds history, tap *Restore* to see it refused. *(P92)*
+
+**Your remembered items are only safe if the backup in step 2 is good — which is why step 3 comes before step 4.** If you would rather not wipe your phone, do steps 1–3 only; they prove the backup without risk.

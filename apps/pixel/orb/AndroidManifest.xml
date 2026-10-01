@@ -81,6 +81,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".BackupActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".AllowActivity"
             android:exported="false" />
 

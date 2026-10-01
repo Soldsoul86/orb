@@ -1,0 +1,431 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.Process;
+import android.provider.MediaStore;
+import android.text.Editable;
+import android.text.InputType;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Back up what Orb remembered, and put it back — the screen for `docs/DURABILITY.md` Step 1.
+ *
+ * **The passphrase is typed here and goes nowhere else.** It is read into a character array, used once
+ * and overwritten; it is not stored, not logged, not journaled and not sent, and the screen is marked
+ * secure so it cannot be screenshotted while it is typed. No hint of it is kept.
+ *
+ * It draws and asks; `Backup` does the work. A backup is written to Downloads as a file the person
+ * carries wherever they choose — it is ciphertext, so where it sits does not matter.
+ */
+public final class BackupActivity extends Activity {
+    private static final int PICK_BACKUP = 41;
+    private static final int PICK_CHECK = 42;
+
+    private TextView last;
+    private TextView progress;
+    private CheckBox pictures;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Back up and restore");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        TextView why = new TextView(this);
+        why.setTextSize(13);
+        why.setPadding(0, 16, 0, 16);
+        why.setText("The file you get from “Export and share journal” holds the record of what happened — "
+            + "not the words or pictures Orb remembered, and not the keys. If you lose this phone, those are gone.\\n\\n"
+            + "A backup holds all of it, locked with a passphrase only you know. Keep the file somewhere that is not this phone "
+            + "(Drive, a USB drive, another phone, a laptop). It is encrypted, so where it sits does not matter.");
+        root.addView(why);
+
+        last = new TextView(this);
+        last.setTextSize(13);
+        last.setTypeface(Typeface.DEFAULT_BOLD);
+        last.setPadding(0, 8, 0, 16);
+        root.addView(last);
+
+        pictures = new CheckBox(this);
+        pictures.setText("Include pictures and files shared to Orb (they can be large)");
+        pictures.setChecked(true);
+        root.addView(pictures);
+
+        Button backup = new Button(this);
+        backup.setText("Back up now…");
+        backup.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startBackup(); }
+        });
+        root.addView(backup);
+
+        Button restore = new Button(this);
+        restore.setText("Restore from a backup…");
+        restore.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startRestore(); }
+        });
+        root.addView(restore);
+
+        Button check = new Button(this);
+        check.setText("Check a backup file…");
+        check.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startCheck(); }
+        });
+        root.addView(check);
+
+        TextView checkNote = new TextView(this);
+        checkNote.setTextSize(12);
+        checkNote.setText("Opens a backup and proves it whole without changing anything on this phone. "
+            + "Do this before you wipe a phone to restore: a backup you have not checked is a hope, not a backup.");
+        root.addView(checkNote);
+
+        progress = new TextView(this);
+        progress.setTextSize(13);
+        progress.setPadding(0, 24, 0, 0);
+        root.addView(progress);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        last.setText(lastLine(journal()));
+    }
+
+    private Journal journal() {
+        Orb app = Orb.get();
+        return app == null ? null : app.journal();
+    }
+
+    /** "Last backup: never" is the sentence that matters most on this screen. */
+    static String lastLine(Journal journal) {
+        if (journal == null) return "Last backup: unknown (the journal is unavailable)";
+        try {
+            long[] last = Backup.last(journal.readLines());
+            if (last == null) return "Last backup: never. If you lose this phone, what Orb remembered is gone.";
+            long days = Math.max(0, (System.currentTimeMillis() - last[0]) / (24L * 3600 * 1000));
+            return "Last backup: " + new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(last[0]))
+                + (days >= 7 ? "  —  " + days + " days ago. Back up again." : "") + "  (" + last[1] + " items)";
+        } catch (IOException unreadable) {
+            return "Last backup: unknown (the journal could not be read)";
+        }
+    }
+
+    // ---- backing up ----------------------------------------------------------------------------
+
+    private void startBackup() {
+        final boolean withPictures = pictures.isChecked();
+        askPassphrase("Back up", true,
+            "Choose a passphrase of at least " + Backup.MIN_PASSPHRASE + " characters and keep it somewhere that is not this phone "
+                + "(a password manager, or on paper at home). If you forget it, the backup cannot be opened — "
+                + "and there is no hint, because a hint weakens it.\\n\\n"
+                + "A backup holds what you have kept up to now. If you erase something later, it is still in any older backup "
+                + "until you delete that file.",
+            null, new PassphraseTaken() {
+                @Override public void taken(final char[] passphrase) { runBackup(passphrase, withPictures); }
+            });
+    }
+
+    private void runBackup(final char[] passphrase, final boolean withPictures) {
+        progress.setText("Backing up… this takes a few seconds.");
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String result;
+                try {
+                    result = backUp(passphrase, withPictures);
+                } catch (Exception failed) {
+                    result = "The backup did not finish, and nothing was recorded: " + failed.getMessage();
+                } finally {
+                    Arrays.fill(passphrase, '\0');
+                }
+                final String shown = result;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        progress.setText(shown);
+                        last.setText(lastLine(journal()));
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private String backUp(char[] passphrase, boolean withPictures) throws Exception {
+        Journal journal = journal();
+        if (journal == null) throw new IOException("the journal is unavailable");
+        List<String> lines = journal.readLines();
+        Backup.Plan plan = Backup.plan(this, lines, withPictures);
+        String name = "orb-backup-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date()) + ".orbbak";
+
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Downloads.DISPLAY_NAME, name);
+        values.put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
+        values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+        ContentResolver resolver = getContentResolver();
+        Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (target == null) throw new IOException("no destination");
+        Backup.Written written;
+        try (OutputStream out = resolver.openOutputStream(target)) {
+            if (out == null) throw new IOException("destination not writable");
+            written = Backup.write(plan, out, passphrase);
+        } catch (Exception failed) {
+            // A partial file is not a backup, and must not be left looking like one.
+            resolver.delete(target, null, null);
+            throw failed;
+        }
+        // Recorded only now that the file is whole: a record of a backup that did not happen would be a lie.
+        journal.append(Backup.TYPE, Backup.facts("Downloads/" + name, written.items, written.bytes, withPictures));
+
+        StringBuilder said = new StringBuilder("Backed up " + written.items + (written.items == 1 ? " item" : " items")
+            + " to Downloads/" + name + ".\\nCopy it somewhere that is not this phone.");
+        if (plan.missing > 0) said.append("\\n").append(plan.missing).append(" kept item(s) could not be found on this phone and are not in it.");
+        if (plan.skippedPictures > 0) said.append("\\n").append(plan.skippedPictures).append(" shared picture(s) or file(s) were left out, as you chose.");
+        return said.toString();
+    }
+
+    // ---- restoring -----------------------------------------------------------------------------
+
+    private void startRestore() {
+        Journal journal = journal();
+        List<String> lines;
+        try {
+            lines = journal == null ? null : journal.readLines();
+        } catch (IOException unreadable) {
+            lines = null;
+        }
+        if (lines == null || !Backup.isFresh(lines)) {
+            new AlertDialog.Builder(this)
+                .setTitle("Restore is for a fresh install")
+                .setMessage("This Orb already holds its own history. Restoring would put two histories on one phone. "
+                    + "To restore, install Orb on the new (or wiped) phone and do it before anything else.")
+                .setPositiveButton("OK", null)
+                .show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Restore from a backup")
+            .setMessage("Only do this if the old phone is lost or wiped. If the old phone is still in use, restoring would put two phones "
+                + "on one history.\\n\\nThis phone will become the old one: its history, what it remembered, and what it erased. "
+                + "Nothing is granted again — you will give Orb back any permission you want it to have.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Choose the backup file", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    pick.addCategory(Intent.CATEGORY_OPENABLE);
+                    pick.setType("*/*");
+                    startActivityForResult(pick, PICK_BACKUP);
+                }
+            })
+            .show();
+    }
+
+    private void startCheck() {
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType("*/*");
+        startActivityForResult(pick, PICK_CHECK);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if ((requestCode != PICK_BACKUP && requestCode != PICK_CHECK) || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri file = data.getData();
+        final boolean onlyCheck = requestCode == PICK_CHECK;
+        askPassphrase(onlyCheck ? "Check" : "Restore", false, "Type the passphrase you chose when you made this backup.", null, new PassphraseTaken() {
+            @Override public void taken(final char[] passphrase) {
+                if (onlyCheck) runCheck(file, passphrase); else runRestore(file, passphrase);
+            }
+        });
+    }
+
+    private void runCheck(final Uri file, final char[] passphrase) {
+        progress.setText("Checking… this takes a few seconds.");
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String message;
+                try (InputStream in = getContentResolver().openInputStream(file)) {
+                    if (in == null) throw new IOException("the file could not be opened");
+                    Backup.Restored good = Backup.check(BackupActivity.this, in, passphrase);
+                    message = "This backup is good: " + good.items + (good.items == 1 ? " item" : " items")
+                        + (good.pictures ? ", pictures included" : ", no pictures") + ", made "
+                        + new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(good.created))
+                        + ".\nNothing on this phone was changed.";
+                } catch (Backup.Failure failed) {
+                    message = words(failed.reason);
+                } catch (Exception failed) {
+                    message = "Could not check it: " + failed.getMessage() + "\nNothing was changed.";
+                } finally {
+                    Arrays.fill(passphrase, '\0');
+                }
+                final String shown = message;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { progress.setText(shown); }
+                });
+            }
+        }).start();
+    }
+
+    private void runRestore(final Uri file, final char[] passphrase) {
+        progress.setText("Restoring… this takes a few seconds. Do not close Orb.");
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String message;
+                boolean done = false;
+                try {
+                    Journal journal = journal();
+                    List<String> lines = journal == null ? java.util.Collections.<String>emptyList() : journal.readLines();
+                    Backup.Restored restored;
+                    try (InputStream in = getContentResolver().openInputStream(file)) {
+                        if (in == null) throw new IOException("the file could not be opened");
+                        restored = Backup.restore(BackupActivity.this, lines, in, passphrase);
+                    }
+                    message = "Restored " + restored.items + (restored.items == 1 ? " item" : " items") + " from the backup made "
+                        + new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(restored.created))
+                        + ".\\n\\nOrb will now close. Open it again.";
+                    done = true;
+                } catch (Backup.Failure failed) {
+                    message = words(failed.reason);
+                } catch (Exception failed) {
+                    message = "Could not restore: " + failed.getMessage() + "\\nNothing was changed.";
+                } finally {
+                    Arrays.fill(passphrase, '\0');
+                }
+                final String shown = message;
+                final boolean closeApp = done;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        progress.setText(closeApp ? "Restored." : shown);
+                        new AlertDialog.Builder(BackupActivity.this)
+                            .setMessage(shown)
+                            .setCancelable(!closeApp)
+                            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int which) {
+                                    // The running process still holds the old identity and journal; it must not write again.
+                                    if (closeApp) { finishAffinity(); Process.killProcess(Process.myPid()); }
+                                }
+                            })
+                            .show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private static String words(String reason) {
+        switch (reason) {
+            case Backup.WRONG_OR_DAMAGED:
+                return "That passphrase does not open this file, or the file is damaged. Nothing was changed.";
+            case Backup.NOT_A_BACKUP:
+                return "That is not an Orb backup. Nothing was changed.";
+            case Backup.WEAK_KDF:
+                return "This backup asks for weaker protection than Orb will accept, so it was refused. Nothing was changed.";
+            case Backup.UNSUPPORTED:
+                return "This backup was made by a version of Orb this one cannot read. Nothing was changed.";
+            case Backup.NOT_FRESH:
+                return "This Orb already holds its own history, so it was not restored. Nothing was changed.";
+            case Backup.BAD_CONTENT:
+                return "The backup opened, but its contents did not check out. Nothing was changed.";
+            default:
+                return "The restore did not happen. Nothing was changed.";
+        }
+    }
+
+    // ---- the passphrase prompt -----------------------------------------------------------------
+
+    private interface PassphraseTaken {
+        void taken(char[] passphrase);
+    }
+
+    /**
+     * Asks for the passphrase (twice when [confirm]). Whatever was typed is read into a character array, the
+     * fields are cleared, and the array is handed on to be overwritten after use.
+     */
+    private void askPassphrase(final String title, final boolean confirm, String message, String error, final PassphraseTaken then) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(48, 24, 48, 0);
+        TextView text = new TextView(this);
+        text.setTextSize(13);
+        text.setText(error == null ? message : error + "\\n\\n" + message);
+        box.addView(text);
+        final EditText first = field("Passphrase");
+        box.addView(first);
+        final EditText second = confirm ? field("The same passphrase again") : null;
+        if (second != null) box.addView(second);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(box)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(title, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    char[] a = take(first);
+                    char[] b = second == null ? a : take(second);
+                    String problem = confirm ? Backup.checkPassphrase(a, b) : (a.length == 0 ? "Type the passphrase." : null);
+                    if (b != a) Arrays.fill(b, '\0');
+                    if (problem != null) {
+                        Arrays.fill(a, '\0');
+                        askPassphrase(title, confirm, "Choose a passphrase of at least " + Backup.MIN_PASSPHRASE + " characters.", problem, then);
+                        return;
+                    }
+                    then.taken(a);
+                }
+            })
+            .create();
+        // The passphrase is being typed here: no screenshots, no recording.
+        dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        dialog.show();
+    }
+
+    private EditText field(String hint) {
+        EditText e = new EditText(this);
+        e.setHint(hint);
+        e.setSingleLine(true);
+        e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        return e;
+    }
+
+    /** Reads a field into a character array and clears the field, so the text does not linger in the widget. */
+    private static char[] take(EditText field) {
+        Editable typed = field.getText();
+        char[] chars = new char[typed.length()];
+        typed.getChars(0, chars.length, chars, 0);
+        typed.clear();
+        return chars;
+    }
+}

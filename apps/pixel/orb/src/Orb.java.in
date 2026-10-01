@@ -51,6 +51,10 @@ public final class Orb extends Application {
         super.onCreate();
         instance = this;
 
+        // A restore that was verified and not finished is finished first — before the identity or the journal
+        // is opened, so Orb never opens a lane that is not the one it is about to become.
+        Backup.finishRestore(this);
+
         try {
             // Minted here, before anything can want a lane. A first run is the
             // only run that writes to disk before it reads.
@@ -74,6 +78,9 @@ public final class Orb extends Application {
         }
 
         recordStart();
+
+        // If this start follows a restore, the history says so.
+        Backup.noteRestored(this, journal);
 
         // Finish any erasure that was declared and not completed (the crash window between
         // the declaration and the key's destruction). Idempotent; never blocks launching.

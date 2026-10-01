@@ -1,0 +1,771 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+
+/**
+ * A backup the person holds: one encrypted file with the journal, the sealed items and their keys —
+ * and the way to put it back (`docs/DURABILITY.md`).
+ *
+ * **Why it exists.** An export carries only the journal's clear record, never the sealed words, pictures
+ * or keys, so losing the phone lost the memory. This is the file that does not.
+ *
+ * **What is in it.** The journal as written; this install's identity and address secret (so every sealed
+ * item is found where it was); for every item **not erased**, its sealed bytes and its key; and the
+ * **destruction markers**, so a restore still refuses to re-mint what was destroyed (`Attachments` inv. 8).
+ * **No key for an erased item** — erasure before the backup is honoured by it — and nothing else: no
+ * passphrase, no setting, no permission. A restore never grants anything; the package-scan permission is
+ * the person's to give again.
+ *
+ * **How it is protected.** AES-256-GCM in 64 KiB chunks. Each chunk is authenticated with the whole
+ * header, its position and whether it is the last, so a flipped bit, a reordered or dropped chunk, a
+ * truncated file or a file with something appended is refused. The key is PBKDF2-HMAC-SHA256 of the
+ * passphrase and a random salt, at an iteration count written in the header — **and a restore refuses a
+ * header asking for fewer than the floor**, so a file cannot talk Orb into a weak key. (PBKDF2 is chosen
+ * because the platform has it and nothing has to be added; a memory-hard function would be better and
+ * is recorded as a debt.)
+ *
+ * **The passphrase** is typed, used and overwritten. It is never stored, logged, journaled or sent, and no
+ * hint of it is kept: a hint is a weakened passphrase.
+ *
+ * **A restore verifies everything before it replaces anything.** The whole file is decrypted into a
+ * staging area; only if every chunk authenticates and the journal's chain links does anything of the
+ * install change, and then the swap can be finished at the next start if the process dies halfway
+ * (`finishRestore`). **It is refused unless this install holds nothing of its own**, because two phones
+ * writing one lane is the corruption the design exists to prevent.
+ *
+ * **What a backup cannot do.** It holds what existed when it was made. Something erased afterwards is
+ * erased on this phone and **still in that file** until the person deletes the file — the limit
+ * `ERASURE.md` §2a names (*a backed-up key is an un-erased payload*), stated, scoped and in their hands.
+ * After a restore the declared erasures replay and destroy it again on the restored phone.
+ */
+final class Backup {
+    private Backup() {}
+
+    static final String TYPE = "orb.backup";
+    static final String RESTORED = "orb.restored";
+
+    private static final byte[] MAGIC = {'O', 'R', 'B', 'B', 'A', 'K', 0, 1};
+    static final int KDF_PBKDF2_SHA256 = 1;
+    /** What this build writes, and the floor a restore will accept. */
+    static final int ITERATIONS = 600_000;
+    static final int MIN_ITERATIONS = 600_000;
+    /** Above this a header is an attempt to make the phone grind, not a backup. */
+    static final int MAX_ITERATIONS = 10_000_000;
+    static final int SALT_BYTES = 16;
+    static final int CHUNK = 64 * 1024;
+    private static final int GCM_TAG_BYTES = 16;
+    private static final int HEADER_BYTES = MAGIC.length + 1 + 4 + SALT_BYTES + 4;
+    static final int MIN_PASSPHRASE = 12;
+
+    private static final long MAX_JOURNAL_BYTES = 512L * 1024 * 1024;
+    private static final long MAX_BLOB_BYTES = Attachments.MAX_BYTES + 1024L;
+    private static final int MAX_NAME = 80;
+    private static final Pattern ADDRESSED = Pattern.compile("(key|blob|destroyed)/([0-9a-f]{64})");
+
+    /** Why a backup or restore did not happen. Never the passphrase and never content. */
+    static final String NOT_A_BACKUP = "notABackup";
+    static final String UNSUPPORTED = "unsupported";
+    static final String WEAK_KDF = "weakKdf";
+    /** Wrong passphrase **or** damage: GCM cannot, and must not, tell them apart. */
+    static final String WRONG_OR_DAMAGED = "wrongPassphraseOrDamaged";
+    static final String NOT_FRESH = "notFresh";
+    static final String BAD_CONTENT = "badContent";
+    static final String CHANGED_WHILE_WRITING = "changedWhileWriting";
+
+    static final class Failure extends IOException {
+        final String reason;
+
+        Failure(String reason, String detail) {
+            super(detail);
+            this.reason = reason;
+        }
+    }
+
+    // ---- what goes in --------------------------------------------------------------------------
+
+    static final class Entry {
+        final String name;
+        final File file;
+        final byte[] bytes;
+        final long length;
+
+        Entry(String name, File file, byte[] bytes) {
+            this.name = name;
+            this.file = file;
+            this.bytes = bytes;
+            this.length = file != null ? file.length() : bytes.length;
+        }
+    }
+
+    static final class Plan {
+        final List<Entry> entries = new ArrayList<>();
+        /** Sealed items (identities) that go in. */
+        int items;
+        /** Items the journal says are kept but whose bytes or key are not on disk — said, never hidden. */
+        int missing;
+        /** Shared pictures and files left out because the person chose not to include them. */
+        int skippedPictures;
+        long bytes;
+        boolean picturesIncluded;
+        String lane;
+    }
+
+    /**
+     * Decides, from a snapshot of the journal's lines, what a backup would hold. Reads sizes, not
+     * contents; nothing is written.
+     */
+    static Plan plan(Context context, List<String> lines, boolean includePictures) throws Exception {
+        Plan plan = new Plan();
+        plan.picturesIncluded = includePictures;
+        plan.lane = Install.lane(context);
+
+        long created = System.currentTimeMillis();
+        // Which identities are still kept, and by what kind of item.
+        Map<String, boolean[]> kept = new LinkedHashMap<>();   // identity -> {hasCapture, hasShare}
+        for (Erasure.Item item : Erasure.items(lines)) {
+            if (item.erased) continue;
+            boolean[] kinds = kept.get(item.identity);
+            if (kinds == null) { kinds = new boolean[2]; kept.put(item.identity, kinds); }
+            if (AssistFacts.CAPTURED.equals(item.type)) kinds[0] = true; else kinds[1] = true;
+        }
+
+        StringBuilder journal = new StringBuilder();
+        for (String line : lines) journal.append(line).append('\n');
+        byte[] journalBytes = journal.toString().getBytes(StandardCharsets.UTF_8);
+
+        List<Entry> sealed = new ArrayList<>();
+        for (Map.Entry<String, boolean[]> e : kept.entrySet()) {
+            boolean words = e.getValue()[0];
+            boolean shared = e.getValue()[1];
+            if (!words && !(shared && includePictures)) { plan.skippedPictures++; continue; }
+            String address = Attachments.address(context, e.getKey());
+            File key = new File(Attachments.keysDir(context), address);
+            File blob = new File(Attachments.blobsDir(context), address);
+            if (!key.exists() || !blob.exists()) { plan.missing++; continue; }
+            sealed.add(new Entry("key/" + address, key, null));
+            sealed.add(new Entry("blob/" + address, blob, null));
+            plan.items++;
+        }
+
+        String manifest = "orb.backup.v1\nlane:" + plan.lane + "\ncreated:" + created + "\nitems:" + plan.items
+            + "\npictures:" + (includePictures ? 1 : 0) + "\n";
+        plan.entries.add(new Entry("manifest", null, manifest.getBytes(StandardCharsets.UTF_8)));
+        plan.entries.add(new Entry("install.id", new File(context.getFilesDir(), "install.id"), null));
+        plan.entries.add(new Entry("address.secret", Attachments.addressSecretFile(context), null));
+        plan.entries.add(new Entry("journal", null, journalBytes));
+        File[] markers = Attachments.destroyedDir(context).listFiles();
+        if (markers != null) {
+            Arrays.sort(markers);
+            for (File marker : markers) {
+                if (marker.isFile() && marker.getName().matches("[0-9a-f]{64}")) {
+                    plan.entries.add(new Entry("destroyed/" + marker.getName(), marker, null));
+                }
+            }
+        }
+        plan.entries.addAll(sealed);
+        for (Entry entry : plan.entries) plan.bytes += entry.length;
+        return plan;
+    }
+
+    // ---- the passphrase ------------------------------------------------------------------------
+
+    /** Null if the passphrase will do; otherwise why not, in words for the person. */
+    static String checkPassphrase(char[] first, char[] second) {
+        if (first == null || first.length < MIN_PASSPHRASE) {
+            return "Use at least " + MIN_PASSPHRASE + " characters. A phrase of a few words is easier to remember than a password.";
+        }
+        if (second == null || !Arrays.equals(first, second)) return "The two entries are different.";
+        return null;
+    }
+
+    private static byte[] derive(char[] passphrase, byte[] salt, int iterations) throws GeneralSecurityException {
+        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, iterations, 256);
+        try {
+            return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+        } finally {
+            spec.clearPassword();
+        }
+    }
+
+    // ---- writing -------------------------------------------------------------------------------
+
+    static final class Written {
+        final int items;
+        final long bytes;
+
+        Written(int items, long bytes) {
+            this.items = items;
+            this.bytes = bytes;
+        }
+    }
+
+    /**
+     * Writes the planned backup to `out`, encrypted under `passphrase` (which the caller overwrites).
+     * On any failure the caller must discard what was written — a partial file is not a backup.
+     */
+    static Written write(Plan plan, OutputStream out, char[] passphrase) throws Exception {
+        byte[] salt = new byte[SALT_BYTES];
+        new SecureRandom().nextBytes(salt);
+        byte[] header = header(ITERATIONS, salt);
+        byte[] key = derive(passphrase, salt, ITERATIONS);
+        try {
+            out.write(header);
+            ChunkWriter chunks = new ChunkWriter(out, key, header);
+            for (Entry entry : plan.entries) writeRecord(chunks, entry);
+            chunks.finish();
+            out.flush();
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
+        return new Written(plan.items, plan.bytes);
+    }
+
+    private static byte[] header(int iterations, byte[] salt) {
+        byte[] h = new byte[HEADER_BYTES];
+        System.arraycopy(MAGIC, 0, h, 0, MAGIC.length);
+        int at = MAGIC.length;
+        h[at++] = KDF_PBKDF2_SHA256;
+        putInt(h, at, iterations); at += 4;
+        System.arraycopy(salt, 0, h, at, SALT_BYTES); at += SALT_BYTES;
+        putInt(h, at, CHUNK);
+        return h;
+    }
+
+    private static void putInt(byte[] b, int at, int v) {
+        b[at] = (byte) (v >>> 24); b[at + 1] = (byte) (v >>> 16); b[at + 2] = (byte) (v >>> 8); b[at + 3] = (byte) v;
+    }
+
+    private static int getInt(byte[] b, int at) {
+        return ((b[at] & 0xff) << 24) | ((b[at + 1] & 0xff) << 16) | ((b[at + 2] & 0xff) << 8) | (b[at + 3] & 0xff);
+    }
+
+    private static void writeRecord(ChunkWriter chunks, Entry entry) throws IOException {
+        byte[] name = entry.name.getBytes(StandardCharsets.UTF_8);
+        byte[] head = new byte[1 + 2 + name.length + 8];
+        head[0] = 1;
+        head[1] = (byte) (name.length >>> 8);
+        head[2] = (byte) name.length;
+        System.arraycopy(name, 0, head, 3, name.length);
+        long n = entry.length;
+        for (int i = 0; i < 8; i++) head[3 + name.length + i] = (byte) (n >>> (56 - 8 * i));
+        chunks.write(head, 0, head.length);
+        if (entry.bytes != null) {
+            chunks.write(entry.bytes, 0, entry.bytes.length);
+            return;
+        }
+        long left = n;
+        byte[] buffer = new byte[8192];
+        try (InputStream in = new FileInputStream(entry.file)) {
+            while (left > 0) {
+                int got = in.read(buffer, 0, (int) Math.min(buffer.length, left));
+                if (got < 0) throw new Failure(CHANGED_WHILE_WRITING, entry.name + " became shorter while it was being read");
+                chunks.write(buffer, 0, got);
+                left -= got;
+            }
+            if (in.read() >= 0) throw new Failure(CHANGED_WHILE_WRITING, entry.name + " grew while it was being read");
+        }
+    }
+
+    /** Authenticated, chunked encryption. Holds at most one chunk. */
+    private static final class ChunkWriter {
+        private final OutputStream out;
+        private final SecretKeySpec key;
+        private final byte[] header;
+        private final byte[] buffer = new byte[CHUNK];
+        private int filled;
+        private long counter;
+
+        ChunkWriter(OutputStream out, byte[] key, byte[] header) {
+            this.out = out;
+            this.key = new SecretKeySpec(key, "AES");
+            this.header = header;
+        }
+
+        void write(byte[] data, int off, int len) throws IOException {
+            while (len > 0) {
+                // A full buffer is only known not to be the last once more data arrives.
+                if (filled == CHUNK) emit(false);
+                int take = Math.min(len, CHUNK - filled);
+                System.arraycopy(data, off, buffer, filled, take);
+                filled += take; off += take; len -= take;
+            }
+        }
+
+        void finish() throws IOException {
+            emit(true);
+        }
+
+        private void emit(boolean last) throws IOException {
+            try {
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BYTES * 8, nonce(counter)));
+                cipher.updateAAD(aad(header, counter, last));
+                byte[] sealed = cipher.doFinal(buffer, 0, filled);
+                byte[] length = new byte[4];
+                putInt(length, 0, sealed.length);
+                out.write(length);
+                out.write(sealed);
+            } catch (GeneralSecurityException e) {
+                throw new IOException("could not seal a chunk", e);
+            }
+            counter++;
+            filled = 0;
+        }
+    }
+
+    private static byte[] nonce(long counter) {
+        byte[] n = new byte[12];
+        for (int i = 0; i < 8; i++) n[4 + i] = (byte) (counter >>> (56 - 8 * i));
+        return n;
+    }
+
+    /** The header, the chunk's place, and whether it is the last: any of them wrong fails the tag. */
+    private static byte[] aad(byte[] header, long counter, boolean last) {
+        byte[] a = new byte[header.length + 8 + 1];
+        System.arraycopy(header, 0, a, 0, header.length);
+        for (int i = 0; i < 8; i++) a[header.length + i] = (byte) (counter >>> (56 - 8 * i));
+        a[a.length - 1] = (byte) (last ? 1 : 0);
+        return a;
+    }
+
+    // ---- reading -------------------------------------------------------------------------------
+
+    /** Plaintext of the whole backup, a chunk at a time; ends only after the last chunk authenticates. */
+    private static final class ChunkReader extends InputStream {
+        private final InputStream in;
+        private final SecretKeySpec key;
+        private final byte[] header;
+        private byte[] plain = new byte[0];
+        private int at;
+        private long counter;
+        private boolean ended;
+        private int peeked = -2;      // -2: nothing peeked
+
+        ChunkReader(InputStream in, byte[] key, byte[] header) {
+            this.in = in;
+            this.key = new SecretKeySpec(key, "AES");
+            this.header = header;
+        }
+
+        private int next() throws IOException {
+            if (peeked != -2) { int p = peeked; peeked = -2; return p; }
+            return in.read();
+        }
+
+        private boolean fill() throws IOException {
+            if (ended) return false;
+            int first = next();
+            if (first < 0) throw new Failure(WRONG_OR_DAMAGED, "the file ends without a final chunk");
+            byte[] length = new byte[4];
+            length[0] = (byte) first;
+            for (int i = 1; i < 4; i++) {
+                int b = next();
+                if (b < 0) throw new Failure(WRONG_OR_DAMAGED, "the file ends inside a chunk header");
+                length[i] = (byte) b;
+            }
+            int n = getInt(length, 0);
+            if (n < GCM_TAG_BYTES || n > CHUNK + GCM_TAG_BYTES) throw new Failure(WRONG_OR_DAMAGED, "a chunk has an impossible length");
+            byte[] sealed = new byte[n];
+            int got = 0;
+            while (got < n) {
+                int r = in.read(sealed, got, n - got);
+                if (r < 0) throw new Failure(WRONG_OR_DAMAGED, "the file ends inside a chunk");
+                got += r;
+            }
+            // Whether this is the last chunk is whether anything follows it — and the tag says whether that was true.
+            peeked = in.read();
+            boolean last = peeked < 0;
+            try {
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BYTES * 8, nonce(counter)));
+                cipher.updateAAD(aad(header, counter, last));
+                plain = cipher.doFinal(sealed);
+            } catch (GeneralSecurityException e) {
+                throw new Failure(WRONG_OR_DAMAGED, "a chunk did not authenticate");
+            }
+            at = 0;
+            counter++;
+            if (last) ended = true;
+            return true;
+        }
+
+        @Override public int read() throws IOException {
+            while (at >= plain.length) if (!fill()) return -1;
+            return plain[at++] & 0xff;
+        }
+
+        @Override public int read(byte[] b, int off, int len) throws IOException {
+            if (len == 0) return 0;
+            while (at >= plain.length) if (!fill()) return -1;
+            int n = Math.min(len, plain.length - at);
+            System.arraycopy(plain, at, b, off, n);
+            at += n;
+            return n;
+        }
+    }
+
+    // ---- restoring -----------------------------------------------------------------------------
+
+    private static final String STAGING = "backup-staging";
+    private static final String COMPLETE = "COMPLETE";
+    private static final String OLD_LANE = "OLD_LANE";
+    private static final String RESTORED_PENDING = "restored.pending";
+
+    static final class Restored {
+        final int items;
+        final long created;
+        final boolean pictures;
+        final String lane;
+
+        Restored(int items, long created, boolean pictures, String lane) {
+            this.items = items;
+            this.created = created;
+            this.pictures = pictures;
+            this.lane = lane;
+        }
+    }
+
+    /**
+     * Whether this install holds nothing of its own, so a restore cannot put two histories on one lane.
+     * Only Orb's own start-up records count as nothing; any other kind of line — or one this does not
+     * recognise — means it is not fresh.
+     */
+    static boolean isFresh(List<String> lines) {
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            if (type == null) return false;
+            boolean startup = type.equals("orb.process.start") || type.equals("orb.chain.discontinuity")
+                || type.equals("orb.export") || type.startsWith("grants.");
+            if (!startup) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Decrypts, verifies and — only then — installs a backup. `currentLines` is this install's own journal.
+     * Throws a `Failure` naming the reason, having changed nothing, for anything wrong; the passphrase is
+     * the caller's to overwrite.
+     */
+    static Restored restore(Context context, List<String> currentLines, InputStream in, char[] passphrase) throws Exception {
+        if (!isFresh(currentLines)) {
+            throw new Failure(NOT_FRESH, "this install already holds its own history; restore only on a fresh install");
+        }
+        File staging = new File(context.getFilesDir(), STAGING);
+        Restored restored = stageAndVerify(staging, in, passphrase);
+
+        // Verified. Record where the swap started from, mark the staging complete, then swap.
+        String oldLane = Install.lane(context);
+        try (FileOutputStream out = new FileOutputStream(new File(staging, OLD_LANE))) {
+            out.write(oldLane.getBytes(StandardCharsets.UTF_8));
+        }
+        try (FileOutputStream out = new FileOutputStream(new File(staging, "pending.txt"))) {
+            String pending = "created:" + restored.created + "\nitems:" + restored.items + "\npictures:" + (restored.pictures ? 1 : 0)
+                + "\nlane:" + restored.lane + "\n";
+            out.write(pending.getBytes(StandardCharsets.UTF_8));
+        }
+        new FileOutputStream(new File(staging, COMPLETE)).close();
+        swap(context, staging);
+        Install.forget();
+        return restored;
+    }
+
+    /**
+     * Whether a backup file opens and is whole — **without touching this install at all**. The same decrypting
+     * and checking as a restore, in a scratch area that is cleared afterwards; it needs no fresh install, so a
+     * person can prove a backup good *before* they wipe anything to restore it.
+     */
+    static Restored check(Context context, InputStream in, char[] passphrase) throws Exception {
+        File scratch = new File(context.getFilesDir(), "backup-check");
+        try {
+            return stageAndVerify(scratch, in, passphrase);
+        } finally {
+            deleteTree(scratch);
+        }
+    }
+
+    /** Decrypts the whole backup into [staging], verifying every chunk and the contents; clears it if anything is wrong. */
+    private static Restored stageAndVerify(File staging, InputStream in, char[] passphrase) throws Exception {
+        byte[] header = new byte[HEADER_BYTES];
+        readFully(in, header, NOT_A_BACKUP, "too short to be a backup");
+        for (int i = 0; i < MAGIC.length - 2; i++) {
+            if (header[i] != MAGIC[i]) throw new Failure(NOT_A_BACKUP, "not an Orb backup");
+        }
+        if (header[MAGIC.length - 2] != 0 || header[MAGIC.length - 1] != 1) throw new Failure(UNSUPPORTED, "a backup format this Orb does not know");
+        int at = MAGIC.length;
+        if (header[at++] != KDF_PBKDF2_SHA256) throw new Failure(UNSUPPORTED, "a key method this Orb does not know");
+        int iterations = getInt(header, at); at += 4;
+        byte[] salt = Arrays.copyOfRange(header, at, at + SALT_BYTES); at += SALT_BYTES;
+        int chunk = getInt(header, at);
+        // The floor is enforced on the file's own claim: a header cannot argue Orb into a weak key.
+        if (iterations < MIN_ITERATIONS) throw new Failure(WEAK_KDF, "this backup asks for a weaker key than Orb will accept");
+        if (iterations > MAX_ITERATIONS) throw new Failure(UNSUPPORTED, "this backup asks for an unreasonable amount of work");
+        if (chunk != CHUNK) throw new Failure(UNSUPPORTED, "a chunk size this Orb does not know");
+
+        deleteTree(staging);
+        if (!staging.mkdirs()) throw new IOException("could not make a staging area");
+
+        byte[] key = derive(passphrase, salt, iterations);
+        String manifest = null;
+        Map<String, Long> staged = new HashMap<>();
+        try {
+            ChunkReader plain = new ChunkReader(in, key, header);
+            while (true) {
+                int type = plain.read();
+                if (type < 0) break;
+                if (type != 1) throw new Failure(WRONG_OR_DAMAGED, "an unknown record");
+                int nameLength = (plain.read() << 8) | plain.read();
+                if (nameLength <= 0 || nameLength > MAX_NAME) throw new Failure(BAD_CONTENT, "a record with an impossible name");
+                byte[] nameBytes = new byte[nameLength];
+                readFully(plain, nameBytes, WRONG_OR_DAMAGED, "a record cut short");
+                String name = new String(nameBytes, StandardCharsets.UTF_8);
+                long length = 0;
+                for (int i = 0; i < 8; i++) length = (length << 8) | plain.read();
+                if (length < 0) throw new Failure(BAD_CONTENT, "a record with an impossible length");
+                if (staged.containsKey(name)) throw new Failure(BAD_CONTENT, "the same record twice");
+
+                File target = stagedFile(staging, name);
+                long cap = name.equals("manifest") ? 4096 : name.equals("journal") ? MAX_JOURNAL_BYTES
+                    : name.equals("install.id") || name.equals("address.secret") ? 4096 : MAX_BLOB_BYTES;
+                if (length > cap) throw new Failure(BAD_CONTENT, "a record larger than allowed");
+                target.getParentFile().mkdirs();
+                try (OutputStream out = new FileOutputStream(target)) {
+                    byte[] buffer = new byte[8192];
+                    long left = length;
+                    ByteArrayOutputStream copy = name.equals("manifest") ? new ByteArrayOutputStream() : null;
+                    while (left > 0) {
+                        int got = plain.read(buffer, 0, (int) Math.min(buffer.length, left));
+                        if (got < 0) throw new Failure(WRONG_OR_DAMAGED, "a record cut short");
+                        out.write(buffer, 0, got);
+                        if (copy != null) copy.write(buffer, 0, got);
+                        left -= got;
+                    }
+                    if (copy != null) manifest = new String(copy.toByteArray(), StandardCharsets.UTF_8);
+                }
+                staged.put(name, length);
+            }
+            return verify(staging, staged, manifest);
+        } catch (IOException | RuntimeException e) {
+            deleteTree(staging);
+            throw e;
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
+    }
+
+    private static File stagedFile(File staging, String name) throws Failure {
+        if (name.equals("manifest") || name.equals("journal") || name.equals("install.id") || name.equals("address.secret")) {
+            return new File(staging, name);
+        }
+        java.util.regex.Matcher m = ADDRESSED.matcher(name);
+        if (!m.matches()) throw new Failure(BAD_CONTENT, "a record with a name Orb does not use");
+        return new File(new File(staging, m.group(1)), m.group(2));
+    }
+
+    private static Restored verify(File staging, Map<String, Long> staged, String manifest) throws IOException {
+        for (String required : new String[] {"manifest", "journal", "install.id", "address.secret"}) {
+            if (!staged.containsKey(required)) throw new Failure(BAD_CONTENT, "the backup has no " + required);
+        }
+        Map<String, String> m = new HashMap<>();
+        for (String line : manifest.split("\n")) {
+            int c = line.indexOf(':');
+            if (c > 0) m.put(line.substring(0, c), line.substring(c + 1));
+        }
+        if (!manifest.startsWith("orb.backup.v1\n")) throw new Failure(UNSUPPORTED, "a manifest this Orb does not know");
+        String lane = m.get("lane");
+        String installId = new String(Files.readAllBytes(new File(staging, "install.id").toPath()), StandardCharsets.UTF_8).trim();
+        if (lane == null || !lane.equals(installId)) throw new Failure(BAD_CONTENT, "the backup's identity does not match its manifest");
+        List<String> lines = new ArrayList<>();
+        for (String line : new String(Files.readAllBytes(new File(staging, "journal").toPath()), StandardCharsets.UTF_8).split("\n")) {
+            if (!line.isEmpty()) lines.add(line);
+        }
+        if (lines.isEmpty()) throw new Failure(BAD_CONTENT, "the backup's journal is empty");
+        if (!Journal.chainBreaksOf(lines).isEmpty()) throw new Failure(BAD_CONTENT, "the backup's journal does not link");
+        // Every key has its sealed bytes and every sealed byte its key.
+        File keys = new File(staging, "key");
+        File blobs = new File(staging, "blob");
+        String[] keyNames = keys.list() == null ? new String[0] : keys.list();
+        String[] blobNames = blobs.list() == null ? new String[0] : blobs.list();
+        if (!new java.util.HashSet<>(Arrays.asList(keyNames)).equals(new java.util.HashSet<>(Arrays.asList(blobNames)))) {
+            throw new Failure(BAD_CONTENT, "a sealed item without its key, or a key without its item");
+        }
+        long created = parseLong(m.get("created"));
+        return new Restored(keyNames.length, created, "1".equals(m.get("pictures")), lane);
+    }
+
+    private static long parseLong(String s) {
+        try { return s == null ? 0L : Long.parseLong(s); } catch (NumberFormatException e) { return 0L; }
+    }
+
+    /**
+     * Finishes a restore that was verified and not completed, or clears one that never verified.
+     * Called at start, **before the install's identity or journal is opened**: a swap interrupted
+     * halfway would otherwise leave Orb opening a lane that is not the one it is about to become.
+     */
+    static void finishRestore(Context context) {
+        File staging = new File(context.getFilesDir(), STAGING);
+        if (!staging.exists()) return;
+        try {
+            if (new File(staging, COMPLETE).exists()) {
+                swap(context, staging);
+                Install.forget();
+            } else {
+                deleteTree(staging);
+            }
+        } catch (IOException ignored) {
+            // The staging stays; the next start tries again. Nothing is half-trusted in the meantime.
+        }
+    }
+
+    private static void swap(Context context, File staging) throws IOException {
+        String oldLane = new String(Files.readAllBytes(new File(staging, OLD_LANE).toPath()), StandardCharsets.UTF_8).trim();
+        // The lane being restored: from the staged identity, or — if a previous attempt already moved it — from
+        // the identity now in place.
+        File stagedId = new File(staging, "install.id");
+        File placedId = new File(context.getFilesDir(), "install.id");
+        String newLane = new String(Files.readAllBytes((stagedId.exists() ? stagedId : placedId).toPath()), StandardCharsets.UTF_8).trim();
+        File journalDir = context.getExternalFilesDir(null);
+        if (journalDir == null) journalDir = context.getFilesDir();
+
+        moveInto(new File(staging, "install.id"), new File(context.getFilesDir(), "install.id"));
+        moveInto(new File(staging, "address.secret"), Attachments.addressSecretFile(context));
+        for (String kind : new String[] {"key", "blob", "destroyed"}) {
+            File from = new File(staging, kind);
+            File to = kind.equals("key") ? Attachments.keysDir(context)
+                : kind.equals("blob") ? Attachments.blobsDir(context) : Attachments.destroyedDir(context);
+            String[] names = from.list();
+            if (names != null) for (String name : names) moveInto(new File(from, name), new File(to, name));
+        }
+        moveInto(new File(staging, "journal"), new File(journalDir, newLane + ".lane.jsonl"));
+        // The fresh install's own, now empty, lane — unless it is the very lane just restored.
+        if (!oldLane.equals(newLane)) new File(journalDir, oldLane + ".lane.jsonl").delete();
+
+        File pending = new File(staging, "pending.txt");
+        if (pending.exists()) moveInto(pending, new File(context.getFilesDir(), RESTORED_PENDING));
+        deleteTree(staging);
+    }
+
+    /** Atomically if the same filesystem allows; otherwise copied, flushed, renamed within the destination, then removed. */
+    private static void moveInto(File from, File to) throws IOException {
+        moveInto(from, to, true);
+    }
+
+    /**
+     * [tryAtomic] false forces the copy path, which a real phone takes for the journal: its directory
+     * (app-specific external storage) is on a different filesystem from the app's private one.
+     */
+    static void moveInto(File from, File to, boolean tryAtomic) throws IOException {
+        if (!from.exists()) return;
+        to.getParentFile().mkdirs();
+        if (tryAtomic) {
+            try {
+                Files.move(from.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                return;
+            } catch (IOException crossDevice) {
+                // fall through to the copy
+            }
+        }
+        File tmp = new File(to.getParentFile(), to.getName() + ".restoring");
+        try (InputStream in = new FileInputStream(from); RandomAccessFile out = new RandomAccessFile(tmp, "rw")) {
+            out.setLength(0);
+            byte[] buffer = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+            out.getFD().sync();
+        }
+        Files.move(tmp.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        from.delete();
+    }
+
+    /**
+     * After a restore, the next start records that it happened — `orb.restored`, naming when the backup was made
+     * and how many items came back — and forgets the marker. A restore changed this phone's history; the history says so.
+     */
+    static void noteRestored(Context context, Journal journal) {
+        File marker = new File(context.getFilesDir(), RESTORED_PENDING);
+        if (!marker.exists() || journal == null) return;
+        try {
+            Map<String, String> m = new HashMap<>();
+            for (String line : new String(Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8).split("\n")) {
+                int c = line.indexOf(':');
+                if (c > 0) m.put(line.substring(0, c), line.substring(c + 1));
+            }
+            Map<String, Object> payload = Json.obj();
+            payload.put("backupCreated", parseLong(m.get("created")));
+            payload.put("items", parseLong(m.get("items")));
+            payload.put("picturesIncluded", "1".equals(m.get("pictures")));
+            if (journal.append(RESTORED, payload) != null) marker.delete();
+        } catch (IOException ignored) {
+            // Kept for the next start.
+        }
+    }
+
+    // ---- the record of a backup, and the line on the screen ------------------------------------
+
+    /** The `orb.backup` payload: that it happened, and how much. Never the passphrase, salt, or any content. */
+    static Map<String, Object> facts(String destination, int items, long bytes, boolean picturesIncluded) {
+        Map<String, Object> p = Json.obj();
+        p.put("destination", destination);
+        p.put("items", (long) items);
+        p.put("bytes", bytes);
+        p.put("picturesIncluded", picturesIncluded);
+        p.put("kdfIterations", (long) ITERATIONS);
+        return p;
+    }
+
+    /** When the newest backup was made and what it held, from the journal alone; null if there has never been one. */
+    static long[] last(List<String> lines) {
+        long[] found = null;
+        java.util.regex.Pattern wall = java.util.regex.Pattern.compile("\"wallClock\":(\\d+)");
+        java.util.regex.Pattern items = java.util.regex.Pattern.compile("\"items\":(\\d+)");
+        for (String line : lines) {
+            if (!TYPE.equals(Journal.typeOf(line))) continue;
+            java.util.regex.Matcher w = wall.matcher(line);
+            int payload = line.indexOf("\"payload\":");
+            java.util.regex.Matcher i = items.matcher(line);
+            if (w.find() && payload >= 0 && i.find(payload)) found = new long[] {Long.parseLong(w.group(1)), Long.parseLong(i.group(1))};
+        }
+        return found;
+    }
+
+    // ---- small helpers -------------------------------------------------------------------------
+
+    private static void readFully(InputStream in, byte[] into, String reason, String detail) throws IOException {
+        int got = 0;
+        while (got < into.length) {
+            int r = in.read(into, got, into.length - got);
+            if (r < 0) throw new Failure(reason, detail);
+            got += r;
+        }
+    }
+
+    private static void deleteTree(File file) {
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteTree(child);
+        file.delete();
+    }
+}

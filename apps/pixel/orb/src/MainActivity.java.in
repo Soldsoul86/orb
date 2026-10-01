@@ -29,6 +29,7 @@ import java.util.Map;
  */
 public final class MainActivity extends Activity {
     private TextView status;
+    private TextView backupLine;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -50,6 +51,19 @@ public final class MainActivity extends Activity {
             @Override public void onClick(View view) { export(); }
         });
         root.addView(export);
+
+        // Durability (docs/DURABILITY.md): the line that says whether losing this phone loses everything.
+        backupLine = new TextView(this);
+        backupLine.setTextSize(12);
+        backupLine.setPadding(0, 8, 0, 8);
+        root.addView(backupLine);
+
+        Button backupButton = new Button(this);
+        backupButton.setText("Back up and restore");
+        backupButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, BackupActivity.class)); }
+        });
+        root.addView(backupButton);
 
         // Step 7 / A8: read back, search, and erase what Orb remembered.
         Button recall = new Button(this);
@@ -131,6 +145,8 @@ public final class MainActivity extends Activity {
         super.onResume();
         Orb app = Orb.get();
         Journal journal = app == null ? null : app.journal();
+        // The line that says whether losing this phone loses everything is first, and always refreshed.
+        backupLine.setText(BackupActivity.lastLine(journal));
         if (journal == null) {
             status.setText("\njournal unavailable");
             return;

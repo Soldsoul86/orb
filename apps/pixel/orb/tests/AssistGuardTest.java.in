@@ -180,6 +180,23 @@ final class AssistGuardTest {
         Harness.check("a drawn picture is let go when its window closes", recallActivity.contains("drawn.recycle()"));
         Harness.check("only Recall opens the sealed bytes; RecallActivity asks it", recallActivity.contains("Recall.openBytes(") && !recallActivity.contains("Attachments"));
 
+        Harness.suite("the passphrase goes nowhere but into the key");
+        String backupSrc = new String(Files.readAllBytes(root.resolve("src/Backup.java.in")), StandardCharsets.UTF_8);
+        String backupUi = new String(Files.readAllBytes(root.resolve("src/BackupActivity.java.in")), StandardCharsets.UTF_8);
+        for (String[] pair : new String[][] {{"Backup", backupSrc}, {"BackupActivity", backupUi}}) {
+            StringBuilder live = new StringBuilder();
+            for (String line : pair[1].split("\n")) if (!isComment(line)) live.append(line).append('\n');
+            Harness.check(pair[0] + " logs nothing and keeps nothing in preferences or intents",
+                !Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast|SharedPreferences|putExtra|putString|setPrivateImeOptions").matcher(live).find());
+        }
+        Harness.check("the key is overwritten after use", backupSrc.contains("Arrays.fill(key, (byte) 0)"));
+        Harness.check("the typed passphrase is overwritten after use", backupUi.split("Arrays.fill\\(passphrase", -1).length - 1 >= 2);
+        Harness.check("and cleared from the field it was typed into", backupUi.contains("typed.clear()"));
+        Harness.check("the screen and its prompts are secure while a passphrase is typed", backupUi.split("FLAG_SECURE, WindowManager", -1).length - 1 >= 2);
+        Harness.check("the record of a backup is built from numbers only", backupSrc.contains("static Map<String, Object> facts(String destination, int items, long bytes, boolean picturesIncluded)"));
+        Harness.check("a restore weaker than the floor is refused in code", backupSrc.contains("iterations < MIN_ITERATIONS"));
+        Harness.check("the restore is refused unless fresh", backupSrc.contains("if (!isFresh(currentLines))"));
+
         Harness.suite("one process, one writer; nothing extra requested");
         Harness.check("no component runs in its own process", !manifest.contains("android:process"));
         Harness.check("platform backup is off", manifest.contains("android:allowBackup=\"false\""));
