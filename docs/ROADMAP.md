@@ -198,7 +198,7 @@ captured something.
 | Step | What it is | How it makes Orb useful |
 | --- | --- | --- |
 | **B1** | **Decided 2026-10-01 (DR-16): Kotlin on the phone, shared test vectors with the TypeScript reference, rules before any model; the toolchain is proved to build (AD-14).** Was: where the reasoning layers run on the phone and whether the first reasoning step is local-only | Everything below depends on it; without it the middle exists only on a laptop, which can never be required |
-| **B2** | Evidence Graph over Observations | Every captured thing becomes evidence with a source and lineage, so Orb can answer *where did I get this* — and it is where AD-6 is decided honestly |
+| **B2** | **B2a built 2026-10-01 (the phone writes its own Observations; `PHONE_BRAIN.md`), awaiting the device; B2b graph and B2c Recall provenance next.** Evidence Graph over Observations | Every captured thing becomes evidence with a source and lineage, so Orb can answer *where did I get this* — and it is where AD-6 is decided honestly |
 | **B3** | Entities and Relationships — people, places, organisations, dates | *Everything about Ravi*, *everything about this trip*; the step from a pile of notes to a memory |
 | **B4** | **The first workflow, chosen by you** — messaging, travel, content or work were named; a good first one is **commitments** ("I'll send it Friday") or **trips** (booking → dates → reminder) | **The first time Orb does something for you without being asked to remember it** |
 | **B5** | The Capability → Policy → permission gate for anything that *acts* (this is what resolves AD-7) | Orb may notify, remind or draft only with your permission, recorded, revocable; also the moment the package scan gets its proper gate |

@@ -1,0 +1,55 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Map;
+
+/**
+ * Writes an export in which the phone has **observed its own events** (`docs/PHONE_BRAIN.md` B2a):
+ * it runs `Capture.remember`, a share, and then **`Observe.run`** — the phone's real Kotlin brain and
+ * Java shell — against real keys on a temp disk, and then keeps one more screen **after** the pass,
+ * which is left unobserved on purpose (an export is taken whenever it is taken).
+ *
+ * Every record is what the phone would write; only the inputs are invented, and none of their words may
+ * appear in the output.
+ */
+public final class GenObservedExport {
+    static final String SECRET_ONE = "call priya about the invoice";
+    static final String SECRET_TWO = "the lift code is 4471";
+    static final String SECRET_THREE = "ticket for the 9pm show";
+
+    private static ScreenText screen(String... lines) {
+        ScreenText s = new ScreenText();
+        for (String line : lines) s.add(line);
+        return s;
+    }
+
+    public static void main(String[] args) throws Exception {
+        File dir = Files.createTempDirectory("orb-gen-observed").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), "orb-000000000000000000000004");
+
+        journal.append("orb.process.start", Start.record(
+            "16", 36L, "2026-01-01", "TEST.000000.000", "Test phone", "test", 1000L, 1234L, "0.1-test"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        journal.append(AssistFacts.DECLINED, AssistFacts.declined(AssistPolicy.NOT_ALLOWED, 1234L));
+
+        Capture.remember(context, journal, screen(SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L, false);
+        Map<String, Object> share = Shares.declared("android.intent.action.SEND", "text/plain",
+            "android-app://com.example.chat", java.util.Arrays.asList("https://example.test/a:b"));
+        journal.append("orb.shared", share);
+        Capture.remember(context, journal, screen(SECRET_THREE), "com.example.chat", 1234L, false);
+
+        // The pass: what the app does at start and after a capture.
+        Observe.Result pass = Observe.run(journal);
+        if (pass.written != 3 || pass.failed || pass.unreadable != 0) {
+            throw new IllegalStateException("expected three Observations, got " + pass.written);
+        }
+
+        // Kept after the pass, so this export carries one event no Observation cites yet.
+        Capture.remember(context, journal, screen("one more thing, later"), "com.example.chat", 1234L, false);
+
+        for (String line : journal.readLines()) System.out.println(line);
+    }
+}

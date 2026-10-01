@@ -14,8 +14,12 @@ OUT="build/tests"
 
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
+# The brain (Kotlin) is compiled once, by its own build; the shell that calls it is under test here.
+BRAIN="$(cd ../../../runtime/brain && ./build.sh | tail -1)"
+BRAIN_CLASSES="$(cd ../../../runtime/brain && pwd)/build/classes"
+
 for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/Install.java.in \
-              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in \
+              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in src/Observe.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do
@@ -23,5 +27,5 @@ for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"
 done
 
-javac -Xlint:all -d "$OUT/classes" ../pass1/tests/shim/android/content/Context.java "$OUT/src/$PKG_PATH"/*.java
-java -Dorb.root="$PWD" -cp "$OUT/classes" "$PKG.Tests"
+javac -Xlint:all -cp "$BRAIN_CLASSES" -d "$OUT/classes" ../pass1/tests/shim/android/content/Context.java "$OUT/src/$PKG_PATH"/*.java
+java -Dorb.root="$PWD" -cp "$OUT/classes:$BRAIN_CLASSES:$BRAIN/lib/kotlin-stdlib.jar" "$PKG.Tests"

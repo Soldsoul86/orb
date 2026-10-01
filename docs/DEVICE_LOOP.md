@@ -5749,3 +5749,54 @@ screen text, so those three rest on the operator's word, not on the journal.
 3. Invoke on a WhatsApp chat and **Remember**. *(P65)*
 4. Invoke on PhonePe or Google Pay. *(P66)*
 5. Orb → **Apps Orb may remember from** and look at the WhatsApp row. Then **Export and share journal**. *(P67)*
+
+### 7b55. The phone observes itself — B2a, the first Kotlin on the device — 2026-10-01
+
+**Status: built, not yet run on the device.** `orb-app-v19-observe.apk` (versionCode 29847562+).
+**First, v18 on the device** (`orb-20261001-162423.txt`, 185 events): P63–P67 held — see §7b54.
+
+#### What changed (`docs/PHONE_BRAIN.md` B2a)
+
+1. **The phone's journal can cite a cause.** `Journal.append(type, payload, causes)`; the one-argument form
+   still writes none. The cause is inside the hash (re-derived in a test, and verified by the TypeScript
+   side on a phone-written fixture).
+2. **`runtime/brain` — Kotlin, pure.** A strict JSON reader, the translation of `orb.assist.captured` and
+   `orb.shared` into an Observation body, and `Observer.plan` (which Observations a lane is missing).
+   135 checks, mutation-checked, and held to TypeScript by vectors **computed by TypeScript**.
+3. **`Observe` (Java shell)** writes what the brain plans, at app start and after a *Remember* or a share. It is
+   the only caller of the brain. A pass that cannot run writes `orb.observe.failed` (a reason and a count).
+4. **The importer counts citations across every lane**, so a phone-written Observation is not translated a
+   second time on the laptop. Older exports are translated on import exactly as before.
+5. The build compiles Kotlin first (`scripts/fetch-kotlin.sh` fetches the pinned compiler once; never during a
+   build) and the Kotlin library goes into the APK (750 KB, was 58 KB — AD-14).
+
+#### Checked before the device
+
+- 299 phone-side checks (was 295 → 241 at v17), 135 brain checks, 378 TypeScript, lint and typecheck clean.
+- **The brain, run over the operator's real 185-event export: 0 unreadable lines, 31 Observations (14 shares,
+  17 captures), identical to TypeScript's translation on all 31.** The export is not committed.
+- Two older fixture generators (`gen-assist-export`, `gen-erasure-export`) had been broken by v17's changes and
+  their fixtures not regenerated; both are fixed and regenerated, and a new one writes
+  `observed-export.txt` from the phone's real Kotlin and Java.
+- One real difference found by the vectors and fixed in TypeScript: an **array** payload was treated as an
+  object (empty reading); both sides now refuse it.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P68** | v19 installs over v18 and **launches normally** — Kotlin loads on the device | the Kotlin library or d8 step is wrong on the phone (AD-14 item 3); `orb.observe.failed` says `brainUnavailable` |
+| **P69** | After the first launch the journal holds **31 new `orb.observation` events** (plus one for anything kept since the last export), each citing exactly one `orb.shared` / `orb.assist.captured` event, and **no `orb.observe.failed`** | the brain refused or did not run |
+| **P70** | *Remember* on an allowed app adds **exactly one** Observation, citing that capture | the call after a capture is not reached |
+| **P71** | A share adds exactly one Observation | the share path is not reached |
+| **P72** | The export `verifyLane`-verifies on the laptop, **causes included**, and importing it adds **no second Observation** on any occurrence | the Java encoder disagrees with TypeScript on causes, or the importer double-counts |
+| **P73** | *Kept by Orb* lists the same items as before, and erasing one still destroys its key; its Observation **stays** | Observations are being counted as items |
+
+#### The operator's protocol
+
+1. Install `orb-app-v19-observe.apk` over v18 and open Orb. *(P68)*
+2. **Export and share journal** immediately. *(P69)*
+3. Invoke Orb on an allowed app and **Remember** something non-private. *(P70)*
+4. Share one thing to Orb. *(P71)*
+5. Orb → **Kept by Orb** and look; erase the newest capture. *(P73)*
+6. **Export and share journal** again and send both exports. *(P72)*

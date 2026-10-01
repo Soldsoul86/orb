@@ -20,6 +20,7 @@ for source in "$PIXEL"/pass1/src/Journal.java.in "$PIXEL"/pass1/src/Json.java.in
               "$PIXEL"/orb/src/Shares.java.in "$PIXEL"/orb/src/Start.java.in \
               "$PIXEL"/orb/src/Erasure.java.in "$PIXEL"/orb/src/Erase.java.in \
               "$PIXEL"/orb/src/Attachments.java.in "$PIXEL"/orb/src/Install.java.in \
+              "$PIXEL"/orb/src/AllowList.java.in "$PIXEL"/orb/src/AssistPolicy.java.in \
               tools/GenErasureExport.java.in; do
   name="$(basename "$source" .java.in)"
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"

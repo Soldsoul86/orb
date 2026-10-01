@@ -367,6 +367,7 @@ public final class AssistSession extends VoiceInteractionSession {
         pending.discard();
         pending = null;
         if (result.kept()) {
+            Observe.run(journal);
             show("Remembered. You can find it in Orb → Kept by Orb, and erase it there.", false, false);
         } else if (result.outcome.equals("erased")) {
             show("You erased this exact content before, so Orb will not keep it again.", false, false);

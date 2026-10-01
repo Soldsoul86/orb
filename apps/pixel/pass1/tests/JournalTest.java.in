@@ -41,6 +41,49 @@ final class JournalTest {
         aTypeNamedInsideAPayloadIsNotAMatch();
         anUnreadableTypeIsRefusedNotSkipped();
         bookkeepingMatchesTheSharedList();
+        anEventCanCiteItsCauses();
+    }
+
+    /**
+     * Lineage (`ERASURE.md` §3): a derived event cites what it came from, in the envelope and
+     * in the hash. The one-argument append still writes none, and a cause that cannot be
+     * followed is refused rather than written.
+     */
+    private static void anEventCanCiteItsCauses() throws IOException {
+        Harness.suite("an event can cite its causes");
+        File dir = temp("causes");
+        Journal journal = Journal.open(new Context(dir), "pixel", "test-device");
+        Map<String, Object> first = journal.append("orb.shared", beat(1));
+        String cause = (String) first.get("id");
+        Harness.check("the plain append cites nothing", ((List<?>) first.get("causes")).isEmpty());
+
+        Map<String, Object> derived = journal.append("orb.observation", beat(2), java.util.Arrays.asList(cause));
+        Harness.check("a derived event is written", derived != null);
+        Harness.equal("and names its cause", ((List<?>) derived.get("causes")).get(0), cause);
+        Harness.equal("the chain still verifies", journal.verify(), "ok (2 events)");
+        Harness.check("the cause is on the line as written", lastLine(dir).contains("\"causes\":[\"" + cause + "\"]"));
+
+        Harness.equal("a null cause list is refused", journal.append("orb.observation", beat(3), null), null);
+        Harness.equal("an empty cause is refused", journal.append("orb.observation", beat(3), java.util.Arrays.asList("")), null);
+        Harness.equal("a null cause is refused",
+            journal.append("orb.observation", beat(3), java.util.Arrays.asList((String) null)), null);
+        Harness.equal("and nothing was written for any refusal", journal.count(), 2);
+
+        // The phone can only check linkage, so a cause edited after the fact is for the TypeScript
+        // verifier to catch (`verifyLane`) — here the cause must at least be *inside the hash*:
+        // re-deriving the event's hash from its own fields, with its causes, must reproduce it.
+        @SuppressWarnings("unchecked") Map<String, Object> integrity = (Map<String, Object>) derived.get("integrity");
+        @SuppressWarnings("unchecked") List<String> citedBack = (List<String>) derived.get("causes");
+        @SuppressWarnings("unchecked") Map<String, Object> schema = (Map<String, Object>) derived.get("schema");
+        @SuppressWarnings("unchecked") Map<String, Object> hlc = (Map<String, Object>) derived.get("hlc");
+        String withCause = Journal.sha256(Json.canonical(Journal.preimage(1, (String) derived.get("id"), "pixel", "test-device",
+            hlc, ((Number) derived.get("wallClock")).longValue(), "orb.observation", schema, citedBack,
+            (String) integrity.get("payloadHash"), (String) integrity.get("previous"))));
+        Harness.equal("the cause is inside the hash", withCause, integrity.get("hash"));
+        String withoutCause = Journal.sha256(Json.canonical(Journal.preimage(1, (String) derived.get("id"), "pixel", "test-device",
+            hlc, ((Number) derived.get("wallClock")).longValue(), "orb.observation", schema, new java.util.ArrayList<String>(),
+            (String) integrity.get("payloadHash"), (String) integrity.get("previous"))));
+        Harness.check("and dropping it changes the hash", !withoutCause.equals(integrity.get("hash")));
     }
 
     /**

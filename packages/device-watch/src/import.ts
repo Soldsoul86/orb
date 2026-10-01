@@ -21,7 +21,7 @@
  */
 import type { Journal, StoredEvent, OrbEvent } from "@orb/journal";
 import { hasPayload, unwrapPayload } from "@orb/journal";
-import { observationDraft, readObservation } from "@orb/observation";
+import { observationDraft, readObservation, type Observation } from "@orb/observation";
 import { grantsSource, type DeviceAuthorityReading, type KindReading } from "./reading.js";
 import { SHARED_TYPE, SHARE_CONFIDENCE_PERCENT, shareFrom, shareSource } from "./share.js";
 import { ASSIST_CAPTURED_TYPE, ASSIST_CONFIDENCE_PERCENT, assistFrom, assistSource } from "./assist.js";
@@ -149,7 +149,7 @@ export async function importExport(journal: Journal, text: string): Promise<Impo
  */
 interface Translation {
   /** What perceived it (inv. 3): the sensor, on the phone that holds this lane. */
-  readonly source: (event: StoredEvent) => string;
+  readonly source: (device: string) => string;
   /** Confidence in the occurrence, as the integer percent the journal can carry. */
   readonly confidencePercent: number;
   /** The Observation's data and attachments, or null when the payload is not usable. */
@@ -166,7 +166,7 @@ const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
       // The grants sensor, at the install that holds this lane — not the importer,
       // which only carried it, and not an app: every build carrying the grants
       // watch takes the same look (`docs/SENSOR_GRANTS.md` §4).
-      source: (event) => grantsSource(event.device),
+      source: (device) => grantsSource(device),
       // There is no inference here: the value is what the OS returned, and a read
       // that failed is carried as `readable: false` rather than smeared into a
       // lower number. Uncertainty that has its own field does not belong in this
@@ -181,7 +181,7 @@ const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
   [
     SHARED_TYPE,
     {
-      source: (event) => shareSource(event.device),
+      source: (device) => shareSource(device),
       confidencePercent: SHARE_CONFIDENCE_PERCENT,
       translate: (payload) => shareFrom(payload),
     },
@@ -189,47 +189,72 @@ const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
   [
     ASSIST_CAPTURED_TYPE,
     {
-      source: (event) => assistSource(event.device),
+      source: (device) => assistSource(device),
       confidencePercent: ASSIST_CONFIDENCE_PERCENT,
       translate: (payload) => assistFrom(payload),
     },
   ],
 ]);
 
-/** Turns replicated events into Observations, once each. */
+/**
+ * The Observation a device event translates to, or null when it is not one Orb translates (or its
+ * payload is unusable). **The single place the body of an Observation is assembled** — the
+ * importer uses it, and so do the shared vectors the phone's Kotlin translation is held to
+ * (`runtime/brain/tests/vectors`), so the two cannot describe the same event differently.
+ */
+export function translateEvent(
+  type: string,
+  device: string,
+  payload: unknown,
+): Observation<unknown> | null {
+  const translation = TRANSLATIONS.get(type);
+  if (translation === undefined) return null;
+  const translated = translation.translate(payload);
+  if (translated === null) return null;
+  return {
+    source: translation.source(device),
+    confidencePercent: translation.confidencePercent,
+    data: translated.data,
+    ...(translated.attachments !== undefined && translated.attachments.length > 0
+      ? { attachments: translated.attachments }
+      : {}),
+  };
+}
+
+/**
+ * Turns replicated events into Observations, once each.
+ *
+ * "Once" is judged by **citation across every lane this device holds**: a phone that wrote its own
+ * Observation (`docs/PHONE_BRAIN.md` B2a) has already observed that event, and translating it again
+ * here would put two Observations on one occurrence. Exports from builds that write none are
+ * translated here exactly as before.
+ */
 async function observeReadings(journal: Journal, lanes: readonly string[]): Promise<number> {
   const cited = new Set<string>();
-  for (const event of await journal.readLane(journal.lane)) {
-    if (readObservation(event) === null) continue;
-    for (const cause of event.causes ?? []) cited.add(cause);
+  for (const lane of new Set([journal.lane, ...lanes])) {
+    for (const event of await journal.readLane(lane)) {
+      if (readObservation(event) === null) continue;
+      for (const cause of event.causes ?? []) cited.add(cause);
+    }
   }
 
   let observed = 0;
   for (const lane of lanes) {
     for (const event of await journal.readLane(lane)) {
-      const translation = TRANSLATIONS.get(event.type);
-      if (translation === undefined) continue;
+      if (!TRANSLATIONS.has(event.type)) continue;
       // A replicated envelope whose payload this device does not hold cannot be
       // read, and is left for a later import rather than recorded as an empty
       // reading.
       if (!hasPayload(event) || cited.has(event.id)) continue;
 
-      const translated = translation.translate(unwrapPayload((event as OrbEvent).payload));
-      if (translated === null) continue;
-
-      await journal.appendOne(
-        observationDraft(
-          {
-            source: translation.source(event),
-            confidencePercent: translation.confidencePercent,
-            data: translated.data,
-            ...(translated.attachments !== undefined && translated.attachments.length > 0
-              ? { attachments: translated.attachments }
-              : {}),
-          },
-          [event.id],
-        ),
+      const observation = translateEvent(
+        event.type,
+        event.device,
+        unwrapPayload((event as OrbEvent).payload),
       );
+      if (observation === null) continue;
+
+      await journal.appendOne(observationDraft(observation, [event.id]));
       observed += 1;
     }
   }

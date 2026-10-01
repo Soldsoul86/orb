@@ -73,7 +73,7 @@ const IDENTITY = /^[a-z0-9]+:[0-9a-f]+$/;
 
 /** The capture as a translation, or null when the payload is not an object at all. */
 export function assistFrom(payload: unknown): AssistTranslation | null {
-  if (payload === null || typeof payload !== "object") return null;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
   const flat = payload as Record<string, unknown>;
 
   const text = (key: string): string | undefined =>

@@ -136,6 +136,22 @@ final class AssistGuardTest {
         Harness.check("the warning says the app can send money, before the second tap",
             session.contains("can also send money. If you allow it, payment screens inside it can be kept too"));
 
+        Harness.suite("the brain is reached through one file, which cannot touch what is sealed");
+        String observe = new String(Files.readAllBytes(root.resolve("src/Observe.java.in")), StandardCharsets.UTF_8);
+        List<String> brainUsers = new ArrayList<>();
+        try (java.util.stream.Stream<Path> all = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) all::iterator) {
+                String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+                if (text.contains("dev.orb.brain")) brainUsers.add(file.getFileName().toString());
+            }
+        }
+        Harness.equal("only Observe calls the brain", brainUsers, java.util.Arrays.asList("Observe.java.in"));
+        Harness.check("Observe never refers to Attachments", !observe.contains("Attachments"));
+        Harness.check("nor to Android", !observe.contains("android."));
+        Harness.check("nor logs", !Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast").matcher(observe).find());
+        Harness.check("and the brain it calls is the Observer, which writes nothing",
+            observe.contains("dev.orb.brain.Observer.plan(") && !observe.contains("Observer.write"));
+
         Harness.suite("one process, one writer; nothing extra requested");
         Harness.check("no component runs in its own process", !manifest.contains("android:process"));
         Harness.check("platform backup is off", manifest.contains("android:allowBackup=\"false\""));

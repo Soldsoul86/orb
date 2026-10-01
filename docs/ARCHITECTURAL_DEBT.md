@@ -542,7 +542,7 @@ C is the one to refuse unless a way to erase *within* an index is found.
    SHA-256 of the compiler zip *as first downloaded from the project's own release page*. Maven Central
    publishes no checksum for that zip, so it is not checked against a second source. The **runtime library
    that ships in the APK is** (its SHA-1 matches Maven Central's).
-2. **The library ships unshrunk** (a 2.2 MB dex against a 58 KB app today). A shrinker (R8) would cut it, at
+2. **The library ships unshrunk** (a 2.2 MB dex; the APK went from 58 KB to 750 KB). A shrinker (R8) would cut it, at
    the cost of one more tool whose effect on a security-sensitive app has to be understood.
 3. **Nothing Kotlin has run on the phone yet.** It compiles and dexes; whether it behaves on the device is
    shown only when the first piece ships.

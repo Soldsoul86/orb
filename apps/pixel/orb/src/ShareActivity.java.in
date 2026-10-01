@@ -65,6 +65,7 @@ public final class ShareActivity extends Activity {
         resolve(intent, payload);
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(Orb.SHARED, payload);
+        Observe.run(journal);
 
         Toast.makeText(this, "Orb recorded the share", Toast.LENGTH_SHORT).show();
         finish();

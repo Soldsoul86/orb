@@ -112,7 +112,7 @@ const IDENTITY = /^[a-z0-9]+:[0-9a-f]+$/;
  * string would be interpreting, and the phone's own event is still in history.
  */
 export function shareFrom(payload: unknown): ShareTranslation | null {
-  if (payload === null || typeof payload !== "object") return null;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return null;
   const flat = payload as Record<string, unknown>;
 
   const text = (key: string): string | undefined =>

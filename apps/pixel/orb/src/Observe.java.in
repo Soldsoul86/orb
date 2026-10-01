@@ -1,0 +1,101 @@
+package @PKG@;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The imperative shell around the phone's Observer (`runtime/brain`, `docs/PHONE_BRAIN.md` B2a).
+ *
+ * The brain is pure: it reads the lane's lines and returns the Observations that are missing. This
+ * is the one place those are written. It reads the app's own journal, appends what it was told to,
+ * and keeps **nothing** — whether an event has been observed is answered by whether an Observation
+ * cites it, so running this twice is harmless and there is no second record to drift.
+ *
+ * **The only caller of the causes append, and the only writer of Observations.** It uses the app's
+ * single `Journal`; a second journal object over the same file would be a second writer.
+ *
+ * It never opens an Attachment and never reads what a device event does not say in the clear: the
+ * brain's translation carries an attachment *identity* and nothing from inside it.
+ */
+final class Observe {
+    private Observe() {}
+
+    static final class Result {
+        /** Observations written by this call. */
+        final int written;
+        /** Journal lines the brain could not read. When above 0, **nothing is written** — cannot check is not fine. */
+        final int unreadable;
+        /** An append failed part-way. What was written stands; the next run continues from there. */
+        final boolean failed;
+
+        Result(int written, int unreadable, boolean failed) {
+            this.written = written;
+            this.unreadable = unreadable;
+            this.failed = failed;
+        }
+    }
+
+    /** Something Orb did not do and says so: what stopped the pass, and nothing from any screen. */
+    static final String FAILED = "orb.observe.failed";
+
+    private static void failed(Journal journal, String reason, int lines) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("reason", reason);
+        payload.put("unreadableLines", (long) lines);
+        journal.append(FAILED, payload);
+    }
+
+    /**
+     * Observes whatever is not yet observed. Never throws; never blocks launching or a capture.
+     *
+     * A pass that could not do its work **says so in the journal** (`orb.observe.failed`, a reason and
+     * a count, nothing else): otherwise "no Observations" would mean either *nothing to observe* or
+     * *the brain did not run*, and an export could not tell them apart.
+     */
+    static Result run(Journal journal) {
+        return run(journal, new Planner() {
+            @Override public dev.orb.brain.Plan plan(List<String> lines) {
+                return dev.orb.brain.Observer.plan(lines);
+            }
+        });
+    }
+
+    /** Where the plan comes from: the brain, or a stand-in in the test that has to make it fail. */
+    interface Planner {
+        dev.orb.brain.Plan plan(List<String> lines);
+    }
+
+    @SuppressWarnings("unchecked")
+    static Result run(Journal journal, Planner planner) {
+        if (journal == null) return new Result(0, 0, true);
+        List<String> lines;
+        try {
+            lines = journal.readLines();
+        } catch (IOException unreadable) {
+            return new Result(0, 0, true);
+        }
+        dev.orb.brain.Plan plan;
+        try {
+            plan = planner.plan(lines);
+        } catch (RuntimeException | LinkageError unavailable) {
+            // The brain refuses rather than throws. If it throws anyway — or cannot be loaded at all,
+            // which is a LinkageError and not an exception — nothing was written, and launching goes on.
+            failed(journal, "brainUnavailable", 0);
+            return new Result(0, 0, true);
+        }
+        if (plan.getUnreadable() > 0) {
+            failed(journal, "unreadableLine", plan.getUnreadable());
+            return new Result(0, plan.getUnreadable(), false);
+        }
+
+        int written = 0;
+        for (dev.orb.brain.Draft draft : plan.getDrafts()) {
+            Map<String, Object> event = journal.append(
+                draft.getType(), (Map<String, Object>) draft.getPayload(), draft.getCauses());
+            if (event == null) return new Result(written, 0, true);
+            written++;
+        }
+        return new Result(written, 0, false);
+    }
+}

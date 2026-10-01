@@ -1,0 +1,158 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The shell that writes the Observations the phone's brain plans (`docs/PHONE_BRAIN.md` B2a).
+ *
+ * The planning is tested in Kotlin, against the TypeScript vectors. What is tested here is what
+ * only the shell does: the events it writes are real journal events that cite their causes, it
+ * writes each once, it declines on a line it cannot read, and it leaves capture and erasure exactly
+ * as they were.
+ */
+final class ObserveTest {
+    private ObserveTest() {}
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String line : journal.readLines()) if (type.equals(Journal.typeOf(line))) n++;
+        return n;
+    }
+
+    private static String last(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String line : journal.readLines()) if (type.equals(Journal.typeOf(line))) found = line;
+        return found;
+    }
+
+    static void run() throws Exception {
+        File dir = Files.createTempDirectory("orb-observe").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+
+        Harness.suite("nothing kept, nothing observed");
+        Observe.Result none = Observe.run(journal);
+        Harness.equal("no Observation is invented", none.written, 0);
+        Harness.equal("and nothing is wrong", none.failed, false);
+
+        Harness.suite("a capture is observed, citing the event it came from");
+        ScreenText mine = new ScreenText();
+        mine.add("meet ravi at 4");
+        mine.add("bring the contract");
+        Capture.Result kept = Capture.remember(context, journal, mine, "com.example.chat", 7L, false);
+        Harness.equal("stored", kept.outcome, Capture.STORED);
+        String captured = last(journal, AssistFacts.CAPTURED);
+        Observe.Result first = Observe.run(journal);
+        Harness.equal("one Observation written", first.written, 1);
+        String observation = last(journal, "orb.observation");
+        Harness.check("it exists as a journal event", observation != null);
+        String capturedId = captured.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        Harness.check("and cites the capture in its causes", observation.contains("\"causes\":[\"" + capturedId + "\"]"));
+        Harness.check("attributed to the assist sensor at this install",
+            observation.contains("\"source\":\"orb.sensor.assist@" + Install.id(context) + "\""));
+        Harness.check("with confidence in the occurrence", observation.contains("\"confidencePercent\":100"));
+        Harness.check("naming the app that was allowed", observation.contains("\"package\":\"com.example.chat\""));
+        Harness.check("and the sealed text by identity", observation.contains("\"attachments\":[\"sha256:"));
+        Harness.check("the chain still verifies", journal.verify().startsWith("ok"));
+
+        Harness.suite("no word of the screen reaches the Observation, or any file");
+        Harness.check("the Observation holds no word of the text",
+            !observation.contains("ravi") && !observation.contains("contract") && !observation.contains("meet"));
+        for (String word : new String[] {"ravi", "contract"}) {
+            byte[] needle = word.getBytes(StandardCharsets.UTF_8);
+            Harness.check("\"" + word + "\" is on no disk file in the clear", !onDisk(dir, needle));
+        }
+
+        Harness.suite("once each: running again writes nothing");
+        Harness.equal("a second run", Observe.run(journal).written, 0);
+        Harness.equal("a third", Observe.run(journal).written, 0);
+        Harness.equal("still one Observation", count(journal, "orb.observation"), 1);
+
+        Harness.suite("a share is observed, and only what is new");
+        Map<String, Object> share = Json.obj();
+        share.put("because", "share");
+        share.put("shareReadable", true);
+        share.put("references", "https://example.test/a:b");
+        journal.append("orb.shared", share);
+        Harness.equal("exactly one more", Observe.run(journal).written, 1);
+        Harness.check("attributed to the share sensor",
+            last(journal, "orb.observation").contains("\"source\":\"orb.sensor.share@" + Install.id(context) + "\""));
+        Harness.equal("two Observations in all", count(journal, "orb.observation"), 2);
+
+        Harness.suite("things that are not occurrences stay events");
+        journal.append(AssistFacts.DECLINED, AssistFacts.declined("notAllowed", 7L));
+        journal.append(AllowList.DISALLOWED, AssistFacts.revoke("com.example.chat"));
+        Harness.equal("declines and allow-list changes are not observed", Observe.run(journal).written, 0);
+
+        Harness.suite("capture and erasure see exactly what they saw before");
+        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        Harness.equal("the remembered items are the one capture (a share with no file is not an item)", items.size(), 1);
+        Harness.check("an Observation is not an item", count(journal, "orb.observation") == 2);
+        long keysBefore = Attachments.counts(context)[0];
+        Erase.Result erased = Erase.execute(context, journal, items.get(0).hash);
+        Harness.equal("erasing the capture destroys its key as before", erased.outcome, Erase.DESTROYED);
+        Harness.check("the Observation of it stays: history says it happened",
+            last(journal, "orb.observation") != null && count(journal, "orb.observation") == 2);
+        Harness.equal("running after an erase writes nothing", Observe.run(journal).written, 0);
+        Harness.check("the key count fell by exactly one", Attachments.counts(context)[0] == keysBefore - 1);
+
+        Harness.suite("a line it cannot read means nothing is written");
+        File file = new File(dir, "journal.jsonl");
+        File[] candidates = dir.listFiles();
+        File lane = null;
+        if (candidates != null) for (File f : candidates) if (f.isFile() && f.length() > 0 && f.getName().endsWith(".jsonl")) lane = f;
+        Harness.check("the lane file was found", lane != null);
+        journal.append("orb.shared", share);
+        try (FileOutputStream out = new FileOutputStream(lane, true)) {
+            out.write("{this is not json\n".getBytes(StandardCharsets.UTF_8));
+        }
+        int before = count(journal, "orb.observation");
+        Observe.Result refused = Observe.run(journal);
+        Harness.equal("nothing is written", refused.written, 0);
+        Harness.check("and it says a line could not be read", refused.unreadable >= 1);
+        Harness.equal("no Observation was added", count(journal, "orb.observation"), before);
+        Harness.equal("and the refusal is recorded once, in the journal", count(journal, Observe.FAILED), 1);
+        String refusal = last(journal, Observe.FAILED);
+        Harness.check("with a reason and a count and nothing from any screen",
+            refusal.contains("\"reason\":\"unreadableLine\"") && refusal.contains("\"unreadableLines\":1")
+            && !refusal.contains("ravi") && !refusal.contains("http"));
+
+        Harness.suite("a brain that cannot run is recorded, and launching goes on");
+        Journal other = Journal.open(new Context(Files.createTempDirectory("orb-observe2").toFile()), "lane-x", "orb-000000000000000000000009");
+        Observe.Result missing = Observe.run(other, new Observe.Planner() {
+            @Override public dev.orb.brain.Plan plan(List<String> lines) { throw new NoClassDefFoundError("kotlin/jvm/internal/Intrinsics"); }
+        });
+        Harness.equal("a missing class is a failure, not a crash", missing.failed, true);
+        Harness.equal("and says why", last(other, Observe.FAILED).contains("\"reason\":\"brainUnavailable\""), true);
+        Observe.Result thrown = Observe.run(other, new Observe.Planner() {
+            @Override public dev.orb.brain.Plan plan(List<String> lines) { throw new IllegalStateException("x"); }
+        });
+        Harness.equal("so is an exception", thrown.failed, true);
+        Harness.equal("nothing was observed", count(other, "orb.observation"), 0);
+
+        Harness.suite("no journal is a failure, not a crash");
+        Harness.equal("a missing journal reports failure", Observe.run(null).failed, true);
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            byte[] bytes = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= bytes.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (bytes[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+}

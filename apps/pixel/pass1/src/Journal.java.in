@@ -287,6 +287,21 @@ final class Journal {
      * is there to make impossible.
      */
     synchronized Map<String, Object> append(String type, Map<String, Object> payload) {
+        return append(type, payload, Collections.<String>emptyList());
+    }
+
+    /**
+     * Appends one event that **cites the events it was derived from**.
+     *
+     * Lineage is what lets an erase find everything built on what it destroys
+     * (`docs/ERASURE.md` §3), so a derived event — an Observation — must carry it. The list
+     * is copied, and a null or empty-string cause is refused with a null return: an event is
+     * never written with a cause that cannot be followed.
+     */
+    synchronized Map<String, Object> append(String type, Map<String, Object> payload, List<String> citedCauses) {
+        if (citedCauses == null) return null;
+        for (String cause : citedCauses) if (cause == null || cause.isEmpty()) return null;
+        List<String> causes = new java.util.ArrayList<>(citedCauses);
         long wallClock = System.currentTimeMillis();
         clock = Hlc.tick(clock, wallClock);
 
@@ -294,7 +309,6 @@ final class Journal {
         schema.put("id", type);
         schema.put("version", (long) SCHEMA_VERSION);
 
-        List<String> causes = Collections.emptyList();
         String id = Ids.newEventId(wallClock);
         boolean v2 = envelopeVersion == 2;
 

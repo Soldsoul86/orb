@@ -25,6 +25,7 @@ export {
   ImportError,
   importExport,
   parseExport,
+  translateEvent,
 } from "./import.js";
 export type { ImportResult } from "./import.js";
 export {

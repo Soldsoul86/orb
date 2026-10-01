@@ -74,9 +74,16 @@ done
   --min-sdk-version 34 \
   --target-sdk-version "$API"
 
+# The phone's reasoning layers (Kotlin, `runtime/brain`) are compiled first and put on javac's
+# classpath. The compiler is never fetched here (DR-16, AD-14); build.sh in that module says how
+# to get it if it is missing, and checks the library that ships in the APK against its hash.
+BRAIN="$(cd ../../../runtime/brain && ./build.sh | tail -1)"
+BRAIN_CLASSES="$(cd ../../../runtime/brain && pwd)/build/classes"
+STDLIB="$BRAIN/lib/kotlin-stdlib.jar"
+
 # A failed compile must stop the build. Piping javac into a filter would hide
 # its exit code, and the next step would package whichever classes survived.
-if ! javac -source 17 -target 17 -classpath "$JAR" -d "$OUT/classes" \
+if ! javac -source 17 -target 17 -classpath "$JAR:$BRAIN_CLASSES" -d "$OUT/classes" \
      $(find "$OUT/src" -name '*.java') > "$OUT/javac.log" 2>&1; then
   grep -v '^Note:' "$OUT/javac.log" >&2 || true
   echo "compile failed" >&2
@@ -85,7 +92,7 @@ fi
 grep -v '^Note:' "$OUT/javac.log" || true
 
 "$BT/d8" --lib "$JAR" --min-api 34 --output "$OUT" \
-  $(find "$OUT/classes" -name '*.class')
+  $(find "$OUT/classes" "$BRAIN_CLASSES" -name '*.class') "$STDLIB"
 
 python3 - "$OUT" <<'PYEOF'
 import sys, zipfile, pathlib

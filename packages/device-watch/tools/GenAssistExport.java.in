@@ -41,10 +41,10 @@ public final class GenAssistExport {
         journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
 
         // 1. Kept (new content).  2. The identical screen again: held, a second citation.
-        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
-        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L, false);
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L, false);
         // 3. A different screen, no page address.
-        Capture.remember(context, journal, screen(null, SECRET_OTHER), "com.example.chat", 1234L);
+        Capture.remember(context, journal, screen(null, SECRET_OTHER), "com.example.chat", 1234L, false);
 
         // Erase both citations of the first screen; the key is destroyed with the last.
         for (Erasure.Item item : Erasure.items(journal.readLines())) {
@@ -53,7 +53,7 @@ public final class GenAssistExport {
             }
         }
         // 4. The same text offered again: refused as erased, recorded as a failure naming no app.
-        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L, false);
 
         for (String line : journal.readLines()) System.out.println(line);
     }
