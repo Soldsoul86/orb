@@ -46,7 +46,7 @@ fi
 
 # `Install` from the app, and `Journal`, `Json`, `Hlc`, `Ids` from pass 1 -- taken,
 # not copied, so the probe records with the code that would actually ship.
-for source in src/*.java.in ../orb/src/Install.java.in \
+for source in src/*.java.in ../orb/src/Install.java.in ../orb/src/PixelStats.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in; do
   name="$(basename "$source" .java.in)"

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares Orb as a voice-interaction service (an "assistant").
+
+  supportsAssist asks the platform to hand over the screen's structure and a screenshot
+  when the gesture fires. Keyguard launch is off: this is about a screen the person is
+  looking at, and a locked phone is a different, larger question.
+
+  The recognition service is **required**: a build without one was not offered by the
+  system's chooser (DEVICE_LOOP.md 7b43, P30). It recognises nothing.
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="@PKG@.SessionService"
+    android:recognitionService="@PKG@.RecognitionStub"
+    android:settingsActivity="@PKG@.MainActivity"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />

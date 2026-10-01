@@ -1,7 +1,6 @@
 package @PKG@;
 
 import android.app.Application;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.SystemClock;
@@ -98,13 +97,20 @@ public final class Orb extends Application {
      * an event; a witness holding envelopes alone learns nothing about the
      * handset.
      */
+    /** This build's version code, or `Start.VERSION_UNREADABLE` — never 0, never a guess. */
+    long versionCode() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
+        } catch (PackageManager.NameNotFoundException | RuntimeException unreadable) {
+            return Start.VERSION_UNREADABLE;
+        }
+    }
+
     private void recordStart() {
-        long versionCode = Start.VERSION_UNREADABLE;
+        long versionCode = versionCode();
         String versionName = "";
         try {
-            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
-            versionCode = info.getLongVersionCode();
-            versionName = info.versionName;
+            versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (PackageManager.NameNotFoundException | RuntimeException unreadable) {
             // Recorded as unreadable, not as a version; see `Start`.
         }

@@ -1,0 +1,353 @@
+package @PKG@;
+
+import android.app.assist.AssistContent;
+import android.app.assist.AssistStructure;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.service.voice.VoiceInteractionSession;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * One invocation of the assistant: look at the screen, decide, and say what Orb did.
+ *
+ * **Part 1 of step 7 keeps nothing from a screen.** It makes every decision a real
+ * capture would — the five checks, the allow-list, the payments floor, the 3-second wait —
+ * and then *simulates* the capture: the person can record that Orb **would** have kept so
+ * many text elements and characters, as numbers. No text is held beyond a length, no
+ * picture beyond a 32×32 summary, and nothing is written until a button is pressed.
+ * `AssistGuardTest` fails the build if this file ever does otherwise.
+ *
+ * **Decided before looked at.** The app is named and checked against the allow-list
+ * before any of its structure is walked; an app that is not allowed is declined as that,
+ * and the rest of its screen is never read.
+ *
+ * **A late callback is not this invocation's.** Once a session has closed or decided, a
+ * further callback is ignored — a stray empty screenshot was seen arriving after its
+ * session ended (`DEVICE_LOOP.md` §7b44–§7b45).
+ */
+public final class AssistSession extends VoiceInteractionSession {
+    private static final int MAX_DEPTH = 400;
+    /** Measured latencies were ≤ 270 ms; this is generous (SENSOR_ASSIST §5). */
+    private static final long WAIT_MS = 3000L;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable timeout = new Runnable() {
+        @Override public void run() { settle(true); }
+    };
+
+    private boolean closed = true;
+    private boolean decided;
+
+    private boolean structureDone;
+    private boolean structureArrived;
+    private String packageName;
+    private boolean allowed;
+    private int blocked;
+    private long textNodes;
+    private long textChars;
+    private boolean webUri;
+
+    private boolean screenshotDone;
+    private boolean screenshotArrived;
+    private boolean uniform;
+
+    private TextView message;
+    private Button allowButton;
+    private Button recordButton;
+
+    AssistSession(Context context) {
+        super(context);
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private long versionCode() {
+        Orb orb = Orb.get();
+        return orb == null ? Start.VERSION_UNREADABLE : orb.versionCode();
+    }
+
+    @Override
+    public View onCreateContentView() {
+        float density = getContext().getResources().getDisplayMetrics().density;
+        int pad = (int) (16 * density);
+
+        FrameLayout frame = new FrameLayout(getContext());
+        frame.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { hide(); }
+        });
+
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(pad, pad, pad, pad);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xF0202124);
+        background.setCornerRadius(24 * density);
+        card.setBackground(background);
+        card.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {}
+        });
+
+        TextView title = new TextView(getContext());
+        title.setText("Orb");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(16);
+        card.addView(title);
+
+        message = new TextView(getContext());
+        message.setTextColor(0xFFC8CCD0);
+        message.setTextSize(14);
+        message.setPadding(0, pad / 2, 0, pad / 2);
+        card.addView(message);
+
+        allowButton = new Button(getContext());
+        allowButton.setText("Allow Orb to remember from this app");
+        allowButton.setVisibility(View.GONE);
+        allowButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { allowThisApp(); }
+        });
+        card.addView(allowButton);
+
+        recordButton = new Button(getContext());
+        recordButton.setText("Record this test (nothing is kept)");
+        recordButton.setVisibility(View.GONE);
+        recordButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { recordSimulation(); }
+        });
+        card.addView(recordButton);
+
+        Button close = new Button(getContext());
+        close.setText("Close");
+        close.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { hide(); }
+        });
+        card.addView(close);
+
+        FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+        int margin = (int) (8 * density);
+        at.setMargins(margin, margin, margin, margin);
+        frame.addView(card, at);
+        return frame;
+    }
+
+    @Override
+    public void onShow(Bundle args, int showFlags) {
+        super.onShow(args, showFlags);
+        closed = false;
+        decided = false;
+        structureDone = false;
+        structureArrived = false;
+        packageName = null;
+        allowed = false;
+        blocked = 0;
+        textNodes = 0;
+        textChars = 0;
+        webUri = false;
+        screenshotDone = false;
+        screenshotArrived = false;
+        uniform = false;
+        show("Looking at this screen…", false, false);
+        handler.removeCallbacks(timeout);
+        handler.postDelayed(timeout, WAIT_MS);
+    }
+
+    @Override
+    public void onHandleAssist(AssistState state) {
+        super.onHandleAssist(state);
+        if (closed || decided) return;
+        structureDone = true;
+
+        AssistStructure structure = state.getAssistStructure();
+        AssistContent content = state.getAssistContent();
+        Bundle data = state.getAssistData();
+        structureArrived = structure != null;
+
+        // The app first. Nothing about its screen is read until it is known to be allowed.
+        if (structure != null) {
+            ComponentName component = structure.getActivityComponent();
+            if (component != null) packageName = component.getPackageName();
+        }
+        if (packageName == null && data != null) packageName = data.getString(Intent.EXTRA_ASSIST_PACKAGE);
+
+        if (structureArrived && packageName != null) {
+            allowed = isAllowed(packageName);
+            if (allowed) {
+                for (int i = 0; i < structure.getWindowNodeCount(); i++) {
+                    walk(structure.getWindowNodeAt(i).getRootViewNode(), 1);
+                }
+                webUri = content != null && content.getWebUri() != null;
+            }
+        }
+        settle(false);
+    }
+
+    @Override
+    public void onHandleScreenshot(Bitmap screenshot) {
+        super.onHandleScreenshot(screenshot);
+        if (closed || decided) return;
+        screenshotDone = true;
+        if (screenshot != null) {
+            PixelStats stats = summarise(screenshot);
+            // A picture that arrived but cannot be summarised cannot be checked: that is
+            // *cannot check*, which a capture treats as a reason to keep nothing.
+            screenshotArrived = stats.sampled > 0;
+            uniform = stats.uniform;
+        }
+        settle(false);
+    }
+
+    /**
+     * Decides when everything needed has arrived, or when the wait is over.
+     *
+     * An app that is not allowed (or a structure that never came) is decided at once and
+     * the screenshot is not waited for — there is nothing it could change.
+     */
+    private void settle(boolean waitedOut) {
+        if (closed || decided) return;
+        boolean needsScreenshot = structureDone && structureArrived && packageName != null && allowed;
+        if (!structureDone && !waitedOut) return;
+        if (needsScreenshot && !screenshotDone && !waitedOut) return;
+
+        decided = true;
+        handler.removeCallbacks(timeout);
+
+        AssistPolicy.Input in = new AssistPolicy.Input();
+        in.structureArrived = structureArrived;
+        in.packageName = packageName;
+        in.allowed = allowed;
+        in.screenshotArrived = screenshotArrived;
+        in.blockedNodes = blocked;
+        in.uniform = uniform;
+        in.textChars = textChars;
+        String outcome = AssistPolicy.decide(in);
+
+        if (outcome.equals(AssistPolicy.KEEP)) {
+            show("Part 1 test: Orb would keep " + textNodes + " text element" + (textNodes == 1 ? "" : "s")
+                + " (" + textChars + " characters) from this screen. Nothing is kept yet.", false, true);
+            return;
+        }
+
+        Journal journal = journal();
+        if (journal != null) journal.append(AssistFacts.DECLINED, AssistFacts.declined(outcome, versionCode()));
+        boolean canAllow = outcome.equals(AssistPolicy.NOT_ALLOWED) && packageName != null
+            && !AssistPolicy.isFloor(packageName) && AllowList.isPackageName(packageName);
+        show(words(outcome), canAllow, false);
+    }
+
+    private static String words(String reason) {
+        switch (reason) {
+            case AssistPolicy.NO_STRUCTURE:
+                return "Orb could not read this screen's text, so it kept nothing. (If “Use text from screen” is off in Settings, Orb is given nothing.)";
+            case AssistPolicy.NOT_ALLOWED:
+                return "Orb doesn't remember from this app. Nothing was read.";
+            case AssistPolicy.NO_SCREENSHOT:
+                return "Orb couldn't check whether this screen is protected, so it kept nothing. (Is “Use screenshot” on?)";
+            case AssistPolicy.PROTECTED_SCREEN:
+                return "This screen protects itself. Orb kept nothing from it.";
+            default:
+                return "There is no text on this screen to keep.";
+        }
+    }
+
+    private void show(String text, boolean offerAllow, boolean offerRecord) {
+        if (message == null) return;
+        message.setText(text);
+        allowButton.setVisibility(offerAllow ? View.VISIBLE : View.GONE);
+        recordButton.setVisibility(offerRecord ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean isAllowed(String pkg) {
+        Journal journal = journal();
+        if (journal == null) return false;
+        try {
+            return AllowList.isAllowed(journal.readLines(), pkg);
+        } catch (IOException unreadable) {
+            return false;
+        }
+    }
+
+    private void allowThisApp() {
+        // The package is on the screen for the person to see, and recorded only because
+        // they chose to allow it. The floor is checked again here, not only on show.
+        if (packageName == null || AssistPolicy.isFloor(packageName) || !AllowList.isPackageName(packageName)) {
+            show("Orb never remembers payments apps.", false, false);
+            return;
+        }
+        Journal journal = journal();
+        if (journal == null || journal.append(AllowList.ALLOWED, AssistFacts.grant(packageName)) == null) {
+            show("Could not save that. Nothing changed.", false, false);
+            return;
+        }
+        show("Allowed: " + packageName + ". Invoke Orb again on this screen to try it.", false, false);
+    }
+
+    private void recordSimulation() {
+        Journal journal = journal();
+        if (journal == null || packageName == null) return;
+        journal.append(AssistFacts.SIMULATED, AssistFacts.simulated(packageName, textNodes, textChars, webUri, versionCode()));
+        show("Recorded the test: counts only. Nothing from this screen was kept.", false, false);
+    }
+
+    @Override
+    public void onHide() {
+        super.onHide();
+        end();
+    }
+
+    @Override
+    public void onDestroy() {
+        end();
+        super.onDestroy();
+    }
+
+    private void end() {
+        closed = true;
+        handler.removeCallbacks(timeout);
+    }
+
+    /** A 32×32 summary, never the picture; a bitmap that cannot be scaled is reported unsummarised. */
+    private static PixelStats summarise(Bitmap screenshot) {
+        int width = screenshot.getWidth();
+        int height = screenshot.getHeight();
+        try {
+            Bitmap small = Bitmap.createScaledBitmap(screenshot, PixelStats.GRID, PixelStats.GRID, false);
+            int[] grid = new int[PixelStats.GRID * PixelStats.GRID];
+            small.getPixels(grid, 0, PixelStats.GRID, 0, 0, PixelStats.GRID, PixelStats.GRID);
+            if (small != screenshot) small.recycle();
+            return PixelStats.ofGrid(grid, width, height);
+        } catch (RuntimeException error) {
+            return PixelStats.ofGrid(null, width, height);
+        }
+    }
+
+    /** Counts what is on an allowed app's screen. Text is measured, never held. */
+    private void walk(AssistStructure.ViewNode node, int depth) {
+        if (node == null || depth > MAX_DEPTH) return;
+        if (node.isAssistBlocked()) blocked++;
+        // A password field counts as nothing, even if the platform delivered its text.
+        if (!AssistPolicy.isPasswordInput(node.getInputType())) {
+            int length = node.getText() == null ? 0 : node.getText().length();
+            if (length > 0) {
+                textNodes++;
+                textChars += length;
+            }
+        }
+        for (int i = 0; i < node.getChildCount(); i++) walk(node.getChildAt(i), depth + 1);
+    }
+}

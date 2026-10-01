@@ -14,7 +14,7 @@ OUT="build/tests"
 
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
-for source in src/Facts.java.in src/PixelStats.java.in ../pass1/src/Json.java.in \
+for source in src/Facts.java.in ../orb/src/PixelStats.java.in ../pass1/src/Json.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do
   name="$(basename "$source" .java.in)"
   sed -e "s/@PKG@/$PKG/g" "$source" > "$OUT/src/$PKG_PATH/$name.java"

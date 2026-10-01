@@ -1,0 +1,121 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** The five checks, the allow-list, and the records — pure logic, no screen. */
+final class AssistTest {
+    private AssistTest() {}
+
+    private static AssistPolicy.Input good() {
+        AssistPolicy.Input in = new AssistPolicy.Input();
+        in.structureArrived = true;
+        in.packageName = "com.example.chat";
+        in.allowed = true;
+        in.screenshotArrived = true;
+        in.blockedNodes = 0;
+        in.uniform = false;
+        in.textChars = 120;
+        return in;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the five checks, in order");
+        Harness.equal("everything arrived, allowed, unprotected, with text: keep", AssistPolicy.decide(good()), AssistPolicy.KEEP);
+
+        AssistPolicy.Input in = good(); in.structureArrived = false;
+        Harness.equal("1 — no structure (text switch off)", AssistPolicy.decide(in), AssistPolicy.NO_STRUCTURE);
+
+        in = good(); in.allowed = false;
+        Harness.equal("2 — not allowed", AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
+
+        in = good(); in.packageName = null;
+        Harness.equal("2 — an app that cannot be named is not allowed", AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
+
+        in = good(); in.screenshotArrived = false;
+        Harness.equal("3 — no screenshot is *cannot check*, not fine", AssistPolicy.decide(in), AssistPolicy.NO_SCREENSHOT);
+
+        in = good(); in.blockedNodes = 1;
+        Harness.equal("4 — structure blocked by the app", AssistPolicy.decide(in), AssistPolicy.PROTECTED_SCREEN);
+        in = good(); in.uniform = true;
+        Harness.equal("4 — a uniform screenshot (FLAG_SECURE-style)", AssistPolicy.decide(in), AssistPolicy.PROTECTED_SCREEN);
+
+        in = good(); in.textChars = 0;
+        Harness.equal("5 — nothing to keep", AssistPolicy.decide(in), AssistPolicy.NO_TEXT);
+
+        Harness.suite("the order is part of the privacy");
+        in = good(); in.structureArrived = false; in.allowed = false;
+        Harness.equal("structure is checked first", AssistPolicy.decide(in), AssistPolicy.NO_STRUCTURE);
+        in = good(); in.allowed = false; in.screenshotArrived = false; in.blockedNodes = 3; in.textChars = 0;
+        Harness.equal("an app that is not allowed is declined as that and nothing about its screen counts",
+            AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
+
+        Harness.suite("the payments floor");
+        in = good(); in.packageName = "com.google.android.apps.nbu.paisa.user"; in.allowed = true;
+        Harness.equal("a payments app is refused even if the list says allowed", AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
+        Harness.check("the observed payments app is on the floor", AssistPolicy.isFloor("com.google.android.apps.nbu.paisa.user"));
+        Harness.check("so is the observed exchange", AssistPolicy.isFloor("com.coindcx.btc"));
+        Harness.check("an ordinary app is not", !AssistPolicy.isFloor("com.whatsapp"));
+        Harness.check("null is not", !AssistPolicy.isFloor(null));
+
+        Harness.suite("password fields are recognised by input type");
+        Harness.check("text password", AssistPolicy.isPasswordInput(0x81));
+        Harness.check("visible password", AssistPolicy.isPasswordInput(0x91));
+        Harness.check("web password", AssistPolicy.isPasswordInput(0xe1));
+        Harness.check("numeric password", AssistPolicy.isPasswordInput(0x12));
+        Harness.check("plain text is not", !AssistPolicy.isPasswordInput(0x01));
+        Harness.check("a plain number is not", !AssistPolicy.isPasswordInput(0x02));
+        Harness.check("no input type is not", !AssistPolicy.isPasswordInput(0));
+
+        Harness.suite("the allow-list is what the events add up to");
+        File dir = Files.createTempDirectory("orb-allow").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.equal("a fresh install allows nothing", AllowList.allowed(journal.readLines()).size(), 0);
+
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.whatsapp"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Set<String> two = AllowList.allowed(journal.readLines());
+        Harness.equal("two allowed", two.size(), 2);
+        journal.append(AllowList.DISALLOWED, AssistFacts.revoke("com.whatsapp"));
+        Harness.check("latest wins: revoked", !AllowList.isAllowed(journal.readLines(), "com.whatsapp"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.whatsapp"));
+        Harness.check("and allowed again", AllowList.isAllowed(journal.readLines(), "com.whatsapp"));
+
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.phonepe.app"));
+        Harness.check("a payments package written into history is still never allowed",
+            !AllowList.isAllowed(journal.readLines(), "com.phonepe.app"));
+
+        Map<String, Object> sneaky = Json.obj();
+        sneaky.put("note", "\"package\":\"com.evil.app\"");
+        sneaky.put("by", "operator");
+        journal.append(AllowList.ALLOWED, sneaky);
+        Harness.check("a package spelled inside a string is not a package",
+            !AllowList.isAllowed(journal.readLines(), "com.evil.app"));
+        journal.append("orb.shared", AssistFacts.grant("com.not.a.grant"));
+        Harness.check("only the two assist types count", !AllowList.isAllowed(journal.readLines(), "com.not.a.grant"));
+        Harness.check("a malformed name is refused", !AllowList.isPackageName("not a package") && !AllowList.isPackageName("a;b.c"));
+
+        Harness.suite("a decline cannot name the app");
+        Map<String, Object> declined = AssistFacts.declined(AssistPolicy.NOT_ALLOWED, 7L);
+        Harness.equal("exactly a reason and a build number", declined.keySet().size(), 2);
+        Harness.check("no package key", !declined.containsKey("package"));
+        Harness.equal("an unknown reason is not echoed", AssistFacts.declined("com.secret.app", 1L).get("reason"), "invalidReason");
+        for (String reason : AssistPolicy.REASONS) {
+            Harness.equal("reason " + reason + " is accepted as itself", AssistFacts.declined(reason, 1L).get("reason"), reason);
+        }
+
+        Harness.suite("what a simulated capture carries");
+        Map<String, Object> sim = AssistFacts.simulated("com.whatsapp", 40L, 605L, false, 7L);
+        for (Object value : sim.values()) {
+            Harness.check("every value is a number, a boolean or an allowed app's name",
+                value instanceof Long || value instanceof Boolean || value instanceof String);
+        }
+        Harness.equal("an invalid package is not echoed", AssistFacts.simulated("not a package", 1L, 1L, false, 1L).get("package"), "invalid");
+    }
+}

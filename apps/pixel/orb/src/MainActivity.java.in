@@ -51,6 +51,21 @@ public final class MainActivity extends Activity {
         });
         root.addView(export);
 
+        // Step 7: Orb as the assistant, and the apps it may remember from.
+        Button choose = new Button(this);
+        choose.setText("Use Orb as the assistant");
+        choose.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { openAssistantSettings(); }
+        });
+        root.addView(choose);
+
+        Button apps = new Button(this);
+        apps.setText("Apps Orb may remember from");
+        apps.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, AllowActivity.class)); }
+        });
+        root.addView(apps);
+
         // What Orb keeps under a key it can destroy, and the way to destroy one (step 6).
         Button items = new Button(this);
         items.setText("Kept by Orb: erase");
@@ -208,6 +223,23 @@ public final class MainActivity extends Activity {
         if (bytes != null) out.append("bytes    ").append(bytes).append(" (read and discarded)\n");
         out.append("\nrecorded as orb.resolve.attempt\n");
         status.setText(out.toString());
+    }
+
+    /**
+     * The system screen where the default assistant is chosen. Nothing here can make Orb
+     * the assistant; only the person can, there. Falls back to the broader default-apps
+     * screen if the first is not offered.
+     */
+    private void openAssistantSettings() {
+        try {
+            startActivity(new Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS));
+        } catch (RuntimeException first) {
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+            } catch (RuntimeException second) {
+                status.setText("\ncould not open settings\nSettings > Apps > Default apps > Digital assistant app");
+            }
+        }
     }
 
     /**

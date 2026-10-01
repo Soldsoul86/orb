@@ -1,0 +1,107 @@
+package @PKG@;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/**
+ * The assistant may **receive** a screen. In part 1 of step 7 it may keep **none** of it.
+ *
+ * `AssistFacts` makes the records safe by the types of its arguments; this checks that the
+ * rest of the assistant's source cannot go round it. It reads the glue's own text and fails
+ * on any construct that could write, log or persist what the platform handed over. Crude on
+ * purpose: a rule that has to be argued about gets argued away, and a failing test that
+ * prints the line does not.
+ *
+ * **Part 2 changes this deliberately.** When *Remember* keeps text, one file gains the right
+ * to hold it and `Attachments`; until then no assistant file may mention either.
+ */
+final class AssistGuardTest {
+    private static final List<String> GLUE = Arrays.asList(
+        "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity");
+
+    private static final Pattern CONTENT_ACCESSOR = Pattern.compile(
+        "\\.(getText|getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
+            + "|getWebUri|getStructuredData|getClipData|getIntent)\\(\\)");
+
+    static void run() throws IOException {
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        List<String[]> files = new ArrayList<>();   // {name, text}
+        for (String name : GLUE) {
+            Path path = root.resolve("src/" + name + ".java.in");
+            files.add(new String[] {name, new String(Files.readAllBytes(path), StandardCharsets.UTF_8)});
+        }
+        Harness.suite("the assistant's source is what is scanned");
+        Harness.equal("found all the glue", files.size(), GLUE.size());
+
+        Harness.suite("records are built by AssistFacts and nowhere else");
+        reportEach(files, "builds a record outside AssistFacts", Pattern.compile("Json\\.obj\\(|\\.put\\(\""));
+
+        Harness.suite("nothing is logged");
+        reportEach(files, "writes somewhere a screen's content could leak",
+            Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast"));
+
+        Harness.suite("screen content is only ever measured, never read");
+        int uses = 0;
+        List<String> offenders = new ArrayList<>();
+        for (String[] file : files) {
+            String[] lines = file[1].split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                if (line.trim().startsWith("*") || line.trim().startsWith("//") || line.trim().startsWith("/*")) continue;
+                java.util.regex.Matcher m = CONTENT_ACCESSOR.matcher(line);
+                while (m.find()) {
+                    uses++;
+                    String after = line.substring(m.end());
+                    String before = line.substring(0, m.start());
+                    // Immediately after the accessor and nowhere else: a length or a null test.
+                    // (Searching the rest of the line would pass `getText().toString()` because
+                    // a `.length()` appears later — found by mutation.)
+                    String next = after.trim();
+                    boolean ok = after.startsWith(".length()") || next.startsWith("!= null") || next.startsWith("== null");
+                    if (!ok) offenders.add(file[0] + ":" + (i + 1) + "  " + line.trim());
+                }
+            }
+        }
+        Harness.check("every use of a content accessor is a length or a null test (" + uses + " uses)", offenders.isEmpty());
+        for (String o : offenders) System.out.println("           " + o);
+        Harness.check("and the scan actually found accessors to check", uses > 0);
+
+        Harness.suite("nothing is kept: no picture, no file, no sealed store");
+        reportEach(files, "could persist something",
+            Pattern.compile("\\.compress\\(|FileOutputStream|openFileOutput|MediaStore\\.Images|SharedPreferences|SQLite|\\bAttachments\\b"));
+
+        Harness.suite("one process, one writer; nothing extra requested");
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8)
+            .replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("no component runs in its own process", !manifest.contains("android:process"));
+        Harness.check("platform backup is off", manifest.contains("android:allowBackup=\"false\""));
+        List<String> permissions = new ArrayList<>();
+        java.util.regex.Matcher pm = Pattern.compile("<uses-permission[^>]*android:name=\"([^\"]+)\"").matcher(manifest);
+        while (pm.find()) permissions.add(pm.group(1));
+        Harness.check("the only permission is the boot receiver's " + permissions,
+            permissions.size() == 1 && permissions.get(0).equals("android.permission.RECEIVE_BOOT_COMPLETED"));
+        Harness.check("the assistant service is bound by the platform's own permission",
+            manifest.contains("android.permission.BIND_VOICE_INTERACTION"));
+    }
+
+    private static void reportEach(List<String[]> files, String what, Pattern bad) {
+        List<String> hits = new ArrayList<>();
+        for (String[] file : files) {
+            String[] lines = file[1].split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i].trim();
+                if (line.startsWith("*") || line.startsWith("//") || line.startsWith("/*")) continue;
+                if (bad.matcher(lines[i]).find()) hits.add(file[0] + ":" + (i + 1) + "  " + line);
+            }
+        }
+        Harness.check(what + "? none in " + files.size() + " files", hits.isEmpty());
+        for (String h : hits) System.out.println("           " + h);
+    }
+}

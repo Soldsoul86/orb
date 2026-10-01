@@ -953,6 +953,9 @@ suggestions".**
 
 7. **How an app joins the allow-list:** an Orb screen with a switch per app, **starting
    empty**. The list is the projection of grant/revoke events, never a stored list.
+   *(Implementation note, 2026-10-01: the add step is on the assistant card, not a list
+   of every app — see `SENSOR_ASSIST.md` §4 for the reason. Starting empty and the
+   projection are unchanged; the mechanism's difference awaits the operator's confirmation.)*
 8. **Retention:** kept **until the person deletes it**, no expiry. Deleting destroys the
    key; the event remains and says only that a capture of *N* characters existed.
 9. **A capture needs both the structure and the screenshot to have arrived.** The

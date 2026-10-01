@@ -26,7 +26,6 @@ final class GuardTest {
         "\\.(getText|getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
             + "|getWebUri|getStructuredData|getClipData|getIntent)\\(\\)");
     /** What a use of one of them may look like: a length or a presence test, nothing else. */
-    private static final Pattern PERMITTED_USE = Pattern.compile("\\.length\\(\\)|[!=]= null");
 
     static void run() throws IOException {
         Path root = Paths.get(System.getProperty("probe.root", "."));
@@ -101,7 +100,17 @@ final class GuardTest {
                 n++;
                 if (isComment(line) || !CONTENT_ACCESSOR.matcher(line).find()) continue;
                 uses++;
-                if (!PERMITTED_USE.matcher(line).find()) {
+                // Every accessor on the line must be followed *immediately* by a length or a null
+                // test. Searching the rest of the line would pass `getText().toString()` when a
+                // `.length()` appears later — found by mutation in the Orb app's copy of this rule.
+                boolean strict = true;
+                java.util.regex.Matcher accessor = CONTENT_ACCESSOR.matcher(line);
+                while (accessor.find()) {
+                    String after = line.substring(accessor.end());
+                    String next = after.trim();
+                    if (!(after.startsWith(".length()") || next.startsWith("!= null") || next.startsWith("== null"))) strict = false;
+                }
+                if (!strict) {
                     bad++;
                     Harness.check(file.getFileName() + ":" + n + " — uses screen content beyond a length or a presence test: " + line.trim(), false);
                 }

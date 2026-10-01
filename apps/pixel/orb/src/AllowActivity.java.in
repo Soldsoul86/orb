@@ -1,0 +1,105 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.Set;
+
+/**
+ * The apps Orb may remember from, and the way to take one away.
+ *
+ * Apps are **added from the assistant card**, where the app is on screen and the person
+ * has just invoked Orb on it — see `SENSOR_ASSIST.md` §4. This screen shows what the
+ * allow-list currently adds up to and removes an app. It starts empty. Names are package
+ * names: Orb is not allowed to look up app labels without a broad package permission it
+ * deliberately does not hold.
+ */
+public final class AllowActivity extends Activity {
+    private LinearLayout list;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Apps Orb may remember from");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        TextView note = new TextView(this);
+        note.setTextSize(12);
+        note.setText("\nOrb remembers from an app only if it is on this list. It starts empty.\n"
+            + "To add one, invoke Orb on that app and choose “Allow”.\n"
+            + "Orb never remembers payments apps, whatever this list says.\n");
+        root.addView(note);
+
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        Orb app = Orb.get();
+        final Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable"));
+            return;
+        }
+        Set<String> allowed;
+        try {
+            allowed = AllowList.allowed(journal.readLines());
+        } catch (IOException error) {
+            list.addView(text("read failed: " + error));
+            return;
+        }
+        if (allowed.isEmpty()) {
+            list.addView(text("No apps yet."));
+            return;
+        }
+        for (final String pkg : allowed) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 20, 0, 20);
+            row.addView(text(pkg));
+            Button remove = new Button(this);
+            remove.setText("Remove");
+            remove.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    journal.append(AllowList.DISALLOWED, AssistFacts.revoke(pkg));
+                    render();
+                }
+            });
+            row.addView(remove);
+            list.addView(row);
+        }
+    }
+
+    private TextView text(String value) {
+        TextView view = new TextView(this);
+        view.setTextSize(13);
+        view.setText(value);
+        return view;
+    }
+}

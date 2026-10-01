@@ -79,9 +79,18 @@ it; an app on no list — a new bank app, anything unknown — is never captured
   and `orb.assist.disallowed` events, latest wins per app. A stored copy would be a
   second source of truth (Art. IX §33).
 - **It starts empty.** A fresh install captures nothing.
-- **How an app is added:** an Orb screen lists the apps on the phone with a switch each.
-  The apps shown are those Orb is allowed to see without `QUERY_ALL_PACKAGES` (the
-  launcher apps; the build's declared visibility). Flipping a switch writes the event.
+- **How an app is added** *(implemented as below on 2026-10-01; differs from the first
+  draft, and the operator has not yet confirmed the difference)*: **from the assistant card,
+  on the app itself.** When Orb declines an app that is not allowed, the card offers
+  *Allow Orb to remember from this app*; tapping it writes the event. An Orb screen
+  (*Apps Orb may remember from*) shows the list and removes an app. **Why not a list of every
+  app with a switch each:** showing one needs launcher-wide package visibility
+  (`<queries>`), and Orb's package scan reads whatever it can see — so the visible set would
+  jump by roughly a hundred apps and the install alert would report a hundred "new apps" that
+  were not new. It can be done (with a deliberate re-baseline of the scan's scope), at the cost
+  of that boundary; it is a decision, not a default. A consequence of the chosen route: the
+  list shows **package names**, because Orb cannot look up app labels without the same
+  visibility.
 - **A refused capture does not log which app it was.** When an app is not allowed, the
   decline records the *reason* and **never the package** (§6) — a record of "Orb declined
   an app" naming a payments app would itself be the leak the ruling forbids.

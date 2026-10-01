@@ -1,0 +1,109 @@
+package @PKG@;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * Whether Orb may keep anything from the screen it was just handed — the five checks of
+ * `SENSOR_ASSIST.md` §5, as one pure function with no Android in it.
+ *
+ * **Arrival is the only signal.** The flags and the system's switches say what was
+ * *permitted*; only what arrived says what was *delivered* (`DEVICE_LOOP.md` §7b45). So
+ * every input here is something that arrived, or the fact that it did not.
+ *
+ * **The order matters, and is part of the privacy.** The app is checked *before* the
+ * screen is looked at: an app that is not allowed gets a decline and nothing else is
+ * read. A decline names a *reason* and **never the app** — a record of "Orb declined X"
+ * for a payments app would itself be the leak DR-14 forbids.
+ *
+ * **A floor under the list.** DR-14 ruling 1: no payments app is ever captured. A person
+ * could still allow one by mistake, so the floor refuses it whatever the list says. It is
+ * a list of package names, which makes it imperfect, and it says so rather than pretend to
+ * be a classifier.
+ */
+final class AssistPolicy {
+    private AssistPolicy() {}
+
+    /** The reasons, as written in `orb.assist.declined`. Exactly these and no others. */
+    static final String NO_STRUCTURE = "noStructure";
+    static final String NOT_ALLOWED = "notAllowed";
+    static final String NO_SCREENSHOT = "noScreenshot";
+    static final String PROTECTED_SCREEN = "protectedScreen";
+    static final String NO_TEXT = "noText";
+
+    /** The outcome that is not a decline. */
+    static final String KEEP = "keep";
+
+    static final Set<String> REASONS = new HashSet<>(Arrays.asList(
+        NO_STRUCTURE, NOT_ALLOWED, NO_SCREENSHOT, PROTECTED_SCREEN, NO_TEXT));
+
+    /**
+     * Payments packages that can never be allowed — **version 1, 2026-10-01**.
+     *
+     * Two are **observed on the operator's phone** (Google Pay and a crypto exchange, both
+     * of which delivered an intact screenshot in `DEVICE_LOOP.md` §7b42); the rest are
+     * well-known payments apps listed from general knowledge and **not checked against a
+     * device**. A wrong entry matches nothing and is harmless; a missing one is not
+     * covered, which is why this is a floor under an allow-list and not the control.
+     */
+    static final int FLOOR_VERSION = 1;
+    static final Set<String> FLOOR = new HashSet<>(Arrays.asList(
+        "com.google.android.apps.nbu.paisa.user",   // Google Pay (India) — observed
+        "com.coindcx.btc",                          // a crypto exchange — observed
+        "com.phonepe.app",
+        "net.one97.paytm",
+        "in.org.npci.upiapp",                       // BHIM
+        "com.dreamplug.androidapp",                 // CRED
+        "com.mobikwik_new",
+        "com.freecharge.android",
+        "com.paypal.android.p2pmobile",
+        "com.google.android.apps.walletnfcrel"      // Google Wallet
+    ));
+
+    static boolean isFloor(String packageName) {
+        return packageName != null && FLOOR.contains(packageName);
+    }
+
+    /**
+     * Whether an input type is a password field. Counted as nothing and, once text is kept,
+     * dropped — **even if the platform delivered it**, because *"the platform probably
+     * blanked it"* is an assumption and this is a rule (`SENSOR_ASSIST.md` §6).
+     * `android.text.InputType`: class text (1) with variation password (0x80), visible
+     * password (0x90) or web password (0xe0); class number (2) with password (0x10).
+     */
+    static boolean isPasswordInput(int inputType) {
+        int cls = inputType & 0xf;
+        int variation = inputType & 0xff0;
+        if (cls == 1) return variation == 0x80 || variation == 0x90 || variation == 0xe0;
+        if (cls == 2) return variation == 0x10;
+        return false;
+    }
+
+    /** What arrived, and what the person has allowed. Plain values; no content. */
+    static final class Input {
+        boolean structureArrived;
+        String packageName;
+        boolean allowed;
+        boolean screenshotArrived;
+        int blockedNodes;
+        boolean uniform;
+        long textChars;
+    }
+
+    /** `KEEP`, or one of `REASONS`. */
+    static String decide(Input in) {
+        // 1. Did the structure arrive? (Includes the person having switched text off.)
+        if (!in.structureArrived) return NO_STRUCTURE;
+        // 2. Is the app allowed? Decided before anything about the screen is considered.
+        if (in.packageName == null || !in.allowed || isFloor(in.packageName)) return NOT_ALLOWED;
+        // 3. Did the screenshot arrive? Missing is *cannot check*, never *fine*.
+        if (!in.screenshotArrived) return NO_SCREENSHOT;
+        // 4. Did the screen protect itself? Either signal is enough; an app that opts out
+        //    is never overridden.
+        if (in.blockedNodes > 0 || in.uniform) return PROTECTED_SCREEN;
+        // 5. Is there anything to keep?
+        if (in.textChars <= 0) return NO_TEXT;
+        return KEEP;
+    }
+}

@@ -295,6 +295,8 @@ describe("the process start names the build that wrote it", () => {
     const start = await readFile(join(here, "../../../../apps/pixel/orb/src/Start.java.in"), "utf8");
     assert.match(start, /VERSION_UNREADABLE\s*=\s*-1L/);
     const orb = await readFile(join(here, "../../../../apps/pixel/orb/src/Orb.java.in"), "utf8");
-    assert.match(orb, /long versionCode = Start\.VERSION_UNREADABLE/);
+    // An unreadable version is returned as the named constant, never as 0.
+    assert.match(orb, /return Start\.VERSION_UNREADABLE/);
+    assert.doesNotMatch(orb, /return 0L?;/);
   });
 });

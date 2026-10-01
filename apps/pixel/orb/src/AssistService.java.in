@@ -1,0 +1,13 @@
+package @PKG@;
+
+import android.service.voice.VoiceInteractionService;
+
+/**
+ * Makes Orb selectable as the device's assistant. It does nothing else.
+ *
+ * The platform binds it when the person chooses Orb in *Default digital assistant app*;
+ * no read happens until they invoke the gesture, and nothing is kept until they tap
+ * (`SENSOR_ASSIST.md` §3). Everything that matters is in `AssistSession`.
+ */
+public final class AssistService extends VoiceInteractionService {
+}

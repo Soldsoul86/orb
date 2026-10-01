@@ -15,6 +15,7 @@ OUT="build/tests"
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/Install.java.in \
+              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do
@@ -23,4 +24,4 @@ for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/
 done
 
 javac -Xlint:all -d "$OUT/classes" ../pass1/tests/shim/android/content/Context.java "$OUT/src/$PKG_PATH"/*.java
-java -cp "$OUT/classes" "$PKG.Tests"
+java -Dorb.root="$PWD" -cp "$OUT/classes" "$PKG.Tests"

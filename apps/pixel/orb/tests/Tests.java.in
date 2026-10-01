@@ -6,6 +6,8 @@ public final class Tests {
         System.out.println("orb app, erasure on the phone");
         ErasureTest.run();
         EraseTest.run();
+        AssistTest.run();
+        AssistGuardTest.run();
         System.exit(Harness.report());
     }
 }

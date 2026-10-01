@@ -5274,3 +5274,76 @@ real phone**, and visible in its own export.
 **Step 6 is closed.** What it leaves open is registered, not hidden: AD-12 (only sealed
 attachments are erasable; the desk does not yet honour a declaration; flash may hold stale
 copies of a deleted key).
+
+### 7b50. Step 7, part 1 — Orb as the assistant, deciding but keeping nothing — 2026-10-01
+
+**Status: built, 99 off-device checks, not yet run on the device.** `orb-app-v12-assist.apk`.
+Part 1 of two (the operator's split): everything a real capture decides, and a **simulated**
+*Remember* that records **counts**, never content. Part 2 replaces the simulation with the
+sealed text.
+
+#### What it is
+
+- **Orb is now an assistant** (the service, the session and the do-nothing recognition
+  stub — required, §7b43 — moved into the Orb app, sharing its journal; the probe stays as an
+  instrument and is unchanged).
+- **The five checks of `SENSOR_ASSIST.md` §5**, as one pure function (`AssistPolicy.decide`):
+  structure arrived → app allowed → screenshot arrived → screen not protected → there is text.
+  **The app is checked before its screen is read**, so an app that is not allowed is declined
+  as that and nothing else is looked at.
+- **A payments floor under the list**: ten package names (two observed on the phone, eight from
+  general knowledge and **not checked against a device**) that can never be allowed — refused
+  at the decision, at the *Allow* button, and in the projection of history, so nothing written
+  by anything else widens it.
+- **Declines name a reason and never the app.** `AssistFacts.declined` takes a reason and a
+  build number and has no parameter for anything else.
+- **The allow-list is a projection** of `orb.assist.allowed` / `disallowed`, latest wins,
+  starting empty.
+- **A 3-second wait** for the screenshot; a missing one is `noScreenshot`, never a pass; a
+  callback after the session closed or decided is ignored.
+- **Password fields count as nothing**, by input type, even if the platform delivered them.
+- **The card says what happened in plain words**, offers *Allow* only when that is the reason
+  and the app is not a payments app, and for a screen that would be kept offers *Record this
+  test (nothing is kept)* — which writes `orb.assist.simulated`: the app's name (allowed apps
+  only), counts, a yes/no for a page address, the build.
+
+#### What guards it
+
+`AssistGuardTest` reads the assistant's own source and fails on: a record built outside
+`AssistFacts`; any logging or `Toast`; a content accessor used for anything but its length or a
+null test (**found weak by mutation and tightened** — the first rule searched the rest of the
+line and let `getText().toString()` through when a `.length()` appeared later; the probe's
+copy of the rule had the same flaw and is fixed too); any picture, file, preference or
+`Attachments` use; a component in its own process; any permission beyond the boot receiver's.
+Mutation-checked: logging, a stringified read, an `Attachments` reference, an ignored payments
+floor and a record built in glue each fail a named check.
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P39** | Orb is offered in *Default digital assistant app* and can be chosen | the services moved into Orb differently from the probe's; compare the manifest |
+| **P40** | On an app not on the list the card says Orb doesn't remember from it and offers **Allow**; the export holds `orb.assist.declined`, `reason: notAllowed`, with **only** `reason` and `versionCode` | a decline named the app — the failure the design exists to prevent |
+| **P41** | After *Allow*, invoking again says Orb **would keep N text elements (M characters)**; `orb.assist.allowed` names the app; *Record this test* writes `orb.assist.simulated` with the same counts | the allow-list projection or the settle logic is wrong |
+| **P42** | On a payments app (Google Pay, PhonePe) the card refuses, **offers no Allow button**, and the decline carries no package | the floor leaks |
+| **P43** | On an allowed app's protected screen (Chrome incognito after allowing Chrome on a normal tab) the card says the screen protects itself | the protection signals do not drive the decision |
+| **P44** | With *Use text from screen* off, the card says Orb could not read the screen's text, and the record is `noStructure` | arrival is not what the decision keys on |
+| **P45** | The simulated counts for a screen are within about 15 % of the probe's for the same kind of screen (a WhatsApp chat: roughly 30–40 text elements, 400–600 characters) | the walk differs from the probe's; password exclusion or the allowed-app gate is miscounting |
+
+#### The operator's protocol
+
+1. Install `orb-app-v12-assist.apk` (updates Orb). Open Orb.
+2. **Use Orb as the assistant** → choose **Orb** (not the probe). Orb → **Apps Orb may remember
+   from** should say *No apps yet.*
+3. Open a WhatsApp chat and invoke the gesture. Expect: *Orb doesn't remember from this app*
+   and an **Allow** button. Tap **Allow**.
+4. Invoke again on the same chat. Expect *Orb would keep N text elements…*. Tap **Record this
+   test**.
+5. Invoke on **PhonePe or Google Pay**. Expect a refusal and **no** Allow button.
+6. Invoke on a normal **Chrome** tab → **Allow**. Then open an **incognito** tab and invoke.
+   Expect *This screen protects itself.*
+7. Settings → Digital assistant app → **Use text from screen** off → invoke on WhatsApp. Expect
+   *could not read this screen's text*. Turn it back on.
+8. Orb → **Export and share journal**.
+
+To go back to your usual assistant: Settings → Default apps → Digital assistant app.

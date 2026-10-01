@@ -1,0 +1,71 @@
+package @PKG@;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Which apps the person has allowed — a projection of events, never a stored list.
+ *
+ * `orb.assist.allowed` and `orb.assist.disallowed` are the record; the current list is
+ * what they add up to, **latest wins per app**. A stored copy would be a second source of
+ * truth (Art. IX §33), and a list that can drift from its own history is the failure the
+ * journal exists to prevent. It starts empty: a fresh install captures nothing.
+ *
+ * Reads the phone's own canonical lines with a pattern, as `Erasure` does and for the
+ * same reason (no JSON parser on the phone; a quote inside a string is escaped, so a
+ * sentence that contains the field's spelling is not the field).
+ */
+final class AllowList {
+    private AllowList() {}
+
+    static final String ALLOWED = "orb.assist.allowed";
+    static final String DISALLOWED = "orb.assist.disallowed";
+
+    private static final Pattern PACKAGE_FIELD = Pattern.compile("\"package\":\"([^\"\\\\]+)\"");
+    private static final Pattern PACKAGE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+");
+
+    static boolean isPackageName(String value) {
+        return value != null && value.length() <= 255 && PACKAGE_NAME.matcher(value).matches();
+    }
+
+    /** The package a grant or revocation names, or null if the line is not one or is malformed. */
+    static String packageOf(String line) {
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return null;
+        Matcher m = PACKAGE_FIELD.matcher(line);
+        if (!m.find(payload)) return null;
+        return isPackageName(m.group(1)) ? m.group(1) : null;
+    }
+
+    /**
+     * The apps currently allowed, in the order they were first allowed.
+     *
+     * A payments package never appears, whatever the history says: the floor is applied
+     * to the projection as well as to the act, so an event written by anything else
+     * cannot widen what is captured.
+     */
+    static Set<String> allowed(List<String> lines) {
+        Set<String> out = new LinkedHashSet<>();
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            boolean grant = ALLOWED.equals(type);
+            if (!grant && !DISALLOWED.equals(type)) continue;
+            String pkg = packageOf(line);
+            if (pkg == null) continue;
+            if (grant) out.add(pkg);
+            else out.remove(pkg);
+        }
+        Set<String> floored = new HashSet<>();
+        for (String pkg : out) if (AssistPolicy.isFloor(pkg)) floored.add(pkg);
+        out.removeAll(floored);
+        return out;
+    }
+
+    static boolean isAllowed(List<String> lines, String packageName) {
+        return packageName != null && allowed(lines).contains(packageName);
+    }
+}

@@ -67,6 +67,44 @@
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity
+            android:name=".AllowActivity"
+            android:exported="false" />
+
+        <!--
+          Orb as the device's assistant (step 7). Bound only when the person chooses Orb in
+          Default digital assistant app. No permission is requested: the BIND permission is
+          what the *platform* must hold to bind these, not something Orb asks for.
+        -->
+        <service
+            android:name=".AssistService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".SessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:exported="true" />
+
+        <!-- Required for the system to offer Orb as an assistant (P30); recognises nothing. -->
+        <service
+            android:name=".RecognitionStub"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
+        <activity
             android:name=".ItemsActivity"
             android:exported="false" />
 
