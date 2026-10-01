@@ -183,7 +183,8 @@ public final class RecallActivity extends Activity {
             TextView head = new TextView(this);
             head.setTextSize(12);
             head.setTypeface(Typeface.DEFAULT_BOLD);
-            head.setText(when.format(new Date(entry.wallClock)) + "  ·  " + (entry.packageName == null ? "" : entry.packageName));
+            head.setText(when.format(new Date(entry.wallClock)) + "  ·  " + (entry.packageName == null ? "" : entry.packageName)
+                + (Provenance.SHARED_TEXT.equals(entry.type) ? "  ·  shared" : ""));
             row.addView(head);
 
             TextView body = new TextView(this);
@@ -328,7 +329,9 @@ public final class RecallActivity extends Activity {
         scroll.addView(text);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-            .setTitle(entry.packageName == null ? "Remembered" : entry.packageName)
+            .setTitle(Provenance.SHARED_TEXT.equals(entry.type)
+                ? "Shared" + (entry.packageName == null ? "" : " from " + entry.packageName)
+                : entry.packageName == null ? "Remembered" : entry.packageName)
             .setView(scroll)
             .setPositiveButton("Close", null)
             .setNegativeButton("Erase", new DialogInterface.OnClickListener() {

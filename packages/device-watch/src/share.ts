@@ -49,6 +49,7 @@ export const SHARE_FIELDS_MAPPED = [
   "resolveOutcome",
   "resolveDetail",
   "attachmentBytes",
+  "textChars",
 ] as const;
 
 /**
@@ -93,6 +94,11 @@ export interface ShareReading {
   readonly resolveOutcome?: string;
   readonly resolveDetail?: string;
   readonly attachmentBytes?: number;
+  /**
+   * How many characters of **text** were shared. Words are sealed as an Attachment and never written in the
+   * clear (`docs/SENSOR_SHARE.md`); the count says how much there was, not what.
+   */
+  readonly textChars?: number;
 }
 
 /** The Observation a share becomes, before it is drafted. */
@@ -135,6 +141,7 @@ export function shareFrom(payload: unknown): ShareTranslation | null {
   const resolveOutcome = text("resolveOutcome");
   const resolveDetail = text("resolveDetail");
   const attachmentBytes = count("attachmentBytes");
+  const textChars = count("textChars");
 
   const data: ShareReading = {
     // Same convention as the grants reading: a missing reason is `unknown`, not
@@ -151,6 +158,7 @@ export function shareFrom(payload: unknown): ShareTranslation | null {
     ...(resolveOutcome === undefined ? {} : { resolveOutcome }),
     ...(resolveDetail === undefined ? {} : { resolveDetail }),
     ...(attachmentBytes === undefined ? {} : { attachmentBytes }),
+    ...(textChars === undefined ? {} : { textChars }),
   };
 
   const identity = text("attachment");

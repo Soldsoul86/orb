@@ -33,6 +33,12 @@ final class Provenance {
     /** The share event's type. `SHARED` is the writer's; a test asserts the two spellings are one. */
     static final String SHARED = "orb.shared";
 
+    /**
+     * Not an event type: how the screens name an item that is a *share* whose content is sealed **text**, so its
+     * wording says *words* and not *file*. The event itself is still `orb.shared`.
+     */
+    static final String SHARED_TEXT = "orb.shared.text";
+
     static final class Facts {
         /** "capture", "share" or "other". */
         String kind = "other";
@@ -152,6 +158,9 @@ final class Provenance {
      * of the event stays in the journal, the words (or the file) do not. Said by kind of item.
      */
     static String stays(String itemType) {
+        if (SHARED_TEXT.equals(itemType)) {
+            return "Orb keeps its record that this was shared \u2014 when, where from, how much text \u2014 but not the words.";
+        }
         return SHARED.equals(itemType)
             ? "Orb keeps its record that this was shared — when, where from, and what it pointed to — but not the file's content."
             : "Orb keeps its record that this happened — when, from which app, how much text — but not the words.";

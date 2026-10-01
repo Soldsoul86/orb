@@ -29,6 +29,9 @@ final class Shares {
      * Not an empty share. *Cannot check* is not *nothing was shared*, and rendering
      * it that way is the `Readable: false` error one signal over.
      */
+    /** The share event's type, here so the pieces that read shares need not depend on the screens. */
+    static final String TYPE = "orb.shared";
+
     static Map<String, Object> unreadable() {
         Map<String, Object> payload = Json.obj();
         payload.put("because", "user.shared");
@@ -70,6 +73,18 @@ final class Shares {
         // (`SENSOR_SHARE.md` §3) and has not happened.
         payload.put("resolved", false);
         payload.put("absenceReason", "unfetched");
+        return payload;
+    }
+
+    /**
+     * A share whose content is **text**: recorded without the text. The words are sealed by the caller
+     * (`SharedText`) and named by identity once stored, so nothing the person shared is written in the
+     * clear. `references` is empty on purpose and `textChars` says how much there was.
+     */
+    static Map<String, Object> declaredText(String action, String mimeType, String referrer, long textChars) {
+        Map<String, Object> payload = declared(action, mimeType, referrer, java.util.Collections.<String>emptyList());
+        payload.put("itemCount", 1L);
+        payload.put("textChars", textChars);
         return payload;
     }
 

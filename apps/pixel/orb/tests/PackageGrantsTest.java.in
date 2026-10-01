@@ -1,0 +1,51 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/** What the journal says about the package-scan grant, read from the end. */
+final class PackageGrantsTest {
+    private PackageGrantsTest() {}
+
+    private static Map<String, Object> event(String capability) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("capability", capability);
+        payload.put("by", "operator");
+        return payload;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the grant history");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-grants").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+
+        Harness.check("no history is not a grant", !PackageGrants.lastIsGrant(journal.readLines()));
+        journal.append("orb.process.start", Json.obj());
+        Harness.check("unrelated events are not a grant", !PackageGrants.lastIsGrant(journal.readLines()));
+
+        journal.append(PackageGrants.GRANTED, event("installedPackages.read"));
+        Harness.check("a grant last is a grant", PackageGrants.lastIsGrant(journal.readLines()));
+        journal.append("orb.process.start", Json.obj());
+        Harness.check("later unrelated events do not change it", PackageGrants.lastIsGrant(journal.readLines()));
+
+        journal.append(PackageGrants.REVOKED, event("installedPackages.read"));
+        Harness.check("a revocation last is not a grant", !PackageGrants.lastIsGrant(journal.readLines()));
+        journal.append(PackageGrants.GRANTED, event("installedPackages.read"));
+        Harness.check("granted again", PackageGrants.lastIsGrant(journal.readLines()));
+
+        journal.append(PackageGrants.REVOKED, event("something.else"));
+        Harness.check("another capability's revocation says nothing about this one", PackageGrants.lastIsGrant(journal.readLines()));
+
+        List<String> broken = new ArrayList<>(journal.readLines());
+        broken.add("not an event");
+        boolean refused = false;
+        try { PackageGrants.lastIsGrant(broken); } catch (java.io.IOException expected) { refused = true; }
+        Harness.check("a line whose type cannot be read is refused, not skipped", refused);
+    }
+}

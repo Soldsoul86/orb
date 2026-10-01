@@ -6132,3 +6132,52 @@ Not done in v24 so as not to change the build mid-test; bundled with the next ch
 
 **Track D's package signal is closed for this phone:** the set no longer moves with interaction, and it still catches what was really installed or removed. Still stated, not fixed: an app with no launcher icon that is neither UPI nor a device admin is outside this set (the grants watch covers what protects the person); the 12-hour scan interval is still a guess and a decision for the operator; P21 (a change undone between two scans is invisible) stands.
 
+
+
+### 7b60. Shared words are sealed and searchable — pending item 2 — 2026-10-01
+
+**Status: built, awaiting the device** — `orb-app-v25-sharedtext.apk`. v24 is §7b59 (verified).
+The finding it closes: **words shared to Orb were written into the journal in the clear and could not be erased** (AD-12, first row). A text share now takes the
+same road as a remembered screen.
+
+#### What changed
+
+1. **Shared text is sealed.** `ShareActivity` hands the words to `SharedText.document`, which `Attachments.store` seals like a screen's text (own header `orb.shared.text.v1`, no address).
+   The `orb.shared` record now says **how many characters** (`textChars`) and names the sealed item by identity; `references` is empty. **No word reaches the journal or the disk in the clear.**
+   A link is still never opened or fetched.
+2. **Searchable, showable, erasable in Recall**, beside remembered screens, marked "· shared"; the app filter includes the sending app (Android's referrer, when it said).
+   *Where from?* reads *"shared — when, where from, how much text — but not the words."* **Erase** works as for a screen, and the same words shared again are refused as erased.
+3. **Backups carry the words.** Shared text counts as words: it is always in a backup, even with pictures off. Only shared files and pictures obey the pictures checkbox.
+4. **A guard on the source.** `ShareActivity` is scanned line by line: every use of the shared text is a length, a null test or the seal. **The guard found a real hole on its first run:** the old
+   `references()` still had a branch that would have put EXTRA_TEXT in the journal for any intent that reached it without being treated as a text share; it is removed.
+5. **Older exports still import.** Builds before v25 wrote the words in `references`; the desk importer keeps carrying that whole (the fixture keeps that shape) and now also reads `textChars`.
+   History is not edited: **words shared before v25 stay in the old journal in the clear** (AD-12, updated).
+6. **A small honest gap closed (found in §7b59):** after a restore the journal's latest word on the package-scan capability could say *granted* while the phone's was *not*. At start, if the last recorded
+   decision is *granted* and the marker is absent, Orb appends `grants.capability.revoked` with **`by: "reconcile"`** — never mistaken for a decision. (The same crash window — event written, flag not yet set — is covered.)
+
+#### Checked before the device
+
+- 591 phone-side checks (was 534), brain 187, TypeScript 410, lint clean: document round trip; the record names no word; nothing in the journal or on disk in the clear; search, filter and the app list; an unnamed sender; the same words twice (held, one item);
+  erase keeps/destroys as for screens; a re-share of erased words refused; provenance wording; the Observation names the count and not the words; **a backup with pictures off carries the words and a restore opens them**; the grant-history helper
+  (no history, unrelated events, grant last, revoke last, another capability's revocation, a line whose type cannot be read refused and not skipped).
+- The share fixture is regenerated from the phone's own class with a sealed-text shape added; the Kotlin vectors regenerated.
+- **Not testable off the phone:** the real share sheet from real apps, Android naming the referrer, and the reconcile glue (`PackageAccess.reconcile` needs Android) — **the device check**.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P98** | Share some text from another app (a note, a message) to Orb: the export has an `orb.shared` with `textChars` = its length, `references: ""`, `resolveOutcome: stored`, one attachment — and **none of the words anywhere in the export file** | words still reach the journal |
+| **P99** | **Recall** lists it marked "· shared"; searching a distinctive word of it finds it; the app filter offers the sending app (or lists it under no app if Android named none) | search does not reach shared text |
+| **P100** | **Where from?** on it says it was shared, when, from where and how much text — **not the words** | provenance reads the wrong thing |
+| **P101** | **Erase** it: it disappears from search; sharing the same words again is refused as erased | an erased share can be re-kept |
+| **P102** | **Check a backup file…** on a fresh backup made with *pictures off* says good, and the backup is larger than before the share | words are left out of a backup |
+| **P103** | On an ordinary start with scanning granted, **no `by: reconcile` event appears** | the reconcile revokes a live grant |
+
+#### The operator's protocol
+
+1. Install `orb-app-v25-sharedtext.apk` over v24; open Orb once. *(P103)*
+2. From any app, select some text with a distinctive word, **Share → Orb**. Open **Recall**, search that word; tap the result; **Where from?** *(P99, P100)*
+3. **Export and share journal**; search the file for that word — it should not be there. *(P98)*
+4. In Recall, **Erase** the shared item; search again; share the same words again — Orb should record it as refused/erased. Export. *(P101)*
+5. Share new text, then **Back up and restore → Back up now…** with *pictures* **off**; **Check a backup file…** on it. *(P102)*

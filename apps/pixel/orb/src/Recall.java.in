@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -132,9 +133,11 @@ final class Recall {
     static List<Entry> shared(Journal journal) throws IOException {
         List<String> lines = journal.readLines();
         java.util.Set<String> erased = Erasure.erasedHashes(lines);
+        // Shared **text** is words, not a file: it lives in the searchable list with remembered screens.
+        java.util.Set<String> words = SharedText.sealedTextHashes(lines);
         List<Entry> out = new ArrayList<>();
         for (Erasure.Item item : Erasure.items(lines)) {
-            if (!Provenance.SHARED.equals(item.type) || item.erased || erased.contains(item.hash)) continue;
+            if (!Provenance.SHARED.equals(item.type) || item.erased || erased.contains(item.hash) || words.contains(item.hash)) continue;
             String line = null;
             for (String candidate : lines) {
                 if (item.hash.equals(Erasure.envelopeHash(candidate))) { line = candidate; break; }
@@ -180,7 +183,7 @@ final class Recall {
     /** Parses what `ScreenText.document()` wrote. */
     static Doc parse(byte[] bytes) {
         String s = new String(bytes, StandardCharsets.UTF_8);
-        String prefix = ScreenText.HEADER + "\nuri:";
+        String prefix = s.startsWith(SharedText.HEADER + "\nuri:") ? SharedText.HEADER + "\nuri:" : ScreenText.HEADER + "\nuri:";
         if (!s.startsWith(prefix)) return null;
         int eol = s.indexOf('\n', prefix.length());
         if (eol < 0) return null;
@@ -224,12 +227,33 @@ final class Recall {
 
     /** The apps something has been remembered from, for the filter. */
     static List<String> apps(Journal journal) throws IOException {
+        List<String> lines = journal.readLines();
+        Map<String, String> sharedApp = sealedTextApps(lines);
         List<String> out = new ArrayList<>();
-        for (Erasure.Item item : Erasure.items(journal.readLines())) {
-            if (!item.type.equals(AssistFacts.CAPTURED) || item.erased || item.packageName == null) continue;
-            if (!out.contains(item.packageName)) out.add(item.packageName);
+        for (Erasure.Item item : Erasure.items(lines)) {
+            if (item.erased) continue;
+            String app = item.type.equals(AssistFacts.CAPTURED) ? item.packageName : sharedApp.get(item.hash);
+            if (app == null || out.contains(app)) continue;
+            out.add(app);
         }
         java.util.Collections.sort(out);
+        return out;
+    }
+
+    /**
+     * For every share whose content is sealed **text**: the envelope hash and the app that handed it over (the
+     * referrer's package, or null if Android did not say). Words shared to Orb are searched, shown and erased
+     * like remembered screens (`SharedText`), so this is what lets them take part in the same list and filter.
+     */
+    static Map<String, String> sealedTextApps(List<String> lines) {
+        Map<String, String> out = new java.util.HashMap<>();
+        for (String line : lines) {
+            if (SharedText.textCharsOf(line) < 0) continue;
+            String hash = Erasure.envelopeHash(line);
+            if (hash == null) continue;
+            String referrer = field(REFERRER, line);
+            out.put(hash, referrer == null || referrer.isEmpty() || referrer.equals("unknown") ? null : fromLabel(referrer));
+        }
         return out;
     }
 
@@ -238,13 +262,18 @@ final class Recall {
      * item looked at is opened in memory and let go.
      */
     static Results search(Context context, Journal journal, String query, String packageFilter) throws IOException {
-        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        List<String> lines = journal.readLines();
+        List<Erasure.Item> items = Erasure.items(lines);
+        Map<String, String> sharedApp = sealedTextApps(lines);
         Results results = new Results();
         int looked = 0;
         for (int i = items.size() - 1; i >= 0; i--) {
             Erasure.Item item = items.get(i);
-            if (!item.type.equals(AssistFacts.CAPTURED) || item.erased) continue;
-            if (packageFilter != null && !packageFilter.equals(item.packageName)) continue;
+            boolean screen = item.type.equals(AssistFacts.CAPTURED);
+            boolean sharedText = sharedApp.containsKey(item.hash);
+            if ((!screen && !sharedText) || item.erased) continue;
+            String app = screen ? item.packageName : sharedApp.get(item.hash);
+            if (packageFilter != null && !packageFilter.equals(app)) continue;
             if (looked >= SCAN_LIMIT) { results.skipped++; continue; }
             looked++;
             try {
@@ -252,8 +281,11 @@ final class Recall {
                 if (bytes == null) continue;               // destroyed or gone: not an error
                 Doc doc = parse(bytes);
                 if (doc == null) { results.unreadable++; continue; }
-                if (matches(doc, item.packageName, query)) {
-                    results.entries.add(new Entry(item.hash, item.id, item.identity, item.wallClock, item.packageName, snippet(doc, query)));
+                if (matches(doc, app, query)) {
+                    results.entries.add(screen
+                        ? new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query))
+                        : new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query),
+                            Provenance.SHARED_TEXT, null, null, item.bytes));
                 }
             } catch (Exception corrupt) {
                 results.unreadable++;

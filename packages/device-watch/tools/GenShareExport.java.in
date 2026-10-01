@@ -84,7 +84,14 @@ public final class GenShareExport {
         Shares.outcome(text, Shares.unresolvableOutcome(Shares.firstReference(text)), null, null, 0L);
         record(journal, text);
 
-        // 6. An intent the activity could not read. Not "nothing was shared".
+        // 6. Plain text as the phone shares it now: sealed as an Attachment and named by
+        //    identity. No words in the record, only how many characters there were.
+        Map<String, Object> sealed = Shares.declaredText(
+            "android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 38L);
+        Shares.outcome(sealed, "stored", null, HASH, 120L);
+        record(journal, sealed);
+
+        // 7. An intent the activity could not read. Not "nothing was shared".
         record(journal, Shares.unreadable());
 
         for (String line : journal.readLines()) System.out.println(line);

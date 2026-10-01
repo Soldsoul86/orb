@@ -49,7 +49,7 @@ describe("an export written by the phone's share code", () => {
   test("verifies under the TypeScript verifier, and holds six shares and one non-share", async () => {
     const events = parseExport(await fixture());
     assert.doesNotThrow(() => verifyLane(events));
-    assert.equal(events.filter((event) => event.type === SHARED_TYPE).length, 6);
+    assert.equal(events.filter((event) => event.type === SHARED_TYPE).length, 7);
     assert.equal(events.filter((event) => event.type === "orb.process.start").length, 1);
   });
 });
@@ -59,10 +59,10 @@ describe("each share becomes one Observation, and nothing else does", () => {
     const j = await desk();
     const result = await importExport(j, await fixture());
 
-    assert.equal(result.replicated, 7);
-    assert.equal(result.observed, 6, "runtime activity is an Event, not an Observation");
-    assert.equal((await shares(j)).length, 6);
-    assert.equal((await j.readLane(INSTALL)).length, 7, "the phone's lane arrives whole");
+    assert.equal(result.replicated, 8);
+    assert.equal(result.observed, 7, "runtime activity is an Event, not an Observation");
+    assert.equal((await shares(j)).length, 7);
+    assert.equal((await j.readLane(INSTALL)).length, 8, "the phone's lane arrives whole");
   });
 
   test("the source is the sensor at the install, the occurrence is certain, and the phone's event is cited", async () => {
@@ -143,6 +143,16 @@ describe("what a share carries", () => {
     assert.equal(text.attachments, undefined);
   });
 
+  test("a sealed text share names how much and holds the words only as an attachment", async () => {
+    const sealed = (await byOutcome())[5]!;
+    assert.equal(sealed.data.textChars, 38);
+    assert.equal(sealed.data.references, "", "no words in the record");
+    assert.equal(sealed.data.resolved, true);
+    assert.deepEqual(sealed.attachments, [
+      "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+    ]);
+  });
+
   test("the referrer is carried as data, not promoted to the source", async () => {
     // The sensor is the doorway; the sending app is where it came from. Whether
     // two shares from different apps are independent is AD-6's question, and is
@@ -160,7 +170,7 @@ describe("importing again", () => {
     const again = await importExport(j, await fixture());
     assert.equal(again.replicated, 0);
     assert.equal(again.observed, 0);
-    assert.equal((await shares(j)).length, 6);
+    assert.equal((await shares(j)).length, 7);
   });
 
   test("a longer export of the same lane adds only its tail", async () => {
@@ -172,9 +182,9 @@ describe("importing again", () => {
     assert.equal(early.observed, 3, "three shares in the first four events");
 
     const full = await importExport(j, lines.join("\n") + "\n");
-    assert.equal(full.replicated, 3);
-    assert.equal(full.observed, 3);
-    assert.equal((await shares(j)).length, 6);
+    assert.equal(full.replicated, 4);
+    assert.equal(full.observed, 4);
+    assert.equal((await shares(j)).length, 7);
   });
 });
 
@@ -236,7 +246,7 @@ describe("shares and grants readings share a lane without disturbing each other"
     await importExport(both, await fixture());
     const state = project(await both.readAll());
     assert.equal(alertsFor(state).length, expected);
-    assert.equal((await shares(both)).length, 6 + 4, "six shares beside the four grants readings");
+    assert.equal((await shares(both)).length, 7 + 4, "seven shares beside the four grants readings");
   });
 });
 

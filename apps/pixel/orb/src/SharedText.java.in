@@ -1,0 +1,55 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Text handed to Orb with a share, kept **sealed** — like a remembered screen, and for the same reason.
+ *
+ * Until this existed, shared text was written into the journal in the clear (`references` carried it), where
+ * nothing could erase it and every export carried it away (`ARCHITECTURAL_DEBT.md` AD-12). Now the text is
+ * sealed as an Attachment under its own key — **erasable, backed up and restored with the rest** — and the
+ * journal says only that a text share happened: when, from which app, how many characters, and the sealed
+ * item's identity. **A link is not fetched**: sharing one is not authorization to visit it.
+ *
+ * The document is the same shape as a remembered screen's (`Recall.parse` reads both), under its own header,
+ * so shared words are **searched, shown and erased the same way**.
+ *
+ * Text shared by an earlier build is in the clear and stays there: history is never rewritten.
+ */
+final class SharedText {
+    private SharedText() {}
+
+    static final String HEADER = "orb.shared.text.v1";
+
+    private static final Pattern TEXT_CHARS = Pattern.compile("\"textChars\":(\\d+)");
+
+    /** What is sealed: a versioned header, an empty address line (a share has none), then the text exactly as given. */
+    static byte[] document(String text) {
+        return (HEADER + "\nuri:\n---\n" + text).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The number of characters a sealed text share carries, from its clear record — or -1 if this event is not one. */
+    static long textCharsOf(String line) {
+        if (!Shares.TYPE.equals(Journal.typeOf(line))) return -1L;
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return -1L;
+        Matcher m = TEXT_CHARS.matcher(line);
+        return m.find(payload) ? Long.parseLong(m.group(1)) : -1L;
+    }
+
+    /** Envelope hashes of the share events whose content is sealed text — words, not a file. */
+    static Set<String> sealedTextHashes(List<String> lines) {
+        Set<String> out = new HashSet<>();
+        for (String line : lines) {
+            if (textCharsOf(line) < 0) continue;
+            String hash = Erasure.envelopeHash(line);
+            if (hash != null) out.add(hash);
+        }
+        return out;
+    }
+}

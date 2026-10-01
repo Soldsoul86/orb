@@ -423,7 +423,7 @@
    "file": "packages/device-watch/tests/fixtures/share-export.txt",
    "expected": [
     {
-     "cause": "01M3VK2J8SK8HFXWM3QJ1N54YS",
+     "cause": "01M3W19S39HE1V9JBCNPP9D6MV",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,
@@ -441,7 +441,7 @@
      }
     },
     {
-     "cause": "01M3VK2J8XPZAV2N9XSVPK38AC",
+     "cause": "01M3W19S3EQ9KXTHK9F55P70RX",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,
@@ -461,7 +461,7 @@
      }
     },
     {
-     "cause": "01M3VK2J91MHWTZ1RQD842AJWN",
+     "cause": "01M3W19S3J2G4JWB92T7AHTNJH",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,
@@ -483,7 +483,7 @@
      }
     },
     {
-     "cause": "01M3VK2J93GW8TSDPF06WKGY1N",
+     "cause": "01M3W19S3N4EV9WJ9PBT2D3SXG",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,
@@ -505,7 +505,7 @@
      }
     },
     {
-     "cause": "01M3VK2J96DVVVZD7ZB5M4VDCE",
+     "cause": "01M3W19S3RHPZFEJHHVCNAXT7D",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,
@@ -524,7 +524,30 @@
      }
     },
     {
-     "cause": "01M3VK2J99DBQPE7AQDQ2K595M",
+     "cause": "01M3W19S3V98F10HJQWM40NZCY",
+     "expected": {
+      "source": "orb.sensor.share@orb-000000000000000000000001",
+      "confidencePercent": 100,
+      "data": {
+       "because": "user.shared",
+       "shareReadable": true,
+       "action": "android.intent.action.SEND",
+       "mimeType": "text/plain",
+       "referrer": "android-app://com.example.notes",
+       "itemCount": 1,
+       "references": "",
+       "resolved": true,
+       "resolveOutcome": "stored",
+       "attachmentBytes": 120,
+       "textChars": 38
+      },
+      "attachments": [
+       "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+      ]
+     }
+    },
+    {
+     "cause": "01M3W19S3XR3N0NF9WEX18PKS3",
      "expected": {
       "source": "orb.sensor.share@orb-000000000000000000000001",
       "confidencePercent": 100,

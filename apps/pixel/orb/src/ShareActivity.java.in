@@ -59,16 +59,57 @@ public final class ShareActivity extends Activity {
         }
 
         Intent intent = getIntent();
-        Map<String, Object> payload = record(intent);
-        // While the grant is live, and only here. By the time this activity
-        // finishes it is gone (§7b33).
-        resolve(intent, payload);
+        String text = sharedText(intent);
+        Map<String, Object> payload;
+        if (text != null) {
+            // Words handed over are sealed, never written into the journal: the record says only that
+            // a text share happened, how long it was, and the sealed item's identity (`SharedText`).
+            payload = recordText(intent, text);
+            sealText(payload, text);
+        } else {
+            payload = record(intent);
+            // While the grant is live, and only here. By the time this activity
+            // finishes it is gone (§7b33).
+            resolve(intent, payload);
+        }
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(Orb.SHARED, payload);
         Observe.run(journal);
 
         Toast.makeText(this, "Orb recorded the share", Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    /** The text of a plain text share — one `EXTRA_TEXT`, no stream — or null if this is not one. */
+    private static String sharedText(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return null;
+        if (intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri.class) != null) return null;
+        CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+        if (text == null || text.length() == 0) return null;
+        return text.toString();
+    }
+
+    private Map<String, Object> recordText(Intent intent, String text) {
+        Uri referrer = getReferrer();
+        return Shares.declaredText(
+            String.valueOf(intent.getAction()),
+            intent.getType(),
+            referrer == null ? null : referrer.toString(),
+            text.length());
+    }
+
+    /**
+     * Seals the shared words as an Attachment and records the outcome. **A link is not opened or fetched**: sharing
+     * one is not authorization to visit it. If the same words were erased before, the store refuses them, the
+     * record says so, and the words are written nowhere.
+     */
+    private void sealText(Map<String, Object> payload, String text) {
+        try {
+            Attachments.Stored stored = Attachments.store(this, new java.io.ByteArrayInputStream(SharedText.document(text)));
+            Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
+        } catch (Exception error) {
+            Shares.failed(payload, error);
+        }
     }
 
     /**
@@ -126,9 +167,8 @@ public final class ShareActivity extends Activity {
     /**
      * The references a share carries, in the order the sender gave them.
      *
-     * Plain text is *itself* the content and is recorded as the reference; a
-     * `content://` URI and a URL are pointers. The distinction matters for what
-     * resolution would later have to do, and not for what is recorded now.
+     * Pointers only — `content://` URIs. Words are content, not a pointer, and are sealed elsewhere; older builds
+     * recorded them here in the clear, and their exports still import (`share-import.test.ts`).
      */
     private List<String> references(Intent intent) {
         List<String> out = new ArrayList<>();
@@ -150,13 +190,9 @@ public final class ShareActivity extends Activity {
             return out;
         }
 
-        CharSequence text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
-        if (text != null) {
-            out.add(text.toString());
-            return out;
-        }
-
-        // A share that named neither a stream nor text. Recorded as an empty
+        // Words are never a reference: a text share is sealed (`sealText`) and never reaches here, and any other
+        // intent that carries text has it ignored rather than written to the journal in the clear.
+        // A share that named no stream. Recorded as an empty
         // list, which with `itemCount: 0` says *this arrived and carried
         // nothing we could name* — a fact, and different from a failed read.
         return out;

@@ -31,7 +31,7 @@ object Translate {
     val ASSIST_FIELDS = listOf("because", "package", "textNodes", "textChars", "webUri", "resolveOutcome",
         "attachmentBytes", "versionCode", "passwordFields")
     val SHARE_FIELDS = listOf("because", "shareReadable", "action", "mimeType", "referrer", "itemCount",
-        "references", "resolved", "absenceReason", "resolveOutcome", "resolveDetail", "attachmentBytes")
+        "references", "resolved", "absenceReason", "resolveOutcome", "resolveDetail", "attachmentBytes", "textChars")
 
     fun assist(payload: Any?): Translation? = from(payload, ASSIST_FIELDS)
     fun share(payload: Any?): Translation? = from(payload, SHARE_FIELDS)

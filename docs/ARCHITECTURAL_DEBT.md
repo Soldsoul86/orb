@@ -497,7 +497,7 @@ journal holds in the clear.
 
 | | Why |
 | --- | --- |
-| Shared **text** (`references` carries it) | the phone has no sealed payloads; the text is written in the journal itself and cannot be unwritten |
+| Shared **text** shared **before v25** (`references` carries it) | written in the journal itself and cannot be unwritten. **From v25 on, shared text is sealed** (`DEVICE_LOOP.md` §7b60) and is erasable like a captured screen; only the old words remain |
 | Any event payload | the phone writes payloads in the clear; payload-key sealing exists in `runtime/journal` (`sealedStore`) and not in `Journal.java` |
 | The desk's replica | nothing applies a received `orb.erasure`; `erasedHashes` is a projection only, so a replicated event keeps its clear payload |
 

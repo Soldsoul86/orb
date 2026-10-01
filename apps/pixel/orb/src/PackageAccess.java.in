@@ -40,8 +40,8 @@ final class PackageAccess {
 
     private static final String FILE = "package-access.granted";
 
-    static final String GRANTED = "grants.capability.granted";
-    static final String REVOKED = "grants.capability.revoked";
+    static final String GRANTED = PackageGrants.GRANTED;
+    static final String REVOKED = PackageGrants.REVOKED;
 
     /** Whether the package scan may run. */
     static boolean granted(Context context) {
@@ -58,7 +58,7 @@ final class PackageAccess {
      */
     static void grant(Context context, Journal journal) throws IOException {
         if (granted(context)) return;
-        record(context, journal, GRANTED);
+        record(context, journal, GRANTED, "operator");
         touch(new File(context.getFilesDir(), FILE));
     }
 
@@ -71,10 +71,26 @@ final class PackageAccess {
      */
     static void revoke(Context context, Journal journal) {
         new File(context.getFilesDir(), FILE).delete();
-        record(context, journal, REVOKED);
+        record(context, journal, REVOKED, "operator");
     }
 
-    private static void record(Context context, Journal journal, String type) {
+    /**
+     * Makes the history say what the device does. A restore brings the journal back and grants nothing, and a process
+     * can die between writing a grant and setting its flag; either way the journal's last word is "granted" while the
+     * scan is off, and a later reader would believe a capability was live that is not. This appends the revocation
+     * the device already enacted — `by: "reconcile"`, so it is never mistaken for a decision. The other direction
+     * (flag set, journal says revoked) cannot arise: revoke removes the flag first.
+     */
+    static void reconcile(Context context, Journal journal) {
+        if (journal == null || granted(context)) return;
+        try {
+            if (PackageGrants.lastIsGrant(journal.readLines())) record(context, journal, REVOKED, "reconcile");
+        } catch (IOException unreadable) {
+            // Cannot read the history, so cannot say what it claims. Write nothing.
+        }
+    }
+
+    private static void record(Context context, Journal journal, String type, String by) {
         if (journal == null) return;
         boolean all = declaresQueryAll(context);
         Map<String, Object> payload = Json.obj();
@@ -94,7 +110,7 @@ final class PackageAccess {
         payload.put("scope", all ? "all installed packages on this device"
                                   : "the apps that match the queries Orb declares: launchers, UPI payment handlers and device admins");
         payload.put("manifestScope", all ? "all" : DeclaredPackages.SCOPE);
-        payload.put("by", "operator");
+        payload.put("by", by);
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(type, payload);
     }

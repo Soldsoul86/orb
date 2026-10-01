@@ -97,7 +97,7 @@ Three resolutions, three different declarations:
 
 | What was shared | Resolution | Tier | Why |
 | --- | --- | --- | --- |
-| plain text | none — it *is* the content | — | nothing to reach for |
+| plain text | **sealed on arrival** (v25): the words become an Attachment, never a journal field | `Observe` | a local act the person authorized by sharing; before v25 the words were written in the clear (AD-12) |
 | `content://` URI (photo, PDF, file) | read the bytes into an `Attachment` | `Observe` | a local read the user authorized by sharing; the URI grant is scoped and expires |
 | a URL | **fetching it is egress** | `Act (irreversible)` | the host learns you fetched. You cannot un-disclose that — the same reasoning DR-9 applied to a remote model route |
 
@@ -138,7 +138,8 @@ And in its `data`, under the phone's own names:
 | `mimeType` | as declared by the sender | *declared*, never verified by the sensor |
 | `referrer` | the calling package as Android reported it, or `unknown` | §5; **unverified** |
 | `itemCount` | 1, or n for `SEND_MULTIPLE`, 0 if nothing nameable arrived | |
-| `references` | what was handed over, colon-joined; for text, the text itself | never the resolved bytes; **carried whole, never split** — a URI and a sentence both contain colons |
+| `references` | what was handed over, colon-joined; empty for text from v25 on (older builds put the text itself here) | never the resolved bytes; **carried whole, never split** — a URI and a sentence both contain colons |
+| `textChars` | how many characters of text were shared (v25 on) | the count, never the words; the words are the sealed attachment |
 | `resolved` | `true` / `false` | §6 |
 | `absenceReason` | `unfetched` while unresolved | omitted once the content is held |
 | `resolveOutcome` | `stored`, `held`, `refused`, `failed`, `openedNull`, `tooLarge`, `readFailed`, `sealFailed`, `noReference`, `notAContentUri`, `erased` | every outcome is recorded, including refusals |

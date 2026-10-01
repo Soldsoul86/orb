@@ -86,6 +86,9 @@ public final class Orb extends Application {
         // the declaration and the key's destruction). Idempotent; never blocks launching.
         Erase.reconcile(this, journal);
 
+        // A restored journal may say the package scan is granted when the device has granted nothing.
+        PackageAccess.reconcile(this, journal);
+
         // Turn anything kept and not yet observed into an Observation (B2a). Idempotent;
         // refuses to write if any line cannot be read; never blocks launching.
         Observe.run(journal);

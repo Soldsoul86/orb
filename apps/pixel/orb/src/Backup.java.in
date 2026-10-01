@@ -146,12 +146,14 @@ final class Backup {
 
         long created = System.currentTimeMillis();
         // Which identities are still kept, and by what kind of item.
-        Map<String, boolean[]> kept = new LinkedHashMap<>();   // identity -> {hasCapture, hasShare}
+        // Words — remembered screens and shared text — always go in; shared pictures and files only if asked for.
+        java.util.Set<String> sharedWords = SharedText.sealedTextHashes(lines);
+        Map<String, boolean[]> kept = new LinkedHashMap<>();   // identity -> {hasWords, hasFile}
         for (Erasure.Item item : Erasure.items(lines)) {
             if (item.erased) continue;
             boolean[] kinds = kept.get(item.identity);
             if (kinds == null) { kinds = new boolean[2]; kept.put(item.identity, kinds); }
-            if (AssistFacts.CAPTURED.equals(item.type)) kinds[0] = true; else kinds[1] = true;
+            if (AssistFacts.CAPTURED.equals(item.type) || sharedWords.contains(item.hash)) kinds[0] = true; else kinds[1] = true;
         }
 
         StringBuilder journal = new StringBuilder();

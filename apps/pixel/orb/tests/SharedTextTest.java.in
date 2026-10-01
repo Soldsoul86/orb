@@ -1,0 +1,206 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** Words shared to Orb are sealed, searched, shown and erased like remembered screens — and are in the journal nowhere. */
+final class SharedTextTest {
+    private SharedTextTest() {}
+
+    private static final String WORDS = "dinner at 8 with priya\n\n--- and the lift code is 4471 é🙂";
+
+    /** What `ShareActivity` does for a text share, off the phone. */
+    private static String share(Context context, Journal journal, String text, String referrer) throws Exception {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", referrer, text.length());
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(SharedText.document(text)));
+        Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
+        journal.append("orb.shared", payload);
+        return stored.outcome;
+    }
+
+    private static boolean contains(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            if (contains(Files.readAllBytes(child.toPath()), needle)) return true;
+        }
+        return false;
+    }
+
+    /** The shared words go to `SharedText.document` and nowhere else; the source says so, line by line. */
+    private static void guardShareActivity() throws Exception {
+        Harness.suite("ShareActivity puts the words nowhere in the clear");
+        java.nio.file.Path root = java.nio.file.Paths.get(System.getProperty("orb.root", "."));
+        String[] lines = new String(Files.readAllBytes(root.resolve("src/ShareActivity.java.in")), StandardCharsets.UTF_8).split("\n");
+        java.util.regex.Pattern word = java.util.regex.Pattern.compile("\\btext\\b");
+        java.util.regex.Pattern allowed = java.util.regex.Pattern.compile(
+            "String text = |CharSequence text = intent\\.getCharSequenceExtra\\(Intent\\.EXTRA_TEXT\\)|text [!=]= null|text\\.length\\(\\)|text\\.toString\\(\\)|recordText\\(intent, text\\)|sealText\\(payload, text\\)"
+            + "|SharedText\\.document\\(text\\)|String text\\)|final String text");
+        List<String> offenders = new java.util.ArrayList<>();
+        int uses = 0;
+        for (int i = 0; i < lines.length; i++) {
+            String trimmed = lines[i].trim();
+            if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) continue;
+            if (!word.matcher(lines[i]).find()) continue;
+            uses++;
+            String rest = allowed.matcher(lines[i]).replaceAll("");
+            if (word.matcher(rest).find() || lines[i].contains("Log.") || lines[i].contains(".put(")) offenders.add((i + 1) + "  " + trimmed);
+        }
+        Harness.check("every use of the shared text is a length, a null test or the seal (" + uses + " uses)", offenders.isEmpty() && uses > 0);
+        for (String o : offenders) System.out.println("           " + o);
+    }
+
+    static void run() throws Exception {
+        guardShareActivity();
+        Harness.equal("the share type is spelled once", Shares.TYPE, Provenance.SHARED);
+        Harness.suite("the sealed document");
+        byte[] doc = SharedText.document(WORDS);
+        Harness.check("it has its own header and no address", new String(doc, StandardCharsets.UTF_8).startsWith("orb.shared.text.v1\nuri:\n---\n"));
+        Recall.Doc parsed = Recall.parse(doc);
+        Harness.check("Recall reads it as it reads a screen's", parsed != null);
+        Harness.equal("the words come back exactly, blank lines, dashes and all", parsed.body, WORDS);
+        Harness.equal("there is no address", parsed.uri, "");
+        ScreenText hello = new ScreenText();
+        hello.add("hello");
+        Harness.check("a screen's document still reads", Recall.parse(hello.document()) != null);
+        Harness.check("anything else is not one of ours", Recall.parse("something else\nuri:\n---\nx".getBytes(StandardCharsets.UTF_8)) == null);
+
+        Harness.suite("the record names no word");
+        Map<String, Object> declared = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.chat", WORDS.length());
+        String declaredText = Json.canonical(declared);
+        Harness.check("a text share declares how much, and not what", declaredText.contains("\"textChars\":" + WORDS.length()) && !declaredText.contains("priya") && !declaredText.contains("4471"));
+        Harness.check("references are empty and the count is one", declaredText.contains("\"references\":\"\"") && declaredText.contains("\"itemCount\":1"));
+
+        Install.forget();   // the identity is cached process-wide: mint this directory's own
+        File dir = Files.createTempDirectory("orb-sharedtext").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.equal("stored the first time", share(context, journal, WORDS, "android-app://com.example.chat"), Capture.STORED);
+        String line = null;
+        for (String l : journal.readLines()) if ("orb.shared".equals(Journal.typeOf(l))) line = l;
+        Harness.check("the journal holds no word of it", !line.contains("priya") && !line.contains("4471") && !line.contains("dinner") && !line.contains("lift"));
+        Harness.check("nor does any file on disk, in the clear", !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "4471".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("the sealed content is named by identity", line.contains("\"attachment\":\"sha256:") && line.contains("\"resolved\":true"));
+        Harness.equal("it is recognised as sealed text", SharedText.textCharsOf(line), (long) WORDS.length());
+        Harness.equal("a share of a file is not", SharedText.textCharsOf("{\"payload\":{\"attachment\":\"x\"},\"type\":\"orb.shared\"}"), -1L);
+        Harness.equal("and a capture is not", SharedText.textCharsOf(line.replace("orb.shared", "orb.assist.captured")), -1L);
+        Harness.equal("the journal can say which events are sealed text", SharedText.sealedTextHashes(journal.readLines()).size(), 1);
+
+        Harness.suite("it is searched with the words Orb remembered");
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        ScreenText screen = new ScreenText();
+        screen.add("a remembered screen about priya's invoice");
+        Capture.remember(context, journal, screen, "com.example.chat", 7L, false);
+        Recall.Results all = Recall.search(context, journal, "", null);
+        Harness.equal("both are listed", all.entries.size(), 2);
+        Harness.equal("newest first: the screen was remembered after", all.entries.get(0).type, AssistFacts.CAPTURED);
+        Recall.Entry sharedEntry = all.entries.get(1);
+        Harness.equal("the share is marked as one", sharedEntry.type, Provenance.SHARED_TEXT);
+        Harness.equal("from the app that handed it over", sharedEntry.packageName, "com.example.chat");
+        Recall.Results found = Recall.search(context, journal, "lift code", null);
+        Harness.equal("a search for its words finds it, and only it", found.entries.size(), 1);
+        Harness.check("with a snippet of the words", found.entries.get(0).snippet.contains("lift code"));
+        Harness.equal("a search for words in both finds both", Recall.search(context, journal, "priya", null).entries.size(), 2);
+        Harness.equal("the app filter includes shared text", Recall.search(context, journal, "", "com.example.chat").entries.size(), 2);
+        Harness.equal("and excludes other apps", Recall.search(context, journal, "", "com.other.app").entries.size(), 0);
+        Harness.check("the apps list includes the app that shared", Recall.apps(journal).contains("com.example.chat"));
+        Harness.check("it opens to the exact words", Recall.open(context, sharedEntry.identity).body.equals(WORDS));
+        Harness.equal("it is not listed among shared files and pictures", Recall.shared(journal).size(), 0);
+
+        Harness.suite("a picture's app is not a words app");
+        Install.forget();
+        File picDir = Files.createTempDirectory("orb-sharedpic").toFile();
+        Context picContext = new Context(picDir);
+        Journal picJournal = Journal.open(picContext, Install.lane(picContext), Install.id(picContext));
+        Map<String, Object> picture = Shares.declared("android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/photo-1"));
+        Shares.outcome(picture, "held", null, "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", 10L);
+        picJournal.append("orb.shared", picture);
+        Harness.check("a shared picture's app is not in the words' app list", !Recall.apps(picJournal).contains("com.example.gallery"));
+
+        Harness.suite("an unnamed sender still works");
+        Context other = new Context(Files.createTempDirectory("orb-sharedtext2").toFile());
+        Install.forget();
+        Journal j2 = Journal.open(other, Install.lane(other), Install.id(other));
+        share(other, j2, "no sender named", null);
+        Recall.Results anon = Recall.search(other, j2, "sender", null);
+        Harness.equal("it is found", anon.entries.size(), 1);
+        Harness.equal("with no app", anon.entries.get(0).packageName, null);
+        Install.forget();
+        context = new Context(dir);
+        Install.forget();
+
+        Harness.suite("the same words twice are one sealed item, two shares");
+        journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.equal("the second is held", share(context, journal, WORDS, "android-app://com.example.chat"), Capture.HELD);
+        Harness.equal("two shares of those words are listed", Recall.search(context, journal, "lift code", null).entries.size(), 2);
+        long keysBefore = Attachments.counts(context)[0];
+
+        Harness.suite("erasing it is real");
+        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        Erasure.Item first = null;
+        for (Erasure.Item i : items) if (i.type.equals("orb.shared")) { first = i; break; }
+        Erase.Result kept = Erase.execute(context, journal, first.hash);
+        Harness.equal("erasing one while another keeps the words leaves them", kept.outcome, Erase.KEPT_BY_OTHERS);
+        Harness.equal("one is left", Recall.search(context, journal, "lift code", null).entries.size(), 1);
+        Harness.equal("the key is still held", Attachments.counts(context)[0], keysBefore);
+        Erasure.Item second = null;
+        for (Erasure.Item i : Erasure.items(journal.readLines())) if (i.type.equals("orb.shared") && !i.erased) second = i;
+        Erase.Result gone = Erase.execute(context, journal, second.hash);
+        Harness.equal("erasing the last destroys the key", gone.outcome, Erase.DESTROYED);
+        Harness.equal("nothing is found", Recall.search(context, journal, "lift code", null).entries.size(), 0);
+        Harness.equal("and the words cannot be opened", Recall.open(context, second.identity), null);
+        Harness.equal("sharing the same words again is refused as erased", share(context, journal, WORDS, "android-app://com.example.chat"), "erased");
+        String refused = null;
+        for (String l : journal.readLines()) if ("orb.shared".equals(Journal.typeOf(l))) refused = l;
+        Harness.check("and still no word of them is written anywhere", !refused.contains("priya") && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "4471".getBytes(StandardCharsets.UTF_8)));
+
+        Harness.suite("it is where from, and what stays, in its own words");
+        Harness.check("the erase note says words, not file", Provenance.stays(Provenance.SHARED_TEXT).contains("but not the words"));
+        Harness.check("and a file's still says file", Provenance.stays(Provenance.SHARED).contains("not the file's content"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        share(context, journal, "fresh words to look up", "android-app://com.example.chat");
+        Recall.Entry fresh = Recall.search(context, journal, "fresh words", null).entries.get(0);
+        Harness.check("where from? works on it", Provenance.render(Provenance.of(journal, fresh.id), new java.text.SimpleDateFormat("yyyy")).startsWith("You shared this to Orb.\n"));
+        Observe.Result observed = Observe.run(journal);
+        Harness.check("it is observed", observed.written >= 1 && !observed.failed);
+        String observation = null;
+        for (String l : journal.readLines()) if ("orb.observation".equals(Journal.typeOf(l)) && l.contains(fresh.id)) observation = l;
+        Harness.check("the Observation names how much and not what",
+            observation.contains("\"textChars\":22") && !observation.contains("fresh words") && observation.contains("\"attachments\":[\"sha256:"));
+
+        Harness.suite("a backup carries shared words, even without pictures");
+        Context src = context;
+        Backup.Plan plan = Backup.plan(src, journal.readLines(), false);
+        boolean hasWords = false;
+        for (Backup.Entry e : plan.entries) if (e.name.startsWith("blob/")) hasWords = true;
+        Harness.check("the sealed words are in, with pictures off", hasWords && plan.items >= 1 && plan.skippedPictures == 0);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Backup.write(plan, out, "correct horse battery".toCharArray());
+        Install.forget();
+        Context restoreTo = new Context(Files.createTempDirectory("orb-sharedtext3").toFile());
+        Journal fresh3 = Journal.open(restoreTo, Install.lane(restoreTo), Install.id(restoreTo));
+        fresh3.append("orb.process.start", Json.obj());
+        Backup.restore(restoreTo, fresh3.readLines(), new ByteArrayInputStream(out.toByteArray()), "correct horse battery".toCharArray());
+        Install.forget();
+        Journal restored = Journal.open(restoreTo, Install.lane(restoreTo), Install.id(restoreTo));
+        Harness.equal("after a restore the shared words are found again", Recall.search(restoreTo, restored, "fresh words", null).entries.size(), 1);
+    }
+}
