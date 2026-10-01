@@ -42,7 +42,7 @@ public final class AllowActivity extends Activity {
         note.setTextSize(12);
         note.setText("\nOrb remembers from an app only if it is on this list. It starts empty.\n"
             + "To add one, invoke Orb on that app and choose “Allow”.\n"
-            + "Orb never remembers payments apps, whatever this list says.\n");
+            + "Orb never remembers the banking and wallet apps on its fixed list, whatever this list says. An app that can also send money, like WhatsApp, is only allowed by a named exception.\n");
         root.addView(note);
 
         paymentsNote = new TextView(this);
@@ -72,7 +72,7 @@ public final class AllowActivity extends Activity {
         } else if (upi.isEmpty()) {
             paymentsNote.setText("\nNo app on this phone handles a UPI payment link.\n");
         } else {
-            StringBuilder names = new StringBuilder("\nTreated as payments apps (they handle UPI links, so Orb never remembers from them):\n");
+            StringBuilder names = new StringBuilder("\nTreated as payments apps (they handle UPI links) unless you allowed one by exception when Orb offered it:\n");
             for (String name : upi) names.append("  ").append(name).append('\n');
             paymentsNote.setText(names.toString());
         }
@@ -83,8 +83,10 @@ public final class AllowActivity extends Activity {
             return;
         }
         Set<String> allowed;
+        final Set<String> excepted;
         try {
             allowed = AllowList.allowed(journal.readLines());
+            excepted = AllowList.exceptions(journal.readLines());
         } catch (IOException error) {
             list.addView(text("read failed: " + error));
             return;
@@ -97,7 +99,10 @@ public final class AllowActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(0, 20, 0, 20);
-            row.addView(text(AssistPolicy.isPaymentsApp(pkg, upi) ? pkg + "  (a payments app: never remembered)" : pkg));
+            String label = pkg;
+            if (excepted.contains(pkg) && upi != null && upi.contains(pkg)) label = pkg + "  (can send money; allowed by your exception)";
+            else if (AssistPolicy.isPaymentsApp(pkg, upi, excepted)) label = pkg + "  (a payments app: not remembered)";
+            row.addView(text(label));
             Button remove = new Button(this);
             remove.setText("Remove");
             remove.setOnClickListener(new View.OnClickListener() {

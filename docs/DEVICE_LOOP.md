@@ -5691,3 +5691,51 @@ on the phone (and the screen cannot be screenshotted by design); no complaint ca
    com.whatsapp**, then **No**; invoke again, **Allow**, then **Yes, allow**. *(P60)*
 4. Invoke on WhatsApp again and **Remember** something non-private. *(P62)*
 5. Orb → **Scan installed packages now**, then **Export and share journal**. *(P61)*
+
+### 7b54. v17 on the device, and a named exception for WhatsApp — 2026-10-01
+
+**Status: built, 256 phone-side checks (was 241), not yet run on the device.** `orb-app-v18-exception.apk`.
+The v17 export (`orb-20261001-145626.txt`) is read first.
+
+#### What v17 showed
+
+- **P61 held** (`verifyLane`-clean export): the first package scan reports `installedPackageScope:
+  "visible+upi"`, `installedPackageBaseline: true`, 147 packages — a quiet re-baseline.
+- **The check works, and over-reaches exactly as ruling 11 says it would.** After the operator removed
+  WhatsApp from the list, the card read *Orb never remembers payments apps. Nothing was read.* — and offered no
+  Allow. **WhatsApp answers `upi://pay`** (WhatsApp Pay), so it is a payments app by the rule; the operator
+  could not add it back. Chrome, which does not, was allowed and captured normally. The same applies to
+  anything else that answers the link (the scan lists Jio, Airtel and Amazon among the installed apps; which
+  of them answer UPI is shown on the *Apps Orb may remember from* screen).
+- P58 (UPI apps refused) held for the apps tried: every decline in the export is `notAllowed` and none names
+  an app. The payments list screen (P59) and the two-tap flow's *No* branch (P60) were not shown in the
+  export; they stay open.
+
+#### What changed (DR-14 ruling 13)
+
+The operator chose **a named exception**. An app that handles the UPI link and is **not on the name floor**
+is offered *Allow `<app>` (it can send money)*; the second tap warns *“`<app>` can also send money. If you allow
+it, payment screens inside it can be kept too whenever you tap Remember. Orb shows you the text first, and
+never keeps a login screen.”* The grant carries `paymentsException: true`; `AllowList.exceptions` projects it
+(latest wins; a revocation or plain grant ends it). The exception **never reaches the floor** and **is
+ignored if Android will not answer**. The *Apps Orb may remember from* screen marks such an app *(can send
+money; allowed by your exception)*. Mutation-checked: letting an exception outrank the floor or the
+cannot-check rule fails two checks.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P63** | On WhatsApp (not allowed) the card says Orb treats it as a payments app because it can open UPI links, and offers **Allow com.whatsapp (it can send money)** | the exception is not offered |
+| **P64** | One tap shows the warning naming WhatsApp; **No** writes nothing; **Yes** writes an `orb.assist.allowed` with `paymentsException: true` | the two-tap flow is wrong |
+| **P65** | After that, Remember on a WhatsApp chat keeps the text as before | the exception does not reach the capture check |
+| **P66** | On **PhonePe / Google Pay** the card still says *never* and offers no Allow (they are on the name floor) | the floor is not holding |
+| **P67** | The *Apps Orb may remember from* list marks WhatsApp as allowed by exception, and **Remove** ends it | the label or the revocation is wrong |
+
+#### The operator's protocol
+
+1. Install `orb-app-v18-exception.apk`. Open WhatsApp and invoke Orb. *(P63)*
+2. Tap **Allow com.whatsapp (it can send money)**, read the warning, tap **No**; invoke again, Allow, **Yes**. *(P64)*
+3. Invoke on a WhatsApp chat and **Remember**. *(P65)*
+4. Invoke on PhonePe or Google Pay. *(P66)*
+5. Orb → **Apps Orb may remember from** and look at the WhatsApp row. Then **Export and share journal**. *(P67)*

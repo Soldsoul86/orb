@@ -65,6 +65,31 @@ final class AllowList {
         return out;
     }
 
+    private static final Pattern EXCEPTION_FIELD = Pattern.compile("\"paymentsException\":true");
+
+    /**
+     * The apps allowed **by a named payments exception** — those whose latest grant carries it.
+     * A later plain grant, or a revocation, ends the exception with the rest of the grant: latest
+     * wins. The floor is never excepted.
+     */
+    static Set<String> exceptions(List<String> lines) {
+        Set<String> out = new LinkedHashSet<>();
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            boolean grant = ALLOWED.equals(type);
+            if (!grant && !DISALLOWED.equals(type)) continue;
+            String pkg = packageOf(line);
+            if (pkg == null) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (grant && EXCEPTION_FIELD.matcher(line).region(payload, line.length()).find()) out.add(pkg);
+            else out.remove(pkg);
+        }
+        Set<String> floored = new HashSet<>();
+        for (String pkg : out) if (AssistPolicy.isFloor(pkg)) floored.add(pkg);
+        out.removeAll(floored);
+        return out;
+    }
+
     static boolean isAllowed(List<String> lines, String packageName) {
         return packageName != null && allowed(lines).contains(packageName);
     }

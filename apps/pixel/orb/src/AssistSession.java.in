@@ -192,7 +192,7 @@ public final class AssistSession extends VoiceInteractionSession {
 
         if (structureArrived && packageName != null) {
             // What the app *does* as well as what it is called: a UPI handler is a payments app.
-            paymentsApp = UpiApps.isPayments(getContext(), packageName);
+            paymentsApp = UpiApps.isPayments(getContext(), packageName, exceptions());
             allowed = !paymentsApp && isAllowed(packageName);
             if (allowed) pending = ScreenReader.read(structure, content);
         }
@@ -258,12 +258,17 @@ public final class AssistSession extends VoiceInteractionSession {
         pending = null;
         Journal journal = journal();
         if (journal != null) journal.append(AssistFacts.DECLINED, AssistFacts.declined(outcome, versionCode()));
+        // A payments app can be allowed only by a named exception, and only if it is UPI-capable and
+        // not on the name floor (a banking or wallet app on the floor is never offered).
+        boolean exceptable = paymentsApp && packageName != null && UpiApps.canExcept(getContext(), packageName);
         boolean canAllow = outcome.equals(AssistPolicy.NOT_ALLOWED) && packageName != null
-            && !paymentsApp && AllowList.isPackageName(packageName);
-        if (canAllow) allowButton.setText("Allow " + packageName);
-        show(paymentsApp && outcome.equals(AssistPolicy.NOT_ALLOWED)
-            ? "Orb never remembers payments apps. Nothing was read."
-            : words(outcome), canAllow, false);
+            && AllowList.isPackageName(packageName) && (!paymentsApp || exceptable);
+        if (canAllow) allowButton.setText(paymentsApp ? "Allow " + packageName + " (it can send money)" : "Allow " + packageName);
+        String declinedWords = !(paymentsApp && outcome.equals(AssistPolicy.NOT_ALLOWED)) ? words(outcome)
+            : exceptable
+                ? "Orb treats this app as a payments app because it can open UPI payment links. Nothing was read."
+                : "Orb never remembers payments apps. Nothing was read.";
+        show(declinedWords, canAllow, false);
     }
 
     private static String words(String reason) {
@@ -291,6 +296,17 @@ public final class AssistSession extends VoiceInteractionSession {
         recordButton.setVisibility(offerRecord ? View.VISIBLE : View.GONE);
     }
 
+    /** The apps allowed by a named payments exception; none if the journal cannot be read (never wider). */
+    private java.util.Set<String> exceptions() {
+        Journal journal = journal();
+        if (journal == null) return new java.util.HashSet<>();
+        try {
+            return AllowList.exceptions(journal.readLines());
+        } catch (IOException unreadable) {
+            return new java.util.HashSet<>();
+        }
+    }
+
     private boolean isAllowed(String pkg) {
         Journal journal = journal();
         if (journal == null) return false;
@@ -308,23 +324,34 @@ public final class AssistSession extends VoiceInteractionSession {
     private void allowThisApp() {
         // Asked again now, not only when the card opened: an app can be a payments app by the time
         // the person taps.
-        if (packageName == null || !AllowList.isPackageName(packageName)
-            || UpiApps.isPayments(getContext(), packageName)) {
+        if (packageName == null || !AllowList.isPackageName(packageName)) {
+            confirmingAllow = false;
+            show("Orb could not tell which app this is, so nothing changed.", false, false);
+            return;
+        }
+        boolean payments = UpiApps.isPayments(getContext(), packageName, exceptions());
+        if (payments && !UpiApps.canExcept(getContext(), packageName)) {
             confirmingAllow = false;
             show("Orb never remembers payments apps.", false, false);
             return;
         }
         if (!confirmingAllow) {
             confirmingAllow = true;
-            message.setText("Allow Orb to remember the text of " + packageName + "?\n\n"
-                + "Only when you invoke Orb and tap Remember. You can remove it any time in Orb → Apps Orb may remember from.");
-            allowButton.setText("Yes, allow " + packageName);
+            message.setText(payments
+                ? packageName + " can also send money. If you allow it, payment screens inside it can be kept too "
+                    + "whenever you tap Remember. Orb shows you the text first, and never keeps a login screen.\n\n"
+                    + "Allow Orb to remember the text of " + packageName + "?\n\n"
+                    + "You can remove it any time in Orb → Apps Orb may remember from."
+                : "Allow Orb to remember the text of " + packageName + "?\n\n"
+                    + "Only when you invoke Orb and tap Remember. You can remove it any time in Orb → Apps Orb may remember from.");
+            allowButton.setText(payments ? "Yes, allow " + packageName + " (it can send money)" : "Yes, allow " + packageName);
             closeButton.setText("No");
             return;
         }
         confirmingAllow = false;
         Journal journal = journal();
-        if (journal == null || journal.append(AllowList.ALLOWED, AssistFacts.grant(packageName)) == null) {
+        if (journal == null || journal.append(AllowList.ALLOWED,
+                payments ? AssistFacts.grantException(packageName) : AssistFacts.grant(packageName)) == null) {
             show("Could not save that. Nothing changed.", false, false);
             return;
         }
@@ -335,7 +362,7 @@ public final class AssistSession extends VoiceInteractionSession {
         Journal journal = journal();
         if (journal == null || packageName == null || pending == null) return;
         Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode(),
-            UpiApps.isPayments(getContext(), packageName));
+            UpiApps.isPayments(getContext(), packageName, exceptions()));
         // Kept or not, the text leaves memory now.
         pending.discard();
         pending = null;

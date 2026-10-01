@@ -35,6 +35,17 @@ final class AssistFacts {
         return p;
     }
 
+    /**
+     * A grant for an app that can send money (it handles UPI links) but is mainly something else.
+     * The same record plus the plain fact that the person chose this knowing it — the exception is
+     * the event, not a setting.
+     */
+    static Map<String, Object> grantException(String packageName) {
+        Map<String, Object> p = grant(packageName);
+        p.put("paymentsException", true);
+        return p;
+    }
+
     /** A revocation's payload, the same shape. */
     static Map<String, Object> revoke(String packageName) {
         return grant(packageName);

@@ -77,10 +77,23 @@ final class AssistPolicy {
      * is a reason to keep nothing, never a pass.
      */
     static boolean isPaymentsApp(String packageName, Set<String> upiHandlers) {
+        return isPaymentsApp(packageName, upiHandlers, null);
+    }
+
+    /**
+     * The same, with **the person's named exceptions** (DR-14 ruling 13). WhatsApp can send money
+     * in India, so it answers the UPI link — and is mainly a chat app. An app that handles the link
+     * but is *not on the name floor* may be allowed by an explicit, recorded exception, after a
+     * warning. An exception never reaches the floor, and **never applies when Android would not
+     * answer**: an exception is a decision about an app seen to be UPI-capable, and *cannot check*
+     * still keeps nothing.
+     */
+    static boolean isPaymentsApp(String packageName, Set<String> upiHandlers, Set<String> exceptions) {
         if (packageName == null) return false;
         if (isFloor(packageName)) return true;
         if (upiHandlers == null) return true;
-        return upiHandlers.contains(packageName);
+        if (!upiHandlers.contains(packageName)) return false;
+        return exceptions == null || !exceptions.contains(packageName);
     }
 
     /**

@@ -125,7 +125,16 @@ final class AssistGuardTest {
         Harness.check("the first tap asks again and names the app", session.contains("confirmingAllow") && session.contains("\"Yes, allow \" + packageName"));
         Harness.check("the button names the app before the first tap", session.contains("\"Allow \" + packageName"));
         Harness.check("a payments app is re-checked at the tap, not only when the card opened",
-            session.contains("UpiApps.isPayments(getContext(), packageName)") && session.split("UpiApps.isPayments", -1).length - 1 >= 3);
+            session.contains("UpiApps.isPayments(getContext(), packageName, exceptions())") && session.split("UpiApps.isPayments", -1).length - 1 >= 3);
+
+        Harness.suite("a payments exception is named, warned about, and nowhere else");
+        Harness.check("only the session writes an exception, and only through the fact builder",
+            session.contains("AssistFacts.grantException(packageName)")
+            && !source.get("AllowActivity").contains("grantException") && !source.get("Capture").contains("grantException"));
+        Harness.check("the exception is offered only to an app that handles UPI and is not on the floor",
+            session.contains("UpiApps.canExcept(getContext(), packageName)") && source.get("UpiApps").contains("!AssistPolicy.isFloor(packageName)"));
+        Harness.check("the warning says the app can send money, before the second tap",
+            session.contains("can also send money. If you allow it, payment screens inside it can be kept too"));
 
         Harness.suite("one process, one writer; nothing extra requested");
         Harness.check("no component runs in its own process", !manifest.contains("android:process"));

@@ -67,6 +67,15 @@ final class AssistTest {
         Harness.check("with an empty UPI answer an ordinary app is not", !AssistPolicy.isPaymentsApp("com.whatsapp", new java.util.HashSet<String>()));
         Harness.check("if Android would not say, every app is treated as payments — cannot check is not a pass", AssistPolicy.isPaymentsApp("com.whatsapp", null));
         Harness.check("an app that cannot be named is not judged", !AssistPolicy.isPaymentsApp(null, upi));
+        java.util.Set<String> excepted = new java.util.HashSet<>(java.util.Arrays.asList("com.bank.mobile", "com.coindcx.btc", "com.whatsapp"));
+        Harness.check("a UPI-capable app the person excepted is not treated as payments",
+            !AssistPolicy.isPaymentsApp("com.bank.mobile", upi, excepted));
+        Harness.check("an exception for an app Android does not list as UPI-capable changes nothing",
+            !AssistPolicy.isPaymentsApp("com.whatsapp", upi, excepted));
+        Harness.check("an exception never reaches the name floor", AssistPolicy.isPaymentsApp("com.coindcx.btc", upi, excepted));
+        Harness.check("and never applies if Android would not answer: cannot check is not a pass",
+            AssistPolicy.isPaymentsApp("com.bank.mobile", null, excepted));
+        Harness.check("an app that handles UPI without an exception is payments", AssistPolicy.isPaymentsApp("com.someone.pay", upi, excepted));
         in = good(); in.paymentsApp = true;
         Harness.equal("a payments app is declined as not allowed, even if the list allows it", AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
         in = good(); in.paymentsApp = true; in.passwordFields = 1;
@@ -126,6 +135,35 @@ final class AssistTest {
         journal.append(AllowList.ALLOWED, AssistFacts.grant("com.phonepe.app"));
         Harness.check("a payments package written into history is still never allowed",
             !AllowList.isAllowed(journal.readLines(), "com.phonepe.app"));
+
+        Harness.suite("a payments exception is the latest grant that carries it");
+        Harness.equal("none to start", AllowList.exceptions(journal.readLines()).size(), 0);
+        journal.append(AllowList.ALLOWED, AssistFacts.grantException("com.example.chatpay"));
+        Harness.check("an excepted grant is allowed and listed as an exception",
+            AllowList.isAllowed(journal.readLines(), "com.example.chatpay")
+            && AllowList.exceptions(journal.readLines()).contains("com.example.chatpay"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chatpay"));
+        Harness.check("a later plain grant ends the exception (latest wins)",
+            !AllowList.exceptions(journal.readLines()).contains("com.example.chatpay"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grantException("com.example.chatpay"));
+        journal.append(AllowList.DISALLOWED, AssistFacts.revoke("com.example.chatpay"));
+        Harness.check("a revocation removes the exception with the grant",
+            !AllowList.isAllowed(journal.readLines(), "com.example.chatpay")
+            && !AllowList.exceptions(journal.readLines()).contains("com.example.chatpay"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grantException("com.phonepe.app"));
+        Harness.check("the floor is never excepted, whatever the history says",
+            !AllowList.exceptions(journal.readLines()).contains("com.phonepe.app")
+            && !AllowList.isAllowed(journal.readLines(), "com.phonepe.app"));
+        Map<String, Object> spelled = Json.obj();
+        spelled.put("by", "operator");
+        spelled.put("package", "com.example.spelled");
+        spelled.put("note", "\"paymentsException\":true");
+        journal.append(AllowList.ALLOWED, spelled);
+        Harness.check("the field spelled inside a string is not the field",
+            !AllowList.exceptions(journal.readLines()).contains("com.example.spelled"));
+        Harness.check("the exception record names the app and says so plainly",
+            AssistFacts.grantException("com.example.chatpay").get("paymentsException").equals(Boolean.TRUE)
+            && AssistFacts.grantException("com.example.chatpay").get("package").equals("com.example.chatpay"));
 
         Map<String, Object> sneaky = Json.obj();
         sneaky.put("note", "\"package\":\"com.evil.app\"");

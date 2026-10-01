@@ -100,6 +100,10 @@ it; an app on no list — a new bank app, anything unknown — is never captured
   each time, so an app updated into a payments app is judged as it is now; if Android will not answer, every app
   is treated as one. The **name list** stays as a backstop for what UPI does not cover (an exchange, a wallet).
   Allowing an app takes **two taps** and names the app.
+  **One exception, by name** *(DR-14 ruling 13)*: an app that handles UPI but is **not on the name list** (WhatsApp, which
+  can send money) may be allowed after a warning; the grant carries `paymentsException: true`. It never reaches the name
+  list and is ignored if Android will not answer. Orb cannot tell a chat app from a bank app that also answers UPI, so
+  the warning is the safeguard.
 
 ## 5. The decision, in order
 

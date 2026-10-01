@@ -978,6 +978,17 @@ suggestions".**
     `com.example.app`*, the first tap asks again, only the second writes the allowance, and the payments
     check is re-run at both taps, so a stray tap on a card that appeared over another app cannot widen what
     Orb reads.
+13. **A named exception for an app that can send money but is mainly something else** *(2026-10-01, the
+    operator's choice of the recommendation, after v17 refused WhatsApp)*: WhatsApp answers the UPI link in
+    India, so ruling 11 filed it under payments. An app that handles the link but is **not on the name floor**
+    may be allowed by an explicit exception: the card says it is treated as a payments app, offers *Allow
+    `<app>` (it can send money)*, and the second tap warns that payment screens inside it can be kept too
+    (Orb still shows the text first and never keeps a login screen). The exception is **the grant event
+    itself** (`paymentsException: true`), latest wins, revocable in *Apps Orb may remember from*. It **never
+    reaches the name floor** and **never applies when Android will not answer** (*cannot check* still keeps
+    nothing). **No content filter** for payment screens was chosen: it would be a guess that looks like a
+    control. **Honest limit:** the check cannot tell a chat app from a bank app that also answers UPI — both
+    are UPI-capable — so the warning is the safeguard, and the person decides.
 
 All of it is mechanism in `SENSOR_ASSIST.md`. **Not ruled, and written there as
 proposals:** a short list of payments packages that cannot be allowed; excluding

@@ -43,7 +43,17 @@ final class UpiApps {
     }
 
     /** Whether this app is a payments app, now. */
-    static boolean isPayments(Context context, String packageName) {
-        return AssistPolicy.isPaymentsApp(packageName, handlers(context));
+    static boolean isPayments(Context context, String packageName, Set<String> exceptions) {
+        return AssistPolicy.isPaymentsApp(packageName, handlers(context), exceptions);
+    }
+
+    /**
+     * Whether an exception could be offered for this app now: Android answered, the app handles the
+     * link, and it is not on the name floor. (When Android will not answer, nothing is offered.)
+     */
+    static boolean canExcept(Context context, String packageName) {
+        Set<String> handlers = handlers(context);
+        return handlers != null && packageName != null && handlers.contains(packageName)
+            && !AssistPolicy.isFloor(packageName);
     }
 }
