@@ -5489,3 +5489,22 @@ and nothing near it, and a live chat almost never repeats identically.
 not give. They can be tested on a **static screen** — a Settings page that does not change. The
 same property is worth stating plainly: the rule protects against re-keeping *identical* content,
 not *similar* content; a near-identical screen after an erasure is a new capture.
+
+#### Part 2 closed — P47–P50 held on the device (export `orb-20261001-112147.txt`, 113 events, `verifyLane`-clean)
+
+A static screen (a Settings page), allowed from the card, kept twice and erased twice:
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **P49** | **Held** | events 108, 109: the same attachment identity, `resolveOutcome` **`stored`** then **`held`** — 18 text elements, 252 characters both times; one Attachment, two citations |
+| **P48** | **Held** | events 110, 111 declare both citations erased (each names the capture it erases); `attachmentsDestroyed` **4 → 5** and `attachmentKeysHeld` back to 7 — one key made, one key destroyed |
+| **P50** | **Held** | event 112: `orb.assist.captureFailed`, `outcome: erased`, **no app named**, and **no new `orb.assist.captured`** — the identical text was refused |
+| **P47** | **Held** | the same clear-record shape as before (§ above) |
+
+**Not confirmed by an export, by design:** P46 (the preview and *Don't keep* leave no record) and
+P51 (a password field's text never reaching the preview) — the second has not been exercised on a
+login screen. Both are visible only on the phone.
+
+Part 2 is closed for what the export can show. Step 7 is built end to end: **invoke → card → preview →
+Remember**, text only, sealed, erasable, refused when erased, and nothing kept from a payments app, a
+protected screen or an app that was not allowed.
