@@ -178,6 +178,34 @@ final class Attachments {
     }
 
     /**
+     * Opens a sealed Attachment: its bytes, or **null if it is not readable here** — destroyed,
+     * never held, or its key gone. Null is the erasure having worked, not an error
+     * (`Attachment.md` inv. 8); anything else that goes wrong is an exception.
+     *
+     * **The bytes are checked against their identity** (inv. 5): content that does not hash to
+     * the name it was stored under is corruption, and is refused rather than shown. The caller
+     * holds the result in memory only and is responsible for letting go of it.
+     */
+    static byte[] open(Context context, String identity) throws Exception {
+        if (state(context, identity).equals(DESTROYED_STATE)) return null;
+        String address = address(context, identity);
+        File key = new File(dir(context, KEYS), address);
+        File blob = new File(dir(context, BLOBS), address);
+        if (!key.exists() || !blob.exists()) return null;
+
+        byte[] sealed = readBytes(blob);
+        if (sealed.length <= IV_BYTES) throw new IOException("sealed content too short");
+        byte[] iv = java.util.Arrays.copyOfRange(sealed, 0, IV_BYTES);
+        byte[] cipherText = java.util.Arrays.copyOfRange(sealed, IV_BYTES, sealed.length);
+
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(readBytes(key), "AES"), new GCMParameterSpec(TAG_BITS, iv));
+        byte[] bytes = cipher.doFinal(cipherText);
+        if (!identity(bytes).equals(identity)) throw new IOException("content does not match its identity");
+        return bytes;
+    }
+
+    /**
      * Takes back an Attachment that was just stored and could not be recorded — **a rollback,
      * not an erasure**. It removes the key and the ciphertext and leaves **no marker**: nothing
      * was ever promised about it, and a marker would forbid keeping the same content later.

@@ -5587,3 +5587,57 @@ card read *"This looks like a login screen, so Orb kept nothing from it."* with 
 **P51 is closed**: a password field's contents never reached the sealed text (v14 recognised the field and
 the preview showed no letters); the masked-dots remnant that did appear is fixed (v15's mask rule); and a
 login screen is now refused outright. The earlier captures that might have held a username are destroyed.
+
+### 7b52. Recall — reading back what Orb remembered — 2026-10-01
+
+**Status: built, 223 phone-side checks (was 177), not yet run on the device.** `orb-app-v16-recall.apk`.
+Roadmap A8. Search is **by opening each item** (`DECISIONS.md` DR-15).
+
+#### What it is
+
+**What Orb remembered** (a button on Orb's screen) lists remembered screens, **newest first**: the time, the
+app, and a line of the text. You can **search by words** (every word must appear, any case, in the text, the
+page address or the app), **filter by app** (the button cycles *all* → each app something was kept from), and
+**tap one to read all of it** with a button to **Erase** (the same confirm-and-destroy as *Kept by Orb*, and
+the same *kept by N other items* warning). An erased item leaves every list and search at once. A damaged
+item is **reported as unreadable, never shown**. A search says how many items it did not look at past
+**500**.
+
+**No index, no copy.** Each item is decrypted in memory, looked through and let go; a test snapshots every
+file on disk before and after a search and asserts **no file changed in name or size** (mutation-checked: a
+search that writes anything fails it). Erasing therefore erases the only copy.
+
+**The screen hides itself.** `RecallActivity` and the dialog that shows the full text are `FLAG_SECURE`: no
+screenshot, no recording, no recents thumbnail, and no assistant — Orb's own included — is handed what is on
+them. **A consequence for testing:** you cannot screenshot this screen; describe what you see.
+
+#### What confines it
+
+`Recall` is the only code, besides `Capture`, that touches the sealed store, and the only code that reads it
+*back*; `RecallActivity` may not mention `Attachments` at all, may not log, and may not use a text
+accessor (it took the search words from the text watcher, found by the guard). `AssistGuardTest` checks all
+of it and that **both** windows are secure (the dialog's flag was found missing by mutation and the check
+tightened).
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P52** | **What Orb remembered** lists what you remembered, newest first, with a line of text, the app and the time; photo shares are **not** in it | the list is built from the wrong events |
+| **P53** | Searching a word you know is in a screen finds it, and a word that is nowhere finds nothing; two words need both | the matching is wrong |
+| **P54** | **App** cycles through *all* and each app you remembered from, and narrows the list | the filter is wrong |
+| **P55** | Tapping a result shows **all** of the text and any page address, selectable, with **Erase** | the open path is wrong |
+| **P56** | Erasing from here removes it from the list and from search at once, and the export's `attachmentsDestroyed` rises when it was the last copy of those words | erasure is not wired to the list |
+| **P57** | A screenshot attempt on this screen produces a blank or is refused by the phone; it does not appear in the recent-apps card | the screen is not secure |
+
+#### The operator's protocol
+
+1. Install `orb-app-v16-recall.apk`. Open Orb → **What Orb remembered**.
+2. You should see what you kept since v15, newest first. *(P52)*
+3. Type a word you know is in one of them. *(P53)* Then a nonsense word.
+4. Tap **App** to cycle. *(P54)*
+5. Tap a result; read it; tap **Erase** and confirm. *(P55, P56)*
+6. Try to screenshot this screen, and look at it in the recent-apps view. *(P57)*
+7. **Export and share journal** (counts only).
+
+If nothing is listed, invoke Orb on an allowed app and **Remember** something first.

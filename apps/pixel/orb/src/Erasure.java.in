@@ -58,8 +58,11 @@ final class Erasure {
         final long bytes;
         final long wallClock;
         final boolean erased;
+        /** The app a capture came from, or null (a share has none). */
+        final String packageName;
 
-        Item(String hash, String type, String identity, long bytes, long wallClock, boolean erased) {
+        Item(String hash, String type, String identity, long bytes, long wallClock, boolean erased, String packageName) {
+            this.packageName = packageName;
             this.hash = hash;
             this.type = type;
             this.identity = identity;
@@ -127,7 +130,7 @@ final class Erasure {
             if (identity == null || hash == null) continue;
             int payload = line.indexOf("\"payload\":");
             out.add(new Item(hash, type, identity, number(BYTES, line, payload),
-                number(WALL_CLOCK, line, 0), erased.contains(hash)));
+                number(WALL_CLOCK, line, 0), erased.contains(hash), AllowList.packageOf(line)));
         }
         return out;
     }

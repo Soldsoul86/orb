@@ -191,7 +191,7 @@ captured something.
 | **A5** | The written declaration: what the overlay reads, the allow-list and how you edit it, how long text lives | Turns "Orb reads my screen" from a worry into a promise with limits, and a promise the tests can enforce |
 | **A6** | Erase one capture on the phone — destroy its key | You can delete something Orb remembered and it is *actually* gone; without this, nothing may be stored from a screen |
 | **A7** | Invoke → card → *Remember* (text only, allow-listed apps, per invocation) | **The first daily use:** one gesture from a message, a page, a ticket, a work document — Orb keeps it with where it came from |
-| **A8** *(proposed, not yet agreed)* | **Recall** — a screen that lists and searches what you remembered, by app, date and text | Remembering with no way back is useless. Plain search, no AI needed, and it is what makes A7 worth using |
+| **A8** *(agreed 2026-10-01; built, not yet run on the device)* | **Recall** — list, search by words, filter by app, read and erase what you remembered; search by opening each item (DR-15, AD-13); the screen is secure (`DEVICE_LOOP.md` §7b52) | **A useful thing:** you can get back what you kept, which is what makes remembering worth doing |
 
 **Track B — the missing middle (the brain).**
 

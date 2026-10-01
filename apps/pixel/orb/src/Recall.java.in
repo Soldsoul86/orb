@@ -1,0 +1,162 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Reading back what Orb remembered — search, filter, open — with **nothing kept anywhere new**.
+ *
+ * **Search is done by opening each item.** There is no index (DR-15). Each remembered screen is
+ * decrypted in memory, looked through, and let go; the words are never copied into a second store,
+ * so erasing an item (destroying its key) erases the only copy, and there is no index to forget to
+ * erase. That is cheap at this size and will not be cheap at thousands of items; `AD-13` names the
+ * point at which to revisit and what the alternatives cost.
+ *
+ * **Only erased-or-destroyed is never shown.** An item whose declaration is on the record is
+ * excluded, and one whose key is gone opens as nothing; either way it cannot appear in a result.
+ * **A corrupt item is reported, not shown** (the content did not match its identity).
+ *
+ * The only code, besides `Capture`, that touches the sealed store — and the only code that reads
+ * it *back*. `AssistGuardTest` confines it: no logging, no file or picture writes, no screen reading.
+ */
+final class Recall {
+    private Recall() {}
+
+    /** Most items looked through in one search. Newest first; more than this says so. */
+    static final int SCAN_LIMIT = 500;
+    private static final int SNIPPET = 140;
+
+    /** One remembered screen, as a list row. */
+    static final class Entry {
+        final String hash;
+        final String identity;
+        final long wallClock;
+        final String packageName;
+        final String snippet;
+
+        Entry(String hash, String identity, long wallClock, String packageName, String snippet) {
+            this.hash = hash;
+            this.identity = identity;
+            this.wallClock = wallClock;
+            this.packageName = packageName;
+            this.snippet = snippet;
+        }
+    }
+
+    /** What a search found, and how much it did not look at. */
+    static final class Results {
+        final List<Entry> entries = new ArrayList<>();
+        int unreadable;
+        int skipped;
+    }
+
+    /** A sealed document, taken apart. Null from `parse` means it is not one of ours. */
+    static final class Doc {
+        final String uri;
+        final String body;
+
+        Doc(String uri, String body) {
+            this.uri = uri;
+            this.body = body;
+        }
+    }
+
+    /** Parses what `ScreenText.document()` wrote. */
+    static Doc parse(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = ScreenText.HEADER + "\nuri:";
+        if (!s.startsWith(prefix)) return null;
+        int eol = s.indexOf('\n', prefix.length());
+        if (eol < 0) return null;
+        String uri = s.substring(prefix.length(), eol);
+        String rest = s.substring(eol + 1);
+        if (!rest.startsWith("---\n") && !rest.equals("---")) return null;
+        return new Doc(uri, rest.length() <= 4 ? "" : rest.substring(4));
+    }
+
+    /**
+     * Whether every term appears, case-insensitively, in the text, the page address or the app.
+     * An empty query matches everything.
+     */
+    static boolean matches(Doc doc, String packageName, String query) {
+        if (query == null) return true;
+        String hay = (doc.body + "\n" + doc.uri + "\n" + (packageName == null ? "" : packageName)).toLowerCase(Locale.ROOT);
+        for (String term : query.toLowerCase(Locale.ROOT).trim().split("\\s+")) {
+            if (!term.isEmpty() && !hay.contains(term)) return false;
+        }
+        return true;
+    }
+
+    /** A line of context: around the first term found, or the start of the text. */
+    static String snippet(Doc doc, String query) {
+        String flat = doc.body.replace('\n', ' ');
+        int at = 0;
+        if (query != null) {
+            String lower = flat.toLowerCase(Locale.ROOT);
+            for (String term : query.toLowerCase(Locale.ROOT).trim().split("\\s+")) {
+                if (term.isEmpty()) continue;
+                int found = lower.indexOf(term);
+                if (found >= 0) { at = found; break; }
+            }
+        }
+        int start = Math.max(0, at - SNIPPET / 3);
+        if (start > 0 && start < flat.length() && Character.isLowSurrogate(flat.charAt(start))) start--;
+        int end = Math.min(flat.length(), start + SNIPPET);
+        if (end < flat.length() && end > start && Character.isHighSurrogate(flat.charAt(end - 1))) end--;
+        return (start > 0 ? "…" : "") + flat.substring(start, end) + (end < flat.length() ? "…" : "");
+    }
+
+    /** The apps something has been remembered from, for the filter. */
+    static List<String> apps(Journal journal) throws IOException {
+        List<String> out = new ArrayList<>();
+        for (Erasure.Item item : Erasure.items(journal.readLines())) {
+            if (!item.type.equals(AssistFacts.CAPTURED) || item.erased || item.packageName == null) continue;
+            if (!out.contains(item.packageName)) out.add(item.packageName);
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    /**
+     * Remembered screens matching `query` (and `packageFilter`, if not null), newest first. Every
+     * item looked at is opened in memory and let go.
+     */
+    static Results search(Context context, Journal journal, String query, String packageFilter) throws IOException {
+        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        Results results = new Results();
+        int looked = 0;
+        for (int i = items.size() - 1; i >= 0; i--) {
+            Erasure.Item item = items.get(i);
+            if (!item.type.equals(AssistFacts.CAPTURED) || item.erased) continue;
+            if (packageFilter != null && !packageFilter.equals(item.packageName)) continue;
+            if (looked >= SCAN_LIMIT) { results.skipped++; continue; }
+            looked++;
+            try {
+                byte[] bytes = Attachments.open(context, item.identity);
+                if (bytes == null) continue;               // destroyed or gone: not an error
+                Doc doc = parse(bytes);
+                if (doc == null) { results.unreadable++; continue; }
+                if (matches(doc, item.packageName, query)) {
+                    results.entries.add(new Entry(item.hash, item.identity, item.wallClock, item.packageName, snippet(doc, query)));
+                }
+            } catch (Exception corrupt) {
+                results.unreadable++;
+            }
+        }
+        return results;
+    }
+
+    /** The whole of one remembered screen, for reading. Null if it is no longer readable. */
+    static Doc open(Context context, String identity) {
+        try {
+            byte[] bytes = Attachments.open(context, identity);
+            return bytes == null ? null : parse(bytes);
+        } catch (Exception corrupt) {
+            return null;
+        }
+    }
+}

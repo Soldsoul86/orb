@@ -1,0 +1,142 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+
+/** Reading back: search, filter, open — and nothing new written. */
+final class RecallTest {
+    private RecallTest() {}
+
+    private static ScreenText screen(String uri, String... lines) {
+        ScreenText s = new ScreenText();
+        for (String l : lines) s.add(l);
+        if (uri != null) s.setWebUri(uri);
+        return s;
+    }
+
+    /** A snapshot of every file and its size under `dir`: Recall must not change it. */
+    private static String fingerprint(File dir) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        File[] children = dir.listFiles();
+        if (children == null) return "";
+        java.util.Arrays.sort(children);
+        for (File child : children) {
+            if (child.isDirectory()) sb.append(child.getName()).append('{').append(fingerprint(child)).append('}');
+            else sb.append(child.getName()).append(':').append(child.length()).append(';');
+        }
+        return sb.toString();
+    }
+
+    static void run() throws Exception {
+        Harness.suite("a sealed document is taken apart");
+        Recall.Doc doc = Recall.parse(screen("https://example.test/a", "one", "two").document());
+        Harness.equal("the text", doc.body, "one\ntwo");
+        Harness.equal("the address", doc.uri, "https://example.test/a");
+        Harness.equal("no address reads as empty", Recall.parse(screen(null, "x").document()).uri, "");
+        Harness.check("something that is not one of ours is refused", Recall.parse("hello".getBytes(StandardCharsets.UTF_8)) == null);
+        Harness.equal("an empty body is empty text", Recall.parse(screen(null).document()).body, "");
+
+        Harness.suite("matching: every term, any case, in the text, the address or the app");
+        Recall.Doc d = Recall.parse(screen("https://example.test/Invoice", "Meet Ravi at 4", "bring the contract").document());
+        Harness.check("an empty query matches", Recall.matches(d, "com.a", ""));
+        Harness.check("a null query matches", Recall.matches(d, "com.a", null));
+        Harness.check("one term", Recall.matches(d, "com.a", "ravi"));
+        Harness.check("any case", Recall.matches(d, "com.a", "RAVI"));
+        Harness.check("every term must appear", Recall.matches(d, "com.a", "ravi contract") && !Recall.matches(d, "com.a", "ravi absent"));
+        Harness.check("in the page address", Recall.matches(d, "com.a", "invoice"));
+        Harness.check("and the app", Recall.matches(d, "com.whatsapp", "whatsapp"));
+        Harness.check("extra spaces do not matter", Recall.matches(d, "com.a", "  ravi    contract "));
+
+        Harness.suite("a snippet is a line of context");
+        Recall.Doc big = Recall.parse(screen(null, "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega and then some more words to push it past the limit").document());
+        Harness.check("with no match it starts at the beginning", Recall.snippet(big, "").startsWith("alpha"));
+        Harness.check("it is cut short and says so", Recall.snippet(big, "").endsWith("…"));
+        Harness.check("with a match it is centred near it", Recall.snippet(big, "omega").contains("omega"));
+        Harness.check("lines are joined", !Recall.snippet(Recall.parse(screen(null, "a", "b").document()), "").contains("\n"));
+
+        Harness.suite("the list: newest first, from what is really sealed");
+        File dir = Files.createTempDirectory("orb-recall").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.mail"));
+        Capture.remember(context, journal, screen(null, "meet ravi at 4", "bring the contract"), "com.example.chat", 7L);
+        Capture.remember(context, journal, screen("https://example.test/m/1", "invoice due friday"), "com.example.mail", 7L);
+        Capture.remember(context, journal, screen(null, "dinner with ravi on sunday"), "com.example.chat", 7L);
+        // A photograph share is sealed too, but it is not text and is not Recall's.
+        java.util.Map<String, Object> share = Json.obj();
+        share.put("attachment", "sha256:" + "d".repeat(64));
+        share.put("attachmentBytes", 9L);
+        journal.append("orb.shared", share);
+
+        String before = fingerprint(dir);
+        Recall.Results all = Recall.search(context, journal, "", null);
+        Harness.equal("three remembered screens, not the share", all.entries.size(), 3);
+        Harness.check("newest first", all.entries.get(0).snippet.startsWith("dinner") && all.entries.get(2).snippet.startsWith("meet"));
+        Harness.equal("nothing unreadable", all.unreadable, 0);
+
+        Harness.suite("search by words, and filter by app");
+        Harness.equal("a word that appears twice", Recall.search(context, journal, "ravi", null).entries.size(), 2);
+        Harness.equal("two words together", Recall.search(context, journal, "ravi contract", null).entries.size(), 1);
+        Harness.equal("a word that appears nowhere", Recall.search(context, journal, "zebra", null).entries.size(), 0);
+        Harness.equal("a word in a page address", Recall.search(context, journal, "example.test", null).entries.size(), 1);
+        Harness.equal("filtered to one app", Recall.search(context, journal, "", "com.example.mail").entries.size(), 1);
+        Harness.equal("search and filter together", Recall.search(context, journal, "ravi", "com.example.chat").entries.size(), 2);
+        Harness.equal("the apps something was kept from", Recall.apps(journal), java.util.Arrays.asList("com.example.chat", "com.example.mail"));
+        Harness.equal("a result carries the app", all.entries.get(1).packageName, "com.example.mail");
+
+        Harness.suite("Recall writes nothing");
+        Harness.equal("no file anywhere changed, in name or size", fingerprint(dir), before);
+
+        Harness.suite("an erased screen is gone from every result");
+        Erasure.Item mail = null;
+        for (Erasure.Item item : Erasure.items(journal.readLines())) if ("com.example.mail".equals(item.packageName)) mail = item;
+        Erase.execute(context, journal, mail.hash);
+        Harness.equal("it no longer appears in the list", Recall.search(context, journal, "", null).entries.size(), 2);
+        Harness.equal("nor in a search for its words", Recall.search(context, journal, "invoice", null).entries.size(), 0);
+        Harness.check("and it cannot be opened", Recall.open(context, mail.identity) == null);
+        Harness.equal("its app leaves the filter", Recall.apps(journal), java.util.Arrays.asList("com.example.chat"));
+
+        Harness.suite("an item declared erased is hidden even while its content is still held");
+        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L);
+        Capture.remember(context, journal, screen(null, "same words twice"), "com.example.chat", 7L);
+        Harness.equal("both are listed", Recall.search(context, journal, "same words", null).entries.size(), 2);
+        Erasure.Item twin = null;
+        for (Erasure.Item item : Erasure.items(journal.readLines())) if (!item.erased && item.packageName != null && Recall.open(context, item.identity) != null
+                && Recall.open(context, item.identity).body.equals("same words twice")) { twin = item; break; }
+        Erase.Result kept = Erase.execute(context, journal, twin.hash);
+        Harness.equal("erasing one is kept by the other", kept.outcome, Erase.KEPT_BY_OTHERS);
+        Harness.check("the content can still be opened", Recall.open(context, twin.identity) != null);
+        Harness.equal("but the erased one is no longer a result", Recall.search(context, journal, "same words", null).entries.size(), 1);
+
+        Harness.suite("a destroyed marker wins over a key that is still on disk (the crash window)");
+        Capture.remember(context, journal, screen(null, "half erased"), "com.example.chat", 7L);
+        String identity = null;
+        for (Erasure.Item item : Erasure.items(journal.readLines())) if (!item.erased && Recall.open(context, item.identity) != null
+                && Recall.open(context, item.identity).body.equals("half erased")) identity = item.identity;
+        File marker = new File(new File(dir, "attachment-destroyed"), Attachments.address(context, identity));
+        marker.getParentFile().mkdirs();
+        Files.write(marker.toPath(), new byte[] {1});
+        Harness.check("with the marker written and the key still there, it cannot be opened", Recall.open(context, identity) == null);
+        Harness.equal("and it is not a result", Recall.search(context, journal, "half erased", null).entries.size(), 0);
+
+        Harness.suite("opening one screen reads all of it");
+        Recall.Entry dinner = Recall.search(context, journal, "dinner", null).entries.get(0);
+        Recall.Doc opened = Recall.open(context, dinner.identity);
+        Harness.equal("the whole text", opened.body, "dinner with ravi on sunday");
+
+        Harness.suite("a damaged item is reported, never shown");
+        int shownBefore = Recall.search(context, journal, "", null).entries.size();
+        File victim = new File(new File(dir, "attachments"), Attachments.address(context, dinner.identity));
+        byte[] bytes = Files.readAllBytes(victim.toPath());
+        bytes[bytes.length - 1] ^= 0x01;
+        Files.write(victim.toPath(), bytes);
+        Recall.Results damaged = Recall.search(context, journal, "", null);
+        Harness.equal("one is reported unreadable", damaged.unreadable, 1);
+        Harness.equal("the others are still shown", damaged.entries.size(), shownBefore - 1);
+        Harness.check("and it cannot be opened", Recall.open(context, dinner.identity) == null);
+    }
+}

@@ -511,3 +511,25 @@ written; the keyring is not), then honour declarations on the desk. **Revisit:**
 Orb stores anything beyond sealed attachments, or when plain-text shares matter — and
 before any claim that Orb can "forget everything" is made to a person.
 
+---
+
+## AD-13 — Recall's search does not scale past a few hundred items
+
+**Opened 2026-10-01** (`DECISIONS.md` DR-15). **Debt, not a defect:** search opens each remembered item
+in memory, which is deliberately simple and keeps one copy of the words; it is also linear in the number
+of items, and it stops looking after the newest 500 (and says so).
+
+**Revisit when:** a search is noticeably slow (about a second), or a person has more than a few hundred
+items and wants the older ones searched.
+
+**The options and what each costs.**
+
+| | Cost |
+| --- | --- |
+| **A. An in-memory index**, built when Recall opens and never written down | fast; costs memory and a rebuild each time; **no second copy on disk**, so erasure is untouched. *Leading option* |
+| **B. Per-item sealed search terms**, stored beside each item under the **same key** | erases with the item; but search must still open each item's terms, so it only shortens the work |
+| **C. One sealed index** | fastest to search; **a second copy of the words** that erasing one item cannot reach — the residue DR-15 refuses |
+| **D. Nothing** (today's rule) | exact and simple; slow at scale |
+
+C is the one to refuse unless a way to erase *within* an index is found.
+

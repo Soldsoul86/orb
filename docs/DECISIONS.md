@@ -972,6 +972,33 @@ All of it is mechanism in `SENSOR_ASSIST.md`. **Not ruled, and written there as
 proposals:** a short list of payments packages that cannot be allowed; excluding
 accessibility descriptions; the decision timeout.
 
+
+## DR-15 — Recall searches by opening each remembered item; there is no index
+
+- **Status:** Decided · **Decided:** 2026-10-01, operator ("build Recall with that search approach") ·
+  **Bears on:** `ARCHITECTURAL_DEBT.md` AD-13, `ERASURE.md` §2a, `SENSOR_ASSIST.md` §8
+
+**The question.** Reading back what Orb remembered means looking inside sealed text. Searching a lot of
+it can be fast with an index, or one-copy-simple by opening each item. Which?
+
+**Ruled.** **Open each item, in memory, and let go.** No index is built or stored. Each remembered screen
+is decrypted, searched and forgotten; the words are never copied into a second place.
+
+**Why.** An index is a **second copy of the words** (or of enough of them to reconstruct the text), and
+it would **not be sealed under the key that erasing destroys**. Erasing an item would then leave the index
+behind: the exact residue `ERASURE.md` §2a warns against (*"a backed-up key is an un-erased payload"* —
+an index is the same thing for words). Searching by opening keeps **one copy, one key, one erasure**.
+
+**What it costs, stated now.** Search time grows with the number of items. A search looks through the
+newest **500** and says how many it did not look at (`Recall.SCAN_LIMIT`). At the size Orb will have for a
+long while that is a fraction of a second; it will not stay true at thousands, which is `AD-13`.
+
+**Also decided with it:** the Recall screen is **secure** (`FLAG_SECURE`) — no screenshot, no recording,
+no recents thumbnail, and no assistant, Orb's own included, is handed its contents — because it shows the
+person's own words.
+
+---
+
 ---
 
 ## Provenance

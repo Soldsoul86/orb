@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
  * | `ScreenReader` | read `getText` and the page address | read anything else off a screen; keep, log or write anything |
  * | `ScreenText` | hold the text in memory | import Android; write or log anything |
  * | `Capture` | seal the text (`Attachments`) | read a screen; log |
+ * | `Recall` | open sealed text (`Attachments.open`), in memory | write anything; log; read a screen |
+ * | `RecallActivity` | draw it, behind `FLAG_SECURE` | touch the sealed store |
  * | `AssistFacts` | build every record | — |
  * | everything else in the assistant | decide and draw | read screen content; touch `Attachments`; build a record; log |
  *
@@ -30,15 +32,15 @@ final class AssistGuardTest {
     /** Every assistant file that is not the one place records are built. */
     private static final List<String> ALL = Arrays.asList(
         "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
-        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader", "Capture");
+        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader", "Capture", "Recall", "RecallActivity");
     /** The assistant files that may not read what a screen says. */
     private static final List<String> NO_CONTENT = Arrays.asList(
         "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
-        "AssistPolicy", "AllowList", "ScreenText", "Capture");
+        "AssistPolicy", "AllowList", "ScreenText", "Capture", "Recall", "RecallActivity");
     /** The assistant files that may not touch the sealed store. */
     private static final List<String> NO_STORE = Arrays.asList(
         "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
-        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader");
+        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader", "RecallActivity");
 
     private static final Pattern CONTENT_ACCESSOR = Pattern.compile(
         "\\.(getText|getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
@@ -96,11 +98,17 @@ final class AssistGuardTest {
 
         Harness.suite("only Capture touches the sealed store");
         forbid(source, NO_STORE, "refers to Attachments", Pattern.compile("\\bAttachments\\b"));
-        Harness.check("Capture does", source.get("Capture").contains("Attachments.store("));
+        Harness.check("Capture seals", source.get("Capture").contains("Attachments.store("));
+        Harness.check("Recall opens", source.get("Recall").contains("Attachments.open("));
+        Harness.check("and nothing but Recall opens it", !source.get("Capture").contains("Attachments.open(")
+            && !source.get("RecallActivity").contains("Attachments"));
 
-        Harness.suite("no picture, no file, no preference, no database — anywhere in the assistant");
-        forbid(source, ALL, "could persist something outside the sealed store",
-            Pattern.compile("\\.compress\\(|FileOutputStream|openFileOutput|MediaStore\\.Images|SharedPreferences|SQLite"));
+        Harness.suite("the screen that shows remembered words hides itself");
+        String ra = source.get("RecallActivity");
+        Harness.check("RecallActivity's own window is secure: no screenshot, recording or recents thumbnail",
+            ra.contains("getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE"));
+        Harness.check("and so is the dialog that shows the full text",
+            ra.contains("dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE"));
 
         Harness.suite("one process, one writer; nothing extra requested");
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8)

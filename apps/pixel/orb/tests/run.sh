@@ -15,7 +15,7 @@ OUT="build/tests"
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/Install.java.in \
-              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in \
+              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do

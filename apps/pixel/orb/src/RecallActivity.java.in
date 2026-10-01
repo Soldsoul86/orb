@@ -1,0 +1,237 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * What Orb remembered, to search and read — and the way to erase it.
+ *
+ * **This screen shows the person's own words, so it hides itself.** It is marked secure: the
+ * system will not screenshot it, record it, or show it in the recent-apps view, and no assistant —
+ * Orb's own included — is handed its contents. Reading is on the phone only and the text is held
+ * in memory for as long as the screen shows it.
+ *
+ * It draws; `Recall` does the reading (`AssistGuardTest` keeps the sealed store out of this
+ * file). Search is by opening each item (DR-15); a search over more than `Recall.SCAN_LIMIT`
+ * items says how many it did not look at.
+ */
+public final class RecallActivity extends Activity {
+    private LinearLayout list;
+    private TextView summary;
+    private EditText query;
+    /** What the person typed, kept from the text watcher so this file never needs a text accessor. */
+    private String queryText = "";
+    private Button appButton;
+    private List<String> apps;
+    private int appIndex = -1;           // -1 = all apps
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("What Orb remembered");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        query = new EditText(this);
+        query.setHint("Search your words");
+        query.setSingleLine(true);
+        query.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) { queryText = s.toString(); render(); }
+        });
+        root.addView(query);
+
+        appButton = new Button(this);
+        appButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { nextApp(); }
+        });
+        root.addView(appButton);
+
+        summary = new TextView(this);
+        summary.setTextSize(12);
+        summary.setPadding(0, 16, 0, 16);
+        root.addView(summary);
+
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadApps();
+        render();
+    }
+
+    private Journal journal() {
+        Orb app = Orb.get();
+        return app == null ? null : app.journal();
+    }
+
+    private void loadApps() {
+        Journal journal = journal();
+        try {
+            apps = journal == null ? new java.util.ArrayList<String>() : Recall.apps(journal);
+        } catch (IOException unreadable) {
+            apps = new java.util.ArrayList<String>();
+        }
+        if (appIndex >= apps.size()) appIndex = -1;
+        appButton.setText("App: " + (appIndex < 0 ? "all" : apps.get(appIndex)));
+    }
+
+    /** Cycles through *all*, then each app something was remembered from. */
+    private void nextApp() {
+        appIndex = appIndex + 1 >= apps.size() ? -1 : appIndex + 1;
+        appButton.setText("App: " + (appIndex < 0 ? "all" : apps.get(appIndex)));
+        render();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        Journal journal = journal();
+        if (journal == null) {
+            summary.setText("journal unavailable");
+            return;
+        }
+        Recall.Results results;
+        try {
+            results = Recall.search(this, journal, queryText, appIndex < 0 ? null : apps.get(appIndex));
+        } catch (IOException error) {
+            summary.setText("read failed: " + error);
+            return;
+        }
+
+        StringBuilder said = new StringBuilder();
+        said.append(results.entries.size()).append(results.entries.size() == 1 ? " result" : " results");
+        if (results.unreadable > 0) said.append(" · ").append(results.unreadable).append(" could not be read");
+        if (results.skipped > 0) said.append(" · searched the newest ").append(Recall.SCAN_LIMIT).append(", ").append(results.skipped).append(" not looked at");
+        summary.setText(said.toString());
+
+        if (results.entries.isEmpty()) {
+            TextView none = new TextView(this);
+            none.setTextSize(13);
+            none.setText(queryText.isEmpty()
+                ? "Nothing remembered yet. Invoke Orb on an allowed app and choose Remember."
+                : "Nothing matches.");
+            list.addView(none);
+            return;
+        }
+
+        SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        for (final Recall.Entry entry : results.entries) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 20, 0, 20);
+
+            TextView head = new TextView(this);
+            head.setTextSize(12);
+            head.setTypeface(Typeface.DEFAULT_BOLD);
+            head.setText(when.format(new Date(entry.wallClock)) + "  ·  " + (entry.packageName == null ? "" : entry.packageName));
+            row.addView(head);
+
+            TextView body = new TextView(this);
+            body.setTextSize(14);
+            body.setText(entry.snippet);
+            row.addView(body);
+
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { open(entry); }
+            });
+            list.addView(row);
+        }
+    }
+
+    private void open(final Recall.Entry entry) {
+        Recall.Doc doc = Recall.open(this, entry.identity);
+        if (doc == null) {
+            new AlertDialog.Builder(this).setMessage("This can no longer be read.").setPositiveButton("OK", null).show();
+            render();
+            return;
+        }
+        ScrollView scroll = new ScrollView(this);
+        TextView text = new TextView(this);
+        text.setTextSize(14);
+        text.setPadding(48, 24, 48, 24);
+        text.setTextIsSelectable(true);
+        text.setText((doc.uri.isEmpty() ? "" : doc.uri + "\n\n") + doc.body);
+        scroll.addView(text);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(entry.packageName == null ? "Remembered" : entry.packageName)
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .setNegativeButton("Erase", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { confirmErase(entry); }
+            })
+            .create();
+        // The words on screen are the person's own: no screenshots, no recording, no assistant.
+        dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        dialog.show();
+    }
+
+    private void confirmErase(final Recall.Entry entry) {
+        Journal journal = journal();
+        if (journal == null) return;
+        Erasure.Plan plan;
+        try {
+            plan = Erasure.plan(journal.readLines(), entry.hash);
+        } catch (IOException error) {
+            return;
+        }
+        String words = plan.outcome.equals(Erasure.KEPT_BY_OTHERS)
+            ? "The same words are also kept by " + plan.others + " other item" + (plan.others == 1 ? "" : "s")
+                + ". This one will be marked erased and disappear from here; the words stay until the last of them is erased too."
+            : "Nothing else keeps these words. Their key will be destroyed and they can never be read again. This cannot be undone.";
+        new AlertDialog.Builder(this)
+            .setTitle("Erase this?")
+            .setMessage(words)
+            .setNegativeButton("Keep", null)
+            .setPositiveButton("Erase", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { erase(entry); }
+            })
+            .show();
+    }
+
+    private void erase(Recall.Entry entry) {
+        Journal journal = journal();
+        if (journal == null) return;
+        try {
+            Erase.execute(this, journal, entry.hash);
+        } catch (IOException error) {
+            new AlertDialog.Builder(this).setMessage("Not erased: " + error).setPositiveButton("OK", null).show();
+        }
+        loadApps();
+        render();
+    }
+}

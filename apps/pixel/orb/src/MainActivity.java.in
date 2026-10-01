@@ -51,6 +51,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(export);
 
+        // Step 7 / A8: read back, search, and erase what Orb remembered.
+        Button recall = new Button(this);
+        recall.setText("What Orb remembered");
+        recall.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, RecallActivity.class)); }
+        });
+        root.addView(recall);
+
         // Step 7: Orb as the assistant, and the apps it may remember from.
         Button choose = new Button(this);
         choose.setText("Use Orb as the assistant");
