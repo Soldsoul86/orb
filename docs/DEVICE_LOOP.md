@@ -6112,3 +6112,13 @@ v24 itself ran (versionCode 29847716).
 and reality disagree until the operator grants again. The fix is a start-up reconcile: if the latest recorded decision is *granted* and the marker is absent, record a revocation (`by: restore`) so the record matches the phone.
 Not done in v24 so as not to change the build mid-test; bundled with the next change.
 
+#### v24, steps 1–3 (`orb-20261001-194008.txt` 272 events; `orb-20261001-194335.txt` 277 events — both `verifyLane`-clean)
+
+- **P93 held.** v24 (versionCode 29847716) installed and runs; no Play Protect refusal was reported.
+- **Re-grant.** After the refusal (the restore had not re-granted), the operator granted: `grants.capability.granted` with `manifestScope: declared` and the new scope sentence — the grant now states what the build delivers.
+- **P94 held, with one wrong number.** The first scan after granting: **`installedPackageScope: "declared"`, `installedPackageBaseline: true`, 153 packages, nothing gained or lost.** **My prediction that the count would be *smaller* than 147 was wrong:** it is
+  **larger**. Declaring the launcher query makes *every* launchable app visible, where the old set was only what happened to be visible (plus system packages that have no launcher). So the old figure was an undercount of the apps a person
+  actually has, and the new one is stable. **Google Photos and Chrome are in the baseline** (both have launchers) — they can no longer appear as gained or lost, which is the point; and the system packages that used to pad the list are gone (4 `com.android.*` remain: Chrome, Settings, STK, Play).
+- **Step 3 was done, but the scan after it is missing.** The Photos share (`…863908767`) and the Chrome capture (`…863931785`) are in the export; **no scan follows them**, so **P95 is not yet shown** — the export ends with the interactions and an export. By construction neither can flap now (both are launcher apps in the set); the check is to scan after them and see gained/lost empty.
+- **Still open:** P95 (scan after the interactions), P96 (a second scan hours later, identical), P97 (install a small app → the only entry in gained; uninstall → the only entry in lost).
+
