@@ -1023,6 +1023,47 @@ person's own words.
 
 ---
 
+## DR-16 — The phone's reasoning layers are written in Kotlin; the first step uses rules, not a model
+
+- **Status:** Decided · **Decided:** 2026-10-01, operator ("go with your recommendation") ·
+  **Bears on:** `ROADMAP.md` Track B (B1), `DEVICE_LOOP.md` R2, `ARCHITECTURAL_DEBT.md` AD-14,
+  `contracts/Reasoner.md`, `contracts/ModelRouter.md`
+
+**The question.** Orb's thinking layers (evidence, entities, reasoner, planner) exist as contracts and a
+TypeScript reference; the phone has only Java capture code. A laptop can never be required, so where does
+the brain run on the phone?
+
+**Ruled.**
+
+1. **The phone's reasoning layers are written in Kotlin**, with coroutines, as `CLAUDE.md` names. The
+   TypeScript stays as the reference and the place the logic is first proved.
+2. **The two copies are held together by shared test vectors**, as the journal's two encoders already are
+   (R2): the vectors are computed by one side and checked by the other, so agreeing means something.
+3. **The first reasoning step uses plain rules, no language model**: dates, names, phrases such as "I'll send
+   it Friday". It runs wholly on the phone, answers the same every time (so it can be replayed from the
+   journal), and needs none of AD-7's permission machinery. A model comes later through the `ModelRouter`
+   (on-device first; anything that leaves the phone only through a `Capability`, per DR-9).
+4. **The fallback is Java.** If Kotlin could not be made to build in the no-Gradle toolchain, the brain
+   would be written in Java and kept easy to port. **It can be built** (below), so the fallback is not taken.
+
+**Checked before committing (2026-10-01).** A Kotlin 2.0.21 file compiled with `kotlinc`, ran on the JVM,
+and went through the same `d8` step the app uses (with the Kotlin library: a 2.2 MB dex, unshrunk). It has
+**not been run on the phone**; that is the first thing the first Kotlin piece must show.
+
+**What follows.**
+- The app's build gains a Kotlin step and the Kotlin runtime library in the APK (AD-14 records the cost).
+- The compiler is fetched **once**, by `scripts/fetch-kotlin.sh`, pinned by version and hash — **never during
+  a build**, which keeps "nothing resolved from a network at build time".
+- Reasoning code is **pure** (no Android, no files): it takes events in and returns records out, so it is
+  testable on a laptop's JVM and replayable.
+
+**What it does not change.** No contract text changes; the journal, its encoders and the capture code stay in
+Java; nothing here sends anything off the phone.
+
+**What is still open.** Which on-device model, if any, serves the later reasoning steps; whether a second
+non-phone implementation (Rust) ever pays for itself.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

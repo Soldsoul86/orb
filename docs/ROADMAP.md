@@ -170,8 +170,8 @@ statements.
 | P21 — a change undone between two scans is invisible | recorded limit | small, real; see track D |
 | 12-hour scan interval | a guess, now load-bearing (no prompt route exists) | a decision |
 | **Nothing after the journal is built** — Evidence Graph, Entities, Twin, Reasoner, Agent | contracts Accepted, no code; Phase 3c open | the largest item — track B |
-| **Where the brain runs on the phone** | the kernel is TypeScript; the phone runs Java capture code, and `DEVICE_LOOP.md` R2 names Kotlin as the production host. A laptop can never be required, so this cannot stay open | **decision, before track B** |
-| Whether the first reasoning step is local-only | proposed, unchecked (`DECISIONS.md`) | settles with the design of track B |
+| **Where the brain runs on the phone** | the kernel is TypeScript; the phone runs Java capture code, and `DEVICE_LOOP.md` R2 names Kotlin as the production host. A laptop can never be required, so this cannot stay open | **decided 2026-10-01 (DR-16): Kotlin** |
+| Whether the first reasoning step is local-only | **decided 2026-10-01 (DR-16): rules, no model, on the phone** | closed |
 | Order of further senses | open since DR-13 | decision, track C |
 | `STATE.md` counts stale (304 tests) | **fixed** in this change | closed |
 
@@ -197,7 +197,7 @@ captured something.
 
 | Step | What it is | How it makes Orb useful |
 | --- | --- | --- |
-| **B1** | **Decision:** where the reasoning layers run on the phone (Kotlin implementation of the kernel, or another route) and whether the first reasoning step is local-only | Everything below depends on it; without it the middle exists only on a laptop, which can never be required |
+| **B1** | **Decided 2026-10-01 (DR-16): Kotlin on the phone, shared test vectors with the TypeScript reference, rules before any model; the toolchain is proved to build (AD-14).** Was: where the reasoning layers run on the phone and whether the first reasoning step is local-only | Everything below depends on it; without it the middle exists only on a laptop, which can never be required |
 | **B2** | Evidence Graph over Observations | Every captured thing becomes evidence with a source and lineage, so Orb can answer *where did I get this* — and it is where AD-6 is decided honestly |
 | **B3** | Entities and Relationships — people, places, organisations, dates | *Everything about Ravi*, *everything about this trip*; the step from a pile of notes to a memory |
 | **B4** | **The first workflow, chosen by you** — messaging, travel, content or work were named; a good first one is **commitments** ("I'll send it Friday") or **trips** (booking → dates → reminder) | **The first time Orb does something for you without being asked to remember it** |
