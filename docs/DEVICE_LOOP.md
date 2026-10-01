@@ -5462,3 +5462,30 @@ importer has not decided about (proven to).
 
 Choose a screen you are content for me to read the *counts* of; the export carries **no text**,
 and the sealed text never leaves the phone.
+
+#### Part 2 on the device — first results (export `orb-20261001-111601.txt`, 105 events, `verifyLane`-clean)
+
+v13 is installed (event 96, `versionCode: 29847188`). Four `orb.assist.captured` events: three
+WhatsApp screens and one Chrome page (21 text elements, a page address supplied).
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **P47** | **Held** | every capture event holds exactly `attachment`, `attachmentBytes`, `because`, `package`, `resolveOutcome`, `textChars`, `textNodes`, `versionCode`, `webUri` — numbers, an allowed app, a yes/no and the sealed identity; no field able to carry text |
+| **P48** | **Held** | the first capture (event 99) was erased (event 100) and the store's counts moved **`attachmentsDestroyed` 2 → 4, `attachmentKeysHeld` 5 → 7** across the session: the erased capture's key is gone |
+| **P49, P50** | **Not tested** | see below |
+| **P46, P51** | **Not confirmed in the export** | the preview and the password screen leave no record by design |
+
+**Why the screen was kept again after the erasures — and why that is correct.** The operator
+erased two items: **the capture (event 99) and an older shared photograph (event 82)** — two
+different things, not two copies of the same capture. The next *Remember* on the same WhatsApp
+screen (event 102) kept a **new** Attachment: **836 characters in 34 elements, against 917 in 36**
+for the erased one. The chat had changed between the taps — a new message, a time, a *last seen*
+line — so the text was **different text**, hence different content, hence a different identity.
+It is not about a screenshot: Orb **keeps text and never a picture**, and the screenshot is only
+the protection check. The erased-content rule (`Attachment.md` inv. 8) refuses **identical** text
+and nothing near it, and a live chat almost never repeats identically.
+
+**What that means for P49 and P50.** Both need the *exact same text* twice, which a live chat does
+not give. They can be tested on a **static screen** — a Settings page that does not change. The
+same property is worth stating plainly: the rule protects against re-keeping *identical* content,
+not *similar* content; a near-identical screen after an erasure is a new capture.
