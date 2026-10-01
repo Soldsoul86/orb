@@ -9,6 +9,7 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.service.voice.VoiceInteractionSession;
 import android.view.Gravity;
 import android.view.View;
@@ -136,7 +137,8 @@ public final class Session extends VoiceInteractionSession {
         Journal journal = journal();
         if (journal != null) {
             journal.append(Facts.INVOKED, Facts.invoked(
-                invocation, showFlags, withAssist, withScreenshot, sources, args == null ? 0 : args.size()));
+                invocation, showFlags, withAssist, withScreenshot, sources, args == null ? 0 : args.size(),
+                setting("assist_structure_enabled"), setting("assist_screenshot_enabled")));
         }
 
         lines.setLength(0);
@@ -144,6 +146,21 @@ public final class Session extends VoiceInteractionSession {
         line(withAssist ? "system says it will send screen structure" : "system says it will NOT send screen structure");
         line(withScreenshot ? "system says it will send a screenshot" : "system says it will NOT send a screenshot");
         watchFirstDraw();
+    }
+
+    /**
+     * One of the system's own "assist" switches. By name because the constants are
+     * hidden. 1 on, 0 off, `Facts.SETTING_UNREADABLE` if the platform refuses,
+     * `Facts.SETTING_ABSENT` if there is no such setting — never a guess at either.
+     */
+    private long setting(String key) {
+        try {
+            return Settings.Secure.getInt(getContext().getContentResolver(), key);
+        } catch (Settings.SettingNotFoundException absent) {
+            return Facts.SETTING_ABSENT;
+        } catch (RuntimeException refused) {
+            return Facts.SETTING_UNREADABLE;
+        }
     }
 
     @Override

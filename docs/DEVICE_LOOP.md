@@ -4889,3 +4889,100 @@ says which variant produced it. The export file is named by the package suffix
    Export first if you uninstall — the journal goes with the app.
 
 Also export Orb itself once (step 1's check).
+
+### 7b44. Track 0 on the device — the build is on the record, and the settings round is half-answered — 2026-10-01
+
+Three exports, all `verifyLane`-clean: `orb-20261001-083535.txt` (Orb, 54 events),
+`orb-probea-20261001-083530.txt` (the assist probe, 91), `orb-probena-20261001-083524.txt`
+(the variant without the recognition stub, **1**).
+
+#### 0a — confirmed on the device
+
+Event 50 of Orb's lane is a start with `versionCode: 29845625`, `versionName:
+"0.1-orb"` — the first export that names the build that wrote it. v9 is installed
+and, with it, `dataExtractionRules` (0b; not observable from the phone, §7b43).
+The share importer still reads the lane (5 shares, 13 grants readings, re-import a
+no-op).
+
+#### What the run actually was
+
+The assist probe's `assist.service.ready` at event 70 has **no `versionCode` and no
+`recognitionStub`** — so the build that answered was **v1**, the one installed
+before; v2 was never installed (the protocol only asked for it if the variant failed).
+That matters for one reason: the probe did not record the state of the system's
+switches, so **an invocation cannot be matched to a switch position from the export
+alone.** What follows is therefore read from the *pattern* of each invocation, and
+labelled as such.
+
+#### P30 — the stub-less variant: provisional, one fact missing
+
+`dev.orb.probena` holds **no `assist.service.ready` at all**, no invocation, and its
+only event is the export: the platform **never bound it**. Whether that is because it
+was **absent from the chooser** (the platform requires a recognition service —
+P30 refuted) or **never selected** is not in the data, and the operator fell back to
+the stubbed probe, which suggests the first. **Asked, not assumed.**
+
+#### P31 — text off: structure is withheld, and so is the screenshot
+
+One invocation (the last, 220549234) has the signature of the text switch being off:
+`assistCallbacks: 1` but **`assist.structure arrived: false`** with no package,
+`assist.content arrived: false`, and **`screenshotCallbacks: 0`** — *no screenshot
+callback at all*. `argKeys` is **6** where every other invocation has 7.
+
+- The **structure half of P31 held**: with the switch off the structure does not arrive.
+- The **screenshot half was refuted**: I predicted the screenshot would still arrive.
+  It did not. **The screenshot is coupled to the text switch** — consistent with the
+  operator's report that the screenshot switch cannot be used while text is off.
+- **`flags` did not move.** It stayed **263** and `withAssist` / `withScreenshot` stayed
+  **true** on the invocation where nothing arrived. **The flags do not tell a session
+  what it will receive; arrival does.** Anything built on them would be wrong.
+
+#### P32 — screenshot off alone: **not measured**
+
+No invocation has structure arriving and the screenshot not. Since the screenshot
+cannot be switched off independently while text is off, the only way to measure P32 is
+**text on, screenshot off**, which this round did not do.
+
+#### P33 — a game: it opted out, like incognito
+
+The chess app, twice (events 76–85): `nodes: 1, blockedNodes: 1`, no text, and a
+**uniform black screenshot** — the same two-mechanism opt-out as the incognito tab in
+§7b42. So a game that protects itself is withheld by the app, not by the platform;
+**P33 as stated (a game delivers structure with little text) is not tested**, because
+this game delivered none. P29 stays open for a game that does not opt out.
+
+#### Two things from the invocations before the round
+
+- **A second screenshot callback.** After the second chess invocation's session had
+  closed, a further `assist.screenshot` with `arrived: false` was recorded 31.6 s
+  after its invocation — at the instant the next invocation began. §7b42's *"callbacks
+  fire exactly once"* held for that round and is **not a rule**: a stray null screenshot
+  callback can arrive late. Not harmful (the probe records it as not-arrived), but
+  `Remember` must never treat a late callback as belonging to the invocation in
+  front of it.
+- **Apps that deliver intact:** the Claude app (83 nodes, 18 with text, a real
+  capture) and Instagram (784 nodes, 61 with text), recorded before the round. Both
+  fall under DR-14's allow-list rather than the platform's protection.
+
+#### An unrelated observation in Orb's own lane
+
+`com.google.android.apps.photos` was **gained** in the visible-package set at event 47
+(a share from Photos was about to be recorded) and is **lost** at event 53, at the next
+process start, with nothing uninstalled. Under the no-`QUERY_ALL_PACKAGES` build the
+"visible" set is whatever the platform lets Orb see, and **that set appears to move
+with Orb's own interactions** — here, a share from that app. **Hypothesis, two data
+points:** a package becomes visible while a share from it is in flight and leaves the
+set afterwards. If it holds, the install/uninstall alert at this scope will raise a
+change for something that did not happen. Recorded for track D; not yet investigated.
+
+#### What the next probe build adds, and the one round that remains
+
+`orb-assist-probe-v3.apk` records the system's own switches on every `assist.invoked`
+(`textSetting`, `screenshotSetting`: 1 on, 0 off, -1 unreadable, -2 absent) — so a
+later export names the switch state instead of leaving it to be inferred. The key
+names are the platform's hidden ones; if the platform refuses to read them they come
+back -1, and that is itself the answer.
+
+One round, on **WhatsApp, the same chat each time**: text on, screenshot on → text on,
+**screenshot off** → text off → back to both on. Then export. That measures P32
+directly and checks P31 against a recorded switch state.

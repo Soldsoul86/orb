@@ -93,10 +93,16 @@ final class Facts {
      * @param flags the raw `showFlags`, kept so a source this build does not
      *     decode is still on the record
      * @param sources comma-joined names from {@link #SOURCES}; anything else is dropped
+     * @param textSetting the system's own "use text from screen" value at the moment of
+     *     the invocation: 1 on, 0 off, {@link #SETTING_UNREADABLE} the platform would not
+     *     say, {@link #SETTING_ABSENT} no such setting. **Recorded because the flags do
+     *     not follow the switches** — `flags` stayed 263 with the text switch off — so
+     *     without this an export cannot say which switch state produced which arrival.
+     * @param screenshotSetting the same, for "use screenshot"
      */
     static Map<String, Object> invoked(
             long invocation, int flags, boolean withAssist, boolean withScreenshot,
-            String sources, int argKeys) {
+            String sources, int argKeys, long textSetting, long screenshotSetting) {
         Map<String, Object> p = Json.obj();
         p.put("invocation", invocation);
         p.put("flags", (long) flags);
@@ -104,8 +110,15 @@ final class Facts {
         p.put("withScreenshot", withScreenshot);
         p.put("sources", cleanSources(sources));
         p.put("argKeys", (long) argKeys);
+        p.put("textSetting", textSetting);
+        p.put("screenshotSetting", screenshotSetting);
         return p;
     }
+
+    /** The platform would not report a setting — *cannot check*, not *off*. */
+    static final long SETTING_UNREADABLE = -1L;
+    /** The setting does not exist on this build. */
+    static final long SETTING_ABSENT = -2L;
 
     /**
      * The structure callback fired. Counts only — how much there was, never what it

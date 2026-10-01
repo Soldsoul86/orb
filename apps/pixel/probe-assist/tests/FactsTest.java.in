@@ -35,10 +35,14 @@ final class FactsTest {
     private static void onlyKnownSourcesAreNamed() {
         Harness.suite("an invocation's source can only be a known word");
         Map<String, Object> p = Facts.invoked(9L, 7, true, true,
-            "assistGesture,my secret note,application,", 2);
+            "assistGesture,my secret note,application,", 2, 1L, 0L);
         Harness.equal("unknown entries are dropped", p.get("sources"), "assistGesture,application");
         Harness.check("and never echoed", !Json.canonical(p).contains("secret"));
         Harness.equal("the raw flags are kept for what this build does not decode", p.get("flags"), 7L);
+        Harness.equal("the system's text switch is recorded as given", p.get("textSetting"), 1L);
+        Harness.equal("and the screenshot switch", p.get("screenshotSetting"), 0L);
+        Harness.check("unreadable and absent are different from off",
+            Facts.SETTING_UNREADABLE != 0L && Facts.SETTING_ABSENT != 0L && Facts.SETTING_UNREADABLE != Facts.SETTING_ABSENT);
     }
 
     private static void everyRecordIsNumbersAndBooleans() {
@@ -48,7 +52,7 @@ final class FactsTest {
             Facts.ready(true, true, 7L, false),
             Facts.shutdown(),
             Facts.showFailed(1),
-            Facts.invoked(1L, 3, true, false, "assistGesture", 0),
+            Facts.invoked(1L, 3, true, false, "assistGesture", 0, Facts.SETTING_UNREADABLE, Facts.SETTING_ABSENT),
             Facts.structure(1L, true, "com.whatsapp", 0, 1, true, 1, 2, 3, 4L, 5, 6, 7, 8, 9, 10L),
             Facts.content(1L, true, true, false, true, false, 12L, true, 2),
             Facts.exported(9),
