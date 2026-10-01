@@ -91,7 +91,7 @@ a recording time of *today*; the capture it cites happened weeks ago. A window q
 **earliest cited device event's** clock (the occurrence). An Observation with no readable cause falls
 back to its own recording time and is **flagged** (`occurredAtKnown: false`), never silently mixed in.
 
-**Built (TypeScript):** `runtime/evidence`, 28 checks, mutation-checked (`TESTS.md` there). Forward questions
+**Built (TypeScript and Kotlin; verified by vectors and on real exports, not yet on a device — nothing in the app calls it yet):** `runtime/evidence` (28 checks) and `runtime/brain` `Graph.kt`, held together by 483 shared questions over 9 scenarios (`tests/vectors/graph.json`, computed by TypeScript). Forward questions
 are stricter than `lineage.ts`: an event that cannot say what it cites is named in `unresolved`.
 
 **Where.** TypeScript first, as the reference: a new package `runtime/evidence`

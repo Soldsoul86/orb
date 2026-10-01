@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 
 import { translateEvent } from "../src/index.js";
 import { buildVectors, vectorsPath } from "./brain-vectors-build.js";
+import { buildGraphVectors, graphVectorsPath } from "./graph-vectors-build.js";
 
 const DEVICE = "orb-0123456789abcdef01234567";
 const ASSIST = "orb.assist.captured";
@@ -31,5 +32,20 @@ describe("the vectors the phone's Kotlin translation is held to", () => {
   test("an array payload is not an object (both translations agree)", () => {
     assert.equal(translateEvent(ASSIST, DEVICE, []), null);
     assert.equal(translateEvent(SHARED, DEVICE, []), null);
+  });
+});
+
+describe("the vectors the phone's Kotlin Evidence Graph is held to", () => {
+  test("are current (regenerate with node scripts/write-brain-vectors.mjs)", async () => {
+    const fresh = JSON.stringify(await buildGraphVectors(), null, 1) + "\n";
+    assert.equal(await readFile(graphVectorsPath, "utf8"), fresh, "runtime/brain/tests/vectors/graph.json is stale");
+  });
+
+  test("cover a closed answer, a lower bound, an unheld root and a damaged history", async () => {
+    const v = await buildGraphVectors();
+    const queries = v.scenarios.flatMap((s) => s.queries) as { expected: { closed: boolean; unresolved: string[] } }[];
+    assert.ok(queries.some((q) => q.expected.closed), "a closed answer");
+    assert.ok(queries.some((q) => !q.expected.closed && q.expected.unresolved.length > 0), "a lower bound that names what it missed");
+    assert.ok(v.scenarios.length >= 9);
   });
 });

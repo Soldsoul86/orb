@@ -22,5 +22,11 @@ is reachable only as an identity. The same rules as `packages/device-watch/src/a
 **Known stricter-than-TypeScript behaviour.** A line holding a fraction or an integer past 2^53 is
 refused whole here (TypeScript would read it and leave the field out). The journal cannot write either.
 
+**The graph (`Graph.kt`).** The Kotlin twin of `@orb/evidence`: a typed view over lineage, never stored, with
+the walks of `lineage.ts` step for step (BFS, visited set, unheld causes *named*, events that cannot say what
+they cite *named*), so there is one meaning of "built on" and two implementations held to it by vectors.
+A journal line that cannot be read is named in every answer (`line:N`) and makes it a lower bound — never skipped.
+One line reader (`Lines.kt`) serves the Observer and the graph, so they cannot disagree about what a line says.
+
 **Not here:** package-scan (`grants.*`) Observations stay translated on the laptop; no `Evidence`
 events are produced; no entities, no model.

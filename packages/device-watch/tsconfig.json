@@ -5,6 +5,19 @@
     "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "references": [{ "path": "../../runtime/journal" }, { "path": "../../runtime/observation" }]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../../runtime/journal"
+    },
+    {
+      "path": "../../runtime/observation"
+    },
+    {
+      "path": "../../runtime/evidence"
+    }
+  ]
 }

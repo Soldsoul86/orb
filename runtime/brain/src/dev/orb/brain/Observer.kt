@@ -24,31 +24,19 @@ class Plan(val drafts: List<Draft>, val unreadable: Int)
 object Observer {
     const val OBSERVATION_TYPE = "orb.observation"
 
-    private class Line(val id: String, val device: String, val type: String, val causes: List<String>, val payload: Any?)
+    /** The Observer needs lineage: a line that states none cannot be placed, and the pass declines. */
+    private class Seen(val id: String, val device: String, val type: String, val causes: List<String>, val payload: Any?)
 
-    /** One journal line, with the v2 envelope (real type and causes inside the payload) opened. Null if unreadable. */
-    @Suppress("UNCHECKED_CAST")
-    private fun read(text: String): Line? {
-        val event = try { Json.parse(text) } catch (e: JsonError) { return null } as? Map<String, Any?> ?: return null
-        val id = event["id"] as? String ?: return null
-        val device = event["device"] as? String ?: return null
-        val envelopeType = event["type"] as? String ?: return null
-        val wrapped = (event["v"] as? Long) == 2L
-        if (!wrapped) {
-            val causes = event["causes"] as? List<Any?> ?: return null
-            if (!causes.all { it is String }) return null
-            return Line(id, device, envelopeType, causes as List<String>, event["payload"])
-        }
-        val inner = event["payload"] as? Map<String, Any?> ?: return null
-        val type = inner["type"] as? String ?: return null
-        val causes = inner["causes"] as? List<Any?> ?: return null
-        if (!causes.all { it is String }) return null
-        return Line(id, device, type, causes as List<String>, inner["data"])
+    private fun read(text: String): Seen? {
+        val line = Lines.read(text) ?: return null
+        val id = line.event["id"] as? String ?: return null
+        val device = line.event["device"] as? String ?: return null
+        return Seen(id, device, line.type, line.causes ?: return null, line.payload)
     }
 
     @JvmStatic
     fun plan(lines: List<String>): Plan {
-        val read = ArrayList<Line>(lines.size)
+        val read = ArrayList<Seen>(lines.size)
         var unreadable = 0
         for (text in lines) {
             if (text.isEmpty()) continue

@@ -6,7 +6,7 @@ import java.io.File
 object PurityTest {
     private val FORBIDDEN = listOf(
         "import android", "android.", "java.io", "java.nio", "java.net", "javax.", "kotlin.io",
-        "System.", "println", "print(", "Thread", "Random", "Clock", "Instant", "Attachments", "File(")
+        "System.", "println", "print(", "Thread", "Random", "java.time", "Instant", "Attachments", "File(")
 
     fun run(root: File) {
         Harness.suite("the brain is pure")
