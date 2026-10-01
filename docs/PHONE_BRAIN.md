@@ -118,11 +118,77 @@ it"; cycles cannot loop it.
 | Cost grows with the journal | Linear per question; fine at hundreds of events; recorded as a debt to revisit with AD-13's reasoning (an in-memory index, never on disk) |
 | The graph leaks | Output type has no field for content; a guard test, as for the translation |
 
-### B2c — Visible in Recall *(after B2b)*
+### B2c — Where did this come from? *(design proposed 2026-10-01; awaiting approval)*
 
-Recall's detail view gains *Where did this come from?* — the app, when, and the chain — and an
-erase dialog that says what depended on the item. Nothing about the text is shown outside the
-secure Recall window.
+**What the operator sees.** In Recall, an item's detail has the words and **Erase**. It gains a third button,
+**Where from?**, which opens a small secure window in plain English:
+
+```
+You asked Orb to remember this screen.
+App:            com.whatsapp
+It happened:    29 Sep 2026 14:02
+Orb noted it:   1 Oct 2026 16:58        (shown only when it differs by more than a minute — a back-filled record)
+Built on this:  nothing yet
+Same words kept: 2 times
+record 01M3…V2AD
+```
+
+- **"It happened"** is the capture's own clock, never the Observation's (the occurrence rule).
+- **"Orb noted it"** is the Observation's recording time, shown only when it differs, so a back-filled item
+  says so rather than looking as if it were new.
+- **"Built on this"** counts what the graph says depends on the item beyond its own Observation, by kind;
+  today that is nothing, and the line says *nothing yet* only when the answer is **closed** — otherwise
+  *"Orb could not read part of its history, so this may be incomplete"* (and how many lines).
+- **"Same words kept"** is the graph's `holding`, the number of items sharing the sealed text.
+- **A short record id** at the foot so an item can be tied to a line of an export. No other id is shown.
+- If the item has **no Observation yet** (a journal from before v19, before its first launch pass), it says
+  *"Orb has not recorded this as an observation yet."* — never a guess.
+
+**The erase confirmations say what stays — which they did not before.** Erasing destroys the words' key; the
+**Observation stays** (v19's export proved it: the Observation of an erased capture remained). So both erase
+dialogs (Recall and *Kept by Orb*) gain: *"Orb keeps its record that this happened — when, from which app, how
+much text — but not the words."* and, if the graph finds things built on the item, *"N things Orb worked out
+from it will also be listed for you to review."* — no: **nothing is worked out yet**, so only the first sentence
+is written now; the second is added when something derives from an item, and a test fails if the dependents
+list is non-empty and the dialog does not say so.
+
+**Shape.** One new Java file, `Provenance.java.in`: **the only caller of `dev.orb.brain.Evidence`**, as `Observe`
+is the only caller of the Observer. It builds the graph from the journal's lines when a dialog opens (never to
+draw a list), asks, and returns plain facts; `RecallActivity` / `ItemsActivity` draw them. The graph is
+dropped when the dialog closes — nothing is stored. `Erasure.Item` and `Recall.Entry` gain the event `id` (the
+graph is keyed by id, Erasure by hash).
+
+**One source of truth for "kept by others".** The erase confirmation keeps deciding from `Erasure.plan` (tested,
+verified on the device). The graph's `holding` is shown beside it, and **a test asserts the two agree** on every
+fixture — two paths to one number is a drift, and a test is how it is caught.
+
+**Invariants.** The window shows the app, times, counts and a short id — **no words, no address, no attachment
+identity**; it is `FLAG_SECURE` like the screen it opens from (guard test, as for the other dialogs). Only
+`Provenance` calls the graph (guard test). It cannot reach Attachments.
+
+**Risks.**
+
+| Risk | Held by |
+| --- | --- |
+| The wrong time shown (writing time as occurrence) | Phone-side test with a back-filled Observation weeks after its capture; the P-check on a real back-filled item (your 31) |
+| *Nothing built on this* read as complete when it is not | The line is written only when `closed`; a test with an unreadable line |
+| Two numbers for "kept by others" drifting | A test asserting `Erasure.plan` and `holding` agree on every fixture |
+| First run of the Kotlin graph on the device | It is the first caller; P-checks below, and a `orb.provenance.failed`-style visible failure message in the window, never a blank |
+| Leaking | Only app, times, counts, short id; guard test on the file and on the dialog flag |
+| Cost | Built once per dialog open, ~hundreds of events; not per row |
+
+**Predictions for the device.**
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P74** | *Where from?* on a back-filled item shows **"It happened"** weeks before **"Orb noted it"** | the occurrence time is not being used |
+| **P75** | On an item kept after v19, the two times are within a minute and only one is shown | the differs-rule is wrong |
+| **P76** | *Same words kept* equals the count the erase dialog gives (*kept by N other items* = that number − 1) | the two sources disagree |
+| **P77** | The erase dialog now says Orb keeps its record that this happened, but not the words — and after erasing, the next export still holds that Observation | the sentence is untrue (it must never be) |
+| **P78** | *Built on this* says **nothing yet** | the graph found a dependent that should not exist |
+| **P79** | The window is secure (no screenshot) and shows no word of the item | a leak |
+
+**Needs a new APK** (v20); the first on-device run of the Kotlin graph.
 
 ## 4. Invariants this must keep
 
