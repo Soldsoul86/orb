@@ -5230,3 +5230,25 @@ Same-file sharing is easiest from **Photos**: open one screenshot there and shar
 5. Share that same screenshot from Photos once more.
 6. **Export.** The export should show `attachmentsDestroyed` one higher than the first, a
    share record with `resolveOutcome: erased`, and two new declarations.
+
+### 7b48. Step 6 on the device — the guard holds, and the key is gone — 2026-10-01
+
+Two exports from the v11 run: `orb-20261001-091701.txt` (the starting counts, 68 events) and
+`orb-20261001-091819.txt` (73), both `verifyLane`-clean. v11 is installed (event 65,
+`versionCode: 29847103`).
+
+| Evidence | What it shows |
+| --- | --- |
+| Event 68: **`attachmentKeysHeld: 5`, `attachmentsDestroyed: 1`** | The first erasure (§7b47, a single-citation item) **did destroy its key**: five photographs still held, one identity destroyed. The §7b47 gap is closed — the declaration was a commitment, and this is the fact |
+| Events 69, 70, 72 | The same screenshot shared three more times, each recorded **`held`**, not `stored`: Orb recognised identical bytes as one Attachment (inv. 2) four times over, with the original at event 63 |
+| Event 71 + the dialog *"also kept by 2 other items"* | Erasing one of the four: **the guard counted the other readers correctly** and the content **stayed** — **P35 held on the device** |
+| Event 73: still **5 held, 1 destroyed** | After that erasure and a further share the key count did not move: nothing still cited was destroyed |
+| `erasedHashes` over the export | Exactly two — the two shares the phone named — and each is **confirmed by the phone**; both name real events |
+
+**P36 and P37 are not yet run:** the content is still cited by three readable items (events
+63, 70, 72), so its key correctly still stands. Erasing the last of them should say *nothing
+else keeps this*, move `attachmentsDestroyed` to 2, and a further share of that screenshot
+should record `resolveOutcome: erased`.
+
+The one erased row's status in the new screen (*the content stays while N other items still
+keep it*) matches the data. Nothing in these exports contradicts a prediction.
