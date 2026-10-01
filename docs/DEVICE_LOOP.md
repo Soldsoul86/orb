@@ -5571,3 +5571,19 @@ words, an asterisk note).
 
 **What to erase:** the login-page captures made before v15 may hold usernames, and the earlier Chrome one
 (the 11:30 login page) may hold more. They are listed in *Kept by Orb* as *remembered*.
+
+#### v15 on the device — the password question closed (export `orb-20261001-130700.txt`, 142 events, `verifyLane`-clean)
+
+v15 is installed (event 135, `versionCode: 29847275`). On `github.com/login` with a made-up password typed, the
+card read *"This looks like a login screen, so Orb kept nothing from it."* with no *Remember* button.
+
+| Evidence | What it shows |
+| --- | --- |
+| Events 138, 139, 141 | three `orb.assist.declined`, `reason: loginScreen`, each with only a reason and a build — **login screens are refused, three times, with no app named** |
+| Event 140 | an ordinary WhatsApp chat **still captured**: 39 elements, 556 characters, **`passwordFields: 0`** — the new rule did not over-reach |
+| Events 125–133 | nine captures erased — **every login-page capture made before v15** (114, 115, 117–120) and three earlier ones |
+| `attachmentsDestroyed` **5 → 11** | six distinct contents among those nine (117–119 are one; 103 and 115 are one): six keys destroyed, the arithmetic matches exactly. `attachmentKeysHeld` 4 afterwards, 5 after the new capture |
+
+**P51 is closed**: a password field's contents never reached the sealed text (v14 recognised the field and
+the preview showed no letters); the masked-dots remnant that did appear is fixed (v15's mask rule); and a
+login screen is now refused outright. The earlier captures that might have held a username are destroyed.
