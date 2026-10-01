@@ -5901,7 +5901,7 @@ DR-16 rules a model out of the first reasoning step, so this would be a decision
 
 ### 7b57. A secure viewer for shared pictures — 2026-10-01
 
-**Status: built, not yet run on the device.** `orb-app-v21-viewer.apk`. v20 is §7b56 (verified). The finding that
+**Status: verified on the device — P81–P86 held** (the export shows P81 and P85; what the screen drew and whether it was screenshot-proof are seen only on the phone, so P82–P84 and P86 rest on the operator's word: *"Installed v21, all steps done"*). `orb-app-v21-viewer.apk`. v20 is §7b56 (verified). The finding that
 prompted it is at the end of §7b56: a screenshot shared to Orb was *kept* (sealed, erasable under *Kept by Orb*) but
 not *remembered* (Recall lists screen text only), so a person could not see what they had shared.
 
@@ -5949,3 +5949,15 @@ not *remembered* (Recall lists screen text only), so a person could not see what
 3. Close it and open it again, then open the other one. *(P84)*
 4. Share one more picture to Orb (from the share sheet), come back, and check it is listed. *(P81)*
 5. Erase one picture, read the dialog, then **Export and share journal**. *(P85)*
+
+#### Result (`orb-20261001-180829.txt`, 250 events, `verifyLane`-clean)
+
+- v21 started (versionCode 29847630); **40 Observations, every share and capture observed, no `orb.observe.failed`.**
+- **P81 held on a real, large file.** The operator shared one more picture from Google Photos — **an `image/jpeg` of 5,337,202 bytes (5.1 MB)** —
+  and it was kept (`stored`) and observed within 8 ms. That is well past the old screenshots (195 KB) and inside the 25 MB limit, so it
+  exercised the shrink-to-2048 path.
+- **P85 held.** One erasure was declared on that picture; `attachmentsDestroyed` went **13 → 14** (its key was destroyed — nothing else held it)
+  and **its Observation is still in the journal**, as the erase sentence says.
+- P82–P84 and P86 (draws and scrolls; screenshot blocked; reopens; search greyed) are the operator's report. **The decode and draw ran on the phone
+  without incident**, which was the one thing no test off the phone could show.
+
