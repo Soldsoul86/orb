@@ -5072,7 +5072,7 @@ Track 0 is closed. 0c's remaining unknowns are the ones deliberately left: flag 
 
 ### 7b46. Step 6 — the phone can destroy a key — 2026-10-01
 
-**Status: built and tested off the phone; not yet run on it.** Predictions are written
+**Status: built and tested off the phone; partly run on it (§7b47).** Predictions are written
 here before the first erasure. `orb-app-v10-erase.apk`.
 
 #### What it does, in one paragraph
@@ -5168,3 +5168,65 @@ reconcile checks.
 7. **Export and share journal.**
 
 (Do not erase your earlier photographs unless you mean to. Erasing is permanent.)
+
+### 7b47. Step 6 on the device — the declaration works; the run did not test the hard part — 2026-10-01
+
+Export `orb-20261001-091145.txt`: 64 events, `verifyLane`-clean. v10 is installed (event 57,
+`versionCode: 29847090`), and the *Kept by Orb* screen showed rows for the photograph
+shares, with the dialog **"Nothing else keeps this content …"** for the one erased.
+
+#### What held
+
+- **P34 (partly).** The screen listed the sealed shares, newest first, with time, kind and
+  size, and no content.
+- **The declaration is right, on a real device.** Event 62 is an `orb.erasure` whose `hash`
+  is the envelope hash of event 61, a share made fifteen seconds earlier. The phone computed
+  that hash with a regex over its own line; the TypeScript encoder computes the same one.
+  `erasedHashes` returns exactly it, it names a real event, and the phone is the confirming
+  device. That is the cross-implementation check §7b46 did off the phone, now passed on one.
+- **P38.** Shared text was not listed.
+- Importing the export: 9 share Observations (the new three included), re-import a no-op.
+
+#### What the run did **not** test
+
+Each screenshot you shared is a **different file** — 3,317,568, 3,317,641 and 3,317,858 bytes
+— so three different pieces of content, correctly kept apart. The interesting cases need the
+**same bytes twice**:
+
+| | Needs | Status |
+| --- | --- | --- |
+| **P35** — erase one of two citations: the content stays | the same file shared twice | **not run** |
+| **P36** — erase the last: the key is destroyed | the above | **not run** |
+| **P37** — the same bytes again are refused, as `erased` | the above, then a third share | **not run** |
+
+What was erased was a single-citation item, which is the simple path (*willDestroy*).
+
+#### A gap in my own design, found by reading this export
+
+**The export cannot say whether the key is gone.** The declaration is written *before* the
+key is destroyed — deliberately, so nothing shrinks silently — which means it is a
+commitment, not a confirmation. If destruction had failed, this export would look
+identical. The phone's screen knew; the file I read did not. Two small fixes, both in v11:
+
+- the `orb.export` event now carries `attachmentKeysHeld` and `attachmentsDestroyed` —
+  **counts of the store itself**, numbers only. A reader can now see that a key left;
+- each erased row says what is true of its key: *key destroyed*, *the content stays while N
+  other items still keep it*, or *declared; the key is not yet removed*.
+
+The off-device suite gains five checks (45) covering the counts and the on-disk remains.
+
+#### The next run, and what it must show
+
+Same-file sharing is easiest from **Photos**: open one screenshot there and share it to Orb
+**twice**. The two should be one Attachment (`stored`, then `held`).
+
+1. Install `orb-app-v11-erase-state.apk`. **Export** once (this records the starting
+   counts).
+2. In Photos, share **one** screenshot to Orb, then share the **same** screenshot again.
+3. *Kept by Orb: erase* — erase the **newer** of the two: the dialog should say another item
+   keeps the content. Confirm. The row should say the content stays.
+4. Erase the **older**: the dialog should say nothing else keeps it. Confirm. The row should
+   say *key destroyed*.
+5. Share that same screenshot from Photos once more.
+6. **Export.** The export should show `attachmentsDestroyed` one higher than the first, a
+   share record with `resolveOutcome: erased`, and two new declarations.

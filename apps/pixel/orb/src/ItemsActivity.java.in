@@ -96,7 +96,25 @@ public final class ItemsActivity extends Activity {
             row.addView(text(when.format(new Date(item.wallClock)) + "  ·  " + kind(item.type)
                 + "  ·  " + size(item.bytes)));
             if (item.erased) {
-                row.addView(text("erased"));
+                // Declared is a commitment; only the key being gone is the fact. Say which.
+                int stillCiting = 0;
+                for (Erasure.Item other : items) {
+                    if (!other.erased && other.identity.equals(item.identity)) stillCiting++;
+                }
+                String status;
+                try {
+                    if (stillCiting > 0) {
+                        status = "erased · the content stays while " + stillCiting + " other item"
+                            + (stillCiting == 1 ? "" : "s") + " still keep it";
+                    } else if (Attachments.remains(this, item.identity)) {
+                        status = "erased · declared; the key is not yet removed (Orb finishes this at its next start)";
+                    } else {
+                        status = "erased · key destroyed";
+                    }
+                } catch (Exception unreadable) {
+                    status = "erased · could not check the key";
+                }
+                row.addView(text(status));
             } else {
                 Button erase = new Button(this);
                 erase.setText("Erase");

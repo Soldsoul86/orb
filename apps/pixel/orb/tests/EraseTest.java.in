@@ -53,6 +53,12 @@ final class EraseTest {
             Attachments.address(context, stored.identity)).toPath());
         Harness.check("the key is on disk exactly once", filesContaining(dir, key) == 1);
 
+        Harness.suite("the store's state can be counted — keys held, identities destroyed");
+        long[] startCounts = Attachments.counts(context);
+        Harness.equal("one key held", startCounts[0], 1L);
+        Harness.equal("none destroyed", startCounts[1], 0L);
+        Harness.check("and the ciphertext is on disk", Attachments.remains(context, stored.identity));
+
         Harness.suite("erasing one of two citations keeps the content, and says so");
         Erase.Result r1 = Erase.execute(context, journal, a);
         Harness.equal("kept by the other", r1.outcome, Erase.KEPT_BY_OTHERS);
@@ -65,6 +71,10 @@ final class EraseTest {
         Harness.equal("destroyed", r2.outcome, Erase.DESTROYED);
         Harness.equal("the marker says destroyed", Attachments.state(context, stored.identity), Attachments.DESTROYED_STATE);
         Harness.equal("the key bytes are on no disk file", filesContaining(dir, key), 0);
+        long[] after = Attachments.counts(context);
+        Harness.equal("no key held", after[0], 0L);
+        Harness.equal("one identity destroyed", after[1], 1L);
+        Harness.check("and nothing of it remains on disk", !Attachments.remains(context, stored.identity));
         Harness.equal("both declarations are on the record", erasures(journal), 2);
         Harness.equal("erasing again changes nothing", Erase.execute(context, journal, b).outcome, Erasure.ALREADY_ERASED);
         Harness.equal("and declares nothing more", erasures(journal), 2);

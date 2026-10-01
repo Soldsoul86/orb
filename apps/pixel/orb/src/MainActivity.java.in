@@ -243,6 +243,11 @@ public final class MainActivity extends Activity {
             // The two things a reader of the file alone cannot otherwise recover.
             record.put("package", getPackageName());
             record.put("exportScope", "whole-lane");
+            // The state of the store, not only its declarations: keys held, identities
+            // destroyed. Numbers, never content (step 6).
+            long[] keys = Attachments.counts(this);
+            record.put("attachmentKeysHeld", keys[0]);
+            record.put("attachmentsDestroyed", keys[1]);
             journal.append("orb.export", record);
 
             // Re-read, so the file contains the record of its own export. A

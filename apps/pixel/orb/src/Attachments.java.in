@@ -159,6 +159,24 @@ final class Attachments {
         }
     }
 
+    /**
+     * How many keys this phone holds and how many identities it has destroyed, as two
+     * numbers. Written into the export so a reader can see the *state* of the store, not
+     * only the declarations: a declaration says an erasure was committed to, and only a
+     * count of keys can say the key is gone (`DEVICE_LOOP.md` §7b47).
+     */
+    static long[] counts(Context context) {
+        String[] held = dir(context, KEYS).list();
+        String[] gone = dir(context, DESTROYED).list();
+        return new long[] {held == null ? 0L : held.length, gone == null ? 0L : gone.length};
+    }
+
+    /** Whether a key or ciphertext for this identity is still on disk — what destruction removes. */
+    static boolean remains(Context context, String identity) throws Exception {
+        String address = address(context, identity);
+        return new File(dir(context, KEYS), address).exists() || new File(dir(context, BLOBS), address).exists();
+    }
+
     /** What this phone holds for an identity. */
     static final String HELD_STATE = "held";
     static final String DESTROYED_STATE = "destroyed";
