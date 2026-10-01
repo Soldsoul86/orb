@@ -6019,3 +6019,18 @@ losing the phone lost the memory, and a fresh Orb could not read an export at al
 7. Optionally, on an Orb that already holds history, tap *Restore* to see it refused. *(P92)*
 
 **Your remembered items are only safe if the backup in step 2 is good — which is why step 3 comes before step 4.** If you would rather not wipe your phone, do steps 1–3 only; they prove the backup without risk.
+
+#### Result of v22, first run (`orb-20261001-185851.txt`, 255 events, `verifyLane`-clean)
+
+- **P87 held, with a real backup.** One `orb.backup` event: **14 items, 11,862,763 bytes, pictures included, 600,000 iterations**, `Downloads/orb-backup-20261001-185246.orbbak` —
+  the file is whole (the event is written only after it is). Steps 1–2 of the protocol were done (the operator copied the file and tried it).
+- **Step 3 (*Check a backup file…*): "nothing is happening after uploading the file."** Nothing in the journal says what the operator saw (a check changes nothing, by design), so
+  this is a **visibility defect, found honestly**: the result and the "working" text were written to a line at the *bottom* of a scrolling screen, and the passphrase key
+  derivation on a phone (PBKDF2 at 600,000 iterations, in software) takes seconds during which nothing on screen moved. Reading the file through a stream that hands over a few
+  bytes at a time is tested and works; the logic is not what failed to be seen.
+- **v23 (`orb-app-v23-backup-visible.apk`) fixes what could be seen:** a modal *"Checking… / Backing up… / Restoring… this takes a few seconds"* box while it works; the outcome in a dialog
+  that cannot be scrolled past; the status line moved to the top of the screen; *"File chosen. Now type the passphrase."* and *"No file was chosen."* shown the moment the picker returns.
+  518 phone-side checks (one more: a backup read in 7-byte pieces).
+- **Open until the operator reports what v23 shows.** If the passphrase box does not appear after choosing the file, or the box says something other than *good*, that is a different
+  fault and it will be in the words on screen.
+

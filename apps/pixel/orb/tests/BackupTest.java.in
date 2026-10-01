@@ -249,6 +249,12 @@ final class BackupTest {
             if (variant != 0) Harness.check("   …and the fresh install is as it was", new File(target.getFilesDir(), "backup-staging").exists() == false);
         }
 
+        Harness.suite("a real file stream hands over a few bytes at a time");
+        java.io.InputStream trickle = new java.io.FilterInputStream(new ByteArrayInputStream(file)) {
+            @Override public int read(byte[] b, int off, int len) throws java.io.IOException { return super.read(b, off, Math.min(len, 7)); }
+        };
+        Harness.equal("a backup read in 7-byte pieces is still read whole", Backup.check(fresh("orb-bak-trickle"), trickle, PASS).items, 2);
+
         Harness.suite("a backup can be proved good without touching anything");
         Context chk = fresh("orb-bak-chk");
         byte[] chkLane = laneBytes(chk);

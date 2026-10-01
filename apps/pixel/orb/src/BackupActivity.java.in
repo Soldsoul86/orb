@@ -79,6 +79,12 @@ public final class BackupActivity extends Activity {
         last.setPadding(0, 8, 0, 16);
         root.addView(last);
 
+        // What is happening now, where it cannot be scrolled out of sight.
+        progress = new TextView(this);
+        progress.setTextSize(13);
+        progress.setPadding(0, 0, 0, 16);
+        root.addView(progress);
+
         pictures = new CheckBox(this);
         pictures.setText("Include pictures and files shared to Orb (they can be large)");
         pictures.setChecked(true);
@@ -111,11 +117,6 @@ public final class BackupActivity extends Activity {
             + "Do this before you wipe a phone to restore: a backup you have not checked is a hope, not a backup.");
         root.addView(checkNote);
 
-        progress = new TextView(this);
-        progress.setTextSize(13);
-        progress.setPadding(0, 24, 0, 0);
-        root.addView(progress);
-
         ScrollView scroll = new ScrollView(this);
         scroll.addView(root);
         setContentView(scroll);
@@ -125,6 +126,19 @@ public final class BackupActivity extends Activity {
     protected void onResume() {
         super.onResume();
         last.setText(lastLine(journal()));
+    }
+
+    /** A modal "working" box, so a few seconds of key-making and decrypting never looks like nothing happening. */
+    private AlertDialog busy(String words) {
+        AlertDialog box = new AlertDialog.Builder(this).setMessage(words).setCancelable(false).create();
+        box.show();
+        return box;
+    }
+
+    /** The outcome, in a box that cannot be missed or scrolled past. */
+    private void say(String title, String words) {
+        progress.setText(words);
+        new AlertDialog.Builder(this).setTitle(title).setMessage(words).setPositiveButton("OK", null).show();
     }
 
     private Journal journal() {
@@ -163,6 +177,7 @@ public final class BackupActivity extends Activity {
 
     private void runBackup(final char[] passphrase, final boolean withPictures) {
         progress.setText("Backing up… this takes a few seconds.");
+        final AlertDialog working = busy("Backing up… this takes a few seconds.");
         new Thread(new Runnable() {
             @Override public void run() {
                 String result;
@@ -176,7 +191,8 @@ public final class BackupActivity extends Activity {
                 final String shown = result;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        progress.setText(shown);
+                        working.dismiss();
+                        say("Back up", shown);
                         last.setText(lastLine(journal()));
                     }
                 });
@@ -263,9 +279,14 @@ public final class BackupActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if ((requestCode != PICK_BACKUP && requestCode != PICK_CHECK) || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode != PICK_BACKUP && requestCode != PICK_CHECK) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            progress.setText("No file was chosen.");
+            return;
+        }
         final Uri file = data.getData();
         final boolean onlyCheck = requestCode == PICK_CHECK;
+        progress.setText("File chosen. Now type the passphrase.");
         askPassphrase(onlyCheck ? "Check" : "Restore", false, "Type the passphrase you chose when you made this backup.", null, new PassphraseTaken() {
             @Override public void taken(final char[] passphrase) {
                 if (onlyCheck) runCheck(file, passphrase); else runRestore(file, passphrase);
@@ -275,6 +296,7 @@ public final class BackupActivity extends Activity {
 
     private void runCheck(final Uri file, final char[] passphrase) {
         progress.setText("Checking… this takes a few seconds.");
+        final AlertDialog working = busy("Checking the backup… this takes a few seconds.");
         new Thread(new Runnable() {
             @Override public void run() {
                 String message;
@@ -294,7 +316,7 @@ public final class BackupActivity extends Activity {
                 }
                 final String shown = message;
                 runOnUiThread(new Runnable() {
-                    @Override public void run() { progress.setText(shown); }
+                    @Override public void run() { working.dismiss(); say("Check", shown); }
                 });
             }
         }).start();
@@ -302,6 +324,7 @@ public final class BackupActivity extends Activity {
 
     private void runRestore(final Uri file, final char[] passphrase) {
         progress.setText("Restoring… this takes a few seconds. Do not close Orb.");
+        final AlertDialog working = busy("Restoring… this takes a few seconds. Do not close Orb.");
         new Thread(new Runnable() {
             @Override public void run() {
                 String message;
@@ -329,6 +352,7 @@ public final class BackupActivity extends Activity {
                 final boolean closeApp = done;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
+                        working.dismiss();
                         progress.setText(closeApp ? "Restored." : shown);
                         new AlertDialog.Builder(BackupActivity.this)
                             .setMessage(shown)
