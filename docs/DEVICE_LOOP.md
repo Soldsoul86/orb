@@ -5367,3 +5367,21 @@ means a surprising decline is diagnosed by asking, not by reading.
 
 **Still to run:** P41's second half, P43 (a protected screen in an allowed app), P44 (text
 switch off) and P45 (the counts against the probe's).
+
+#### Part 1 closed — every prediction held on the device (export `orb-20261001-103119.txt`, 95 events, `verifyLane`-clean)
+
+| | Result | Evidence |
+| --- | --- | --- |
+| **P41** | **Held** | events 88, 89, 94: `orb.assist.simulated` for `com.whatsapp` — 25 text elements / 301 characters on an image-heavy chat (the card read *"Orb would keep 25 text elements (301 characters)"*), and 87 / 1,669 on a text-heavy one. Numbers, an allowed app's name, a yes/no for a page address, the build — nothing else |
+| **P43** | **Held** | events 91–92: Chrome allowed from a normal tab, then `declined`, `reason: protectedScreen` in the incognito tab; the card read *"This screen protects itself. Orb kept nothing from it."* over a blank screen |
+| **P44** | **Held** | event 93: `declined`, `reason: noStructure` with *Use text from screen* off; the card read *"Orb could not read this screen's text…"* |
+| **P45** | **Not cleanly testable** | the screens are not the same ones the probe measured, so the counts cannot be compared like for like. They are of the right order for the screens shown (a WhatsApp chat of mostly pictures: 25 elements; a text-heavy one: 87), and the walk is the probe's with passwords excluded. Left as *consistent*, not *confirmed* |
+
+Together with §7b50's first results: **P39–P44 held; P45 consistent.**
+
+**Something the screenshots show about "text only", worth knowing before part 2.** The chat
+Orb counted 25 text elements in is mostly *pictures of tables and documents*. The text inside
+a picture is not text to the platform, so a *text only* memory keeps the messages around it and
+**none of what the pictures say**. That is the operator's ruling (DR-14 ruling 5) working as
+written, not a defect — but it means a screen that is mostly images remembers little, and
+reading text out of a picture is a different capability (OCR) that nobody has asked for.
