@@ -26,11 +26,40 @@ final class ScreenText {
     /** Password fields left out — a count, so a screen's login-ness is visible without its contents. */
     int passwordFields;
 
-    /** One element's text, trimmed; blank text is nothing. */
+    /**
+     * Whether this text is a masked secret — only bullets or asterisks, at least three of them.
+     *
+     * **Found on a real phone, 2026-10-01.** A web login page delivered its password field as a
+     * node Orb recognised and skipped — *and* as a second node whose text was the masked
+     * display, `••••••••`. The real characters were never there; the dots were, and **a row of
+     * dots is the length of the password and the fact that there is one.** So a run of mask
+     * characters is treated as a password field whatever node it arrives on. A single bullet
+     * (a separator in a chat list) is ordinary text and is kept.
+     */
+    static boolean looksMasked(String text) {
+        int marks = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == ' ' || c == '\u00a0') continue;
+            if (c == '\u2022' || c == '\u25cf' || c == '\u2219' || c == '\u00b7' || c == '*' || c == '\u2217'
+                || c == '\u25cb' || c == '\u25e6' || c == '\u26ab' || c == '\u2024') {
+                marks++;
+                continue;
+            }
+            return false;
+        }
+        return marks >= 3;
+    }
+
+    /** One element's text, trimmed; blank text is nothing, and a masked secret is a password field. */
     void add(CharSequence text) {
         if (text == null) return;
         String trimmed = text.toString().trim();
         if (trimmed.isEmpty()) return;
+        if (looksMasked(trimmed)) {
+            passwordFields++;
+            return;
+        }
         if (body.length() > 0) body.append('\n');
         body.append(trimmed);
         textNodes++;

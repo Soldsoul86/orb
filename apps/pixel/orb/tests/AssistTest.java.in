@@ -48,6 +48,17 @@ final class AssistTest {
         in = good(); in.textChars = 0;
         Harness.equal("5 — nothing to keep", AssistPolicy.decide(in), AssistPolicy.NO_TEXT);
 
+        Harness.suite("a login screen keeps nothing at all");
+        in = good(); in.passwordFields = 1;
+        Harness.equal("a password field on the screen: nothing is kept", AssistPolicy.decide(in), AssistPolicy.LOGIN_SCREEN);
+        in = good(); in.passwordFields = 1; in.screenshotArrived = false;
+        Harness.equal("and without waiting for the screenshot", AssistPolicy.decide(in), AssistPolicy.LOGIN_SCREEN);
+        in = good(); in.passwordFields = 1; in.allowed = false;
+        Harness.equal("an app that is not allowed is still declined as that first", AssistPolicy.decide(in), AssistPolicy.NOT_ALLOWED);
+        in = good(); in.passwordFields = 1; in.structureArrived = false;
+        Harness.equal("and structure first of all", AssistPolicy.decide(in), AssistPolicy.NO_STRUCTURE);
+        Harness.check("loginScreen is a reason a decline may carry", AssistPolicy.REASONS.contains(AssistPolicy.LOGIN_SCREEN));
+
         Harness.suite("the order is part of the privacy");
         in = good(); in.structureArrived = false; in.allowed = false;
         Harness.equal("structure is checked first", AssistPolicy.decide(in), AssistPolicy.NO_STRUCTURE);

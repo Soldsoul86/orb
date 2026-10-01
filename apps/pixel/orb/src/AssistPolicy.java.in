@@ -28,6 +28,8 @@ final class AssistPolicy {
     /** The reasons, as written in `orb.assist.declined`. Exactly these and no others. */
     static final String NO_STRUCTURE = "noStructure";
     static final String NOT_ALLOWED = "notAllowed";
+    /** A password field is on the screen: nothing is kept from a login screen at all. */
+    static final String LOGIN_SCREEN = "loginScreen";
     static final String NO_SCREENSHOT = "noScreenshot";
     static final String PROTECTED_SCREEN = "protectedScreen";
     static final String NO_TEXT = "noText";
@@ -36,7 +38,7 @@ final class AssistPolicy {
     static final String KEEP = "keep";
 
     static final Set<String> REASONS = new HashSet<>(Arrays.asList(
-        NO_STRUCTURE, NOT_ALLOWED, NO_SCREENSHOT, PROTECTED_SCREEN, NO_TEXT));
+        NO_STRUCTURE, NOT_ALLOWED, LOGIN_SCREEN, NO_SCREENSHOT, PROTECTED_SCREEN, NO_TEXT));
 
     /**
      * Payments packages that can never be allowed — **version 1, 2026-10-01**.
@@ -105,6 +107,8 @@ final class AssistPolicy {
         boolean structureArrived;
         String packageName;
         boolean allowed;
+        /** Password fields found on the screen (by what they say they are, or a run of mask characters). */
+        int passwordFields;
         boolean screenshotArrived;
         int blockedNodes;
         boolean uniform;
@@ -117,6 +121,10 @@ final class AssistPolicy {
         if (!in.structureArrived) return NO_STRUCTURE;
         // 2. Is the app allowed? Decided before anything about the screen is considered.
         if (in.packageName == null || !in.allowed || isFloor(in.packageName)) return NOT_ALLOWED;
+        // 2b. A password field on the screen: a login screen. Skipping the field would still keep
+        //    the username and the rest of a page whose point is a secret, so nothing is kept at all
+        //    (the operator's ruling, 2026-10-01). Decided without waiting for the screenshot.
+        if (in.passwordFields > 0) return LOGIN_SCREEN;
         // 3. Did the screenshot arrive? Missing is *cannot check*, never *fine*.
         if (!in.screenshotArrived) return NO_SCREENSHOT;
         // 4. Did the screen protect itself? Either signal is enough; an app that opts out

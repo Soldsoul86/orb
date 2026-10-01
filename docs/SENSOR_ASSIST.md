@@ -110,6 +110,7 @@ says what was *delivered*.
 | --- | --- | --- |
 | 1 | Did the **structure** arrive? | `noStructure` — includes the person having switched text off |
 | 2 | Is the app **allowed**? (the package is read first; if not, **nothing else is read**) | `notAllowed` |
+| 2b | Is there a **password field** on the screen? (by what a field says it is, or a run of mask characters) | `loginScreen` — nothing is kept from a login screen at all; decided without waiting for the screenshot *(ruled 2026-10-01)* |
 | 3 | Did the **screenshot** arrive? | `noScreenshot` — *cannot check*, never *fine* |
 | 4 | Is the screen **protected**? structure blocked (`blockedNodes > 0`) **or** the screenshot uniform | `protectedScreen` |
 | 5 | Is there **any text**? | `noText` — a game, a canvas: nothing to keep, and the person is told |

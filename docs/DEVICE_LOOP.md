@@ -5543,3 +5543,31 @@ at all** (a new reason, *login screen*)? Skipping the field keeps the password o
 username and the rest of a login page. Declining is simpler and safer; it also means a login page can never
 be remembered. Recommended, because a login page is rarely something worth remembering and always something
 worth not leaking — but it changes the decision order of `SENSOR_ASSIST.md` §5, so it waits for a yes.
+
+#### The password test, decided — what the preview showed (export `orb-20261001-120416.txt`) and v15
+
+The operator's screenshot of the preview on `github.com/login` with a made-up password typed:
+
+- **The password's real characters did not appear.** v14's wider rule found *one* password field and the
+  card said **"(1 password field left out)"** — the rule fires on a Chrome page, which v13 may not have
+  done.
+- **But a second node did appear: `••••••••`.** The page delivered the field as a node Orb recognised
+  *and* a second whose text was the masked display. A row of dots is **the password's length and the fact
+  that there is one**, and it would have been sealed with the rest. So **P51 half held**: no password
+  text; a masked remnant of it.
+
+**v15 (`orb-app-v15-login.apk`) closes it two ways:**
+
+1. a run of mask characters (bullets, asterisks, discs — three or more, spaces ignored) is treated as a
+   password field **whatever node it arrives on**; a single bullet (a chat-list separator) stays text;
+2. **the operator's ruling (DR-14 ruling 10): a screen with a password field keeps nothing at all** — the
+   new reason `loginScreen`, decided right after *the app is allowed* and **without waiting for the
+   screenshot**, the buffer emptied at once. A login page cannot be remembered, so there is no username to
+   keep beside a password that is not.
+
+177 phone-side checks (was 166): the decision order with a login screen, the mask rule over bullets,
+asterisks, discs and spaced groups, and the cases it must **not** catch (one bullet, two, bullets among
+words, an asterisk note).
+
+**What to erase:** the login-page captures made before v15 may hold usernames, and the earlier Chrome one
+(the 11:30 login page) may hold more. They are listed in *Kept by Orb* as *remembered*.

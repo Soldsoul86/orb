@@ -214,7 +214,8 @@ public final class AssistSession extends VoiceInteractionSession {
      */
     private void settle(boolean waitedOut) {
         if (closed || decided) return;
-        boolean needsScreenshot = structureDone && structureArrived && packageName != null && allowed;
+        boolean loginScreen = pending != null && pending.passwordFields > 0;
+        boolean needsScreenshot = structureDone && structureArrived && packageName != null && allowed && !loginScreen;
         if (!structureDone && !waitedOut) return;
         if (needsScreenshot && !screenshotDone && !waitedOut) return;
 
@@ -225,6 +226,7 @@ public final class AssistSession extends VoiceInteractionSession {
         in.structureArrived = structureArrived;
         in.packageName = packageName;
         in.allowed = allowed;
+        in.passwordFields = pending == null ? 0 : pending.passwordFields;
         in.screenshotArrived = screenshotArrived;
         in.blockedNodes = pending == null ? 0 : pending.blocked;
         in.uniform = uniform;
@@ -258,6 +260,8 @@ public final class AssistSession extends VoiceInteractionSession {
                 return "Orb could not read this screen's text, so it kept nothing. (If “Use text from screen” is off in Settings, Orb is given nothing.)";
             case AssistPolicy.NOT_ALLOWED:
                 return "Orb doesn't remember from this app. Nothing was read.";
+            case AssistPolicy.LOGIN_SCREEN:
+                return "This looks like a login screen, so Orb kept nothing from it.";
             case AssistPolicy.NO_SCREENSHOT:
                 return "Orb couldn't check whether this screen is protected, so it kept nothing. (Is “Use screenshot” on?)";
             case AssistPolicy.PROTECTED_SCREEN:

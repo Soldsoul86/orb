@@ -962,6 +962,12 @@ suggestions".**
    screenshot is never stored; it checks for screens that protected themselves without
    marking their structure. Missing screenshot ⇒ *cannot check* ⇒ nothing kept.
 
+10. **A screen with a password field keeps nothing at all** *(2026-10-01, the operator's yes to the
+    recommendation)*. Skipping the field still kept the username and the rest of a page whose point is
+    a secret; a login page is rarely worth remembering and always worth not leaking. Found by a real
+    test (`DEVICE_LOOP.md` §7b51, *The password test*): the password's characters never appeared, but a
+    row of mask dots did — its length, and the fact that there is one.
+
 All of it is mechanism in `SENSOR_ASSIST.md`. **Not ruled, and written there as
 proposals:** a short list of payments packages that cannot be allowed; excluding
 accessibility descriptions; the decision timeout.
