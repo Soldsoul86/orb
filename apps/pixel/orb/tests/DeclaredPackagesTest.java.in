@@ -1,0 +1,67 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/** The package set the scan compares: declared questions only, the same however the platform answers, never partial. */
+final class DeclaredPackagesTest {
+    private DeclaredPackagesTest() {}
+
+    private static DeclaredPackages.Answers answers(final List<String> a, final List<String> b, final List<String> c) {
+        return new DeclaredPackages.Answers() {
+            @Override public List<String> launchers() { return a; }
+            @Override public List<String> upiHandlers() { return b; }
+            @Override public List<String> deviceAdmins() { return c; }
+        };
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the set is the union of the declared questions, sorted");
+        List<String> set = DeclaredPackages.combine(answers(
+            Arrays.asList("com.b.chat", "com.a.maps"), Arrays.asList("com.bank.app", "com.b.chat"), Arrays.asList("com.mdm.agent")));
+        Harness.equal("every answer, once, in order", set, Arrays.asList("com.a.maps", "com.b.chat", "com.bank.app", "com.mdm.agent"));
+        Harness.equal("the same whatever order the platform gave", DeclaredPackages.combine(answers(
+            Arrays.asList("com.a.maps", "com.b.chat"), Arrays.asList("com.b.chat", "com.bank.app"), Arrays.asList("com.mdm.agent"))), set);
+        Harness.equal("the same twice", DeclaredPackages.combine(answers(
+            Arrays.asList("com.b.chat", "com.a.maps"), Arrays.asList("com.bank.app", "com.b.chat"), Arrays.asList("com.mdm.agent"))), set);
+        Harness.equal("three empty answers are an empty set, which is a real answer",
+            DeclaredPackages.combine(answers(new ArrayList<String>(), new ArrayList<String>(), new ArrayList<String>())), new ArrayList<String>());
+
+        Harness.suite("a missing answer makes the whole set unreadable, never partial");
+        List<String> some = Arrays.asList("com.a.maps");
+        Harness.equal("no launcher answer", DeclaredPackages.combine(answers(null, some, some)), null);
+        Harness.equal("no UPI answer", DeclaredPackages.combine(answers(some, null, some)), null);
+        Harness.equal("no device-admin answer", DeclaredPackages.combine(answers(some, some, null)), null);
+
+        Harness.suite("an app that only talked to Orb is not in the set");
+        // The old set was whatever the platform happened to show. Here the only inputs are the three declared
+        // questions, so an app that matches none of them cannot appear — whatever it just did to Orb.
+        List<String> before = DeclaredPackages.combine(answers(Arrays.asList("com.a.maps"), some, some));
+        List<String> afterAShare = DeclaredPackages.combine(answers(Arrays.asList("com.a.maps"), some, some));
+        Harness.equal("a share from Photos changes nothing the set is made of", afterAShare, before);
+        Harness.check("and the scope is a new label, so the first scan is a baseline and not 100 uninstalls",
+            DeclaredPackages.SCOPE.equals("declared") && !DeclaredPackages.SCOPE.equals("visible") && !DeclaredPackages.SCOPE.equals("visible+upi"));
+
+        Harness.suite("the build reads the set by the declared questions, and the manifest declares them");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String reader = new String(Files.readAllBytes(root.resolve("src/GrantReader.java.in")), StandardCharsets.UTF_8);
+        int guard = reader.indexOf("if (!queriesAllPackages(context)) return PackageQueries.read(context);");
+        int broad = reader.indexOf("manager.getInstalledPackages(0)");
+        Harness.check("without the broad permission the platform's moving list is never asked for", guard >= 0 && broad > guard);
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        String queries = manifest.substring(manifest.indexOf("<queries>"), manifest.indexOf("</queries>"));
+        Harness.check("launcher apps are declared", queries.contains("android.intent.action.MAIN") && queries.contains("android.intent.category.LAUNCHER"));
+        Harness.check("so are UPI handlers and device admins", queries.contains("android:scheme=\"upi\"") && queries.contains("DEVICE_ADMIN_ENABLED"));
+        Harness.check("no package is named, and the broad permission is not requested", !queries.contains("<package") && !manifest.contains("android.permission.QUERY_ALL_PACKAGES\""));
+        String access = new String(Files.readAllBytes(root.resolve("src/PackageAccess.java.in")), StandardCharsets.UTF_8);
+        Harness.check("the recorded grant states the scope the build delivers", access.contains("DeclaredPackages.SCOPE") && !access.contains("\"visible+upi\""));
+        String queriesSrc = new String(Files.readAllBytes(root.resolve("src/PackageQueries.java.in")), StandardCharsets.UTF_8);
+        Harness.check("a failed question is unreadable, not empty", queriesSrc.contains("catch (Throwable error)") && queriesSrc.contains("return null;"));
+        Harness.check("and it never starts or opens anything", !queriesSrc.contains("startActivity") && !queriesSrc.contains("sendBroadcast"));
+    }
+}

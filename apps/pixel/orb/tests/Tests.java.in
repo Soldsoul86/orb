@@ -13,6 +13,7 @@ public final class Tests {
         ProvenanceTest.run();
         SharedViewTest.run();
         BackupTest.run();
+        DeclaredPackagesTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

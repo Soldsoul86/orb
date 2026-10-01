@@ -1,0 +1,48 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
+
+/**
+ * The package set the scan compares: **the apps that match the queries Orb declares, and nothing else**
+ * (`docs/SENSOR_GRANTS.md` §9).
+ *
+ * Without `QUERY_ALL_PACKAGES`, `getInstalledPackages` answers *what Orb can see right now*, and Android
+ * makes an app visible while it is interacting with Orb. So the old set gained Photos when a share from
+ * Photos started the process and lost it at the next scan — an install and an uninstall that never
+ * happened. This asks the declared questions directly instead: who has a launcher activity, who handles a
+ * UPI payment link, who has a device-admin receiver. An app that matches one is always visible by
+ * declaration, so it is always here; an app that is visible only because it just talked to Orb matches
+ * none and is not here. **The set depends on the phone, not on what Orb did last.**
+ *
+ * It is the union of the three answers, sorted, so it is the same list however the platform orders them.
+ * **If any of the three cannot be answered the whole set is unreadable (`null`)**: a partial set would
+ * report the missing apps as uninstalled, and *cannot check* is not *nothing changed*.
+ */
+final class DeclaredPackages {
+    private DeclaredPackages() {}
+
+    /** The three answers, from wherever they come: the platform on a phone, a stand-in in a test. Any may be null. */
+    interface Answers {
+        List<String> launchers();
+        List<String> upiHandlers();
+        List<String> deviceAdmins();
+    }
+
+    /** The scope label the scan records for this set. A different set from `visible+upi`, so the first scan is a baseline. */
+    static final String SCOPE = "declared";
+
+    /** The union, sorted and without duplicates; null if any answer is missing. */
+    static List<String> combine(Answers answers) {
+        List<String> a = answers.launchers();
+        List<String> b = answers.upiHandlers();
+        List<String> c = answers.deviceAdmins();
+        if (a == null || b == null || c == null) return null;
+        TreeSet<String> union = new TreeSet<>();
+        union.addAll(a);
+        union.addAll(b);
+        union.addAll(c);
+        return new ArrayList<>(union);
+    }
+}

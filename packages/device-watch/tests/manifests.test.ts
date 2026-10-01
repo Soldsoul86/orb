@@ -41,3 +41,18 @@ describe("phone manifests that hold a journal", () => {
     });
   }
 });
+
+describe("the Orb app's package visibility", () => {
+  // The package scan compares exactly the apps that match these declared queries (`docs/SENSOR_GRANTS.md` §9).
+  // Without the launcher query the set would depend on whatever happened to be visible, which is the defect.
+  test("declares the three questions the scan asks, and names no package", async () => {
+    const xml = await manifest("orb");
+    const queries = xml.match(/<queries>([\s\S]*?)<\/queries>/)?.[1] ?? "";
+    assert.match(queries, /android\.intent\.action\.MAIN/);
+    assert.match(queries, /android\.intent\.category\.LAUNCHER/);
+    assert.match(queries, /android:scheme="upi"/);
+    assert.match(queries, /DEVICE_ADMIN_ENABLED/);
+    assert.doesNotMatch(queries, /<package/, "no app is named");
+    assert.doesNotMatch(xml, /android\.permission\.QUERY_ALL_PACKAGES"/, "the broad permission is not requested");
+  });
+});

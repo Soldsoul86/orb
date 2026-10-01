@@ -6053,3 +6053,51 @@ The operator made a backup (a second one, at v23), took **Clear storage**, opene
 
 **The backup is now a backup.** Losing this phone no longer loses what Orb remembered, provided the file and the passphrase are kept off it.
 
+### 7b59. The package set stops moving when nothing was installed — Track D — 2026-10-01
+
+**Status: built, not yet run on the device.** `orb-app-v24-declared.apk`. Design: `docs/SENSOR_GRANTS.md` §9.
+
+#### The defect, from the operator's own export (`orb-20261001-191418.txt`, nine package scans)
+
+`installedPackageGained` named **Google Photos** at one process start and **lost** it at the next; **Chrome** was gained after a capture from Chrome. Nothing was installed or removed.
+Without `QUERY_ALL_PACKAGES` the platform's list is *what Orb can see right now*, and an app is visible while it is interacting with Orb: Photos was gained **50 ms before a share
+from Photos started Orb's process**, Chrome five minutes after Orb was invoked over Chrome. So `device-watch.packages-changed` would have raised alerts about apps that were never
+installed — and an alert that is wrong teaches the person to ignore the next one. (The mechanism is inferred from the timing; Android's documentation lists callers and URI-granting
+providers among the apps made visible. The *fix* does not depend on the mechanism being exactly that.)
+
+#### What changed
+
+1. **The set is exactly the apps that match the queries Orb declares** — launchers (`MAIN`/`LAUNCHER`), UPI handlers, device admins — asked directly (`PackageQueries`), combined and sorted
+   (`DeclaredPackages`). A declared match is always visible, so it is always in; an app visible only because it just talked to Orb matches none and is not in. The set depends on the phone,
+   not on what Orb did last. **Any unanswered question makes the whole set unreadable** — never empty, never partial.
+2. **A new scope label, `declared`**, so the first scan after the update is a quiet baseline (the existing rule: a scope change is a baseline, not a diff) and not 100 "uninstalls".
+3. **The manifest declares one more query** (launchers) — not `QUERY_ALL_PACKAGES`, no package named.
+4. **Said plainly in the docs:** an app with **no launcher icon** that is neither a UPI handler nor a device admin is outside the set, including an app that hides its icon. The signal that protects the person
+   is the grants watch — accessibility services, notification listeners and device admins — which does not depend on this set.
+
+#### Checked before the device
+
+- **Mutation-checked, six ways** (dropping the guard that keeps the platform's moving list out, turning a missing answer into an empty one, the old scope label, the launcher query, an unsorted union, the grant's scope label): each fails a named check. 534 phone-side checks (was 518): the union is sorted and de-duplicated and the same however the platform orders its answers; a missing answer of any of the three makes the set unreadable and not partial; the scope is
+  a new label; and source guards that without the broad permission the platform's moving list is **never asked for**, that the manifest declares the three questions, names no package and does not request the broad permission,
+  and that the recorded grant states the scope the build delivers. A TypeScript test pins the manifest the same way.
+- **Not testable off the phone:** that the launcher query is accepted by Play Protect on install (QUERY_ALL_PACKAGES was refused, §7b40; an intent query is a much narrower declaration but is unverified), and the real
+  size and stability of the set. **That is the device check.**
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P93** | v24 installs without a Play Protect warning | the launcher query is refused like the broad permission was |
+| **P94** | The first scan after the update reports `installedPackageScope: "declared"`, `installedPackageBaseline: true`, a smaller count than 147 (system packages with no launcher drop out), and **no gained or lost** | the re-baseline did not take |
+| **P95** | Share something to Orb **from Photos**, Remember something in **Chrome**, then *Scan installed packages now*: **gained and lost are empty** | the set still moves with interaction |
+| **P96** | Two scans a few hours apart with nothing installed in between: **identical sets** | the set is not deterministic |
+| **P97** | **Install any small app with a launcher icon, then scan: it is the only entry in gained** (and uninstalling it, the only entry in lost) | a real install is missed |
+
+#### The operator's protocol
+
+1. Install `orb-app-v24-declared.apk` over v23. *(P93)*
+2. Orb → **Scan installed packages now**, then **Export and share journal**. *(P94)*
+3. Share a picture to Orb from Google Photos; invoke Orb over Chrome and Remember something; **Scan installed packages now**; export. *(P95)*
+4. Later the same day, scan again with no install in between; export. *(P96)*
+5. Install any small app (anything from the Play Store), scan, export; then uninstall it, scan, export. *(P97)*
+

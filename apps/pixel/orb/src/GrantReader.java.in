@@ -85,6 +85,10 @@ final class GrantReader {
      * would be the loudest false alarm this app is capable of.
      */
     private static List<String> packages(Context context) {
+        // Without the broad permission the platform's list moves with what Orb was doing (an app that just
+        // handed it a share appears, then vanishes). The set is then exactly the apps matching the queries the
+        // manifest declares, which does not (`docs/SENSOR_GRANTS.md` §9).
+        if (!queriesAllPackages(context)) return PackageQueries.read(context);
         try {
             PackageManager manager = context.getPackageManager();
             if (manager == null) return null;
@@ -101,7 +105,7 @@ final class GrantReader {
     }
 
     /**
-     * Which look the package list was: `all` or `visible+upi` (the visible set plus the UPI handlers).
+     * Which look the package list was: `all`, or `declared` (the apps matching the queries the manifest declares).
      *
      * `QUERY_ALL_PACKAGES` is a normal, install-time permission, so on a build
      * that declares it this is granted without anyone being asked — and on a
@@ -117,14 +121,21 @@ final class GrantReader {
      */
     private static String packageScope(Context context) {
         try {
-            int state = context.checkSelfPermission("android.permission.QUERY_ALL_PACKAGES");
-            // `visible+upi`: what a build without QUERY_ALL_PACKAGES can see, plus the apps that
-            // handle a UPI payment link (the manifest's narrow query). It is a *different set* from
-            // the plain `visible` earlier builds recorded, so the scope changes — and the comparison
-            // re-baselines once, rather than reporting the payments apps as new installs.
-            return state == PackageManager.PERMISSION_GRANTED ? "all" : "visible+upi";
+            // `declared`: the apps matching the queries the manifest declares (launchers, UPI handlers,
+            // device admins) — a *different set* from the `visible` and `visible+upi` earlier builds
+            // recorded, so the scope changes and the comparison re-baselines once, rather than reporting
+            // the difference as installs and uninstalls.
+            return queriesAllPackages(context) ? "all" : DeclaredPackages.SCOPE;
         } catch (Throwable error) {
             return "unknown";
+        }
+    }
+
+    private static boolean queriesAllPackages(Context context) {
+        try {
+            return context.checkSelfPermission("android.permission.QUERY_ALL_PACKAGES") == PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable error) {
+            return false;
         }
     }
 

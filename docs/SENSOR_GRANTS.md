@@ -161,3 +161,21 @@ code (`DR-13`, Phase 3c).
   of a stop is never evidence there was none (P20).
 - **The scope can shrink honestly.** Build without `QUERY_ALL_PACKAGES` and the scan
   reads `visible`, re-baselines once, and reports no phantom uninstalls (§7b40).
+
+## 9. The package set must not move when nothing was installed — 2026-10-01
+
+**The defect, found in the operator's own exports.** Over a week of scans, `installedPackageGained` named **Google Photos**, and the next scan named it **lost**; **Chrome** was
+gained after a capture from Chrome. Nothing was installed or removed. The build has no `QUERY_ALL_PACKAGES` (Play Protect refused it, §7b40), so `getInstalledPackages`
+answers *what Orb can see right now* — and Android makes an app visible while it is **interacting with Orb** (an app that hands Orb a share, or is the app Orb is assisting
+over). Photos was gained 50 ms before a share *from Photos* started Orb's process; Chrome five minutes after Orb was invoked over Chrome. The set moved with what Orb was
+doing, so `device-watch.packages-changed` would have raised alerts about apps that were never installed. An alert that is wrong teaches the person to ignore the next one.
+
+**The rule.** The package set is **exactly the apps that match the queries Orb declares**, resolved by those queries and nothing else: launcher apps (`MAIN`/`LAUNCHER`), UPI
+payment handlers (`upi://pay`), and device-admin receivers. A package that is visible only because it interacted with Orb is not in the set unless it matches one of
+those queries — and one that does match is **always** visible by declaration, so it is always in. The set therefore depends on the phone, not on what Orb did last. Its
+scope label is **`declared`** (a new value, so the first scan after the update is a quiet baseline and not 100 "uninstalls"). If any of the three queries cannot be answered,
+the set is **unreadable**, never empty and never partial: *cannot check* is not *nothing changed*. A build that declares `QUERY_ALL_PACKAGES` still reports `all`.
+
+**What it does not see, said plainly.** An app with **no launcher icon** that is neither a UPI handler nor a device admin is outside this set — including an app that hides its
+icon. That is a real limit of an install signal without the broad permission. It is not the signal that protects the person: **accessibility services, notification listeners and
+device admins** — what an app needs to watch or control the phone — are read directly by the grants watch and do not depend on this set at all.

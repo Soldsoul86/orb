@@ -52,6 +52,17 @@
             <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
         </intent>
         <!--
+          Launcher apps. With the UPI and device-admin queries this is the whole set the package scan
+          compares (docs/SENSOR_GRANTS.md §9): apps that match a declared query are always visible,
+          so the set does not move with what Orb happened to be doing — an app that merely handed Orb
+          a share used to appear in it, and vanish at the next scan, as if it had been installed and
+          removed. This is not QUERY_ALL_PACKAGES, and lists no package by name.
+        -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!--
           Which apps on this phone handle a UPI payment link. Not a list of installed apps: only
           those that answer upi://pay become visible, and Orb uses them for one thing, to refuse
           to remember from a payments app whatever it is called (DR-14 ruling 1). Every UPI app,

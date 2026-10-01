@@ -1,0 +1,55 @@
+package @PKG@;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Asks the platform the three questions the manifest declares (`DeclaredPackages`): who has a launcher
+ * activity, who handles a UPI payment link, who has a device-admin receiver. The only Android in the
+ * package set; the combining and the rule that any missing answer makes the whole set unreadable are
+ * `DeclaredPackages`, which is tested off the phone.
+ */
+final class PackageQueries {
+    private PackageQueries() {}
+
+    /** The declared set, or null if any question could not be answered. */
+    static List<String> read(final Context context) {
+        try {
+            return DeclaredPackages.combine(new DeclaredPackages.Answers() {
+                @Override public List<String> launchers() {
+                    Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+                    return names(context.getPackageManager().queryIntentActivities(main, flags()));
+                }
+                @Override public List<String> upiHandlers() {
+                    java.util.Set<String> handlers = UpiApps.handlers(context);
+                    return handlers == null ? null : new ArrayList<>(handlers);
+                }
+                @Override public List<String> deviceAdmins() {
+                    Intent admin = new Intent("android.app.action.DEVICE_ADMIN_ENABLED");
+                    return names(context.getPackageManager().queryBroadcastReceivers(admin, flags()));
+                }
+            });
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    private static PackageManager.ResolveInfoFlags flags() {
+        return PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL);
+    }
+
+    private static List<String> names(List<ResolveInfo> found) {
+        if (found == null) return null;
+        List<String> out = new ArrayList<>();
+        for (ResolveInfo info : found) {
+            if (info != null && info.activityInfo != null && info.activityInfo.packageName != null) {
+                out.add(info.activityInfo.packageName);
+            }
+        }
+        return out;
+    }
+}
