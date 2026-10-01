@@ -3,6 +3,8 @@ package @PKG@;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.Editable;
@@ -11,6 +13,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -41,6 +44,9 @@ public final class RecallActivity extends Activity {
     private Button appButton;
     private List<String> apps;
     private int appIndex = -1;           // -1 = all apps
+    /** Showing the files and pictures shared to Orb, instead of the words of remembered screens. */
+    private boolean showShared;
+    private Button modeButton;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -67,6 +73,12 @@ public final class RecallActivity extends Activity {
         });
         root.addView(query);
 
+        modeButton = new Button(this);
+        modeButton.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { showShared = !showShared; applyMode(); render(); }
+        });
+        root.addView(modeButton);
+
         appButton = new Button(this);
         appButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) { nextApp(); }
@@ -91,7 +103,17 @@ public final class RecallActivity extends Activity {
     protected void onResume() {
         super.onResume();
         loadApps();
+        applyMode();
         render();
+    }
+
+    /** Words are searched; pictures are not (Orb does not read them), so those controls rest in that mode. */
+    private void applyMode() {
+        modeButton.setText(showShared ? "Showing: shared files and pictures  (tap for remembered screens)"
+            : "Showing: remembered screens  (tap for shared files and pictures)");
+        query.setHint(showShared ? "Pictures can't be searched" : "Search your words");
+        query.setEnabled(!showShared);
+        appButton.setVisibility(showShared ? View.GONE : View.VISIBLE);
     }
 
     private Journal journal() {
@@ -122,6 +144,10 @@ public final class RecallActivity extends Activity {
         Journal journal = journal();
         if (journal == null) {
             summary.setText("journal unavailable");
+            return;
+        }
+        if (showShared) {
+            renderShared(journal);
             return;
         }
         Recall.Results results;
@@ -170,6 +196,120 @@ public final class RecallActivity extends Activity {
             });
             list.addView(row);
         }
+    }
+
+    /** The files and pictures shared to Orb — listed from the clear record, so listing decrypts nothing. */
+    private void renderShared(Journal journal) {
+        List<Recall.Entry> shared;
+        try {
+            shared = Recall.shared(journal);
+        } catch (IOException error) {
+            summary.setText("read failed: " + error);
+            return;
+        }
+        summary.setText(shared.size() + (shared.size() == 1 ? " shared file or picture" : " shared files and pictures")
+            + " \u00b7 kept sealed on this phone. Orb does not read pictures, so these cannot be searched.");
+        if (shared.isEmpty()) {
+            TextView none = new TextView(this);
+            none.setTextSize(13);
+            none.setText("Nothing shared to Orb yet.");
+            list.addView(none);
+            return;
+        }
+        SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        for (final Recall.Entry entry : shared) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 20, 0, 20);
+            TextView head = new TextView(this);
+            head.setTextSize(12);
+            head.setTypeface(Typeface.DEFAULT_BOLD);
+            head.setText(when.format(new Date(entry.wallClock)));
+            row.addView(head);
+            TextView body = new TextView(this);
+            body.setTextSize(14);
+            body.setText(Recall.sharedLabel(entry));
+            row.addView(body);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { openShared(entry); }
+            });
+            list.addView(row);
+        }
+    }
+
+    /**
+     * A shared picture, drawn in a window the system will not screenshot or record. **Held in memory only**:
+     * decrypted, shrunk to fit, drawn, and let go when the window closes — never written anywhere, never
+     * handed to another app. A file that is not a picture, or is too large, stays sealed and can still be erased.
+     */
+    private void openShared(final Recall.Entry entry) {
+        if (!Recall.canShow(entry)) {
+            String why = Recall.isPicture(entry.mime)
+                ? "This picture is too large for Orb to show here (or its size is unknown)."
+                : "Orb can only show pictures.";
+            showSharedWindow(entry, textView(why + " It is kept sealed on this phone, and you can erase it here."), null);
+            return;
+        }
+        byte[] bytes = Recall.openBytes(this, entry.identity);
+        if (bytes == null) {
+            new AlertDialog.Builder(this).setMessage("This can no longer be read.").setPositiveButton("OK", null).show();
+            render();
+            return;
+        }
+        Bitmap bitmap = null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+            if (bounds.outWidth > 0 && bounds.outHeight > 0) {
+                BitmapFactory.Options decode = new BitmapFactory.Options();
+                decode.inSampleSize = Recall.sampleSize(bounds.outWidth, bounds.outHeight, Recall.MAX_SIDE);
+                bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, decode);
+            }
+        } catch (RuntimeException | OutOfMemoryError cannotDraw) {
+            bitmap = null;
+        }
+        bytes = null;
+        if (bitmap == null) {
+            showSharedWindow(entry, textView("Orb could not draw this picture. It is kept sealed, and you can erase it here."), null);
+            return;
+        }
+        ImageView image = new ImageView(this);
+        image.setAdjustViewBounds(true);
+        image.setImageBitmap(bitmap);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(image);
+        showSharedWindow(entry, scroll, bitmap);
+    }
+
+    private TextView textView(String words) {
+        TextView t = new TextView(this);
+        t.setTextSize(14);
+        t.setPadding(48, 24, 48, 24);
+        t.setText(words);
+        return t;
+    }
+
+    private void showSharedWindow(final Recall.Entry entry, View content, final Bitmap drawn) {
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(Recall.sharedLabel(entry))
+            .setView(content)
+            .setPositiveButton("Close", null)
+            .setNegativeButton("Erase", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { confirmErase(entry); }
+            })
+            .setNeutralButton("Where from?", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { whereFrom(entry); }
+            })
+            .create();
+        // The picture is the person's own: no screenshots, no recording, no assistant.
+        dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        if (drawn != null) {
+            dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                @Override public void onDismiss(DialogInterface d) { drawn.recycle(); }
+            });
+        }
+        dialog.show();
     }
 
     private void open(final Recall.Entry entry) {
@@ -233,13 +373,14 @@ public final class RecallActivity extends Activity {
         } catch (IOException error) {
             return;
         }
+        String noun = entry.isShared() ? "content" : "words";
         String words = plan.outcome.equals(Erasure.KEPT_BY_OTHERS)
-            ? "The same words are also kept by " + plan.others + " other item" + (plan.others == 1 ? "" : "s")
-                + ". This one will be marked erased and disappear from here; the words stay until the last of them is erased too."
-            : "Nothing else keeps these words. Their key will be destroyed and they can never be read again. This cannot be undone.";
+            ? "The same " + noun + " is also kept by " + plan.others + " other item" + (plan.others == 1 ? "" : "s")
+                + ". This one will be marked erased and disappear from here; the " + noun + " stays until the last of them is erased too."
+            : "Nothing else keeps this " + noun + ". Its key will be destroyed and it can never be read again. This cannot be undone.";
         new AlertDialog.Builder(this)
             .setTitle("Erase this?")
-            .setMessage(words + "\n\n" + Provenance.eraseNote(journal, AssistFacts.CAPTURED, entry.id))
+            .setMessage(words + "\n\n" + Provenance.eraseNote(journal, entry.type, entry.id))
             .setNegativeButton("Keep", null)
             .setPositiveButton("Erase", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int which) { erase(entry); }

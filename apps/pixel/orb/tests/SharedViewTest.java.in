@@ -1,0 +1,110 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** Showing what was shared to Orb: listed from the clear record, drawn from memory, never searched, always erasable. */
+final class SharedViewTest {
+    private SharedViewTest() {}
+
+    private static String share(Context context, Journal journal, String mime, String referrer, byte[] content) throws Exception {
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(content));
+        Map<String, Object> payload = Shares.declared("android.intent.action.SEND", mime, referrer, Arrays.asList("content://media/" + content.length));
+        Shares.outcome(payload, stored.outcome, null, stored.identity, stored.bytes);
+        journal.append("orb.shared", payload);
+        return stored.identity;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("pure helpers");
+        Harness.check("a picture is image/*", Recall.isPicture("image/png") && Recall.isPicture("IMAGE/JPEG"));
+        Harness.check("anything else is not", !Recall.isPicture("application/pdf") && !Recall.isPicture("text/plain") && !Recall.isPicture(null));
+        Harness.equal("a phone screenshot shrinks once", Recall.sampleSize(1080, 2400, 2048), 2);
+        Harness.equal("a 4000x3000 photo shrinks once", Recall.sampleSize(4000, 3000, 2048), 2);
+        Harness.equal("an 8000x6000 photo shrinks twice over", Recall.sampleSize(8000, 6000, 2048), 4);
+        Harness.equal("a small picture is not shrunk", Recall.sampleSize(100, 100, 2048), 1);
+        Harness.equal("exactly the limit is not shrunk", Recall.sampleSize(2048, 100, 2048), 1);
+        Harness.equal("one pixel over is", Recall.sampleSize(2049, 100, 2048), 2);
+        Harness.equal("an unknown size is never below one", Recall.sampleSize(0, 0, 2048), 1);
+        Harness.equal("no size at all", Recall.sizeLabel(-1), "size unknown");
+        Harness.equal("bytes", Recall.sizeLabel(1023), "1023 B");
+        Harness.equal("kilobytes", Recall.sizeLabel(204800), "200 KB");
+        Harness.equal("megabytes", Recall.sizeLabel(5L * 1024 * 1024 + 512 * 1024), "5.5 MB");
+        Harness.equal("who: an unnamed sender", Recall.fromLabel(null), "an app Android did not name");
+        Harness.equal("who: 'unknown' is the same", Recall.fromLabel("unknown"), "an app Android did not name");
+        Harness.equal("who: Android's prefix is dropped", Recall.fromLabel("android-app://com.android.systemui"), "com.android.systemui");
+        Harness.equal("who: anything else is as given", Recall.fromLabel("https://example.test"), "https://example.test");
+
+        File dir = Files.createTempDirectory("orb-shared").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        byte[] png = new byte[200 * 1024];
+        for (int i = 0; i < png.length; i++) png[i] = (byte) (i * 31 + 7);
+        byte[] pdf = new byte[5000];
+        for (int i = 0; i < pdf.length; i++) pdf[i] = (byte) (i * 17 + 3);
+        String pngId = share(context, journal, "image/png", "android-app://com.android.systemui", png);
+        String pdfId = share(context, journal, "application/pdf", "android-app://com.example.mail", pdf);
+
+        Harness.suite("the list: from the clear record, newest first");
+        List<Recall.Entry> list = Recall.shared(journal);
+        Harness.equal("both shared files", list.size(), 2);
+        Harness.equal("newest first", list.get(0).mime, "application/pdf");
+        Recall.Entry pic = list.get(1);
+        Harness.equal("a picture's type", pic.mime, "image/png");
+        Harness.equal("who handed it over", pic.referrer, "android-app://com.android.systemui");
+        Harness.equal("how big", pic.bytes, (long) png.length);
+        Harness.equal("which sealed content", pic.identity, pngId);
+        Harness.check("it knows what it is", pic.isShared() && pic.id != null && pic.id.length() == 26);
+        Harness.equal("a line about it", Recall.sharedLabel(pic), "Picture \u00b7 image/png \u00b7 200 KB \u00b7 from com.android.systemui");
+        Harness.check("a file says file", Recall.sharedLabel(list.get(0)).startsWith("File \u00b7 application/pdf \u00b7 5 KB"));
+        Harness.check("the label names no identity", !Recall.sharedLabel(pic).contains("sha256") && !Recall.sharedLabel(pic).contains(pngId));
+        Harness.check("a picture within the limit can be shown", Recall.canShow(pic));
+        Harness.check("a pdf cannot", !Recall.canShow(list.get(0)));
+
+        Harness.suite("a picture too large, or of unknown size, is not decrypted to be shown");
+        Recall.Entry huge = new Recall.Entry("h", "i", "sha256:x", 0L, null, null, Provenance.SHARED, "image/jpeg", null, Recall.MAX_PICTURE_BYTES + 1);
+        Recall.Entry unknown = new Recall.Entry("h", "i", "sha256:x", 0L, null, null, Provenance.SHARED, "image/jpeg", null, -1L);
+        Recall.Entry exactly = new Recall.Entry("h", "i", "sha256:x", 0L, null, null, Provenance.SHARED, "image/jpeg", null, Recall.MAX_PICTURE_BYTES);
+        Harness.check("over the limit", !Recall.canShow(huge));
+        Harness.check("unknown size", !Recall.canShow(unknown));
+        Harness.check("exactly the limit", Recall.canShow(exactly));
+        Harness.check("a captured screen is not a shared picture", !Recall.canShow(new Recall.Entry("h", "i", "sha256:x", 0L, "a.b", "s")));
+
+        Harness.suite("it opens the very bytes that were shared, in memory");
+        Harness.check("the picture", Arrays.equals(Recall.openBytes(context, pngId), png));
+        Harness.check("the file", Arrays.equals(Recall.openBytes(context, pdfId), pdf));
+        Harness.equal("content that is not here is nothing, not an error", Recall.openBytes(context, "sha256:" + "e".repeat(64)), null);
+
+        Harness.suite("listing opens nothing");
+        Map<String, Object> ghost = Shares.declared("android.intent.action.SEND", "image/png", null, Arrays.asList("content://nowhere"));
+        Shares.outcome(ghost, "stored", null, "sha256:" + "c".repeat(64), 42L);
+        journal.append("orb.shared", ghost);
+        List<Recall.Entry> withGhost = Recall.shared(journal);
+        Harness.equal("a share whose content is not on disk is still listed", withGhost.size(), 3);
+        Harness.equal("an unnamed sender is said so", Recall.fromLabel(withGhost.get(0).referrer), "an app Android did not name");
+
+        Harness.suite("a share with nothing sealed is not listed");
+        Map<String, Object> text = Shares.declared("android.intent.action.SEND", "text/plain", null, Arrays.asList("hello"));
+        journal.append("orb.shared", text);
+        Harness.equal("the list is unchanged", Recall.shared(journal).size(), 3);
+
+        Harness.suite("erasing takes it out of the list, and out of reach");
+        Erase.Result gone = Erase.execute(context, journal, pic.hash);
+        Harness.equal("destroyed", gone.outcome, Erase.DESTROYED);
+        Harness.equal("no longer listed", Recall.shared(journal).size(), 2);
+        Harness.equal("and cannot be opened", Recall.openBytes(context, pngId), null);
+
+        Harness.suite("where it came from, in the same words");
+        Provenance.Facts f = Provenance.of(journal, Recall.shared(journal).get(1).id);
+        Harness.equal("a share", f.kind, "share");
+        Harness.check("it says so", Provenance.render(f, new java.text.SimpleDateFormat("yyyy")).startsWith("You shared this to Orb.\n"));
+
+        Harness.suite("searching never reaches pictures");
+        Harness.equal("a search for words finds no shared file", Recall.search(context, journal, "", null).entries.size(), 0);
+    }
+}

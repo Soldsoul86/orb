@@ -5898,3 +5898,54 @@ journal; the gap is that a person cannot **see** a picture they shared. Candidat
 items in Recall with their facts and a secure viewer; or read text out of a picture on the phone (needs a vision/OCR step —
 DR-16 rules a model out of the first reasoning step, so this would be a decision).
 
+
+### 7b57. A secure viewer for shared pictures — 2026-10-01
+
+**Status: built, not yet run on the device.** `orb-app-v21-viewer.apk`. v20 is §7b56 (verified). The finding that
+prompted it is at the end of §7b56: a screenshot shared to Orb was *kept* (sealed, erasable under *Kept by Orb*) but
+not *remembered* (Recall lists screen text only), so a person could not see what they had shared.
+
+#### What changed
+
+1. **Recall has a second view**: *Showing: remembered screens ⇄ shared files and pictures.* The shared view lists, newest first, every
+   sealed share that has not been erased — *when · Picture/File · type · size · from <app>* — **from the clear record only, so
+   listing decrypts nothing.** The search box and app filter rest in that view, and say why (*Pictures can't be searched*):
+   Orb does not read pictures.
+2. **Tapping a picture opens it in a window the system will not screenshot or record** (the same `FLAG_SECURE` as Recall's other
+   windows), with **Close / Erase / Where from?**. The bytes are decrypted in memory, shrunk to at most 2048 px on the long side,
+   drawn, and **let go when the window closes** (the bitmap is recycled); nothing is written anywhere and nothing is handed to
+   another app (a guard test forbids compressing, writing, `Intent`, `FileProvider` and the like in these files).
+3. **A file that is not a picture, or is too large (over 25 MB) or of unknown size, is never decrypted to be shown.** The window says
+   so, and it can still be erased and still has *Where from?*.
+4. **Erase and *Where from?* work on shared items too**, with the right words (*content*, not *words*; *You shared this to Orb*).
+5. `Recall` stays the only code that opens the sealed bytes (`Recall.openBytes`); `RecallActivity` asks it and never refers to Attachments.
+
+#### Checked before the device
+
+- 417 phone-side checks (was 366): pure helpers (picture or not, shrink factors, size and sender wording), the list from the clear
+  record (a share whose content is not on disk is still listed, proving listing opens nothing; a text-only share is not listed),
+  the limit (over / unknown / exactly), the **very bytes shared come back** and absent content is nothing not an error, erase removes
+  it from the list and from reach, *Where from?* in a share's words, and that searching never reaches pictures.
+- **Not testable off the phone:** the actual decoding and drawing (`BitmapFactory`, `ImageView`). Those are a dozen lines of platform
+  code, guarded for failure (a picture that cannot be drawn says so and stays erasable; `OutOfMemoryError` is caught) — **and are what
+  the device check is for.**
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P81** | Recall → *Showing: shared files and pictures* lists the two PNG screenshots shared earlier, each *Picture · image/png · 195 KB · from com.android.systemui* | the list or its wording is wrong |
+| **P82** | Tapping one draws the screenshot, scrollable top to bottom | the decode/draw code is wrong on the device |
+| **P83** | The picture window cannot be screenshotted | `FLAG_SECURE` is not holding on this window |
+| **P84** | Closing the window and reopening works again (nothing was cached or left half-held) | a leak or a stuck bitmap |
+| **P85** | Erase on a shared picture says what stays, and after erasing it leaves the list; the next export still holds its Observation | the sentence is untrue |
+| **P86** | The search box is greyed in this view and the app button is hidden | the mode switch is incomplete |
+
+#### The operator's protocol
+
+1. Install `orb-app-v21-viewer.apk` over v20. Orb → **What Orb remembered** → tap the mode button so it says *shared files and
+   pictures*. *(P81, P86)*
+2. Tap a screenshot. Scroll it. Try to screenshot it. *(P82, P83)*
+3. Close it and open it again, then open the other one. *(P84)*
+4. Share one more picture to Orb (from the share sheet), come back, and check it is listed. *(P81)*
+5. Erase one picture, read the dialog, then **Export and share journal**. *(P85)*

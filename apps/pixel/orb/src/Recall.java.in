@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Reading back what Orb remembered — search, filter, open — with **nothing kept anywhere new**.
@@ -39,14 +41,121 @@ final class Recall {
         final long wallClock;
         final String packageName;
         final String snippet;
+        /** The event's type: a remembered screen, or a shared file. */
+        final String type;
+        /** Shared files only: what the sender said it was, who handed it over, and how big it was (-1 if unknown). */
+        final String mime;
+        final String referrer;
+        final long bytes;
 
         Entry(String hash, String id, String identity, long wallClock, String packageName, String snippet) {
+            this(hash, id, identity, wallClock, packageName, snippet, AssistFacts.CAPTURED, null, null, -1L);
+        }
+
+        Entry(String hash, String id, String identity, long wallClock, String packageName, String snippet,
+              String type, String mime, String referrer, long bytes) {
             this.hash = hash;
             this.id = id;
             this.identity = identity;
             this.wallClock = wallClock;
             this.packageName = packageName;
             this.snippet = snippet;
+            this.type = type;
+            this.mime = mime;
+            this.referrer = referrer;
+            this.bytes = bytes;
+        }
+
+        boolean isShared() {
+            return Provenance.SHARED.equals(type);
+        }
+    }
+
+    /** The biggest file Orb will decrypt to show as a picture. Larger ones stay sealed and can still be erased. */
+    static final long MAX_PICTURE_BYTES = 25L * 1024 * 1024;
+    /** A picture is drawn no larger than this on its longest side, however big the file. */
+    static final int MAX_SIDE = 2048;
+
+    private static final Pattern MIME = Pattern.compile("\"mimeType\":\"([^\"\\\\]*)\"");
+    private static final Pattern REFERRER = Pattern.compile("\"referrer\":\"([^\"\\\\]*)\"");
+
+    private static String field(Pattern p, String line) {
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return null;
+        Matcher m = p.matcher(line);
+        return m.find(payload) ? m.group(1) : null;
+    }
+
+    /** Whether the sender said this is a picture. Said, not verified: the decoder decides whether it is one. */
+    static boolean isPicture(String mime) {
+        return mime != null && mime.toLowerCase(Locale.ROOT).startsWith("image/");
+    }
+
+    /** Whether Orb will try to draw it: a picture, of a known size within the limit. */
+    static boolean canShow(Entry entry) {
+        return entry.isShared() && isPicture(entry.mime) && entry.bytes >= 0 && entry.bytes <= MAX_PICTURE_BYTES;
+    }
+
+    /** The power-of-two shrink that brings the longest side to [maxSide] or under. Never below 1. */
+    static int sampleSize(int width, int height, int maxSide) {
+        int longest = Math.max(width, height);
+        int sample = 1;
+        while (longest / sample > maxSide) sample *= 2;
+        return sample;
+    }
+
+    /** "195 KB", "1.2 MB". */
+    static String sizeLabel(long bytes) {
+        if (bytes < 0) return "size unknown";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024L * 1024) return Math.round(bytes / 1024.0) + " KB";
+        return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024));
+    }
+
+    /** Who handed it over, in words; Android's `android-app://` prefix is not the person's business. */
+    static String fromLabel(String referrer) {
+        if (referrer == null || referrer.isEmpty() || referrer.equals("unknown")) return "an app Android did not name";
+        return referrer.startsWith("android-app://") ? referrer.substring("android-app://".length()) : referrer;
+    }
+
+    /** One line about a shared file, from the clear record only: kind, type, size, who. */
+    static String sharedLabel(Entry e) {
+        String kind = isPicture(e.mime) ? "Picture" : "File";
+        return kind + " \u00b7 " + (e.mime == null ? "type unknown" : e.mime) + " \u00b7 " + sizeLabel(e.bytes)
+            + " \u00b7 from " + fromLabel(e.referrer);
+    }
+
+    /**
+     * Files and pictures shared to Orb whose content is sealed here, newest first. **From the clear
+     * record only** — nothing is opened to list them, so listing decrypts nothing.
+     */
+    static List<Entry> shared(Journal journal) throws IOException {
+        List<String> lines = journal.readLines();
+        java.util.Set<String> erased = Erasure.erasedHashes(lines);
+        List<Entry> out = new ArrayList<>();
+        for (Erasure.Item item : Erasure.items(lines)) {
+            if (!Provenance.SHARED.equals(item.type) || item.erased || erased.contains(item.hash)) continue;
+            String line = null;
+            for (String candidate : lines) {
+                if (item.hash.equals(Erasure.envelopeHash(candidate))) { line = candidate; break; }
+            }
+            if (line == null) continue;
+            out.add(new Entry(item.hash, item.id, item.identity, item.wallClock, null, null,
+                item.type, field(MIME, line), field(REFERRER, line), item.bytes));
+        }
+        java.util.Collections.reverse(out);
+        return out;
+    }
+
+    /**
+     * The decrypted bytes of a shared file, for drawing — or null if it is gone, **or too large to
+     * show** (check [canShow] first so that is said, not guessed). Held in memory only; the caller lets go.
+     */
+    static byte[] openBytes(Context context, String identity) {
+        try {
+            return Attachments.open(context, identity);
+        } catch (Exception corrupt) {
+            return null;
         }
     }
 

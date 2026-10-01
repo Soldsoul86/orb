@@ -166,6 +166,20 @@ final class AssistGuardTest {
         Harness.check("and the brain it calls is the Observer, which writes nothing",
             observe.contains("dev.orb.brain.Observer.plan(") && !observe.contains("Observer.write"));
 
+        Harness.suite("a shared picture is shown and nothing else is done with it");
+        for (String name : new String[] {"Recall", "RecallActivity", "Provenance"}) {
+            String code = name.equals("Provenance") ? provenance : new String(Files.readAllBytes(root.resolve("src/" + name + ".java.in")), StandardCharsets.UTF_8);
+            StringBuilder live = new StringBuilder();
+            for (String line : code.split("\n")) if (!isComment(line)) live.append(line).append('\n');
+            Harness.check(name + " never writes a picture, files, or hands anything to another app",
+                !Pattern.compile("\\.compress\\(|MediaStore|insertImage|FileOutputStream|FileWriter|ACTION_SEND|ACTION_VIEW|ClipData|startActivity|Intent\\b|ShareCompat|FileProvider")
+                    .matcher(live).find());
+        }
+        int secureWindows = recallActivity.split("FLAG_SECURE, WindowManager", -1).length - 1;
+        Harness.check("every window Recall opens is secure: its own, the words, the picture, where-from (found " + secureWindows + ")", secureWindows >= 4);
+        Harness.check("a drawn picture is let go when its window closes", recallActivity.contains("drawn.recycle()"));
+        Harness.check("only Recall opens the sealed bytes; RecallActivity asks it", recallActivity.contains("Recall.openBytes(") && !recallActivity.contains("Attachments"));
+
         Harness.suite("one process, one writer; nothing extra requested");
         Harness.check("no component runs in its own process", !manifest.contains("android:process"));
         Harness.check("platform backup is off", manifest.contains("android:allowBackup=\"false\""));

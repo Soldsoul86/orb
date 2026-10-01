@@ -11,6 +11,7 @@ public final class Tests {
         RecallTest.run();
         ObserveTest.run();
         ProvenanceTest.run();
+        SharedViewTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }
