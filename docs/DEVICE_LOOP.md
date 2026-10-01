@@ -6101,3 +6101,14 @@ providers among the apps made visible. The *fix* does not depend on the mechanis
 4. Later the same day, scan again with no install in between; export. *(P96)*
 5. Install any small app (anything from the Play Store), scan, export; then uninstall it, scan, export. *(P97)*
 
+#### First v24 run (`orb-20261001-193025.txt`, 268 events, `verifyLane`-clean): *scan REFUSED — not granted*
+
+Expected, and a consequence of a decision already recorded (AD-15 item 6): **a restore grants nothing.** The package-scan permission is a marker file outside the journal (`PackageAccess`); the
+backup does not carry it, so after the real restore the phone was back to *not granted* — and the scan, as designed, refused and **said so on the record** (`grants.packages`, `installedPackageReadable: false`,
+`installedPackageScope: "ungranted"`), because *"nobody authorized it"* and *"nothing was found"* are opposite facts. The fix for the operator is one tap: **Package scanning: grant / revoke** (it toggles; it should say *GRANTED*), then scan.
+v24 itself ran (versionCode 29847716).
+
+**A small honest gap found by this, to be fixed with the next build:** the *journal's* latest word on the capability is still `grants.capability.granted` (from before the restore) while the phone's actual state is not granted — history
+and reality disagree until the operator grants again. The fix is a start-up reconcile: if the latest recorded decision is *granted* and the marker is absent, record a revocation (`by: restore`) so the record matches the phone.
+Not done in v24 so as not to change the build mid-test; bundled with the next change.
+
