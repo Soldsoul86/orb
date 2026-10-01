@@ -6034,3 +6034,9 @@ losing the phone lost the memory, and a fresh Orb could not read an export at al
 - **Open until the operator reports what v23 shows.** If the passphrase box does not appear after choosing the file, or the box says something other than *good*, that is a different
   fault and it will be in the words on screen.
 
+#### Result of v23: *Check a backup file…* says good (operator's report)
+
+**P89 held.** On v23 the operator chose the real backup (14 items, pictures included, 11.9 MB) and the check reported it **good**, changing nothing — so the file written by the
+phone decrypts and verifies on the same phone, through the real file picker and the real key derivation. The v22 "nothing happening" was the visibility defect recorded above, not a fault
+in the check. **Still open:** P90–P92 — a real restore after *Clear storage*, which is the test that makes the backup a backup. An export cannot show what the check box said; this rests on the operator's word.
+
