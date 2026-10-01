@@ -83,6 +83,40 @@ capability and its own decision.)
 `MainActivity` has two buttons and the status line; the file picker is the only new Android surface. Only `Backup`
 touches the sealed store besides `Capture` and `Recall` (guard test).
 
+## 4b. Revised 2026-10-01 after the operator's brief — control, and automatic
+
+> *"I should be able to control and give access as much as I want, and losing a phone should not lose my data. I will take
+> the necessary precautions."* A backup that has to be remembered is a backup that is forgotten, so the recommendation is
+> **the same encrypted file, written automatically to a folder the person chooses**, in two steps.
+
+**Step 1 — the core: Back up now, Restore.** As §4. Proven end to end (including restored once on the real phone) before
+anything is automated.
+
+**Step 2 — automatic, into a place the person picks.** The person chooses a **folder once** with Android's folder picker
+(Google Drive, Dropbox, a USB drive, an SD card — whatever their phone offers). Android lets Orb keep write access to
+*that folder only*, without a storage permission. Orb writes the encrypted backup there itself; **the person's own sync app
+carries it off the phone**. So **Orb never gets an account, a server, or the internet** — local-first holds — and the person
+chooses where their data goes and can change or stop it any time.
+
+- **The passphrase and automatic backups.** The passphrase is typed once; Orb derives the backup key from it and keeps *that
+  key* (not the passphrase) wrapped by the phone's hardware-backed Keystore, so it can write backups without asking. Restore
+  always needs the passphrase (the key is re-derived from it and the salt in the file). Forget the passphrase and a lost phone is
+  unrecoverable — which is why §6 asks for precautions, not a hint.
+- **The controls** (all in one screen, all changeable): **where** (the folder); **what** (words always; pictures yes / no — they
+  are big; later, per-app); **how often** (after changes, at most once a day, or manual only); **how many copies to keep** (the
+  newest N; older ones Orb deletes **from that folder** — it cannot delete copies the sync app already made elsewhere); **stop**
+  (forget the folder and the key; Orb offers to delete what it wrote).
+- **Visible failure.** If the folder disappears (a USB unplugged, a revoked permission), the main screen says *Backups stopped:
+  Orb cannot write to your folder* — a silent failure here would be the worst kind. The *Last backup* line and the 7-day warning
+  remain for manual use.
+
+**The precautions the operator takes** (Orb states them where the passphrase is set): keep the passphrase somewhere safe that is not
+the phone (a password manager, paper at home); keep the backup in a place that is not the phone; **restore once, on purpose, to
+see that it works**; and when something sensitive is erased, delete older backup files that hold it.
+
+**Step 3 — later, not now.** A second phone or a zero-knowledge relay, which would make protection continuous without a file.
+Step 1 and 2 do not block it.
+
 ## 5. Invariants and tests
 
 - A backup is **ciphertext throughout**: no word of any item, no URL, no identity, no app name in the file (a grep test over
@@ -97,7 +131,7 @@ touches the sealed store besides `Capture` and `Recall` (guard test).
 - **Memory is bounded** (chunking): backing up a large item does not hold it twice.
 - **Mutation-checked**, as everything here is; and **restored once on the real phone** before it is called done.
 
-## 6. What the operator decides
+## 6. What the operator decides *(adopted, 2026-10-01: the recommendation, Step 1 then Step 2 — awaiting a yes to start)*
 
 1. **Option A?** (A passphrase-protected backup file the person carries; a second phone and a relay later, not now.)
 2. **Accept the honest limit?** A backup you made keeps what you erased *after* it, until you delete that file — the same as an
