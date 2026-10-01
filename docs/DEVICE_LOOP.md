@@ -5385,3 +5385,80 @@ a picture is not text to the platform, so a *text only* memory keeps the message
 **none of what the pictures say**. That is the operator's ruling (DR-14 ruling 5) working as
 written, not a defect — but it means a screen that is mostly images remembers little, and
 reading text out of a picture is a different capability (OCR) that nobody has asked for.
+
+### 7b51. Step 7, part 2 — Orb keeps the text, sealed, after a preview — 2026-10-01
+
+**Status: built; 152 phone-side and 366 TypeScript tests; not yet run on the device.**
+`orb-app-v13-remember.apk`. Part 1 (§7b50) made every decision and kept nothing; this keeps.
+
+#### What it does
+
+On an allowed app, with the structure and screenshot arrived and no protection signal, the card
+**shows the start of the text** (400 characters, and how many more there are) and offers
+**Remember** and **Don't keep**. Nothing is written before the tap. **Remember**:
+
+1. checks the app is **still allowed** (it may have been removed since the card opened);
+2. seals the text and the page address as an Attachment under its own key;
+3. only then writes `orb.assist.captured` — numbers, the allowed app, the sealed identity;
+4. and if that record cannot be written, **removes the sealed text again** (a rollback with no
+   marker — nothing was promised), so there is never sealed content no event cites. Unlisted, it
+   could not be found in *Kept by Orb* and so could never be erased.
+
+The same screen twice is **one Attachment, two citations** (`held`); an identical screen after
+it was erased is refused, recorded as `orb.assist.captureFailed` (`erased`) with no app, and the
+card says so. A kept capture appears in **Kept by Orb** as *remembered*, with the same
+erase-and-destroy-the-key behaviour step 6 verified.
+
+#### What confines it
+
+The code that touches a screen's content is **one file**:
+
+| File | May | May not |
+| --- | --- | --- |
+| `ScreenReader` | read `getText` and the page address; skip passwords by input type | read anything else off a screen; keep or log anything |
+| `ScreenText` | hold the text in memory, give a preview, produce the sealed document | import Android; write or log anything |
+| `Capture` | seal (`Attachments`), record | read a screen; log |
+| `AssistFacts` | build every record | — |
+| everything else | decide and draw | read screen content; touch the sealed store; build a record; log |
+
+`AssistGuardTest` reads these files and fails the build on a breach (mutation-checked). The
+buffer is **plain Java**: it cannot import Android, which the off-device build enforces by not
+compiling. It is emptied on a decline, a dismissal, a finished remember and a new invocation.
+
+#### Seen by the importer
+
+`orb.assist.captured` becomes an Observation, source `orb.sensor.assist@<install>`, confidence
+100 **for the occurrence**, the sealed text cited by identity in `attachments`. Declines,
+allow-list changes and failures stay Events. The test fixture is **written by `Capture.remember`
+and `Erase.execute`**, and the first thing the test asserts is that **none of the invented
+conversation's words appear anywhere in the export** — the clear record is clear of content, and
+that is checked on output, not on intent. A drift guard fails if the phone writes a field the
+importer has not decided about (proven to).
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P46** | On an allowed app the card shows the start of the screen's text, with *Remember* and *Don't keep*, and **nothing is written before a tap** — dismissing leaves the export without a capture | the buffer is being written early |
+| **P47** | *Remember* then shows *Remembered…*; the export holds one `orb.assist.captured` with the app, counts, `attachment: sha256:…`, `resolveOutcome: stored`, and **no word of the text or the page address** | the clear record carries content |
+| **P48** | *Kept by Orb* lists it as **remembered**, with its size; *Erase* on it says nothing else keeps it, then destroys the key (`attachmentsDestroyed` +1 in the next export) | the capture is not erasable — the failure this step exists to prevent |
+| **P49** | Remembering the **same screen twice** records `stored` then `held`; *Kept by Orb* shows two rows; erasing one says the content is also kept by 1 other | the same text is not recognised as one Attachment |
+| **P50** | After erasing both, remembering the same screen again says *You erased this exact content before…* and the export holds `orb.assist.captureFailed`, `outcome: erased`, with no app | an erasure was undone |
+| **P51** | A screen with a password field keeps no password text: the preview contains none of it | passwords are delivered and kept |
+
+#### The operator's protocol
+
+1. Install `orb-app-v13-remember.apk` (updates Orb). Open Orb once. Orb is still your assistant.
+2. WhatsApp is on the allow list already. Open a **short, non-private** chat (or a note to
+   yourself) and invoke Orb. Read the preview. Tap **Don't keep**. *(P46)*
+3. Invoke again; tap **Remember**. *(P47)*
+4. Invoke on the **same screen** and **Remember** again. *(P49)*
+5. Orb → **Kept by Orb: erase**. You should see two *remembered* rows. Erase one; read the dialog;
+   confirm. Erase the other. *(P48, P49)*
+6. Invoke on the same screen again and tap **Remember**. *(P50)*
+7. If you can, invoke on a screen with a **password field** (a login page in an allowed app) and
+   read the preview. *(P51)*
+8. **Export and share journal.**
+
+Choose a screen you are content for me to read the *counts* of; the export carries **no text**,
+and the sealed text never leaves the phone.

@@ -11,15 +11,16 @@ import java.util.Map;
  * and names a payments app would itself be the leak the ruling forbids (`SENSOR_ASSIST.md`
  * §4). The guard test also fails the build if any other source builds a record.
  *
- * **Part 1 stores nothing from a screen.** `simulated` carries counts and the name of an
- * app the person has *allowed* — what a capture *would* have kept, with no content — and
- * exists only until the real capture replaces it.
+ * **What is in the clear is numbers and an allowed app's name.** The text a capture keeps is
+ * sealed (`Capture`), and only its identity and size appear here — the journal cannot forget,
+ * so nothing that must be erasable may be written into it.
  */
 final class AssistFacts {
     private AssistFacts() {}
 
     static final String DECLINED = "orb.assist.declined";
-    static final String SIMULATED = "orb.assist.simulated";
+    static final String CAPTURED = "orb.assist.captured";
+    static final String CAPTURE_FAILED = "orb.assist.captureFailed";
 
     /** A package name, or the word `invalid` — never whatever else was passed in. */
     static String packageOrInvalid(String value) {
@@ -47,14 +48,39 @@ final class AssistFacts {
         return p;
     }
 
-    /** What a capture would have kept — numbers and an allowed app's name; no content. */
-    static Map<String, Object> simulated(String allowedPackage, long textNodes, long textChars, boolean webUri, long versionCode) {
+    /**
+     * Orb kept this screen's text. In the clear: the app (one the person allowed), how much,
+     * whether the app supplied a page address (a yes/no — the address itself is sealed), and
+     * the identity of the sealed text. **Never the text.**
+     */
+    static Map<String, Object> captured(
+            String allowedPackage, long textNodes, long textChars, boolean webUri,
+            String identity, long bytes, String outcome, long versionCode) {
         Map<String, Object> p = Json.obj();
+        p.put("attachment", identityOrInvalid(identity));
+        p.put("attachmentBytes", bytes);
+        p.put("because", "user.remembered");
         p.put("package", packageOrInvalid(allowedPackage));
-        p.put("textNodes", textNodes);
+        p.put("resolveOutcome", "stored".equals(outcome) || "held".equals(outcome) ? outcome : "other");
         p.put("textChars", textChars);
+        p.put("textNodes", textNodes);
+        p.put("versionCode", versionCode);
         p.put("webUri", webUri);
+        return p;
+    }
+
+    /** Orb was asked to keep and could not. The reason, and nothing about the screen or the app. */
+    static Map<String, Object> captureFailed(String outcome, long versionCode) {
+        Map<String, Object> p = Json.obj();
+        boolean known = "erased".equals(outcome) || "tooLarge".equals(outcome)
+            || "readFailed".equals(outcome) || "sealFailed".equals(outcome) || "journalFailed".equals(outcome);
+        p.put("outcome", known ? outcome : "other");
         p.put("versionCode", versionCode);
         return p;
+    }
+
+    /** A scheme-tagged content identity, or the word `invalid`. */
+    static String identityOrInvalid(String identity) {
+        return identity != null && identity.matches("sha256:[0-9a-f]{64}") ? identity : "invalid";
     }
 }

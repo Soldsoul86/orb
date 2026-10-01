@@ -21,27 +21,29 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * One invocation of the assistant: look at the screen, decide, and say what Orb did.
+ * One invocation of the assistant: look at the screen, decide, show what would be kept, and
+ * keep it only if the person taps **Remember**.
  *
- * **Part 1 of step 7 keeps nothing from a screen.** It makes every decision a real
- * capture would — the five checks, the allow-list, the payments floor, the 3-second wait —
- * and then *simulates* the capture: the person can record that Orb **would** have kept so
- * many text elements and characters, as numbers. No text is held beyond a length, no
- * picture beyond a 32×32 summary, and nothing is written until a button is pressed.
- * `AssistGuardTest` fails the build if this file ever does otherwise.
+ * **Looking is not keeping.** The text of an allowed app's screen is read into a
+ * `ScreenText` held in this session — memory only — and the card shows the start of it.
+ * Nothing is written until the person taps; dismissing, timing out, a declined screen and a
+ * finished remember all empty the buffer (`end()`). This class never reads a screen's content
+ * itself (`ScreenReader` does) and never touches the sealed store (`Capture` does):
+ * `AssistGuardTest` fails the build if it starts to.
  *
- * **Decided before looked at.** The app is named and checked against the allow-list
- * before any of its structure is walked; an app that is not allowed is declined as that,
- * and the rest of its screen is never read.
+ * **Decided before looked at.** The app is named and checked against the allow-list before any
+ * of its structure is read; an app that is not allowed is declined as that and the rest of its
+ * screen is never read.
  *
  * **A late callback is not this invocation's.** Once a session has closed or decided, a
- * further callback is ignored — a stray empty screenshot was seen arriving after its
- * session ended (`DEVICE_LOOP.md` §7b44–§7b45).
+ * further callback is ignored — a stray empty screenshot was seen arriving after its session
+ * ended (`DEVICE_LOOP.md` §7b44–§7b45).
  */
 public final class AssistSession extends VoiceInteractionSession {
-    private static final int MAX_DEPTH = 400;
     /** Measured latencies were ≤ 270 ms; this is generous (SENSOR_ASSIST §5). */
     private static final long WAIT_MS = 3000L;
+    /** How much of the text the card shows before the person decides. */
+    private static final int PREVIEW_CHARS = 400;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable timeout = new Runnable() {
@@ -55,10 +57,8 @@ public final class AssistSession extends VoiceInteractionSession {
     private boolean structureArrived;
     private String packageName;
     private boolean allowed;
-    private int blocked;
-    private long textNodes;
-    private long textChars;
-    private boolean webUri;
+    /** What the screen said — memory only, emptied by `end()`. */
+    private ScreenText pending;
 
     private boolean screenshotDone;
     private boolean screenshotArrived;
@@ -67,6 +67,7 @@ public final class AssistSession extends VoiceInteractionSession {
     private TextView message;
     private Button allowButton;
     private Button recordButton;
+    private Button closeButton;
 
     AssistSession(Context context) {
         super(context);
@@ -124,19 +125,19 @@ public final class AssistSession extends VoiceInteractionSession {
         card.addView(allowButton);
 
         recordButton = new Button(getContext());
-        recordButton.setText("Record this test (nothing is kept)");
+        recordButton.setText("Remember");
         recordButton.setVisibility(View.GONE);
         recordButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { recordSimulation(); }
+            @Override public void onClick(View view) { remember(); }
         });
         card.addView(recordButton);
 
-        Button close = new Button(getContext());
-        close.setText("Close");
-        close.setOnClickListener(new View.OnClickListener() {
+        closeButton = new Button(getContext());
+        closeButton.setText("Close");
+        closeButton.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) { hide(); }
         });
-        card.addView(close);
+        card.addView(closeButton);
 
         FrameLayout.LayoutParams at = new FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
@@ -155,10 +156,8 @@ public final class AssistSession extends VoiceInteractionSession {
         structureArrived = false;
         packageName = null;
         allowed = false;
-        blocked = 0;
-        textNodes = 0;
-        textChars = 0;
-        webUri = false;
+        if (pending != null) pending.discard();
+        pending = null;
         screenshotDone = false;
         screenshotArrived = false;
         uniform = false;
@@ -187,12 +186,7 @@ public final class AssistSession extends VoiceInteractionSession {
 
         if (structureArrived && packageName != null) {
             allowed = isAllowed(packageName);
-            if (allowed) {
-                for (int i = 0; i < structure.getWindowNodeCount(); i++) {
-                    walk(structure.getWindowNodeAt(i).getRootViewNode(), 1);
-                }
-                webUri = content != null && content.getWebUri() != null;
-            }
+            if (allowed) pending = ScreenReader.read(structure, content);
         }
         settle(false);
     }
@@ -232,17 +226,23 @@ public final class AssistSession extends VoiceInteractionSession {
         in.packageName = packageName;
         in.allowed = allowed;
         in.screenshotArrived = screenshotArrived;
-        in.blockedNodes = blocked;
+        in.blockedNodes = pending == null ? 0 : pending.blocked;
         in.uniform = uniform;
-        in.textChars = textChars;
+        in.textChars = pending == null ? 0L : pending.textChars;
         String outcome = AssistPolicy.decide(in);
 
         if (outcome.equals(AssistPolicy.KEEP)) {
-            show("Part 1 test: Orb would keep " + textNodes + " text element" + (textNodes == 1 ? "" : "s")
-                + " (" + textChars + " characters) from this screen. Nothing is kept yet.", false, true);
+            long hidden = pending.hiddenBy(PREVIEW_CHARS);
+            show("Orb will keep this text from the screen:\n\n" + pending.preview(PREVIEW_CHARS)
+                + (hidden > 0 ? "\n\n(+" + hidden + " more characters)" : "")
+                + "\n\nIt is sealed on this phone, and you can erase it in Orb → Kept by Orb.", false, true);
+            closeButton.setText("Don't keep");
             return;
         }
 
+        // Declined: whatever was read is forgotten at once.
+        if (pending != null) pending.discard();
+        pending = null;
         Journal journal = journal();
         if (journal != null) journal.append(AssistFacts.DECLINED, AssistFacts.declined(outcome, versionCode()));
         boolean canAllow = outcome.equals(AssistPolicy.NOT_ALLOWED) && packageName != null
@@ -267,6 +267,7 @@ public final class AssistSession extends VoiceInteractionSession {
 
     private void show(String text, boolean offerAllow, boolean offerRecord) {
         if (message == null) return;
+        closeButton.setText("Close");
         message.setText(text);
         allowButton.setVisibility(offerAllow ? View.VISIBLE : View.GONE);
         recordButton.setVisibility(offerRecord ? View.VISIBLE : View.GONE);
@@ -297,11 +298,22 @@ public final class AssistSession extends VoiceInteractionSession {
         show("Allowed: " + packageName + ". Invoke Orb again on this screen to try it.", false, false);
     }
 
-    private void recordSimulation() {
+    private void remember() {
         Journal journal = journal();
-        if (journal == null || packageName == null) return;
-        journal.append(AssistFacts.SIMULATED, AssistFacts.simulated(packageName, textNodes, textChars, webUri, versionCode()));
-        show("Recorded the test: counts only. Nothing from this screen was kept.", false, false);
+        if (journal == null || packageName == null || pending == null) return;
+        Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode());
+        // Kept or not, the text leaves memory now.
+        pending.discard();
+        pending = null;
+        if (result.kept()) {
+            show("Remembered. You can find it in Orb → Kept by Orb, and erase it there.", false, false);
+        } else if (result.outcome.equals("erased")) {
+            show("You erased this exact content before, so Orb will not keep it again.", false, false);
+        } else if (result.outcome.equals(Capture.NOT_ALLOWED)) {
+            show("This app is no longer allowed, so nothing was kept.", false, false);
+        } else {
+            show("Orb could not keep this. Nothing was kept.", false, false);
+        }
     }
 
     @Override
@@ -319,6 +331,8 @@ public final class AssistSession extends VoiceInteractionSession {
     private void end() {
         closed = true;
         handler.removeCallbacks(timeout);
+        if (pending != null) pending.discard();
+        pending = null;
     }
 
     /** A 32×32 summary, never the picture; a bitmap that cannot be scaled is reported unsummarised. */
@@ -334,20 +348,5 @@ public final class AssistSession extends VoiceInteractionSession {
         } catch (RuntimeException error) {
             return PixelStats.ofGrid(null, width, height);
         }
-    }
-
-    /** Counts what is on an allowed app's screen. Text is measured, never held. */
-    private void walk(AssistStructure.ViewNode node, int depth) {
-        if (node == null || depth > MAX_DEPTH) return;
-        if (node.isAssistBlocked()) blocked++;
-        // A password field counts as nothing, even if the platform delivered its text.
-        if (!AssistPolicy.isPasswordInput(node.getInputType())) {
-            int length = node.getText() == null ? 0 : node.getText().length();
-            if (length > 0) {
-                textNodes++;
-                textChars += length;
-            }
-        }
-        for (int i = 0; i < node.getChildCount(); i++) walk(node.getChildAt(i), depth + 1);
     }
 }

@@ -1,0 +1,66 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+
+/**
+ * Writes an export in which the phone's assistant has kept, declined and been told to forget,
+ * for the TypeScript side to read.
+ *
+ * It runs **`Capture.remember` and `Erase.execute` themselves**, against real keys on a temp
+ * disk, so every record is what the phone would write. Only the *inputs* are invented — a
+ * made-up conversation and a made-up app — and **none of those words may appear in the output**:
+ * the TypeScript test greps the file for them, which is the check that the clear record really
+ * is clear of content.
+ */
+public final class GenAssistExport {
+    /** Invented. If any of this appears in the export, the design has failed. */
+    static final String SECRET_ONE = "meet ravi at 4";
+    static final String SECRET_TWO = "bring the contract";
+    static final String SECRET_URI = "https://example.test/thread/9";
+    static final String SECRET_OTHER = "a different screen entirely";
+
+    private static ScreenText screen(String uri, String... lines) {
+        ScreenText s = new ScreenText();
+        for (String line : lines) s.add(line);
+        if (uri != null) s.setWebUri(uri);
+        return s;
+    }
+
+    public static void main(String[] args) throws Exception {
+        File dir = Files.createTempDirectory("orb-gen-assist").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), "orb-000000000000000000000003");
+
+        journal.append("orb.process.start", Start.record(
+            "16", 36L, "2026-01-01", "TEST.000000.000", "Test phone", "test", 1000L, 1234L, "0.1-test"));
+
+        // The decision order, as records: declined before anything is allowed, then allowed.
+        journal.append(AssistFacts.DECLINED, AssistFacts.declined(AssistPolicy.NOT_ALLOWED, 1234L));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+
+        // 1. Kept (new content).  2. The identical screen again: held, a second citation.
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
+        // 3. A different screen, no page address.
+        Capture.remember(context, journal, screen(null, SECRET_OTHER), "com.example.chat", 1234L);
+
+        // Erase both citations of the first screen; the key is destroyed with the last.
+        for (Erasure.Item item : Erasure.items(journal.readLines())) {
+            if (item.type.equals(AssistFacts.CAPTURED) && item.bytes > 0 && !item.erased && isFirst(item, journal)) {
+                Erase.execute(context, journal, item.hash);
+            }
+        }
+        // 4. The same text offered again: refused as erased, recorded as a failure naming no app.
+        Capture.remember(context, journal, screen(SECRET_URI, SECRET_ONE, SECRET_TWO), "com.example.chat", 1234L);
+
+        for (String line : journal.readLines()) System.out.println(line);
+    }
+
+    /** The first two captures share an identity; the third does not. */
+    private static boolean isFirst(Erasure.Item item, Journal journal) throws Exception {
+        java.util.List<Erasure.Item> all = Erasure.items(journal.readLines());
+        return item.identity.equals(all.get(0).identity);
+    }
+}

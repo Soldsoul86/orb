@@ -1,0 +1,88 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * The text of one screen, held in memory between *looking* and *tapping Remember* — and
+ * nowhere else. No Android in it.
+ *
+ * **This is the only object that holds what the screen said**, and it lives exactly as long
+ * as the card does. `discard()` empties it: a declined screen, a dismissed card, a finished
+ * remember. Nothing writes it to disk except `Capture`, which seals it, and nothing logs it
+ * (`AssistGuardTest` fails the build if either changes).
+ *
+ * **Text only** (DR-14 ruling 5). It takes node text and one page address; there is no way to
+ * add a description, a hint, an id or a picture, so they cannot be kept by accident. Passwords
+ * are never added: the reader refuses them by input type before they reach here.
+ */
+final class ScreenText {
+    static final String HEADER = "orb.screen.text.v1";
+
+    private final StringBuilder body = new StringBuilder();
+    private String webUri;
+    int textNodes;
+    long textChars;
+    int blocked;
+
+    /** One element's text, trimmed; blank text is nothing. */
+    void add(CharSequence text) {
+        if (text == null) return;
+        String trimmed = text.toString().trim();
+        if (trimmed.isEmpty()) return;
+        if (body.length() > 0) body.append('\n');
+        body.append(trimmed);
+        textNodes++;
+        textChars += trimmed.length();
+    }
+
+    /** A node the app marked as not for assistants. Counted; its text is never added. */
+    void noteBlocked() {
+        blocked++;
+    }
+
+    /** The page address the app supplied. It is content, so it is sealed with the text. */
+    void setWebUri(String uri) {
+        this.webUri = (uri == null || uri.isEmpty()) ? null : uri.replace('\n', ' ');
+    }
+
+    boolean hasWebUri() {
+        return webUri != null;
+    }
+
+    /** The start of the text, for the person to see before deciding. Never splits a character. */
+    String preview(int maxChars) {
+        String all = body.toString();
+        if (all.length() <= maxChars) return all;
+        int end = maxChars;
+        if (end > 0 && Character.isHighSurrogate(all.charAt(end - 1))) end--;
+        return all.substring(0, end) + "…";
+    }
+
+    /** How much of the text a preview of this length leaves out. */
+    long hiddenBy(int maxChars) {
+        long rest = body.length() - maxChars;
+        return rest > 0 ? rest : 0L;
+    }
+
+    /**
+     * What gets sealed: a versioned header, the address if there was one, then the text.
+     *
+     * Identical screens produce identical bytes and therefore one Attachment under one key
+     * (inv. 2) — and an erased one is not kept again (inv. 8). Nothing else is in it: no
+     * time, no app, no counts, so nothing about *when* or *where* sits next to the text.
+     */
+    byte[] document() {
+        String doc = HEADER + "\nuri:" + (webUri == null ? "" : webUri) + "\n---\n" + body;
+        return doc.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Forgets everything. Called whenever the card ends, whatever happened. */
+    void discard() {
+        body.setLength(0);
+        body.trimToSize();
+        webUri = null;
+        textNodes = 0;
+        textChars = 0;
+        blocked = 0;
+    }
+}

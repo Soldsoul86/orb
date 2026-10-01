@@ -1,0 +1,90 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Map;
+
+/**
+ * Keeps one screen's text — sealed, recorded, and erasable. The only assistant code that
+ * touches `Attachments`, and the only place a capture is written.
+ *
+ * **Seal first, record second, and never leave one without the other.** The text goes into
+ * the sealed store; only if that works is the `orb.assist.captured` event written, citing it
+ * by identity. If the event cannot be written the content is **rolled back** — removed with
+ * no marker, because nothing was promised about it — so there is never sealed text that no
+ * event cites. Unlisted, it could not be found in *Kept by Orb* and so could never be
+ * erased, which is the one thing this whole step exists to prevent.
+ *
+ * **A failure is recorded as a failure, and says nothing about the screen.** An erased
+ * identity is refused by the store (`Attachment.md` inv. 8); that, a too-large text and a
+ * seal failure each become `orb.assist.captureFailed` with an outcome and no app.
+ *
+ * **The allowance is checked again here.** It was checked when the card opened; the person
+ * may have removed the app since.
+ */
+final class Capture {
+    private Capture() {}
+
+    static final String STORED = "stored";
+    static final String HELD = "held";
+    static final String NOT_ALLOWED = "notAllowed";
+    static final String JOURNAL_FAILED = "journalFailed";
+
+    /** `stored` or `held` on success; otherwise what went wrong. */
+    static final class Result {
+        final String outcome;
+
+        Result(String outcome) {
+            this.outcome = outcome;
+        }
+
+        boolean kept() {
+            return outcome.equals(STORED) || outcome.equals(HELD);
+        }
+    }
+
+    /** Where records go. The journal, in the app; a stand-in in tests that need a write to fail. */
+    interface Recorder {
+        Map<String, Object> append(String type, Map<String, Object> payload);
+    }
+
+    static Result remember(Context context, final Journal journal, ScreenText text, String packageName, long versionCode) {
+        return remember(context, journal, new Recorder() {
+            @Override public Map<String, Object> append(String type, Map<String, Object> payload) {
+                return journal.append(type, payload);
+            }
+        }, text, packageName, versionCode);
+    }
+
+    static Result remember(Context context, Journal journal, Recorder recorder, ScreenText text, String packageName, long versionCode) {
+        try {
+            if (!AllowList.isAllowed(journal.readLines(), packageName)) return new Result(NOT_ALLOWED);
+        } catch (IOException unreadable) {
+            return new Result(JOURNAL_FAILED);
+        }
+
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(text.document()));
+        if (stored.identity == null) {
+            recorder.append(AssistFacts.CAPTURE_FAILED, AssistFacts.captureFailed(stored.outcome, versionCode));
+            return new Result(stored.outcome);
+        }
+
+        Map<String, Object> payload = AssistFacts.captured(
+            packageName, text.textNodes, text.textChars, text.hasWebUri(),
+            stored.identity, stored.bytes, stored.outcome, versionCode);
+        if (recorder.append(AssistFacts.CAPTURED, payload) == null) {
+            // Only content this call just wrote; content other events already cite stays.
+            if (stored.outcome.equals(STORED)) {
+                try {
+                    Attachments.discard(context, stored.identity);
+                } catch (Exception leftBehind) {
+                    // Cannot be helped here; the next erase pass cannot see it either, which is
+                    // why this path is tested.
+                }
+            }
+            return new Result(JOURNAL_FAILED);
+        }
+        return new Result(stored.outcome);
+    }
+}

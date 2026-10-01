@@ -24,6 +24,7 @@ import { hasPayload, unwrapPayload } from "@orb/journal";
 import { observationDraft, readObservation } from "@orb/observation";
 import { grantsSource, type DeviceAuthorityReading, type KindReading } from "./reading.js";
 import { SHARED_TYPE, SHARE_CONFIDENCE_PERCENT, shareFrom, shareSource } from "./share.js";
+import { ASSIST_CAPTURED_TYPE, ASSIST_CONFIDENCE_PERCENT, assistFrom, assistSource } from "./assist.js";
 
 /** The pass-2 event that carries a grant reading, written at every wake. */
 export const GRANTS_OBSERVED_TYPE = "grants.observed";
@@ -183,6 +184,14 @@ const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
       source: (event) => shareSource(event.device),
       confidencePercent: SHARE_CONFIDENCE_PERCENT,
       translate: (payload) => shareFrom(payload),
+    },
+  ],
+  [
+    ASSIST_CAPTURED_TYPE,
+    {
+      source: (event) => assistSource(event.device),
+      confidencePercent: ASSIST_CONFIDENCE_PERCENT,
+      translate: (payload) => assistFrom(payload),
     },
   ],
 ]);

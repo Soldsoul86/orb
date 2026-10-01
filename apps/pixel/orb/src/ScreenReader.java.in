@@ -1,0 +1,48 @@
+package @PKG@;
+
+import android.app.assist.AssistContent;
+import android.app.assist.AssistStructure;
+
+/**
+ * Reads the text of one allowed app's screen into a `ScreenText`. **The only file that
+ * reads what a screen says.**
+ *
+ * Everything else in the assistant measures or decides; this is the single place a content
+ * accessor is used for its content, so the rule *screen text goes only into the buffer* can
+ * be checked by looking at one file (`AssistGuardTest`). It writes nothing, logs nothing and
+ * keeps nothing: it hands back the buffer and forgets.
+ *
+ * **Text only.** It takes `getText()` and the page address. It never asks for a description,
+ * a hint, a view id or a web domain, so none can be kept by accident. **A password field is
+ * skipped by input type** — even if the platform delivered its text, because "it was
+ * probably blanked already" is an assumption and this is a rule.
+ */
+final class ScreenReader {
+    private ScreenReader() {}
+
+    private static final int MAX_DEPTH = 400;
+
+    static ScreenText read(AssistStructure structure, AssistContent content) {
+        ScreenText text = new ScreenText();
+        if (structure != null) {
+            for (int i = 0; i < structure.getWindowNodeCount(); i++) {
+                walk(structure.getWindowNodeAt(i).getRootViewNode(), 1, text);
+            }
+        }
+        if (content != null && content.getWebUri() != null) {
+            text.setWebUri(content.getWebUri().toString());
+        }
+        return text;
+    }
+
+    private static void walk(AssistStructure.ViewNode node, int depth, ScreenText text) {
+        if (node == null || depth > MAX_DEPTH) return;
+        if (node.isAssistBlocked()) {
+            // The app said no. Counted so the decision can see it; its text is not read.
+            text.noteBlocked();
+        } else if (!AssistPolicy.isPasswordInput(node.getInputType())) {
+            text.add(node.getText());
+        }
+        for (int i = 0; i < node.getChildCount(); i++) walk(node.getChildAt(i), depth + 1, text);
+    }
+}

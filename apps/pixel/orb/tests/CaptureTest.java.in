@@ -1,0 +1,147 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+
+/** Keeping a screen's text: what is sealed, what is in the clear, and what a failure leaves. */
+final class CaptureTest {
+    private CaptureTest() {}
+
+    private static ScreenText screen(String... lines) {
+        ScreenText s = new ScreenText();
+        for (String l : lines) s.add(l);
+        return s;
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String line : journal.readLines()) if (type.equals(Journal.typeOf(line))) n++;
+        return n;
+    }
+
+    /** True if `needle` appears in any file under `dir`. */
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            byte[] bytes = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= bytes.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (bytes[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the screen's text, held in memory");
+        ScreenText s = screen("  Hello  ", "", "   ", "world");
+        Harness.equal("blank text is nothing", s.textNodes, 2);
+        Harness.equal("characters are counted after trimming", s.textChars, 10L);
+        Harness.equal("a preview shows the text as it will be kept", s.preview(100), "Hello\nworld");
+        Harness.equal("a short text hides nothing", s.hiddenBy(100), 0L);
+        ScreenText longer = screen("abcdefghij");
+        Harness.equal("a preview cuts at its limit", longer.preview(4), "abcd…");
+        Harness.equal("and says how much it left out", longer.hiddenBy(4), 6L);
+        ScreenText emoji = screen("ab😀cd");
+        Harness.check("a preview never splits a character in two", !emoji.preview(3).contains("\uD83D") || emoji.preview(3).contains("😀"));
+        s.setWebUri("https://example.test/a\nb");
+        Harness.check("an address carries no line break into the sealed text", !new String(s.document(), StandardCharsets.UTF_8).contains("a\nb"));
+        s.discard();
+        Harness.equal("discard forgets the text", s.preview(100), "");
+        Harness.check("and the address", !s.hasWebUri());
+        Harness.equal("and the counts", s.textNodes, 0);
+
+        Harness.suite("the sealed document says nothing but the text and the address");
+        ScreenText doc = screen("one", "two");
+        doc.setWebUri("https://example.test/");
+        String body = new String(doc.document(), StandardCharsets.UTF_8);
+        Harness.equal("a versioned header, the address, then the text", body, "orb.screen.text.v1\nuri:https://example.test/\n---\none\ntwo");
+        Harness.equal("with no address the line is empty", new String(screen("x").document(), StandardCharsets.UTF_8), "orb.screen.text.v1\nuri:\n---\nx");
+
+        File dir = Files.createTempDirectory("orb-capture").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+
+        Harness.suite("remembering: sealed on disk, recorded in the clear without the text");
+        ScreenText mine = screen("meet ravi at 4", "bring the contract");
+        mine.setWebUri("https://example.test/thread/9");
+        Capture.Result first = Capture.remember(context, journal, mine, "com.example.chat", 7L);
+        Harness.equal("stored", first.outcome, Capture.STORED);
+        Harness.equal("one capture event", count(journal, AssistFacts.CAPTURED), 1);
+        Harness.check("the text is on no disk file in the clear", !onDisk(dir, "meet ravi".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("nor is the address", !onDisk(dir, "example.test/thread".getBytes(StandardCharsets.UTF_8)));
+        String eventLine = null;
+        for (String line : journal.readLines()) if (AssistFacts.CAPTURED.equals(Journal.typeOf(line))) eventLine = line;
+        Harness.check("the event holds no word of the text", !eventLine.contains("ravi") && !eventLine.contains("contract") && !eventLine.contains("example.test"));
+        Harness.check("but names the allowed app, the counts and the sealed identity",
+            eventLine.contains("\"package\":\"com.example.chat\"") && eventLine.contains("\"textNodes\":2") && eventLine.contains("\"attachment\":\"sha256:"));
+        Harness.check("and says whether an address existed, not what it was", eventLine.contains("\"webUri\":true"));
+        Harness.equal("it is listed as something Orb keeps, so it can be erased", Erasure.items(journal.readLines()).size(), 1);
+        Harness.equal("and its type reads as remembered", Erasure.items(journal.readLines()).get(0).type, AssistFacts.CAPTURED);
+
+        Harness.suite("the same screen twice is one Attachment, two citations");
+        ScreenText twin = screen("meet ravi at 4", "bring the contract");
+        twin.setWebUri("https://example.test/thread/9");
+        Capture.Result again = Capture.remember(context, journal, twin, "com.example.chat", 7L);
+        Harness.equal("the second is held, not written again", again.outcome, Capture.HELD);
+        Harness.equal("and both are recorded", count(journal, AssistFacts.CAPTURED), 2);
+
+        Harness.suite("an app that is not allowed is refused at the moment of keeping");
+        Capture.Result refused = Capture.remember(context, journal, screen("secret"), "com.other.app", 7L);
+        Harness.equal("refused", refused.outcome, Capture.NOT_ALLOWED);
+        Harness.equal("and nothing recorded or sealed", count(journal, AssistFacts.CAPTURED), 2);
+        journal.append(AllowList.DISALLOWED, AssistFacts.revoke("com.example.chat"));
+        Harness.equal("an app removed since the card opened is refused too",
+            Capture.remember(context, journal, screen("new text"), "com.example.chat", 7L).outcome, Capture.NOT_ALLOWED);
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+
+        Harness.suite("an erased screen is not kept again");
+        List<Erasure.Item> items = Erasure.items(journal.readLines());
+        Erase.execute(context, journal, items.get(0).hash);
+        Erase.execute(context, journal, items.get(1).hash);
+        Harness.equal("both citations erased: the key is destroyed", Attachments.state(context, items.get(0).identity), Attachments.DESTROYED_STATE);
+        ScreenText same = screen("meet ravi at 4", "bring the contract");
+        same.setWebUri("https://example.test/thread/9");
+        Capture.Result back = Capture.remember(context, journal, same, "com.example.chat", 7L);
+        Harness.equal("the identical text is refused as erased", back.outcome, "erased");
+        Harness.equal("and recorded as a failure that names no app", count(journal, AssistFacts.CAPTURE_FAILED), 1);
+        Map<String, Object> failed = AssistFacts.captureFailed("erased", 7L);
+        Harness.check("a failure carries an outcome and a build, nothing else", failed.size() == 2 && !failed.containsKey("package"));
+        Harness.equal("no new capture event", count(journal, AssistFacts.CAPTURED), 2);
+
+        Harness.suite("a record that cannot be written leaves no sealed text behind");
+        File dir2 = Files.createTempDirectory("orb-capture-fail").toFile();
+        final Context context2 = new Context(dir2);
+        final Journal other = Journal.open(context2, Install.lane(context2), Install.id(context2));
+        other.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Capture.Recorder failing = new Capture.Recorder() {
+            @Override public Map<String, Object> append(String type, Map<String, Object> payload) {
+                return AssistFacts.CAPTURED.equals(type) ? null : other.append(type, payload);
+            }
+        };
+        Capture.Result lost = Capture.remember(context2, other, failing, screen("will not be recorded"), "com.example.chat", 7L);
+        Harness.equal("reported as a journal failure", lost.outcome, Capture.JOURNAL_FAILED);
+        long[] counts = Attachments.counts(context2);
+        Harness.equal("no key left behind", counts[0], 0L);
+        Harness.equal("and no marker: nothing was promised", counts[1], 0L);
+        Harness.check("and no ciphertext", !onDisk(dir2, "will not be recorded".getBytes(StandardCharsets.UTF_8)));
+        Capture.Result retry = Capture.remember(context2, other, screen("will not be recorded"), "com.example.chat", 7L);
+        Harness.equal("so the same text can be kept once the journal works", retry.outcome, Capture.STORED);
+
+        Harness.suite("content other events already cite is never rolled back");
+        Capture.Result kept = Capture.remember(context2, other, screen("cited elsewhere"), "com.example.chat", 7L);
+        Harness.equal("kept", kept.outcome, Capture.STORED);
+        Capture.Result twice = Capture.remember(context2, other, failing, screen("cited elsewhere"), "com.example.chat", 7L);
+        Harness.equal("a failing record for already-held content", twice.outcome, Capture.JOURNAL_FAILED);
+        Harness.equal("leaves the earlier citation's key in place", Attachments.counts(context2)[0], 2L);
+    }
+
+}

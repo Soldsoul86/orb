@@ -1,6 +1,7 @@
 # Sensor Declaration — Assist (the screen, when you ask)
 
-> Status: **declaration, 2026-10-01 — before any code that stores anything.** Written
+> Status: **declaration, 2026-10-01; built the same day** (step 7: part 1 decides, part 2 keeps
+> — `DEVICE_LOOP.md` §7b50–§7b51). Written
 > after the probe round (`DEVICE_LOOP.md` §7b41–§7b45), so every claim about what the
 > platform delivers is a measurement, not a reading of documentation. The rules below
 > are the operator's rulings (`DECISIONS.md` DR-14) turned into mechanism; the points
@@ -131,7 +132,7 @@ ending discards it. It is never logged, never backed up (`AD-11`: backup and dev
 transfer are off), never put in a notification.
 
 **`orb.assist.captured`** — a device event on **Remember**, translated to an Observation
-on import (`SENSOR_SHARE.md` §4a's route):
+on import (`SENSOR_SHARE.md` §4a's route; `packages/device-watch/src/assist.ts`):
 
 | In the clear (the journal cannot forget) | Value |
 | --- | --- |
@@ -140,19 +141,25 @@ on import (`SENSOR_SHARE.md` §4a's route):
 | `textNodes`, `textChars` | how much, as numbers |
 | `webUri` | **boolean** — whether the app supplied a page address |
 | `attachment` / `attachmentBytes` | `sha256:…` and size of the sealed text |
-| `invocation` | the id that ties the callbacks to this capture |
+| `resolveOutcome` | `stored` (new content) or `held` (the same screen was already kept) |
+| `versionCode` | the build that wrote it |
 
 | Sealed inside the Attachment (destroyable) | |
 | --- | --- |
-| The text of the screen's elements, in order | **node text only** |
+| The text of the screen's elements, in order | **node text only**, trimmed, blank elements dropped |
 | The page address, if the app supplied one | the address itself is content, so it is sealed, not written in the clear |
+
+The sealed document is a versioned header (`orb.screen.text.v1`), the address line, `---`, then
+the text — **no time, no app, no counts beside it**, so identical screens are one Attachment
+under one key and nothing about *when* or *where* sits next to the words.
 
 **Excluded in v1:** accessibility descriptions, hints, view ids, and any node the build can
 tell is a password field — dropped even if the platform delivered it, not assumed
 blanked already. The picture is never kept.
 
 **`orb.assist.declined`** — `reason` from §5, the build's `versionCode`, and **no
-package**. **`orb.assist.allowed` / `disallowed`** — the package and `by: operator`.
+package**. **`orb.assist.captureFailed`** — when the person asked to keep and Orb could not
+(`erased`, `tooLarge`, `sealFailed`, `journalFailed`): an outcome and a build, no app. **`orb.assist.allowed` / `disallowed`** — the package and `by: operator`.
 
 The Observation carries `source` `orb.sensor.assist@<install>`, `confidencePercent: 100`
 **for the occurrence** (that you captured this) and none for the content (§7), and

@@ -11,20 +11,34 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * The assistant may **receive** a screen. In part 1 of step 7 it may keep **none** of it.
+ * The assistant may **receive** a screen and may **keep its text only if the person taps
+ * Remember** — and the code that does either is confined, by file, so the rules can be
+ * checked by reading six files rather than trusted across sixty.
  *
- * `AssistFacts` makes the records safe by the types of its arguments; this checks that the
- * rest of the assistant's source cannot go round it. It reads the glue's own text and fails
- * on any construct that could write, log or persist what the platform handed over. Crude on
- * purpose: a rule that has to be argued about gets argued away, and a failing test that
- * prints the line does not.
+ * | File | May | May not |
+ * | --- | --- | --- |
+ * | `ScreenReader` | read `getText` and the page address | read anything else off a screen; keep, log or write anything |
+ * | `ScreenText` | hold the text in memory | import Android; write or log anything |
+ * | `Capture` | seal the text (`Attachments`) | read a screen; log |
+ * | `AssistFacts` | build every record | — |
+ * | everything else in the assistant | decide and draw | read screen content; touch `Attachments`; build a record; log |
  *
- * **Part 2 changes this deliberately.** When *Remember* keeps text, one file gains the right
- * to hold it and `Attachments`; until then no assistant file may mention either.
+ * Crude on purpose: a rule that has to be argued about gets argued away, and a failing test
+ * that prints the line does not.
  */
 final class AssistGuardTest {
-    private static final List<String> GLUE = Arrays.asList(
-        "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity");
+    /** Every assistant file that is not the one place records are built. */
+    private static final List<String> ALL = Arrays.asList(
+        "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
+        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader", "Capture");
+    /** The assistant files that may not read what a screen says. */
+    private static final List<String> NO_CONTENT = Arrays.asList(
+        "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
+        "AssistPolicy", "AllowList", "ScreenText", "Capture");
+    /** The assistant files that may not touch the sealed store. */
+    private static final List<String> NO_STORE = Arrays.asList(
+        "AssistSession", "AssistService", "SessionService", "RecognitionStub", "AllowActivity",
+        "AssistPolicy", "AllowList", "ScreenText", "ScreenReader");
 
     private static final Pattern CONTENT_ACCESSOR = Pattern.compile(
         "\\.(getText|getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
@@ -32,50 +46,60 @@ final class AssistGuardTest {
 
     static void run() throws IOException {
         Path root = Paths.get(System.getProperty("orb.root", "."));
-        List<String[]> files = new ArrayList<>();   // {name, text}
-        for (String name : GLUE) {
-            Path path = root.resolve("src/" + name + ".java.in");
-            files.add(new String[] {name, new String(Files.readAllBytes(path), StandardCharsets.UTF_8)});
+        java.util.Map<String, String> source = new java.util.LinkedHashMap<>();
+        for (String name : ALL) {
+            source.put(name, new String(Files.readAllBytes(root.resolve("src/" + name + ".java.in")), StandardCharsets.UTF_8));
         }
         Harness.suite("the assistant's source is what is scanned");
-        Harness.equal("found all the glue", files.size(), GLUE.size());
+        Harness.equal("found all the files", source.size(), ALL.size());
 
         Harness.suite("records are built by AssistFacts and nowhere else");
-        reportEach(files, "builds a record outside AssistFacts", Pattern.compile("Json\\.obj\\(|\\.put\\(\""));
+        forbid(source, ALL, "builds a record outside AssistFacts", Pattern.compile("Json\\.obj\\(|\\.put\\(\""));
 
         Harness.suite("nothing is logged");
-        reportEach(files, "writes somewhere a screen's content could leak",
+        forbid(source, ALL, "writes somewhere a screen's content could leak",
             Pattern.compile("\\bLog\\.|System\\.(out|err)|printStackTrace|Toast"));
 
-        Harness.suite("screen content is only ever measured, never read");
+        Harness.suite("only ScreenReader reads what a screen says");
         int uses = 0;
         List<String> offenders = new ArrayList<>();
-        for (String[] file : files) {
-            String[] lines = file[1].split("\n");
+        for (String name : NO_CONTENT) {
+            String[] lines = source.get(name).split("\n");
             for (int i = 0; i < lines.length; i++) {
-                String line = lines[i];
-                if (line.trim().startsWith("*") || line.trim().startsWith("//") || line.trim().startsWith("/*")) continue;
-                java.util.regex.Matcher m = CONTENT_ACCESSOR.matcher(line);
+                if (isComment(lines[i])) continue;
+                java.util.regex.Matcher m = CONTENT_ACCESSOR.matcher(lines[i]);
                 while (m.find()) {
                     uses++;
-                    String after = line.substring(m.end());
-                    String before = line.substring(0, m.start());
-                    // Immediately after the accessor and nowhere else: a length or a null test.
-                    // (Searching the rest of the line would pass `getText().toString()` because
-                    // a `.length()` appears later — found by mutation.)
+                    String after = lines[i].substring(m.end());
                     String next = after.trim();
-                    boolean ok = after.startsWith(".length()") || next.startsWith("!= null") || next.startsWith("== null");
-                    if (!ok) offenders.add(file[0] + ":" + (i + 1) + "  " + line.trim());
+                    // Outside the reader a length or a null test is the most that is allowed.
+                    if (!(after.startsWith(".length()") || next.startsWith("!= null") || next.startsWith("== null"))) {
+                        offenders.add(name + ":" + (i + 1) + "  " + lines[i].trim());
+                    }
                 }
             }
         }
-        Harness.check("every use of a content accessor is a length or a null test (" + uses + " uses)", offenders.isEmpty());
+        Harness.check("outside it, a content accessor is only ever a length or a null test (" + uses + " uses)", offenders.isEmpty());
         for (String o : offenders) System.out.println("           " + o);
-        Harness.check("and the scan actually found accessors to check", uses > 0);
 
-        Harness.suite("nothing is kept: no picture, no file, no sealed store");
-        reportEach(files, "could persist something",
-            Pattern.compile("\\.compress\\(|FileOutputStream|openFileOutput|MediaStore\\.Images|SharedPreferences|SQLite|\\bAttachments\\b"));
+        String reader = source.get("ScreenReader");
+        Harness.check("the reader reads text and the page address",
+            reader.contains(".getText()") && reader.contains(".getWebUri()"));
+        forbidIn(source, Arrays.asList("ScreenReader"), "reads more than text and the address",
+            Pattern.compile("\\.(getContentDescription|getHint|getHintIdEntry|getIdEntry|getWebDomain|getTitle"
+                + "|getStructuredData|getClipData|getIntent|getText)\\(\\)\\s*[^;]*;?\\s*$"), true);
+        Harness.check("and refuses a password field by input type", reader.contains("isPasswordInput"));
+
+        Harness.suite("the buffer is plain Java");
+        Harness.check("ScreenText imports nothing from Android", !source.get("ScreenText").contains("import android"));
+
+        Harness.suite("only Capture touches the sealed store");
+        forbid(source, NO_STORE, "refers to Attachments", Pattern.compile("\\bAttachments\\b"));
+        Harness.check("Capture does", source.get("Capture").contains("Attachments.store("));
+
+        Harness.suite("no picture, no file, no preference, no database — anywhere in the assistant");
+        forbid(source, ALL, "could persist something outside the sealed store",
+            Pattern.compile("\\.compress\\(|FileOutputStream|openFileOutput|MediaStore\\.Images|SharedPreferences|SQLite"));
 
         Harness.suite("one process, one writer; nothing extra requested");
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8)
@@ -91,14 +115,32 @@ final class AssistGuardTest {
             manifest.contains("android.permission.BIND_VOICE_INTERACTION"));
     }
 
-    private static void reportEach(List<String[]> files, String what, Pattern bad) {
+    private static boolean isComment(String line) {
+        String t = line.trim();
+        return t.startsWith("*") || t.startsWith("//") || t.startsWith("/*");
+    }
+
+    /** Fails if any named file has a non-comment line matching `bad`. */
+    private static void forbid(java.util.Map<String, String> source, List<String> files, String what, Pattern bad) {
+        forbidIn(source, files, what, bad, false);
+    }
+
+    private static void forbidIn(java.util.Map<String, String> source, List<String> files, String what, Pattern bad, boolean skipPermittedReader) {
         List<String> hits = new ArrayList<>();
-        for (String[] file : files) {
-            String[] lines = file[1].split("\n");
+        for (String name : files) {
+            String[] lines = source.get(name).split("\n");
             for (int i = 0; i < lines.length; i++) {
-                String line = lines[i].trim();
-                if (line.startsWith("*") || line.startsWith("//") || line.startsWith("/*")) continue;
-                if (bad.matcher(lines[i]).find()) hits.add(file[0] + ":" + (i + 1) + "  " + line);
+                if (isComment(lines[i])) continue;
+                if (skipPermittedReader) {
+                    // In the reader: only `getText()` and `getWebUri()` may be called.
+                    java.util.regex.Matcher m = CONTENT_ACCESSOR.matcher(lines[i]);
+                    while (m.find()) {
+                        String accessor = m.group(1);
+                        if (!accessor.equals("getText") && !accessor.equals("getWebUri")) hits.add(name + ":" + (i + 1) + "  " + lines[i].trim());
+                    }
+                } else if (bad.matcher(lines[i]).find()) {
+                    hits.add(name + ":" + (i + 1) + "  " + lines[i].trim());
+                }
             }
         }
         Harness.check(what + "? none in " + files.size() + " files", hits.isEmpty());

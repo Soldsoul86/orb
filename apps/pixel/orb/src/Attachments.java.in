@@ -177,6 +177,25 @@ final class Attachments {
         return new File(dir(context, KEYS), address).exists() || new File(dir(context, BLOBS), address).exists();
     }
 
+    /**
+     * Takes back an Attachment that was just stored and could not be recorded — **a rollback,
+     * not an erasure**. It removes the key and the ciphertext and leaves **no marker**: nothing
+     * was ever promised about it, and a marker would forbid keeping the same content later.
+     * Only for content this call just wrote; never for content other events already cite.
+     */
+    static void discard(Context context, String identity) throws Exception {
+        String address = address(context, identity);
+        File key = new File(dir(context, KEYS), address);
+        if (key.exists()) {
+            try (RandomAccessFile out = new RandomAccessFile(key, "rws")) {
+                out.write(new byte[(int) Math.max(out.length(), 32)]);
+                out.getFD().sync();
+            }
+            key.delete();
+        }
+        new File(dir(context, BLOBS), address).delete();
+    }
+
     /** What this phone holds for an identity. */
     static final String HELD_STATE = "held";
     static final String DESTROYED_STATE = "destroyed";
