@@ -141,7 +141,7 @@ And in its `data`, under the phone's own names:
 | `references` | what was handed over, colon-joined; for text, the text itself | never the resolved bytes; **carried whole, never split** — a URI and a sentence both contain colons |
 | `resolved` | `true` / `false` | §6 |
 | `absenceReason` | `unfetched` while unresolved | omitted once the content is held |
-| `resolveOutcome` | `stored`, `held`, `refused`, `failed`, `openedNull`, `tooLarge`, `readFailed`, `sealFailed`, `noReference`, `notAContentUri` | every outcome is recorded, including refusals |
+| `resolveOutcome` | `stored`, `held`, `refused`, `failed`, `openedNull`, `tooLarge`, `readFailed`, `sealFailed`, `noReference`, `notAContentUri`, `erased` | every outcome is recorded, including refusals |
 | `resolveDetail` | the platform's message, when there is one | |
 | `attachmentBytes` | size of the held content | the identity itself is in `attachments` |
 

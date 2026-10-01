@@ -1,0 +1,83 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * Erases one remembered item — declares it, then destroys what can be destroyed.
+ *
+ * **The declaration is written first.** `ERASURE.md` §1: *history may shrink, it may
+ * never shrink silently.* Destroying first and declaring after would leave a crash
+ * window in which content is gone and nothing says so. In this order the worst crash
+ * leaves *declared and not yet done* — an honest state, and `reconcile` finishes it.
+ *
+ * What it destroys is a key, not bytes (`Attachment.md` inv. 8). It destroys it only when
+ * `Erasure.plan` says nothing readable still cites the content; otherwise the declaration
+ * stands, the content stays, and the person is told why.
+ */
+final class Erase {
+    private Erase() {}
+
+    static final String DESTROYED = "destroyed";
+    static final String KEPT_BY_OTHERS = "keptByOthers";
+    static final String DECLARE_FAILED = "declareFailed";
+    static final String DESTROY_FAILED = "destroyFailed";
+
+    /** What happened — the planning outcomes pass through unchanged. */
+    static final class Result {
+        final String outcome;
+        final int others;
+
+        Result(String outcome, int others) {
+            this.outcome = outcome;
+            this.others = others;
+        }
+    }
+
+    static Result execute(Context context, Journal journal, String eventHash) throws IOException {
+        List<String> lines = journal.readLines();
+        Erasure.Plan plan = Erasure.plan(lines, eventHash);
+
+        // Nothing to declare, and nothing is: an erasure that did not happen is not recorded.
+        if (!plan.outcome.equals(Erasure.WILL_DESTROY) && !plan.outcome.equals(Erasure.KEPT_BY_OTHERS)) {
+            return new Result(plan.outcome, 0);
+        }
+
+        if (journal.append(Erasure.TYPE, Erasure.declaration(Install.lane(context), eventHash)) == null) {
+            return new Result(DECLARE_FAILED, plan.others);
+        }
+        if (plan.outcome.equals(Erasure.KEPT_BY_OTHERS)) return new Result(KEPT_BY_OTHERS, plan.others);
+
+        try {
+            Attachments.destroy(context, plan.identity);
+        } catch (Exception error) {
+            // Declared, not done. The next start finishes it.
+            return new Result(DESTROY_FAILED, 0);
+        }
+        return new Result(DESTROYED, 0);
+    }
+
+    /**
+     * Finishes any erasure that was declared and not completed — the crash window above.
+     * Idempotent: destroying an already-destroyed key is a no-op.
+     *
+     * @return how many keys it found still present and destroyed
+     */
+    static int reconcile(Context context, Journal journal) {
+        int finished = 0;
+        try {
+            for (String identity : Erasure.owedDestruction(journal.readLines())) {
+                try {
+                    // Idempotent: with nothing left to remove this only confirms the marker.
+                    if (Attachments.destroy(context, identity)) finished++;
+                } catch (Exception skipped) {
+                    // Left for the next start; never fatal to launching.
+                }
+            }
+        } catch (IOException unreadable) {
+            // No journal read, no reconciliation. Nothing is guessed.
+        }
+        return finished;
+    }
+}

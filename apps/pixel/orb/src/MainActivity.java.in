@@ -3,6 +3,7 @@ package @PKG@;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -49,6 +50,14 @@ public final class MainActivity extends Activity {
             @Override public void onClick(View view) { export(); }
         });
         root.addView(export);
+
+        // What Orb keeps under a key it can destroy, and the way to destroy one (step 6).
+        Button items = new Button(this);
+        items.setText("Kept by Orb: erase");
+        items.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, ItemsActivity.class)); }
+        });
+        root.addView(items);
 
         // The §7b32 probe, behind an explicit tap. It *is* the Capability act
         // it is testing for (`Resolve`), so it never runs on its own.

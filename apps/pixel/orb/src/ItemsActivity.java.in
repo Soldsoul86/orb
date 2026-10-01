@@ -1,0 +1,182 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * What Orb has kept under a key it can destroy — and the way to destroy one.
+ *
+ * It lists, and does not show. Each row is a time, a kind and a size: **never the
+ * content**, which this screen has no reason to decrypt. (Showing what was remembered
+ * is a different screen and a different step.) The only thing it can do to a row is
+ * erase it, after saying what that will and will not do.
+ *
+ * **The words are the plan's.** `ERASURE.md` D9: erasing one entry does not destroy
+ * content another readable entry still cites, and an owner must be told that *before*,
+ * not discover it after. And the limit that is the phone's own is on screen and not in a
+ * document: shared **text** is written in the journal itself, which this app cannot
+ * unwrite, so it is not listed and is said not to be.
+ */
+public final class ItemsActivity extends Activity {
+    private LinearLayout list;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Kept by Orb");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        TextView note = new TextView(this);
+        note.setTextSize(12);
+        note.setText("\nErasing destroys the key to what Orb kept. The record that it existed\n"
+            + "stays, because history is never rewritten; the content does not.\n"
+            + "Shared text is written in the journal itself and cannot be erased here.\n");
+        root.addView(note);
+
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable"));
+            return;
+        }
+        List<Erasure.Item> items;
+        try {
+            items = Erasure.items(journal.readLines());
+        } catch (IOException error) {
+            list.addView(text("read failed: " + error));
+            return;
+        }
+        if (items.isEmpty()) {
+            list.addView(text("Nothing is kept under a key yet."));
+            return;
+        }
+        SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        for (int i = items.size() - 1; i >= 0; i--) {
+            final Erasure.Item item = items.get(i);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 24, 0, 24);
+            row.addView(text(when.format(new Date(item.wallClock)) + "  ·  " + kind(item.type)
+                + "  ·  " + size(item.bytes)));
+            if (item.erased) {
+                row.addView(text("erased"));
+            } else {
+                Button erase = new Button(this);
+                erase.setText("Erase");
+                erase.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) { confirm(item); }
+                });
+                row.addView(erase);
+            }
+            list.addView(row);
+        }
+    }
+
+    private void confirm(final Erasure.Item item) {
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) return;
+        Erasure.Plan plan;
+        try {
+            plan = Erasure.plan(journal.readLines(), item.hash);
+        } catch (IOException error) {
+            return;
+        }
+        String words;
+        if (plan.outcome.equals(Erasure.KEPT_BY_OTHERS)) {
+            words = "The same content is also kept by " + plan.others + " other item"
+                + (plan.others == 1 ? "" : "s") + ". This one will be marked erased, but the content stays "
+                + "until the last of them is erased too.";
+        } else if (plan.outcome.equals(Erasure.WILL_DESTROY)) {
+            words = "Nothing else keeps this content. Its key will be destroyed and it can never be "
+                + "read again, here or on any copy. This cannot be undone.";
+        } else {
+            words = "Nothing to erase here.";
+            if (plan.outcome.equals(Erasure.ALREADY_ERASED)) words = "Already erased.";
+            new AlertDialog.Builder(this).setMessage(words).setPositiveButton("OK", null).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Erase this?")
+            .setMessage(words + "\n\nOther devices may hold copies of the record that this phone cannot see.")
+            .setNegativeButton("Keep", null)
+            .setPositiveButton("Erase", new android.content.DialogInterface.OnClickListener() {
+                @Override public void onClick(android.content.DialogInterface dialog, int which) { run(item); }
+            })
+            .show();
+    }
+
+    private void run(Erasure.Item item) {
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) return;
+        String said;
+        try {
+            Erase.Result result = Erase.execute(this, journal, item.hash);
+            said = result.outcome.equals(Erase.DESTROYED) ? "Erased. The key is destroyed."
+                : result.outcome.equals(Erase.KEPT_BY_OTHERS) ? "Marked erased. The content stays while " + result.others + " other item" + (result.others == 1 ? "" : "s") + " still keep it."
+                : result.outcome.equals(Erase.DESTROY_FAILED) ? "Declared erased, but the key could not be destroyed yet. Orb will try again when it next starts."
+                : result.outcome.equals(Erase.DECLARE_FAILED) ? "Not erased: the record could not be written."
+                : "Nothing was erased (" + result.outcome + ").";
+        } catch (IOException error) {
+            said = "Not erased: " + error;
+        }
+        new AlertDialog.Builder(this).setMessage(said).setPositiveButton("OK", null).show();
+        render();
+    }
+
+    private TextView text(String value) {
+        TextView view = new TextView(this);
+        view.setTextSize(13);
+        view.setText(value);
+        return view;
+    }
+
+    private static String kind(String type) {
+        return type.equals(Orb.SHARED) ? "shared" : type.equals("orb.assist.captured") ? "remembered" : type;
+    }
+
+    private static String size(long bytes) {
+        if (bytes < 0) return "size unknown";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+        return String.format(Locale.US, "%.1f MB", bytes / 1048576.0);
+    }
+}

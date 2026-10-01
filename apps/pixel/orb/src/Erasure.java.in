@@ -1,0 +1,186 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * What erasing one remembered item would do — the part of erasure that touches no Android.
+ *
+ * `Attachment.md` inv. 8 and `ERASURE.md` §2c, on the phone: **an Attachment's key may be
+ * destroyed only when no readable event still cites it.** An event that has been declared
+ * erased does not keep it alive, because its reference was destroyed with it; and
+ * *"destroyed with the last reference"* is therefore a question over history, not a stored
+ * count (Art. IX §33). The TypeScript side answers it in `evaluateDestruction`; this is
+ * the same rule over the lines the phone's own journal holds, and it is run off the phone
+ * so the two can be compared.
+ *
+ * **Text, not a parser.** The phone has no JSON parser (`Journal` can check linkage, not
+ * re-derive), and does not need one here: the journal writes canonical JSON, keys sorted,
+ * no spaces, so each field below sits at a fixed place. A quote inside a string value is
+ * escaped (`\"`), so a shared sentence that happens to contain `"attachment":"sha256:…"`
+ * cannot be mistaken for the field — `ErasureTest` proves it.
+ *
+ * **What it can erase, and what it cannot.** Only an event whose content is a *sealed
+ * attachment*. Shared **text** is written in the journal itself (`references` carries it)
+ * and the phone cannot unwrite it — so for such an event the plan is `noAttachment`, no
+ * declaration is made, and the person is told. A declaration of an erasure that did not
+ * happen would be the silent lie `ERASURE.md` §1 forbids.
+ */
+final class Erasure {
+    private Erasure() {}
+
+    static final String TYPE = "orb.erasure";
+
+    /** The outcome of planning, said to the person before anything is done. */
+    static final String WILL_DESTROY = "willDestroy";
+    static final String KEPT_BY_OTHERS = "keptByOthers";
+    static final String ALREADY_ERASED = "alreadyErased";
+    static final String NO_ATTACHMENT = "noAttachment";
+    static final String UNKNOWN_EVENT = "unknownEvent";
+
+    private static final Pattern ATTACHMENT = Pattern.compile("\"attachment\":\"(sha256:[0-9a-f]{64})\"");
+    private static final Pattern ENVELOPE_HASH = Pattern.compile("\"integrity\":\\{\"hash\":\"([0-9a-f]{64})\"");
+    private static final Pattern PAYLOAD_HASH = Pattern.compile("\"hash\":\"([0-9a-f]{64})\"");
+    private static final Pattern WALL_CLOCK = Pattern.compile("\"wallClock\":(\\d+)");
+    private static final Pattern BYTES = Pattern.compile("\"attachmentBytes\":(\\d+)");
+
+    /** One remembered item as the journal shows it. */
+    static final class Item {
+        final String hash;
+        final String type;
+        final String identity;
+        final long bytes;
+        final long wallClock;
+        final boolean erased;
+
+        Item(String hash, String type, String identity, long bytes, long wallClock, boolean erased) {
+            this.hash = hash;
+            this.type = type;
+            this.identity = identity;
+            this.bytes = bytes;
+            this.wallClock = wallClock;
+            this.erased = erased;
+        }
+    }
+
+    /** What erasing would do. */
+    static final class Plan {
+        final String outcome;
+        final String identity;
+        /** Other readable events that still cite the same content. */
+        final int others;
+
+        Plan(String outcome, String identity, int others) {
+            this.outcome = outcome;
+            this.identity = identity;
+            this.others = others;
+        }
+    }
+
+    /** The envelope hash — what the chain commits to, and what a declaration names. */
+    static String envelopeHash(String line) {
+        Matcher m = ENVELOPE_HASH.matcher(line);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /** The Attachment this event's content is, or null. */
+    static String attachmentOf(String line) {
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return null;
+        Matcher m = ATTACHMENT.matcher(line);
+        return m.find(payload) ? m.group(1) : null;
+    }
+
+    private static long number(Pattern pattern, String line, int from) {
+        Matcher m = pattern.matcher(line);
+        return m.find(from) ? Long.parseLong(m.group(1)) : -1L;
+    }
+
+    /** Every envelope hash declared erased in these lines. A pure projection; never stored. */
+    static Set<String> erasedHashes(List<String> lines) {
+        Set<String> erased = new HashSet<>();
+        for (String line : lines) {
+            if (!TYPE.equals(Journal.typeOf(line))) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0) continue;
+            Matcher m = PAYLOAD_HASH.matcher(line);
+            if (m.find(payload)) erased.add(m.group(1));
+        }
+        return erased;
+    }
+
+    /** The remembered items — events whose content is a sealed attachment — oldest first. */
+    static List<Item> items(List<String> lines) {
+        Set<String> erased = erasedHashes(lines);
+        List<Item> out = new ArrayList<>();
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            if (type == null || TYPE.equals(type)) continue;
+            String identity = attachmentOf(line);
+            String hash = envelopeHash(line);
+            if (identity == null || hash == null) continue;
+            int payload = line.indexOf("\"payload\":");
+            out.add(new Item(hash, type, identity, number(BYTES, line, payload),
+                number(WALL_CLOCK, line, 0), erased.contains(hash)));
+        }
+        return out;
+    }
+
+    /**
+     * What erasing the event with this envelope hash would do.
+     *
+     * Nothing here changes anything. It is the preview `ERASURE.md` D9 asks the owner be
+     * shown: whether the content goes, or stays because something else still cites it.
+     */
+    static Plan plan(List<String> lines, String eventHash) {
+        Map<String, Item> byHash = new LinkedHashMap<>();
+        for (Item item : items(lines)) byHash.put(item.hash, item);
+
+        Item target = byHash.get(eventHash);
+        if (target == null) {
+            // Not an attachment-bearing event: either no such event, or one whose content is
+            // in the journal itself. Say which, because the person needs different words.
+            for (String line : lines) {
+                if (eventHash.equals(envelopeHash(line))) return new Plan(NO_ATTACHMENT, null, 0);
+            }
+            return new Plan(UNKNOWN_EVENT, null, 0);
+        }
+        if (target.erased) return new Plan(ALREADY_ERASED, target.identity, 0);
+
+        int others = 0;
+        for (Item item : byHash.values()) {
+            if (item.hash.equals(target.hash) || item.erased) continue;
+            if (item.identity.equals(target.identity)) others++;
+        }
+        return new Plan(others == 0 ? WILL_DESTROY : KEPT_BY_OTHERS, target.identity, others);
+    }
+
+    /**
+     * Attachments that are declared erased, whose key may still be here, and that nothing
+     * readable cites — the half-finished erasures `Erase.reconcile` completes.
+     */
+    static List<String> owedDestruction(List<String> lines) {
+        Set<String> live = new HashSet<>();
+        Set<String> declared = new HashSet<>();
+        for (Item item : items(lines)) {
+            if (item.erased) declared.add(item.identity);
+            else live.add(item.identity);
+        }
+        declared.removeAll(live);
+        return new ArrayList<>(declared);
+    }
+
+    /** The declaration's payload: two fields, naming a lane and a hash and nothing else. */
+    static Map<String, Object> declaration(String lane, String hash) {
+        Map<String, Object> payload = Json.obj();
+        payload.put("hash", hash);
+        payload.put("lane", lane);
+        return payload;
+    }
+}

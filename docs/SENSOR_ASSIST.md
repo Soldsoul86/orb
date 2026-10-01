@@ -164,9 +164,14 @@ layer's, above this (`Art. XI §42`).
 exists. **The Event remains** — the journal is append-only (Art. I) — and it still says a
 capture of *N* characters happened in *package* at that time. Erasure removes the **content**,
 not the **fact** that something was kept; this is the same trade `SENSOR_SHARE.md` §9
-accepted. **The phone cannot yet destroy an attachment key (step 6 of the plan), so
-Remember does not store anything until it can** — the first build that stores a screen is
-the one that can also delete it.
+accepted. **The phone can now destroy an attachment key** (step 6, `DEVICE_LOOP.md` §7b46; on the
+device once v10 is run), so the gate that kept *Remember* from storing anything is
+down to one thing: the build that stores a screen must also keep that screen's text
+out of any clear payload — the property AD-12 names.
+
+**A consequence worth stating:** because a destroyed identity is never re-minted, a person
+who erases a capture and later captures the *identical* text will be told Orb will not
+keep it again (`resolveOutcome: erased`). That is `Attachment.md` inv. 8 applied.
 
 ## 9. What this sensor must never do
 
@@ -206,7 +211,7 @@ the one that can also delete it.
 
 ## 12. What it needs, and what it would block on
 
-Needs nothing not already Accepted. **Blocks on step 6** — erasing one capture on the phone
-— for the reason in §8. The general Capability → Policy → permission mechanism (Phase 3c,
+Needs nothing not already Accepted. **Step 6 is built** (erasing one capture on the phone, §8); what remains before Remember
+stores a screen is the overlay itself (step 7). The general Capability → Policy → permission mechanism (Phase 3c,
 AD-7) is not required to *ship* this, which uses the same recorded-grant shape as the
 grants watch; it is what would eventually replace the hand-rolled grant.

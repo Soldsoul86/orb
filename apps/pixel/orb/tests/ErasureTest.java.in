@@ -1,0 +1,84 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** The plan: what erasing an item would do, over lines the phone's own journal wrote. */
+final class ErasureTest {
+    private ErasureTest() {}
+
+    static final String X = "sha256:" + "a".repeat(64);
+    static final String Y = "sha256:" + "b".repeat(64);
+
+    static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    static Map<String, Object> share(String attachment, String references) {
+        Map<String, Object> p = Json.obj();
+        p.put("action", "android.intent.action.SEND");
+        p.put("because", "user.shared");
+        p.put("references", references);
+        if (attachment != null) {
+            p.put("attachment", attachment);
+            p.put("attachmentBytes", 1234L);
+        }
+        return p;
+    }
+
+    static void run() throws Exception {
+        File dir = Files.createTempDirectory("orb-erasure").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+
+        String first = hashOf(journal.append("orb.shared", share(X, "content://p/1")));
+        String second = hashOf(journal.append("orb.shared", share(X, "content://p/2")));
+        String other = hashOf(journal.append("orb.shared", share(Y, "content://p/3")));
+        // A sentence that merely *contains* the field's spelling — quotes escaped by the encoder.
+        String text = hashOf(journal.append("orb.shared",
+            share(null, "see \"attachment\":\"" + X + "\" in the doc")));
+        List<String> lines = journal.readLines();
+
+        Harness.suite("the plan — what erasing would do, said before anything is done");
+        Erasure.Plan single = Erasure.plan(lines, other);
+        Harness.equal("content nothing else cites will be destroyed", single.outcome, Erasure.WILL_DESTROY);
+        Erasure.Plan twice = Erasure.plan(lines, first);
+        Harness.equal("the same photograph shared twice stays while the other still cites it", twice.outcome, Erasure.KEPT_BY_OTHERS);
+        Harness.equal("and says how many others", twice.others, 1);
+        Harness.equal("the identity is carried for the caller", twice.identity, X);
+
+        Harness.suite("shared text cannot be unwritten, and is not declared erased");
+        Harness.equal("an event whose content is in the journal itself has no attachment",
+            Erasure.plan(lines, text).outcome, Erasure.NO_ATTACHMENT);
+        Harness.check("a sentence containing the field's spelling is not an attachment",
+            Erasure.attachmentOf(lines.get(3)) == null);
+        Harness.equal("an event the journal does not hold is unknown, not 'no attachment'",
+            Erasure.plan(lines, "0".repeat(64)).outcome, Erasure.UNKNOWN_EVENT);
+        Harness.equal("only the three attachment-bearing events are items", Erasure.items(lines).size(), 3);
+
+        Harness.suite("an erased event does not keep content alive — and nothing is counted");
+        journal.append(Erasure.TYPE, Erasure.declaration(Install.lane(context), first));
+        lines = journal.readLines();
+        Harness.check("the declaration is read back as a hash", Erasure.erasedHashes(lines).contains(first));
+        Harness.equal("so the second citation is now the last", Erasure.plan(lines, second).outcome, Erasure.WILL_DESTROY);
+        Harness.equal("and the erased one reads as already erased", Erasure.plan(lines, first).outcome, Erasure.ALREADY_ERASED);
+        Harness.equal("declaring twice is not another erasure", Erasure.plan(lines, first).others, 0);
+
+        Harness.suite("owed destruction — erasures declared and not yet done");
+        Harness.equal("content still cited by a readable event is not owed", Erasure.owedDestruction(lines).size(), 0);
+        journal.append(Erasure.TYPE, Erasure.declaration(Install.lane(context), second));
+        Harness.equal("once the last reader is declared erased it is owed",
+            Erasure.owedDestruction(journal.readLines()), Arrays.asList(X));
+
+        Harness.suite("the declaration says almost nothing");
+        Map<String, Object> d = Erasure.declaration("lane-1", "f".repeat(64));
+        Harness.equal("two fields, a lane and a hash", d.keySet().size(), 2);
+        Harness.check("and no type, summary or reason", !d.containsKey("type") && !d.containsKey("reason"));
+    }
+}

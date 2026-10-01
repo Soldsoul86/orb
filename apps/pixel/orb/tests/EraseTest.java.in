@@ -1,0 +1,94 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.List;
+
+/** Erasure for real: keys on disk, destroyed, and not minted again. */
+final class EraseTest {
+    private EraseTest() {}
+
+    private static int erasures(Journal journal) throws Exception {
+        int n = 0;
+        for (String line : journal.readLines()) if (Erasure.TYPE.equals(Journal.typeOf(line))) n++;
+        return n;
+    }
+
+    /** How many files under `dir` contain these exact bytes. */
+    private static int filesContaining(File dir, byte[] needle) throws Exception {
+        int found = 0;
+        File[] children = dir.listFiles();
+        if (children == null) return 0;
+        for (File child : children) {
+            if (child.isDirectory()) { found += filesContaining(child, needle); continue; }
+            byte[] bytes = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= bytes.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (bytes[i + j] != needle[j]) continue outer;
+                found++;
+                break;
+            }
+        }
+        return found;
+    }
+
+    static void run() throws Exception {
+        File dir = Files.createTempDirectory("orb-erase").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+
+        byte[] photo = "pretend these are a photograph's bytes".getBytes(StandardCharsets.UTF_8);
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(photo));
+        Attachments.Stored again = Attachments.store(context, new ByteArrayInputStream(photo));
+        Harness.suite("the same bytes twice are one Attachment under one key");
+        Harness.equal("first write", stored.outcome, "stored");
+        Harness.equal("second is held, not written again", again.outcome, "held");
+
+        String a = ErasureTest.hashOf(journal.append("orb.shared", ErasureTest.share(stored.identity, "content://p/1")));
+        String b = ErasureTest.hashOf(journal.append("orb.shared", ErasureTest.share(stored.identity, "content://p/2")));
+        byte[] key = Files.readAllBytes(new File(new File(dir, "attachment-keys"),
+            Attachments.address(context, stored.identity)).toPath());
+        Harness.check("the key is on disk exactly once", filesContaining(dir, key) == 1);
+
+        Harness.suite("erasing one of two citations keeps the content, and says so");
+        Erase.Result r1 = Erase.execute(context, journal, a);
+        Harness.equal("kept by the other", r1.outcome, Erase.KEPT_BY_OTHERS);
+        Harness.equal("with the count", r1.others, 1);
+        Harness.equal("the declaration was written", erasures(journal), 1);
+        Harness.equal("the key is still here", Attachments.state(context, stored.identity), Attachments.HELD_STATE);
+
+        Harness.suite("erasing the last citation destroys the key");
+        Erase.Result r2 = Erase.execute(context, journal, b);
+        Harness.equal("destroyed", r2.outcome, Erase.DESTROYED);
+        Harness.equal("the marker says destroyed", Attachments.state(context, stored.identity), Attachments.DESTROYED_STATE);
+        Harness.equal("the key bytes are on no disk file", filesContaining(dir, key), 0);
+        Harness.equal("both declarations are on the record", erasures(journal), 2);
+        Harness.equal("erasing again changes nothing", Erase.execute(context, journal, b).outcome, Erasure.ALREADY_ERASED);
+        Harness.equal("and declares nothing more", erasures(journal), 2);
+
+        Harness.suite("the same bytes arriving again do not undo it (inv. 8)");
+        Attachments.Stored back = Attachments.store(context, new ByteArrayInputStream(photo));
+        Harness.equal("refused as erased", back.outcome, "erased");
+        Harness.equal("no new key anywhere", Attachments.state(context, stored.identity), Attachments.DESTROYED_STATE);
+        Harness.equal("and no copy of the content on disk", filesContaining(dir, photo), 0);
+
+        Harness.suite("an erasure that cannot happen is not declared");
+        String text = ErasureTest.hashOf(journal.append("orb.shared", ErasureTest.share(null, "plain words")));
+        int before = erasures(journal);
+        Harness.equal("shared text has nothing sealed to erase", Erase.execute(context, journal, text).outcome, Erasure.NO_ATTACHMENT);
+        Harness.equal("and nothing is declared", erasures(journal), before);
+        Harness.equal("an unknown event likewise", Erase.execute(context, journal, "0".repeat(64)).outcome, Erasure.UNKNOWN_EVENT);
+
+        Harness.suite("a crash between declaring and destroying is finished at the next start");
+        Attachments.Stored z = Attachments.store(context, new ByteArrayInputStream("other bytes".getBytes(StandardCharsets.UTF_8)));
+        String zh = ErasureTest.hashOf(journal.append("orb.shared", ErasureTest.share(z.identity, "content://p/9")));
+        journal.append(Erasure.TYPE, Erasure.declaration(Install.lane(context), zh));   // declared, key not touched
+        Harness.equal("declared and not done reads as held", Attachments.state(context, z.identity), Attachments.HELD_STATE);
+        Harness.equal("reconcile finishes it", Erase.reconcile(context, journal), 1);
+        Harness.equal("now destroyed", Attachments.state(context, z.identity), Attachments.DESTROYED_STATE);
+        Harness.equal("and running it again finds nothing to do", Erase.reconcile(context, journal), 0);
+    }
+}

@@ -5069,3 +5069,102 @@ version; it says nothing about other makers' builds.
 Track 0 is closed. 0c's remaining unknowns are the ones deliberately left: flag bit
 256, and the screenshot switch alone (§7b45), neither needed.
 
+
+### 7b46. Step 6 — the phone can destroy a key — 2026-10-01
+
+**Status: built and tested off the phone; not yet run on it.** Predictions are written
+here before the first erasure. `orb-app-v10-erase.apk`.
+
+#### What it does, in one paragraph
+
+*Kept by Orb: erase* lists what Orb holds under a key it can destroy — time, kind, size,
+**never the content** — and erases one on request, after saying what that will do.
+Erasing **declares first, then destroys**: an `orb.erasure` event naming `{lane, hash}`,
+then the key is overwritten and deleted and the ciphertext removed. If something else
+readable still cites the same content, the declaration stands and the content stays
+until the last of them is erased — the rule of `Attachment.md` inv. 8, which is a
+question over history (*can any readable event still resolve this?*) and **not a stored
+count**.
+
+#### The design decisions that were not obvious
+
+1. **Declare, then destroy.** The other order has a crash window in which content is gone
+   and nothing says so (`ERASURE.md` §1: *never silently*). Declare-first leaves, at worst,
+   *declared and not yet done*, and `Erase.reconcile` finishes it at the next start
+   (tested by simulating exactly that crash).
+2. **A marker, written before the key is touched, outranks the key.** Destruction writes
+   a tombstone (named by the *blinded* address, never the identity), then overwrites and
+   deletes the key, then deletes the ciphertext. A crash between the first two leaves both
+   on disk and reads as **destroyed**, not held.
+3. **The same bytes do not undo it.** `Attachment.md` inv. 8 and `ERASURE.md`: a keyring
+   that minted a fresh key on the next `put` would make an erasure reversible by an accident
+   of timing. So `store` and `mintKey` both refuse a destroyed identity. **A consequence to
+   know:** if you erase a capture and later capture *the identical text*, Orb will not keep
+   it again and will say so — recorded as `resolveOutcome: erased`, `absenceReason:
+   erased`, which is **not** `unfetched` (a helpful peer would restore the second and must not
+   restore the first). That is the contract, applied to a case — repeated identical captures
+   — that text makes likelier than photographs do.
+4. **Nothing is declared that did not happen.** An event whose content is *in the journal
+   itself* cannot be unwritten by this app, so for it the plan is `noAttachment`, **no
+   declaration is written**, and the screen says so.
+5. **No parser.** The phone cannot parse JSON. The journal writes canonical JSON (keys
+   sorted, no spaces), so the three fields needed — the envelope hash, the `attachment`
+   identity, the declaration's hash — sit at fixed places, and a quote inside a string is
+   escaped, so a sentence that contains the field's spelling is not the field (tested).
+   **Checked on your real export**: from 5 shares the extractor finds exactly the 3 that
+   carry a sealed photograph, pairs the two that are the same photograph (`keptByOthers`,
+   1 other) and leaves the single one `willDestroy`.
+
+#### Cross-implementation agreement
+
+`tests/fixtures/erasure-export.txt` is written by **`Erase.execute` itself** against real
+keys on a temp disk (`tools/gen-erasure-export.sh`): one photograph shared twice, the
+first erasure kept, the second destroying, the bytes offered again and refused. The
+TypeScript side then reads it: the chain verifies; `erasedHashes` returns exactly the two
+envelope hashes the phone named — computed by a regex on the phone and by the encoder
+here, so a match means they agree; `confirmationsFor` names the phone as the confirming
+device; a declaration carries a lane and a hash and nothing else; the refused re-share says
+`erased`. Tests: **39** on the phone's side (off-device JVM), **355** TypeScript.
+
+Mutation-checked: letting an erased event keep content alive fails 4 checks; removing the
+tombstone check in `store` fails the re-share refusal; not deleting the key fails the
+reconcile checks.
+
+#### What it does **not** do — and is registered, not hidden (AD-12)
+
+- **Shared text cannot be erased.** `references` carries the text itself in the clear, and
+  the phone has no sealed payloads. Only sealed attachments are erasable on the phone. The
+  screen says so; the assist capture was designed for this (text sealed, only numbers in
+  the clear), shares of plain text were not.
+- **A destroyed key on flash is not a guarantee of destroyed bytes.** Overwrite-then-delete
+  does not control where the storage keeps stale copies. What makes the content
+  unrecoverable is that the key lived nowhere else and, on the phone, file-based encryption
+  keeps what is left unreadable. A hardware-backed key is the stronger answer and is a port,
+  not built.
+- **The desk does not yet act on a declaration.** `erasedHashes` is a projection; nothing
+  on the laptop detaches an erased event's payload. The replica keeps the clear payload —
+  for a sealed attachment that is a content-source URI and numbers, never the content.
+- **Other devices:** there are none yet. The screen says other devices may hold copies of the
+  *record*; the content was only ever on this phone.
+
+#### Predictions (before the run)
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P34** | The screen lists your photograph shares, **two rows for the photograph shared twice** and one for the other | The extractor or the screen is wrong; the real-export check passed off-device, so suspect the screen |
+| **P35** | Erasing the first of the twice-shared pair says the content is *also kept by 1 other*; the export gains **one** `orb.erasure`, and the photograph is not destroyed | The guard let a still-cited key go — the serious failure |
+| **P36** | Erasing the second says nothing else keeps it; the export gains a **second** `orb.erasure`; and the two hashes are exactly those of the two shares (TypeScript `erasedHashes` equals them) | The two implementations disagree on the hash; the declaration names nothing |
+| **P37** | Sharing that same photograph again records `resolveOutcome: erased`, `absenceReason: erased`, no attachment — Orb says it recorded the share, and the content is **not** kept | The erasure was undone by the same bytes — the key was re-minted; a defect in `store` that the off-device test missed |
+| **P38** | A shared **text** is not on the screen | It is: the screen lists something it cannot erase |
+
+#### The operator's protocol
+
+1. Install `orb-app-v10-erase.apk` (updates Orb in place).
+2. Take a screenshot of anything that is not private. Share it to Orb **twice**.
+3. Orb → **Kept by Orb: erase**. You should see the new pair plus your earlier photographs.
+4. Erase the **newer** of the new pair. Read what the dialog says. Confirm.
+5. Erase the **older** of the pair. Read what the dialog says. Confirm.
+6. Share the **same screenshot** a third time.
+7. **Export and share journal.**
+
+(Do not erase your earlier photographs unless you mean to. Erasing is permanent.)

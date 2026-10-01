@@ -1,0 +1,11 @@
+package @PKG@;
+
+/** Entry point. Exits non-zero on any failed check. */
+public final class Tests {
+    public static void main(String[] args) throws Exception {
+        System.out.println("orb app, erasure on the phone");
+        ErasureTest.run();
+        EraseTest.run();
+        System.exit(Harness.report());
+    }
+}

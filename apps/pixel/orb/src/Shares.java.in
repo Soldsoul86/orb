@@ -117,6 +117,9 @@ final class Shares {
             Map<String, Object> payload, String outcome, String detail, String identity, long bytes) {
         payload.put("resolveOutcome", outcome);
         if (detail != null) payload.put("resolveDetail", detail);
+        // *Erased* and *never fetched* are different answers (`ERASURE.md` §7): the first
+        // tells a helpful peer not to restore it. `declared` set the optimistic one.
+        if ("erased".equals(outcome)) payload.put("absenceReason", "erased");
         if (identity != null) {
             payload.put("resolved", true);
             payload.put("attachment", identity);

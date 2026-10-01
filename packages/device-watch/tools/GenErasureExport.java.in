@@ -1,0 +1,65 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.Map;
+
+/**
+ * Writes an export in which the phone has erased things, for the TypeScript side to read.
+ *
+ * Not a hand-built imitation: this runs **`Erase.execute` itself**, against real keys on a
+ * temp disk. The same photograph is "shared" twice (one Attachment, two citations); the
+ * first erasure is kept by the second citation, the second destroys the key; the same
+ * bytes are then offered again and refused. What comes out is exactly what the phone
+ * would write, so `erasedHashes` and `verifyLane` are tested against the Java writer
+ * and not against someone's idea of it. The bytes are invented and identify nothing.
+ */
+public final class GenErasureExport {
+    private static long clock = 1000;
+
+    public static void main(String[] args) throws Exception {
+        File dir = Files.createTempDirectory("orb-gen-erasure").toFile();
+        Context context = new Context(dir);
+        String install = "orb-000000000000000000000002";
+        Journal journal = Journal.open(context, Install.lane(context), install);
+
+        journal.append("orb.process.start", Start.record(
+            "16", 36L, "2026-01-01", "TEST.000000.000", "Test phone", "test", tick(), 1234L, "0.1-test"));
+
+        byte[] bytes = "invented bytes standing in for a photograph".getBytes(StandardCharsets.UTF_8);
+        Attachments.Stored first = Attachments.store(context, new ByteArrayInputStream(bytes));
+        String a = share(journal, "photo-1", first);
+        Attachments.Stored second = Attachments.store(context, new ByteArrayInputStream(bytes));
+        String b = share(journal, "photo-2", second);
+
+        // Kept by the other citation, then destroyed with the last one.
+        Erase.execute(context, journal, a);
+        Erase.execute(context, journal, b);
+
+        // The same bytes offered again: refused, and recorded as erased, not unfetched.
+        Attachments.Stored back = Attachments.store(context, new ByteArrayInputStream(bytes));
+        share(journal, "photo-3", back);
+
+        for (String line : journal.readLines()) System.out.println(line);
+    }
+
+    private static String share(Journal journal, String name, Attachments.Stored stored) {
+        Map<String, Object> payload = Shares.declared(
+            "android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/" + name));
+        Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
+        payload.put("elapsedRealtimeMs", tick());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) journal.append("orb.shared", payload).get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static long tick() {
+        clock += 1000;
+        return clock;
+    }
+}

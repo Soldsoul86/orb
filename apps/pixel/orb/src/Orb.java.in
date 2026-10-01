@@ -76,6 +76,10 @@ public final class Orb extends Application {
 
         recordStart();
 
+        // Finish any erasure that was declared and not completed (the crash window between
+        // the declaration and the key's destruction). Idempotent; never blocks launching.
+        Erase.reconcile(this, journal);
+
         // Ported from pass 2 B (§7b36). The grant reads cost nothing and run
         // unconditionally; the package scan is gated by `PackageAccess`.
         watch = new Watch(this, journal);

@@ -482,3 +482,32 @@ note in `SETTLED.md`) but it is the operator's to accept.
 `dataExtractionRules`/`fullBackupContent` on every Orb build. **Revisit:** before any
 capture beyond what a person explicitly shares — i.e. before step 7's prototype
 stores a screen.
+
+---
+
+## AD-12 — the phone can erase a sealed attachment and nothing else
+
+**Opened 2026-10-01** (`DEVICE_LOOP.md` §7b46). **A boundary, stated so it is not
+discovered later.** Step 6 gave the phone the one erasure it can honestly perform:
+destroying an Attachment's key. `ERASURE.md`'s ruling — *"all these proofs are mine, I
+should be able to erase it"* — is met for sealed attachments and **not** for anything the
+journal holds in the clear.
+
+**What is out of reach.**
+
+| | Why |
+| --- | --- |
+| Shared **text** (`references` carries it) | the phone has no sealed payloads; the text is written in the journal itself and cannot be unwritten |
+| Any event payload | the phone writes payloads in the clear; payload-key sealing exists in `runtime/journal` (`sealedStore`) and not in `Journal.java` |
+| The desk's replica | nothing applies a received `orb.erasure`; `erasedHashes` is a projection only, so a replicated event keeps its clear payload |
+
+**Why it is not worse.** The assist capture (`SENSOR_ASSIST.md` §6) was designed so only
+numbers and the package are in the clear and the text is a sealed attachment; photograph
+shares keep only a content-source URI and size in the clear. What cannot be erased is what
+was never sealed.
+
+**Leading option.** Port payload sealing to the phone's journal (the `v2` envelope is already
+written; the keyring is not), then honour declarations on the desk. **Revisit:** before
+Orb stores anything beyond sealed attachments, or when plain-text shares matter — and
+before any claim that Orb can "forget everything" is made to a person.
+
