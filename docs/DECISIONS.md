@@ -1064,6 +1064,21 @@ Java; nothing here sends anything off the phone.
 non-phone implementation (Rust) ever pays for itself.
 
 
+## DR-17 — An erased item may be kept again, once, by the person's confirmation (proposed)
+
+- **Status:** **Proposed** · **Proposed:** 2026-10-01 · **Direction chosen by the operator** ("go with your
+  recommendation, option 2"); the design below awaits their go-ahead · **Bears on:** `contracts/Attachment.md` inv. 8,
+  `ERASURE.md` §2c, `REKEEP.md`
+
+**The question.** Erasing refuses the same exact bytes for ever, including when the person deliberately shares them again.
+
+**The proposal.** Arrival never undoes an erasure; the person may, once and knowingly, per item. A confirmation names the
+date of the erasure; "Keep again" mints a fresh key and writes a new event citing the erasure in `causes`. Replay needs no
+change (the projection is identity-based, and the new event is live). Full design, crash windows and risks: `REKEEP.md`.
+
+**Not yet changed:** inv. 8's text, any code.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
