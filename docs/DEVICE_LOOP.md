@@ -5823,7 +5823,7 @@ screen text, so those three rest on the operator's word, not on the journal.
 
 ### 7b56. Where did this come from? — B2c, the first caller of the graph — 2026-10-01
 
-**Status: built, not yet run on the device.** `orb-app-v20-provenance.apk`. v19 is §7b55 (verified).
+**Status: verified on the device — P74–P80 held** (the export shows P75 and P77; the window's text is seen only on the phone, so P74, P76, P78, P79 and P80 rest on the operator's word: *"All steps done"*). `orb-app-v20-provenance.apk`. v19 is §7b55 (verified).
 
 #### What changed (`docs/PHONE_BRAIN.md` B2c)
 
@@ -5874,3 +5874,27 @@ they drift; one source with the other as a cross-check is how they are kept hone
 3. Open an item whose words were kept more than once, tap **Erase** and read the dialog; do **not** confirm yet. Compare with
    *Where from?* on the same item. *(P76, P77)*
 4. Erase one item, then **Export and share journal**. *(P77)*
+
+#### Result (`orb-20261001-175256.txt`, 243 events, `verifyLane`-clean)
+
+- v20 started (versionCode 29847613). **Every translatable event is observed** — 22 captures + 17 shares = 39
+  Observations — and there is no `orb.observe.failed`: the pass is steady.
+- **P75 held.** The new captures' Observations were written 5–10 ms after them (within the one-minute rule, so only
+  *It happened* is shown).
+- **P76/P77 held, and the interesting case was exercised.** The operator kept one unchanged Settings screen twice (the second
+  `held`: same sealed text, two citations), then erased the second. `attachmentsDestroyed` stayed **13** — the key was *not*
+  destroyed, because the first still keeps the words — and **that item's Observation is still in the journal**, which is exactly
+  what the new erase sentence promises.
+- **P80 held** — the window ran (reported by the operator); this is the first on-device run of the Kotlin graph (AD-14 stays closed).
+
+#### Finding: a shared picture is kept, but Recall does not list it
+
+The operator shared a screenshot to Orb by hand: *"it was shared but not remembered"*. The export shows it **was** kept — two image
+shares (`image/png`, 199,800 bytes, `resolved: true`, `stored`; `content://media/external/images/media/233367` and `…368`), each
+sealed under its own key (keys held 10 → 14) and each observed. They are in **Kept by Orb** (erasable there). They are not in
+**Recall** because Recall searches and shows the **text** of remembered screens, and Orb does not read pictures. So "kept" and
+"remembered" are different on purpose today: *kept* is sealed storage, *remembered* is searchable words. Nothing is wrong with the
+journal; the gap is that a person cannot **see** a picture they shared. Candidates (B-track / Track C, not started): list shared
+items in Recall with their facts and a secure viewer; or read text out of a picture on the phone (needs a vision/OCR step —
+DR-16 rules a model out of the first reasoning step, so this would be a decision).
+
