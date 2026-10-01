@@ -910,9 +910,8 @@ records that its gate was accepted, not what its work is.
 
 ## DR-14 — Payments apps are never captured by the assistant overlay
 
-- **Status:** Decided in part · **Decided:** 2026-09-29, operator · **Bears on:**
-  `DEVICE_LOOP.md` §7b42, `ARCHITECTURAL_DEBT.md` AD-11, the step-5 sensor
-  declaration (not yet written)
+- **Status:** Decided · **Decided:** 2026-09-29 and 2026-10-01, operator · **Bears on:**
+  `DEVICE_LOOP.md` §7b42, `ARCHITECTURAL_DEBT.md` AD-11, `SENSOR_ASSIST.md`
 
 **The question.** The assist probe showed that Android hands an assistant an intact
 screenshot and full structure of any screen whose app did not opt out — including a
@@ -949,14 +948,20 @@ payments screen (`DEVICE_LOOP.md` §7b42, P26). Which apps may Orb ever capture 
 6. **Platform backup off now** (AD-11), before anything beyond a deliberate share is
    captured.
 
-**Still open — step 5 writes these down with the operator, they are not decided here.**
+**Also ruled, 2026-10-01 — step 5's three open points, on the operator's "go with your
+suggestions".**
 
-- How a person adds an app to the allow-list, and whether a brand-new install starts
-  empty (the consistent reading of ruling 4).
-- **How long kept text lives**, and what erasing one capture does (step 6).
-- Whether *text only* holds for an app that delivers no text (a payments-shaped
-  screen of 50 nodes and none with text was seen): the honest outcome is *nothing
-  kept, and the person told*, not a fallback to the picture — to be confirmed.
+7. **How an app joins the allow-list:** an Orb screen with a switch per app, **starting
+   empty**. The list is the projection of grant/revoke events, never a stored list.
+8. **Retention:** kept **until the person deletes it**, no expiry. Deleting destroys the
+   key; the event remains and says only that a capture of *N* characters existed.
+9. **A capture needs both the structure and the screenshot to have arrived.** The
+   screenshot is never stored; it checks for screens that protected themselves without
+   marking their structure. Missing screenshot ⇒ *cannot check* ⇒ nothing kept.
+
+All of it is mechanism in `SENSOR_ASSIST.md`. **Not ruled, and written there as
+proposals:** a short list of payments packages that cannot be allowed; excluding
+accessibility descriptions; the decision timeout.
 
 ---
 

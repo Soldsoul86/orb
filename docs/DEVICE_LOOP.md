@@ -5057,3 +5057,15 @@ from a phone). 0c: P31, P33 and P29 answered; P32 not measured and not needed; f
 unknown by design. **One fact is still missing:** whether the stub-less build was *absent
 from the chooser* or *never selected* (P30). The platform never bound it; the data
 cannot say why.
+
+#### P30 — answered, 2026-10-01
+
+The operator confirms the stub-less build **did not appear in the Default digital
+assistant list**. With the data (no `assist.service.ready` ever written, no invocation), that is **P30 refuted**: on this device a sideloaded assistant is
+offered **only if it declares a recognition service**. The do-nothing stub stays, and
+`SENSOR_ASSIST.md` records it as required. Caveat: measured on one phone and one Android
+version; it says nothing about other makers' builds.
+
+Track 0 is closed. 0c's remaining unknowns are the ones deliberately left: flag bit
+256, and the screenshot switch alone (§7b45), neither needed.
+
