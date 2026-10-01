@@ -544,8 +544,7 @@ C is the one to refuse unless a way to erase *within* an index is found.
    that ships in the APK is** (its SHA-1 matches Maven Central's).
 2. **The library ships unshrunk** (a 2.2 MB dex; the APK went from 58 KB to 750 KB). A shrinker (R8) would cut it, at
    the cost of one more tool whose effect on a security-sensitive app has to be understood.
-3. **Nothing Kotlin has run on the phone yet.** It compiles and dexes; whether it behaves on the device is
-   shown only when the first piece ships.
+3. ~~Nothing Kotlin has run on the phone yet.~~ **Closed 2026-10-01**: the first Kotlin piece ran on the device (`DEVICE_LOOP.md` §7b55, P68–P69).
 
 **Revisit when:** the first Kotlin piece is on the device (item 3 closes); the APK size matters (item 2); or
 a second source for the compiler's checksum exists (item 1).

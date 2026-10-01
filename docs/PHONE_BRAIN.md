@@ -1,7 +1,7 @@
 # The phone's brain — B2: Observations, then the Evidence Graph, on the phone
 
-> Status: **approved by the operator 2026-10-01** ("Yes to all three, go ahead"). **B2a built,
-> not yet run on the device** (`DEVICE_LOOP.md` §7b55, `orb-app-v19-observe.apk`). B2b and B2c are not started.
+> Status: **approved by the operator 2026-10-01** ("Yes to all three, go ahead"). **B2a built
+> and verified on the device** (`DEVICE_LOOP.md` §7b55, `orb-app-v19-observe.apk`). B2b and B2c are not started.
 > Implements `ROADMAP.md` Track B step B2 under `DECISIONS.md` DR-16 (Kotlin for the phone's
 > reasoning layers; rules before any model). Contracts: `Observation.md`, `Evidence.md`;
 > `EVIDENCE_GRAPH.md` is the architecture. **No contract text changes here.**

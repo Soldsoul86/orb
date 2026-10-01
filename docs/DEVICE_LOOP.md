@@ -5752,7 +5752,7 @@ screen text, so those three rest on the operator's word, not on the journal.
 
 ### 7b55. The phone observes itself — B2a, the first Kotlin on the device — 2026-10-01
 
-**Status: built, not yet run on the device.** `orb-app-v19-observe.apk` (versionCode 29847562+).
+**Status: verified on the device — P68–P73 held.** `orb-app-v19-observe.apk` (versionCode 29847565).
 **First, v18 on the device** (`orb-20261001-162423.txt`, 185 events): P63–P67 held — see §7b54.
 
 #### What changed (`docs/PHONE_BRAIN.md` B2a)
@@ -5800,3 +5800,23 @@ screen text, so those three rest on the operator's word, not on the journal.
 4. Share one thing to Orb. *(P71)*
 5. Orb → **Kept by Orb** and look; erase the newest capture. *(P73)*
 6. **Export and share journal** again and send both exports. *(P72)*
+
+#### Result (`orb-20261001-170050.txt`, 220 events; `orb-20261001-170301.txt`, 228 events — both `verifyLane`-clean)
+
+- **P68 held.** v19 (versionCode 29847565) started; Kotlin loaded on the phone.
+- **P69 held, to the number.** The first export holds **31 `orb.observation` events — exactly the 14 shares and 17
+  captures — each citing one event, no event cited twice, none unobserved, and no `orb.observe.failed`.** It is
+  what the brain predicted on the v18 export before the phone ran it.
+- **P70, P71 held.** Between the exports: two captures (17→19) and one share (14→15), and the Observations
+  went 31→34 — one each, citing the new events. Nothing was observed twice.
+- **P73 held.** One `orb.erasure` was declared and `attachmentsDestroyed` is **13** in the second export; the
+  Observation of the erased capture remains (34 Observations, none removed).
+- **P72 held on real data.** Both exports verify under the TypeScript verifier, **with causes in the hash** — the
+  Java encoder and TypeScript agree on lineage. Importing the first export translates **26** events on the
+  laptop: exactly the 17 grant readings and 9 package scans, which the phone does not observe (by design); **none**
+  of the 31 phone-observed events is translated again. Importing the second adds 0.
+- Not shown by an export, so resting on the operator's word: *Kept by Orb* listing the same items (no complaint
+  came back).
+
+**What this closes:** AD-14 item 3 — Kotlin runs on the phone. B2a is done. Next is B2b, the graph.
+
