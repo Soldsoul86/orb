@@ -1,6 +1,6 @@
 # Keeping erased words again — design (proposed)
 
-> Status: **proposed 2026-10-01, awaiting the operator's go-ahead to build.** Nothing here is built.
+> Status: **approved 2026-10-01 ("Go") and built** (`DEVICE_LOOP.md` §7b61, `orb-app-v26-keepagain.apk`). The design below is as approved, with the deviations in §10.
 > Decision record: `DECISIONS.md` DR-17. Bears on `contracts/Attachment.md` inv. 8, `ERASURE.md` §2c,
 > `DEVICE_LOOP.md` §7b60 (which made shared text erasable), `BACKUP` behaviour in `DURABILITY.md`.
 
@@ -95,3 +95,19 @@ for something else, and the declaration is history).
 1. **Scope:** shared text and remembered screens now; pictures/files later.
 2. **The wording and default:** *"You erased this on <date>. Keep it again?"* — default **Not now**.
 3. **The contract note** in §5 (inv. 8 gains the "unless the owner confirms" clause).
+
+## 10. As built — deviations from the design above
+
+- **Shared text: one event, written after the answer** (as designed). If the activity ends with the question unanswered (home button, the
+  share task cleared), it records the refusal, as *Not now*; rotation does not re-ask (`configChanges`). If the process is *killed* with the
+  dialog showing, nothing is recorded for that share — the same as a share killed during sealing. Stated, not hidden.
+- **Remembered screens: two events**, because there are two taps — *Remember* (refused → `orb.assist.captureFailed`, outcome `erased`, as
+  before) and then *Keep again* (`orb.assist.captured` with `rekept: true`, citing the erasure). The card keeps the text in memory until the
+  person answers or closes it; closing is *Not now* and discards it.
+- **A re-keep that cannot be recorded goes back to erased** — the marker returns and the key is gone — and not to *never kept*, which a plain
+  store would accept.
+- **The dialog is shown only when history holds an erasure to reverse.** A destroyed marker with no declaration (nothing a person can be shown)
+  keeps the plain refusal.
+- **The flag is `rekept: true`** in the share and capture records, carried through the TypeScript and Kotlin translations; the Erasure projection reads it
+  for *Where from?* ("You had erased this and chose to keep it again.").
+- **Desk parity** is AD-16 (below in `ARCHITECTURAL_DEBT.md`): the TypeScript keyring still refuses.

@@ -151,6 +151,9 @@ final class CaptureTest {
             @Override public Map<String, Object> append(String type, Map<String, Object> payload) {
                 return AssistFacts.CAPTURED.equals(type) ? null : other.append(type, payload);
             }
+            @Override public Map<String, Object> appendCiting(String type, Map<String, Object> payload, java.util.List<String> causes) {
+                return AssistFacts.CAPTURED.equals(type) ? null : other.append(type, payload, causes);
+            }
         };
         Capture.Result lost = Capture.remember(context2, other, failing, screen("will not be recorded"), "com.example.chat", 7L, false);
         Harness.equal("reported as a journal failure", lost.outcome, Capture.JOURNAL_FAILED);

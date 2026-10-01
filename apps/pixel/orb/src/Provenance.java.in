@@ -52,6 +52,8 @@ final class Provenance {
         /** The graph could see everything it needed. False means every "nothing" above is a lower bound. */
         boolean closed;
         int unreadableLines;
+        /** The person erased this content before and chose to keep it again. */
+        boolean keptAgain;
         /** Live items (this one included) that keep the same sealed content — from `Erasure`. */
         int sameContent;
         String shortId;
@@ -100,6 +102,7 @@ final class Provenance {
         for (Erasure.Item item : Erasure.items(lines)) {
             if (item.id != null && item.id.equals(eventId)) {
                 f.app = item.packageName;
+                f.keptAgain = item.rekept;
                 int same = 0;
                 for (Erasure.Item other : Erasure.items(lines)) {
                     if (!other.erased && other.identity.equals(item.identity)) same++;
@@ -128,6 +131,7 @@ final class Provenance {
         boolean share = f.kind.equals("share");
         StringBuilder out = new StringBuilder();
         out.append(share ? "You shared this to Orb." : "You asked Orb to remember this screen.").append('\n');
+        if (f.keptAgain) out.append("You had erased this and chose to keep it again.\n");
         if (f.app != null) out.append("App:  ").append(f.app).append('\n');
         out.append("It happened:  ").append(when.format(new Date(f.happened))).append('\n');
         if (!f.observed) {

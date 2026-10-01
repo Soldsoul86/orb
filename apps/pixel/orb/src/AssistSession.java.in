@@ -63,6 +63,8 @@ public final class AssistSession extends VoiceInteractionSession {
     private boolean confirmingAllow;
     /** What the screen said — memory only, emptied by `end()`. */
     private ScreenText pending;
+    /** While the card asks whether to keep erased text again: the content refused. Null otherwise. */
+    private String erasedIdentity;
 
     private boolean screenshotDone;
     private boolean screenshotArrived;
@@ -132,7 +134,7 @@ public final class AssistSession extends VoiceInteractionSession {
         recordButton.setText("Remember");
         recordButton.setVisibility(View.GONE);
         recordButton.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { remember(); }
+            @Override public void onClick(View view) { if (erasedIdentity != null) keepAgain(); else remember(); }
         });
         card.addView(recordButton);
 
@@ -290,6 +292,8 @@ public final class AssistSession extends VoiceInteractionSession {
 
     private void show(String text, boolean offerAllow, boolean offerRecord) {
         if (message == null) return;
+        erasedIdentity = null;
+        recordButton.setText("Remember");
         closeButton.setText("Close");
         message.setText(text);
         allowButton.setVisibility(offerAllow ? View.VISIBLE : View.GONE);
@@ -363,6 +367,8 @@ public final class AssistSession extends VoiceInteractionSession {
         if (journal == null || packageName == null || pending == null) return;
         Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode(),
             UpiApps.isPayments(getContext(), packageName, exceptions()));
+        // Erased before: the person may be asked, and the text stays in memory until they answer or close.
+        if (result.outcome.equals("erased") && result.erasedIdentity != null && offerKeepAgain(journal, result.erasedIdentity)) return;
         // Kept or not, the text leaves memory now.
         pending.discard();
         pending = null;
@@ -373,6 +379,53 @@ public final class AssistSession extends VoiceInteractionSession {
             show("You erased this exact content before, so Orb will not keep it again.", false, false);
         } else if (result.outcome.equals(Capture.NOT_ALLOWED)) {
             show("This app is no longer allowed, so nothing was kept.", false, false);
+        } else {
+            show("Orb could not keep this. Nothing was kept.", false, false);
+        }
+    }
+
+    /** Asks whether to keep erased text again. Closing the card is *Not now*. False if history holds no erasure to reverse. */
+    private boolean offerKeepAgain(Journal journal, String identity) {
+        Erasure.Reversible erased;
+        try {
+            erased = Erasure.reversible(journal.readLines(), identity);
+        } catch (IOException unreadable) {
+            return false;
+        }
+        if (erased == null) return false;
+        String when = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+            .format(new java.util.Date(erased.erasedAt));
+        show("You erased this exact text on " + when + ".\n\nKeep it again? Orb will remember that you chose to.", false, true);
+        erasedIdentity = identity;
+        recordButton.setText("Keep again");
+        closeButton.setText("Not now");
+        return true;
+    }
+
+    /** The person tapped *Keep again*. The only place in this file a `Rekeep` is built. */
+    private void keepAgain() {
+        Journal journal = journal();
+        String identity = erasedIdentity;
+        if (journal == null || packageName == null || pending == null || identity == null) return;
+        Rekeep confirmed;
+        try {
+            confirmed = Rekeep.confirmed(journal.readLines(), identity);
+        } catch (IOException unreadable) {
+            confirmed = null;
+        }
+        if (confirmed == null) {
+            pending.discard();
+            pending = null;
+            show("Orb could not keep this. Nothing was kept.", false, false);
+            return;
+        }
+        Capture.Result result = Capture.remember(getContext(), journal, pending, packageName, versionCode(),
+            UpiApps.isPayments(getContext(), packageName, exceptions()), confirmed);
+        pending.discard();
+        pending = null;
+        if (result.kept()) {
+            Observe.run(journal);
+            show("Kept again. You can find it in Orb → Kept by Orb, and erase it there.", false, false);
         } else {
             show("Orb could not keep this. Nothing was kept.", false, false);
         }

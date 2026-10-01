@@ -1,0 +1,34 @@
+package @PKG@;
+
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * A person's confirmation to keep, again, content they erased — and nothing else that can lift an erasure.
+ *
+ * `Attachment.md` inv. 8: an erasure is not undone by the same bytes **arriving** again. It may be undone by the
+ * person, knowingly, for that item (`REKEEP.md`). This is how the difference is made unforgeable by accident: the
+ * store lifts a destroyed marker only when handed one of these, the constructor is private, and the only factory is
+ * `confirmed` — called from the handlers of the two buttons a person taps (`ShareActivity`, `AssistSession`), which a
+ * source guard (`RekeepTest`) holds to be the only callers. A token is for **one identity**: the store refuses it for
+ * any other content.
+ *
+ * It carries the erasure declarations it reverses, so the new event can cite them in `causes` (show your working).
+ */
+final class Rekeep {
+    final String identity;
+    final List<String> causes;
+    final long erasedAt;
+
+    private Rekeep(String identity, List<String> causes, long erasedAt) {
+        this.identity = identity;
+        this.causes = Collections.unmodifiableList(causes);
+        this.erasedAt = erasedAt;
+    }
+
+    /** The token for a person's "keep it again", or null if history holds no erasure of this content to reverse. */
+    static Rekeep confirmed(List<String> lines, String identity) {
+        Erasure.Reversible erased = Erasure.reversible(lines, identity);
+        return erased == null ? null : new Rekeep(identity, erased.declarations, erased.erasedAt);
+    }
+}

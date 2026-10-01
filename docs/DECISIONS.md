@@ -1064,10 +1064,10 @@ Java; nothing here sends anything off the phone.
 non-phone implementation (Rust) ever pays for itself.
 
 
-## DR-17 — An erased item may be kept again, once, by the person's confirmation (proposed)
+## DR-17 — An erased item may be kept again by the person's confirmation
 
-- **Status:** **Proposed** · **Proposed:** 2026-10-01 · **Direction chosen by the operator** ("go with your
-  recommendation, option 2"); the design below awaits their go-ahead · **Bears on:** `contracts/Attachment.md` inv. 8,
+- **Status:** **Decided and built** · **Decided:** 2026-10-01, operator ("go with your recommendation, option 2", then
+  "Go" to the written design) · **Bears on:** `contracts/Attachment.md` inv. 8,
   `ERASURE.md` §2c, `REKEEP.md`
 
 **The question.** Erasing refuses the same exact bytes for ever, including when the person deliberately shares them again.
@@ -1076,7 +1076,8 @@ non-phone implementation (Rust) ever pays for itself.
 date of the erasure; "Keep again" mints a fresh key and writes a new event citing the erasure in `causes`. Replay needs no
 change (the projection is identity-based, and the new event is live). Full design, crash windows and risks: `REKEEP.md`.
 
-**Not yet changed:** inv. 8's text, any code.
+**Done:** `contracts/Attachment.md` inv. 8 gained the "unless the owner confirms" clause; the phone implements it for shared text
+and remembered screens (`DEVICE_LOOP.md` §7b61). Pictures, files and the desk's keyring are not covered (`ARCHITECTURAL_DEBT.md` AD-16).
 
 
 ## Provenance

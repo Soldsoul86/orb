@@ -36,7 +36,7 @@ describe("an export in which the phone erased things", () => {
   test("its declarations name the envelope hashes the TypeScript side computes", async () => {
     const events = parseExport(await fixture());
     const shares = events.filter((event) => event.type === "orb.shared");
-    assert.equal(shares.length, 3);
+    assert.equal(shares.length, 4);
 
     // The phone extracted these hashes from its own lines with a regex; they must be the
     // hashes the chain actually commits to, or every declaration would name nothing.
@@ -80,16 +80,29 @@ describe("an export in which the phone erased things", () => {
     assert.equal(a["resolveOutcome"], "stored");
     assert.equal(b["resolveOutcome"], "held");
   });
+
+  test("a re-keep is a new event that cites the erasures it reverses, under a fresh key", async () => {
+    const events = parseExport(await fixture());
+    const declarations = events.filter((event) => event.type === "orb.erasure");
+    const shares = events.filter((event) => event.type === "orb.shared");
+    const again = shares[3]!;
+    const payload = unwrapPayload(again.payload) as Record<string, unknown>;
+    assert.equal(payload["rekept"], true);
+    assert.equal(payload["resolveOutcome"], "stored", "sealed anew, not held: the old key never returned");
+    assert.equal(payload["attachment"], (unwrapPayload(shares[0]!.payload) as Record<string, unknown>)["attachment"]);
+    assert.deepEqual([...(again.causes ?? [])].sort(), declarations.map((d) => d.id).sort(), "lineage names both declarations");
+    assert.ok(!erasedHashes(events).has(again.integrity.hash), "the re-keep is live; the earlier citations stay erased");
+  });
 });
 
 describe("importing it", () => {
   const desk = () => Journal.open({ lane: "mac", device: "mac-01", store: new MemoryJournalStore() });
 
-  test("the erasures are bookkeeping, not Observations; the three shares still are", async () => {
+  test("the erasures are bookkeeping, not Observations; the four shares still are", async () => {
     const j = await desk();
     const result = await importExport(j, await fixture());
-    assert.equal(result.replicated, 6);
-    assert.equal(result.observed, 3, "an erasure declaration and a process start are Events");
+    assert.equal(result.replicated, 7);
+    assert.equal(result.observed, 4, "an erasure declaration and a process start are Events");
   });
 
   test("and importing it again is a no-op", async () => {

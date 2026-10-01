@@ -52,4 +52,32 @@ final class SharedText {
         }
         return out;
     }
+
+    /** Seals the words. With a `Rekeep` for exactly these words, content that was erased is kept again (`REKEEP.md`). */
+    static Attachments.Stored seal(android.content.Context context, String text, Rekeep rekeep) {
+        return Attachments.store(context, new java.io.ByteArrayInputStream(document(text)), rekeep);
+    }
+
+    /**
+     * Records the share with what became of its words. A re-keep is written as such — `rekept: true`, citing the
+     * erasures it reverses — and if that record cannot be written the words go back to *erased*, not to *never kept*.
+     *
+     * @return the event, or null if it could not be written
+     */
+    static java.util.Map<String, Object> record(
+            Journal journal, android.content.Context context, java.util.Map<String, Object> payload, Attachments.Stored stored, Rekeep rekeep) {
+        Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
+        boolean again = rekeep != null && stored.identity != null;
+        if (again) Shares.rekept(payload);
+        java.util.Map<String, Object> event = journal.append(Shares.TYPE, payload,
+            again ? rekeep.causes : java.util.Collections.<String>emptyList());
+        if (event == null && again && "stored".equals(stored.outcome)) {
+            try {
+                Attachments.destroy(context, stored.identity);
+            } catch (Exception leftBehind) {
+                // Declared and not live: the next start's reconcile puts it back to erased.
+            }
+        }
+        return event;
+    }
 }

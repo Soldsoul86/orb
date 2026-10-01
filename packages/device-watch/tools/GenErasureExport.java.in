@@ -44,6 +44,18 @@ public final class GenErasureExport {
         Attachments.Stored back = Attachments.store(context, new ByteArrayInputStream(bytes));
         share(journal, "photo-3", back);
 
+        // The person is shown that, confirms, and the same bytes are kept again: a new event, `rekept`, citing the
+        // two erasures it reverses (and a fresh key — the old one never returns).
+        Rekeep confirmed = Rekeep.confirmed(journal.readLines(), first.identity);
+        Attachments.Stored again = Attachments.store(context, new ByteArrayInputStream(bytes), confirmed);
+        Map<String, Object> payload = Shares.declared(
+            "android.intent.action.SEND", "image/jpeg", "android-app://com.example.gallery",
+            Arrays.asList("content://com.example.gallery.provider/0/1/photo-4"));
+        Shares.outcome(payload, again.outcome, again.detail, again.identity, again.bytes);
+        Shares.rekept(payload);
+        payload.put("elapsedRealtimeMs", tick());
+        journal.append("orb.shared", payload, confirmed.causes);
+
         for (String line : journal.readLines()) System.out.println(line);
     }
 

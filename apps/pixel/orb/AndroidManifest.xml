@@ -165,6 +165,7 @@
         -->
         <activity
             android:name=".ShareActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|layoutDirection|locale"
             android:exported="true"
             android:excludeFromRecents="true"
             android:noHistory="true"

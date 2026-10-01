@@ -142,7 +142,7 @@ describe("the importer and the phone agree about every field", () => {
 
   test("a field the phone writes in a capture is one the importer has decided about", async () => {
     const source = await readFile(join(here, "../../../../apps/pixel/orb/src/AssistFacts.java.in"), "utf8");
-    const start = source.indexOf("static Map<String, Object> captured(");
+    const start = source.lastIndexOf("static Map<String, Object> captured("); // the overload that builds the record
     const body = source.slice(start, source.indexOf("\n    }\n", start));
     const written = new Set([...body.matchAll(/p\.put\("([A-Za-z]+)"/g)].map((match) => match[1]!));
     assert.ok(written.size >= 8, `expected to find the phone's fields, found ${written.size}`);

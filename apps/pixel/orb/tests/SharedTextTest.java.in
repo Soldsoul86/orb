@@ -52,7 +52,8 @@ final class SharedTextTest {
         java.util.regex.Pattern word = java.util.regex.Pattern.compile("\\btext\\b");
         java.util.regex.Pattern allowed = java.util.regex.Pattern.compile(
             "String text = |CharSequence text = intent\\.getCharSequenceExtra\\(Intent\\.EXTRA_TEXT\\)|text [!=]= null|text\\.length\\(\\)|text\\.toString\\(\\)|recordText\\(intent, text\\)|sealText\\(payload, text\\)"
-            + "|SharedText\\.document\\(text\\)|String text\\)|final String text");
+            + "|SharedText\\.document\\(text\\)|String text\\)|final String text|java\\.text\\."
+            + "|SharedText\\.seal\\((this|ShareActivity\\.this), text, (null|confirmed)\\)|offerKeepAgain\\(journal, payload, text, stored\\)");
         List<String> offenders = new java.util.ArrayList<>();
         int uses = 0;
         for (int i = 0; i < lines.length; i++) {

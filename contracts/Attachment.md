@@ -112,6 +112,15 @@ currently holds them* may change. No transition alters the bytes or the identity
    and blocks destruction until it can be read. Keys are stored, never derived —
    a derived key is re-derivable, and destroying it destroys nothing.
 
+   **An erasure is not undone by arrival.** The same bytes reaching a device whose
+   key was destroyed are refused; no path mints a key for a destroyed identity on
+   its own. **It may be undone by the owner** — *added 2026-10-01, `../docs/DECISIONS.md`
+   DR-17* — who, shown that they erased this before, confirms keeping it again. The
+   keep is a **new** event whose `causes` cite the erasure declaration(s) it reverses;
+   the content is sealed under a **fresh** key (the old one never returns); the earlier
+   events stay erased. A device that has no owner to ask (the desk's keyring) keeps
+   refusing.
+
 Upholds Constitution Articles I (History) and VIII (Ownership and Trust).
 
 ---

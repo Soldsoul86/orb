@@ -64,8 +64,11 @@ final class Erasure {
         final boolean erased;
         /** The app a capture came from, or null (a share has none). */
         final String packageName;
+        /** The person erased this content once and chose to keep it again (`REKEEP.md`). */
+        final boolean rekept;
 
-        Item(String hash, String id, String type, String identity, long bytes, long wallClock, boolean erased, String packageName) {
+        Item(String hash, String id, String type, String identity, long bytes, long wallClock, boolean erased, String packageName, boolean rekept) {
+            this.rekept = rekept;
             this.packageName = packageName;
             this.id = id;
             this.hash = hash;
@@ -75,6 +78,45 @@ final class Erasure {
             this.wallClock = wallClock;
             this.erased = erased;
         }
+    }
+
+    /** An erasure of some content, as history shows it: which declarations, and when the latest was made. */
+    static final class Reversible {
+        final String identity;
+        /** Event ids of the `orb.erasure` declarations that erased events citing this content. */
+        final List<String> declarations;
+        final long erasedAt;
+
+        Reversible(String identity, List<String> declarations, long erasedAt) {
+            this.identity = identity;
+            this.declarations = declarations;
+            this.erasedAt = erasedAt;
+        }
+    }
+
+    /**
+     * The erasures of this content, or null if history holds none that name it. **Only history answers**: a destroyed
+     * marker on its own, with no declaration, is not something a person can be shown or can reverse (`REKEEP.md` §4).
+     * Nothing is stored; this is a projection.
+     */
+    static Reversible reversible(List<String> lines, String identity) {
+        Set<String> targets = new HashSet<>();
+        for (Item item : items(lines)) if (item.erased && item.identity.equals(identity)) targets.add(item.hash);
+        if (targets.isEmpty()) return null;
+        List<String> ids = new ArrayList<>();
+        long latest = -1L;
+        for (String line : lines) {
+            if (!TYPE.equals(Journal.typeOf(line))) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0) continue;
+            Matcher m = PAYLOAD_HASH.matcher(line);
+            if (!m.find(payload) || !targets.contains(m.group(1))) continue;
+            Matcher id = EVENT_ID.matcher(line);
+            if (!id.find()) continue;
+            ids.add(id.group(1));
+            latest = Math.max(latest, number(WALL_CLOCK, line, 0));
+        }
+        return ids.isEmpty() ? null : new Reversible(identity, ids, latest);
     }
 
     /** What erasing would do. */
@@ -136,7 +178,7 @@ final class Erasure {
             int payload = line.indexOf("\"payload\":");
             Matcher idMatcher = EVENT_ID.matcher(line);
             out.add(new Item(hash, idMatcher.find() ? idMatcher.group(1) : null, type, identity, number(BYTES, line, payload),
-                number(WALL_CLOCK, line, 0), erased.contains(hash), AllowList.packageOf(line)));
+                number(WALL_CLOCK, line, 0), erased.contains(hash), AllowList.packageOf(line), line.indexOf("\"rekept\":true", payload) >= 0));
         }
         return out;
     }

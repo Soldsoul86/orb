@@ -29,9 +29,9 @@ object Translate {
 
     /** Every field the translation can carry, in the TypeScript lists' words. Used by the leak guard. */
     val ASSIST_FIELDS = listOf("because", "package", "textNodes", "textChars", "webUri", "resolveOutcome",
-        "attachmentBytes", "versionCode", "passwordFields")
+        "attachmentBytes", "versionCode", "passwordFields", "rekept")
     val SHARE_FIELDS = listOf("because", "shareReadable", "action", "mimeType", "referrer", "itemCount",
-        "references", "resolved", "absenceReason", "resolveOutcome", "resolveDetail", "attachmentBytes", "textChars")
+        "references", "resolved", "absenceReason", "resolveOutcome", "resolveDetail", "attachmentBytes", "textChars", "rekept")
 
     fun assist(payload: Any?): Translation? = from(payload, ASSIST_FIELDS)
     fun share(payload: Any?): Translation? = from(payload, SHARE_FIELDS)
@@ -60,7 +60,7 @@ object Translate {
                     if (v is String) data[field] = v
                 "textNodes", "textChars", "attachmentBytes", "versionCode", "passwordFields", "itemCount" ->
                     if (v is Long) data[field] = v
-                "webUri", "shareReadable", "resolved" ->
+                "webUri", "shareReadable", "resolved", "rekept" ->
                     if (v is Boolean) data[field] = v
             }
         }

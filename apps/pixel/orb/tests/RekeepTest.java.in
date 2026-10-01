@@ -1,0 +1,238 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Keeping erased words again (`docs/REKEEP.md`): arrival never undoes an erasure; the person may, knowingly, per item,
+ * and the new keep cites the erasures it reverses.
+ */
+final class RekeepTest {
+    private RekeepTest() {}
+
+    private static final String WORDS = "the locker code is 7731 — ask priya";
+    private static final String OTHER = "something else erased too, 9920";
+
+    /** What `ShareActivity` does for a text share, off the phone; returns the event written. */
+    private static Map<String, Object> share(Context context, Journal journal, String text, Rekeep rekeep) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.chat", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, rekeep);
+        return SharedText.record(journal, context, payload, stored, rekeep);
+    }
+
+    private static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static String idOf(Map<String, Object> event) { return (String) event.get("id"); }
+
+    private static String identityOf(String text) throws Exception {
+        return Attachments.identity(SharedText.document(text));
+    }
+
+    private static boolean contains(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            if (contains(Files.readAllBytes(child.toPath()), needle)) return true;
+        }
+        return false;
+    }
+
+    private static Journal fresh(Context[] out, String name) throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory(name).toFile();
+        out[0] = new Context(dir);
+        return Journal.open(out[0], Install.lane(out[0]), Install.id(out[0]));
+    }
+
+    static void run() throws Exception {
+        Context[] box = new Context[1];
+        Journal journal = fresh(box, "orb-rekeep");
+        Context context = box[0];
+        File dir = context.getFilesDir();
+        String identity = identityOf(WORDS);
+
+        Harness.suite("erased words are refused when they arrive");
+        Map<String, Object> first = share(context, journal, WORDS, null);
+        Harness.equal("kept the first time", Attachments.state(context, identity), Attachments.HELD_STATE);
+        byte[] oldKey = Files.readAllBytes(new File(Attachments.keysDir(context), Attachments.address(context, identity)).toPath());
+        Harness.equal("erased", Erase.execute(context, journal, hashOf(first)).outcome, Erase.DESTROYED);
+        Attachments.Stored refused = Attachments.store(context, new ByteArrayInputStream(SharedText.document(WORDS)));
+        Harness.equal("the same words arriving are refused", refused.outcome, "erased");
+        Harness.check("the refusal names the content for the question, and claims none as held",
+            identity.equals(refused.erasedIdentity) && refused.identity == null);
+        Harness.equal("and no key was minted", Attachments.counts(context)[0], 0L);
+
+        Harness.suite("history says what was erased, and when");
+        Erasure.Reversible erased = Erasure.reversible(journal.readLines(), identity);
+        Harness.check("one declaration, with a time", erased != null && erased.declarations.size() == 1 && erased.erasedAt > 0);
+        Harness.check("content never erased has none", Erasure.reversible(journal.readLines(), identityOf("never kept")) == null);
+        Harness.check("so no confirmation can be built for it", Rekeep.confirmed(journal.readLines(), identityOf("never kept")) == null);
+        Rekeep token = Rekeep.confirmed(journal.readLines(), identity);
+        Harness.check("one can for erased content, carrying the declaration it reverses", token != null && token.causes.equals(erased.declarations));
+
+        Harness.suite("a confirmation is for one thing only");
+        Map<String, Object> secondErased = share(context, journal, OTHER, null);
+        Erase.execute(context, journal, hashOf(secondErased));
+        Attachments.Stored wrong = Attachments.store(context, new ByteArrayInputStream(SharedText.document(OTHER)), token);
+        Harness.equal("a token for these words does not lift another's erasure", wrong.outcome, "erased");
+        Harness.equal("and that content is still destroyed", Attachments.state(context, identityOf(OTHER)), Attachments.DESTROYED_STATE);
+
+        Harness.suite("keeping it again, on the person's confirmation");
+        Map<String, Object> again = share(context, journal, WORDS, token);
+        Harness.check("the event is written", again != null);
+        Harness.equal("it is live again", Attachments.state(context, identity), Attachments.HELD_STATE);
+        Harness.equal("it opens to the exact words", new String(Recall.open(context, identity).body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8), WORDS);
+        byte[] newKey = Files.readAllBytes(new File(Attachments.keysDir(context), Attachments.address(context, identity)).toPath());
+        Harness.check("under a fresh key — the old one never returns", !Arrays.equals(oldKey, newKey));
+        String line = null;
+        for (String l : journal.readLines()) if (l.contains(idOf(again))) line = l;
+        Harness.check("the record says it was kept again, names the count and not the words",
+            line.contains("\"rekept\":true") && line.contains("\"textChars\":" + WORDS.length()) && !line.contains("7731") && !line.contains("priya"));
+        Harness.check("and cites the erasure it reverses", line.contains("\"causes\":[\"" + erased.declarations.get(0) + "\"]"));
+        Harness.check("the journal and the disk hold no word of it in the clear",
+            !onDisk(dir, "7731".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)));
+        boolean oldStillErased = false, newLive = false, newRekept = false;
+        for (Erasure.Item item : Erasure.items(journal.readLines())) {
+            if (item.hash.equals(hashOf(first))) oldStillErased = item.erased;
+            if (item.hash.equals(hashOf(again))) { newLive = !item.erased; newRekept = item.rekept; }
+        }
+        Harness.check("the earlier citation stays erased; the new one is live and says why", oldStillErased && newLive && newRekept);
+        Harness.check("restarting changes nothing (nothing is owed)", Erase.reconcile(context, journal) == 0
+            && Attachments.state(context, identity).equals(Attachments.HELD_STATE));
+
+        Harness.suite("it is findable, explained and carried like anything kept");
+        Recall.Results found = Recall.search(context, journal, "locker code", null);
+        Harness.equal("search finds the kept-again words once", found.entries.size(), 1);
+        Harness.equal("as the new item", found.entries.get(0).id, idOf(again));
+        Provenance.Facts facts = Provenance.of(journal, idOf(again));
+        Harness.check("where from? is closed and says it was kept again after erasing",
+            !facts.failed && facts.closed && facts.keptAgain
+            && Provenance.render(facts, new java.text.SimpleDateFormat("yyyy")).contains("You had erased this and chose to keep it again."));
+        Harness.check("it is observed and the Observation carries the flag, not the words", Observe.run(journal).written >= 1);
+        String observation = null;
+        for (String l : journal.readLines()) if ("orb.observation".equals(Journal.typeOf(l)) && l.contains(idOf(again))) observation = l;
+        Harness.check("with `rekept` and no word", observation != null && observation.contains("\"rekept\":true") && !observation.contains("7731"));
+        Backup.Plan plan = Backup.plan(context, journal.readLines(), false);
+        boolean hasWords = false;
+        for (Backup.Entry e : plan.entries) if (e.name.startsWith("key/")) hasWords = true;
+        Harness.check("a backup carries the key of the kept-again words", hasWords);
+
+        Harness.suite("it can be erased again");
+        Harness.equal("erasing the new item destroys it", Erase.execute(context, journal, hashOf(again)).outcome, Erase.DESTROYED);
+        Harness.equal("and arrival is refused again", Attachments.store(context, new ByteArrayInputStream(SharedText.document(WORDS))).outcome, "erased");
+        Harness.check("the declaration history now holds two for these words",
+            Erasure.reversible(journal.readLines(), identity).declarations.size() == 2);
+
+        Harness.suite("a crash fails toward erased");
+        Journal j2 = fresh(box, "orb-rekeep-crash");
+        Context c2 = box[0];
+        Map<String, Object> e1 = share(c2, j2, WORDS, null);
+        Erase.execute(c2, j2, hashOf(e1));
+        // Sealed under a confirmation, but the event was never written.
+        Rekeep t2 = Rekeep.confirmed(j2.readLines(), identity);
+        Harness.equal("stored again", Attachments.store(c2, new ByteArrayInputStream(SharedText.document(WORDS)), t2).outcome, "stored");
+        Harness.equal("the next start finds it owed and destroys it", Erase.reconcile(c2, j2), 1);
+        Harness.equal("so it is erased, not kept", Attachments.state(c2, identity), Attachments.DESTROYED_STATE);
+        Harness.equal("and arrival is refused", Attachments.store(c2, new ByteArrayInputStream(SharedText.document(WORDS))).outcome, "erased");
+        // Marker lifted and nothing stored (killed in between).
+        new File(Attachments.destroyedDir(c2), Attachments.address(c2, identity)).delete();
+        Harness.equal("a lifted marker with nothing behind it is put back", Erase.reconcile(c2, j2), 0);
+        Harness.equal("as erased", Attachments.state(c2, identity), Attachments.DESTROYED_STATE);
+
+        Harness.suite("a remembered screen is kept again the same way");
+        Journal j3 = fresh(box, "orb-rekeep-screen");
+        Context c3 = box[0];
+        j3.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        ScreenText screen = new ScreenText();
+        screen.add("meeting at the red door");
+        Capture.Result kept = Capture.remember(c3, j3, screen, "com.example.chat", 7L, false);
+        String capture = null;
+        for (String l : j3.readLines()) if (AssistFacts.CAPTURED.equals(Journal.typeOf(l))) capture = Erasure.envelopeHash(l);
+        Harness.equal("kept", kept.outcome, Capture.STORED);
+        Erase.execute(c3, j3, capture);
+        Capture.Result refusedScreen = Capture.remember(c3, j3, screen, "com.example.chat", 7L, false);
+        Harness.check("refused as erased, naming the content so the card can ask", refusedScreen.outcome.equals("erased") && refusedScreen.erasedIdentity != null);
+        Rekeep confirmedScreen = Rekeep.confirmed(j3.readLines(), refusedScreen.erasedIdentity);
+        Capture.Result keptScreen = Capture.remember(c3, j3, screen, "com.example.chat", 7L, false, confirmedScreen);
+        Harness.equal("kept again on confirmation", keptScreen.outcome, Capture.STORED);
+        String keptLine = null;
+        for (String l : j3.readLines()) if (AssistFacts.CAPTURED.equals(Journal.typeOf(l)) && l.contains("\"rekept\":true")) keptLine = l;
+        Harness.check("the capture says so, cites the erasure, and holds no word",
+            keptLine != null && keptLine.contains("\"causes\":[\"" + confirmedScreen.causes.get(0) + "\"]") && !keptLine.contains("red door"));
+        Harness.equal("search finds it", Recall.search(c3, j3, "red door", null).entries.size(), 1);
+
+        Harness.suite("a re-keep that cannot be recorded goes back to erased");
+        Journal j4 = fresh(box, "orb-rekeep-fail");
+        Context c4 = box[0];
+        final Journal real = j4;
+        j4.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        ScreenText s4 = new ScreenText();
+        s4.add("will not be recorded the second time");
+        Capture.remember(c4, j4, s4, "com.example.chat", 7L, false);
+        String cap4 = null;
+        for (String l : j4.readLines()) if (AssistFacts.CAPTURED.equals(Journal.typeOf(l))) cap4 = Erasure.envelopeHash(l);
+        Erase.execute(c4, j4, cap4);
+        Rekeep t4 = Rekeep.confirmed(j4.readLines(), Attachments.identity(s4.document()));
+        Capture.Recorder failing = new Capture.Recorder() {
+            @Override public Map<String, Object> append(String type, Map<String, Object> payload) { return real.append(type, payload); }
+            @Override public Map<String, Object> appendCiting(String type, Map<String, Object> payload, List<String> causes) {
+                return AssistFacts.CAPTURED.equals(type) ? null : real.append(type, payload, causes);
+            }
+        };
+        Capture.Result lost = Capture.remember(c4, j4, failing, s4, "com.example.chat", 7L, false, t4);
+        Harness.equal("reported as a journal failure", lost.outcome, Capture.JOURNAL_FAILED);
+        Harness.equal("and the content is erased, not merely unkept", Attachments.state(c4, Attachments.identity(s4.document())), Attachments.DESTROYED_STATE);
+        Harness.equal("so arrival is still refused", Attachments.store(c4, new ByteArrayInputStream(s4.document())).outcome, "erased");
+
+        guard();
+    }
+
+    /** Only a person's tap builds a `Rekeep`: two handlers, and nothing else in the app can lift an erasure. */
+    private static void guard() throws Exception {
+        Harness.suite("only the two buttons can build a confirmation");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        List<String> callers = new ArrayList<>();
+        List<String> constructors = new ArrayList<>();
+        int lifts = 0;
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                if (!file.getFileName().toString().endsWith(".java.in")) continue;
+                String name = file.getFileName().toString().replace(".java.in", "");
+                for (String line : new String(Files.readAllBytes(file), StandardCharsets.UTF_8).split("\n")) {
+                    String t = line.trim();
+                    if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+                    if (t.contains("Rekeep.confirmed(") && !name.equals("Rekeep")) callers.add(name);
+                    if (t.contains("new Rekeep(") && !name.equals("Rekeep")) constructors.add(name);
+                    if (name.equals("Attachments") && t.contains("DESTROYED), address(context, identity)).delete()")) lifts++;
+                }
+            }
+        }
+        java.util.Collections.sort(callers);
+        Harness.equal("`Rekeep.confirmed` is called from the two handlers and nowhere else", callers.toString(), "[AssistSession, ShareActivity]");
+        Harness.check("nothing else constructs one", constructors.isEmpty());
+        Harness.equal("the store lifts a marker in exactly one place", lifts, 1);
+    }
+}

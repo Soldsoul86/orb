@@ -569,3 +569,17 @@ a second source for the compiler's checksum exists (item 1).
    close would write a stray file under the old lane name. Harmless, but real.
 6. **A restore grants nothing** — the package-scan permission is not restored. Conservative on purpose; it costs the person one tap.
 7. **Not testable off the phone:** the file picker, `MediaStore` Downloads, and the swap across the real filesystems. The device check is one real restore.
+
+---
+
+## AD-16 — keeping erased content again is a phone-only act, for text
+
+**Opened 2026-10-01** (`DECISIONS.md` DR-17, `REKEEP.md`). Debts, stated.
+
+1. **Shared pictures and files are not covered.** The sender's read grant is short-lived and the question would have to be asked while it lives;
+   they keep the plain refusal (*erased*). **Revisit** if a person hits it.
+2. **The desk's keyring still refuses** (`runtime/journal/src/attachment-keyring.ts`, keyed by event id). There is no owner at the desk to ask, and the
+   desk does not yet act on an erasure declaration at all (AD-12), so there is nothing to reverse there yet. Revisit when the desk honours declarations.
+3. **A person who wants even the *fact* of an erasure gone is asking for something else.** The declaration is history and stays; the prompt shows its date.
+4. **A process killed while the share dialog is showing records nothing for that share.** Same exposure as a kill during sealing.
+

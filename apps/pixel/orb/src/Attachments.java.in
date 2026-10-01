@@ -73,12 +73,26 @@ final class Attachments {
         final long bytes;
         final String outcome;
         final String detail;
+        /**
+         * For `erased` only: the content that was refused. **Not `identity`** — that field means *the content is here*
+         * and callers record it as such; this one only lets the person be asked whether to keep it again.
+         */
+        final String erasedIdentity;
 
         private Stored(String identity, long bytes, String outcome, String detail) {
+            this(identity, bytes, outcome, detail, null);
+        }
+
+        private Stored(String identity, long bytes, String outcome, String detail, String erasedIdentity) {
             this.identity = identity;
             this.bytes = bytes;
             this.outcome = outcome;
             this.detail = detail;
+            this.erasedIdentity = erasedIdentity;
+        }
+
+        static Stored erased(String identity) {
+            return new Stored(null, 0L, "erased", "this exact content was erased and is not kept again", identity);
         }
 
         /** Written now. */
@@ -115,6 +129,15 @@ final class Attachments {
      * address under the same key, so re-sharing one photograph costs one copy.
      */
     static Stored store(Context context, InputStream in) {
+        return store(context, in, null);
+    }
+
+    /**
+     * As `store`, and — only with a `Rekeep` for exactly this content — keeps content that was erased: the destroyed
+     * marker is lifted and the bytes are sealed under a **fresh** key (the old key never returns). A `Rekeep` for any
+     * other content is refused. `ERASURE.md` §1: this is the person's act, never the store's.
+     */
+    static Stored store(Context context, InputStream in, Rekeep rekeep) {
         byte[] bytes;
         try {
             bytes = readAll(in);
@@ -130,8 +153,12 @@ final class Attachments {
                 // inv. 8: an erasure is not undone by the same bytes arriving again. A
                 // fresh key here would make the content readable again by an accident
                 // of timing, which is the erasure quietly reversed. Refused, recorded,
-                // and said to the person — never a silent no-op.
-                return Stored.failed("erased", "this exact content was erased and is not kept again");
+                // and said to the person — never a silent no-op. Only a person's
+                // confirmation for *this* content (`Rekeep`) lifts it.
+                if (rekeep == null || !rekeep.identity.equals(identity)) return Stored.erased(identity);
+                if (!new File(dir(context, DESTROYED), address(context, identity)).delete()) {
+                    return Stored.failed("sealFailed", "could not lift the erasure marker");
+                }
             }
             File blob = new File(dir(context, BLOBS), address(context, identity));
             if (blob.exists()) {

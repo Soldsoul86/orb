@@ -60,24 +60,100 @@ public final class ShareActivity extends Activity {
 
         Intent intent = getIntent();
         String text = sharedText(intent);
-        Map<String, Object> payload;
         if (text != null) {
             // Words handed over are sealed, never written into the journal: the record says only that
             // a text share happened, how long it was, and the sealed item's identity (`SharedText`).
-            payload = recordText(intent, text);
-            sealText(payload, text);
-        } else {
-            payload = record(intent);
-            // While the grant is live, and only here. By the time this activity
-            // finishes it is gone (§7b33).
-            resolve(intent, payload);
+            Map<String, Object> payload = recordText(intent, text);
+            Attachments.Stored stored = SharedText.seal(this, text, null);
+            if ("erased".equals(stored.outcome) && stored.erasedIdentity != null) {
+                // Erased before. Arrival never undoes that; the person may (`REKEEP.md`). Nothing is
+                // recorded until they have answered, and the words stay in this activity's memory only.
+                if (offerKeepAgain(journal, payload, text, stored)) return;
+            }
+            finishText(journal, payload, stored, null);
+            return;
         }
+
+        Map<String, Object> payload = record(intent);
+        // While the grant is live, and only here. By the time this activity
+        // finishes it is gone (§7b33).
+        resolve(intent, payload);
         payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
         journal.append(Orb.SHARED, payload);
         Observe.run(journal);
 
         Toast.makeText(this, "Orb recorded the share", Toast.LENGTH_SHORT).show();
         finish();
+    }
+
+    /** What to record if this activity ends with the question unanswered: the refusal, as if *Not now*. Null otherwise. */
+    private Runnable unanswered;
+
+    @Override
+    protected void onDestroy() {
+        Runnable owed = unanswered;
+        unanswered = null;
+        if (owed != null) owed.run();
+        super.onDestroy();
+    }
+
+    /** Records the text share, observes it and closes. `rekeep` is non-null only on the person's confirmation. */
+    private void finishText(Journal journal, Map<String, Object> payload, Attachments.Stored stored, Rekeep rekeep) {
+        unanswered = null;
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        SharedText.record(journal, this, payload, stored, rekeep);
+        Observe.run(journal);
+        Toast.makeText(this, rekeep != null && stored.identity != null ? "Orb kept it again" : "Orb recorded the share", Toast.LENGTH_SHORT).show();
+        finish();
+    }
+
+    /**
+     * Asks whether to keep erased words again. **Not now is what back, an outside tap and anything unexpected mean.**
+     * The only place in this activity a `Rekeep` is built is the *Keep again* button's handler.
+     *
+     * @return false if there is nothing to offer (history holds no erasure to reverse), so the caller records the refusal
+     */
+    private boolean offerKeepAgain(final Journal journal, final Map<String, Object> payload, final String text, final Attachments.Stored refused) {
+        final Erasure.Reversible erased;
+        try {
+            erased = Erasure.reversible(journal.readLines(), refused.erasedIdentity);
+        } catch (java.io.IOException unreadable) {
+            return false;
+        }
+        if (erased == null) return false;
+        String when = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+            .format(new java.util.Date(erased.erasedAt));
+        unanswered = new Runnable() {
+            @Override public void run() {
+                payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+                SharedText.record(journal, ShareActivity.this, payload, refused, null);
+            }
+        };
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this)
+            .setTitle("Keep it again?")
+            .setMessage("You erased these exact words on " + when + ".\n\nKeep them again? Orb will remember that you chose to.")
+            .setNegativeButton("Not now", new android.content.DialogInterface.OnClickListener() {
+                @Override public void onClick(android.content.DialogInterface d, int which) { finishText(journal, payload, refused, null); }
+            })
+            .setPositiveButton("Keep again", new android.content.DialogInterface.OnClickListener() {
+                @Override public void onClick(android.content.DialogInterface d, int which) {
+                    Rekeep confirmed;
+                    try {
+                        confirmed = Rekeep.confirmed(journal.readLines(), refused.erasedIdentity);
+                    } catch (java.io.IOException unreadable) {
+                        confirmed = null;
+                    }
+                    if (confirmed == null) { finishText(journal, payload, refused, null); return; }
+                    finishText(journal, payload, SharedText.seal(ShareActivity.this, text, confirmed), confirmed);
+                }
+            })
+            .setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+                @Override public void onCancel(android.content.DialogInterface d) { finishText(journal, payload, refused, null); }
+            })
+            .create();
+        dialog.show();
+        dialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).requestFocus();
+        return true;
     }
 
     /** The text of a plain text share — one `EXTRA_TEXT`, no stream — or null if this is not one. */
@@ -96,20 +172,6 @@ public final class ShareActivity extends Activity {
             intent.getType(),
             referrer == null ? null : referrer.toString(),
             text.length());
-    }
-
-    /**
-     * Seals the shared words as an Attachment and records the outcome. **A link is not opened or fetched**: sharing
-     * one is not authorization to visit it. If the same words were erased before, the store refuses them, the
-     * record says so, and the words are written nowhere.
-     */
-    private void sealText(Map<String, Object> payload, String text) {
-        try {
-            Attachments.Stored stored = Attachments.store(this, new java.io.ByteArrayInputStream(SharedText.document(text)));
-            Shares.outcome(payload, stored.outcome, stored.detail, stored.identity, stored.bytes);
-        } catch (Exception error) {
-            Shares.failed(payload, error);
-        }
     }
 
     /**

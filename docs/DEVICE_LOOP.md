@@ -6181,3 +6181,48 @@ same road as a remembered screen.
 3. **Export and share journal**; search the file for that word — it should not be there. *(P98)*
 4. In Recall, **Erase** the shared item; search again; share the same words again — Orb should record it as refused/erased. Export. *(P101)*
 5. Share new text, then **Back up and restore → Back up now…** with *pictures* **off**; **Check a backup file…** on it. *(P102)*
+
+
+### 7b61. Keeping erased words again — DR-17 — 2026-10-01
+
+**Status: built, awaiting the device** — `orb-app-v26-keepagain.apk`. **v26 includes everything in v25 (§7b60), whose predictions P98–P103 are still open** — install v26 over whatever is on the phone and the §7b60 protocol still applies.
+The operator asked whether it is a problem that erased words can never be kept again. It is, when the person means it; the design is `docs/REKEEP.md`, the decision `DECISIONS.md` DR-17.
+
+#### What changed
+
+1. **Arrival never undoes an erasure; the person may.** If the words you share (or the screen you tap *Remember* on) are exactly ones you erased before, Orb now asks:
+   *"You erased these exact words on [date]. Keep them again? Orb will remember that you chose to."* — **Keep again / Not now**. Back, an outside tap and closing the card all mean *Not now*, which is exactly today's behaviour.
+2. **Keep again** seals the same words under a **fresh key** (the old one never returns) and writes a **new** event with `rekept: true` that **cites the erasure it reverses in `causes`**. The earlier events stay erased.
+   *Where from?* on it says *"You had erased this and chose to keep it again."*
+3. **Only that button can lift an erasure.** The store lifts the destroyed marker only when handed a confirmation (`Rekeep`) for **that exact content**; the constructor is private, and a source guard asserts the only two callers of `Rekeep.confirmed` are the two button handlers.
+4. **A crash fails toward erased**, with the clean-up that already runs at start: words sealed but never recorded are destroyed again; a lifted marker with nothing behind it is put back; a re-keep whose record cannot be written is rolled back to *erased* (not to *never kept*, which a plain store would accept).
+5. **Erase again works**: erasing the kept-again item destroys it, and arrival is refused again.
+6. **Not covered, stated** (`AD-16`): shared pictures and files; the desk's keyring (it keeps refusing); a process killed while the dialog is showing records nothing for that share.
+
+#### Checked before the device
+
+- 638 phone-side checks (was 592): arrival refused with the content named; history says what was erased and when; **a token for one thing does not lift another's erasure**; keep again opens byte for byte under a fresh key (compared against the old key's bytes); the record names the count, not the words, and cites the declaration; nothing in the clear in the journal or on disk;
+  earlier citation stays erased, new one live; restart owes nothing; search, Where from? and the Observation carry it; a backup carries the new key; erase-again; each crash window; the screen path end to end; a failing record rolled back; the source guard.
+  Brain 187, TypeScript 411 (the erasure fixture now contains a real re-keep written by the phone's own code and the importer test reads it), lint clean.
+- **Mutation-checked, eleven ways** (dropping the identity check on the token, lifting on arrival, the erased-only filter, the flag, the causes on both paths, the rollback, the content name for the card, the flag read in the projection, the provenance line): each fails named checks. Not covered by a test: the share path's rollback when the journal cannot be written (the journal cannot be made to fail there; the screen path's identical rollback is tested).
+- **Not testable off the phone:** the dialog and the card button themselves.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P104** | Share some text to Orb, **erase** it in Recall, share the **same words** again: a dialog names the date you erased it and offers **Keep again / Not now** | arrival still refuses silently |
+| **P105** | **Not now** (or Back): nothing is kept; the export has an `orb.shared` with `resolveOutcome: "erased"` and no `rekept` | the default is not safe |
+| **P106** | Share them again and tap **Keep again**: Recall finds the words again; the export has an `orb.shared` with **`rekept: true`**, `resolveOutcome: "stored"`, and a `causes` list naming the earlier `orb.erasure` event — and none of the words anywhere in the file | the re-keep leaks or is unlinked |
+| **P107** | **Where from?** on it says *You had erased this and chose to keep it again.* | provenance does not know |
+| **P108** | Remember a screen in an allowed app, erase it in Recall, invoke Orb on the same screen and tap **Remember**: the card says you erased it and offers **Keep again**; tapping it keeps it (export: `orb.assist.captured` with `rekept: true`) | the screen path does not offer it |
+| **P109** | Erase the kept-again item, then share the same words once more: the dialog appears again (it can be undone and redone, each time by you) | a second erasure is not final |
+
+#### The operator's protocol
+
+1. Install `orb-app-v26-keepagain.apk` over the current build; open Orb once. (Do the §7b60 steps first if you have not — they still count.)
+2. Share a short text (a distinctive word in it) to Orb from any app → in **Recall** open it → **Erase**. Share the **same text** again. *(P104)*
+3. Tap **Not now**. Share it a third time; tap **Keep again**. Search that word in Recall; open **Where from?** *(P105, P106, P107)*
+4. Export; search the file for the word (it should not be there) and look at the last two shares. *(P105, P106)*
+5. Invoke Orb on a screen in an allowed app → **Remember** → in Recall **Erase** it → invoke Orb on the same screen → **Remember** → **Keep again**. *(P108)*
+6. Erase one kept-again item and share its text once more. *(P109)*

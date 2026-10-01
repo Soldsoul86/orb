@@ -34,9 +34,16 @@ final class Capture {
     /** `stored` or `held` on success; otherwise what went wrong. */
     static final class Result {
         final String outcome;
+        /** For `erased` only: the content refused, so the person can be asked whether to keep it again. */
+        final String erasedIdentity;
 
         Result(String outcome) {
+            this(outcome, null);
+        }
+
+        Result(String outcome, String erasedIdentity) {
             this.outcome = outcome;
+            this.erasedIdentity = erasedIdentity;
         }
 
         boolean kept() {
@@ -47,17 +54,37 @@ final class Capture {
     /** Where records go. The journal, in the app; a stand-in in tests that need a write to fail. */
     interface Recorder {
         Map<String, Object> append(String type, Map<String, Object> payload);
+
+        /** As `append`, citing the events this one was derived from (`causes`). */
+        Map<String, Object> appendCiting(String type, Map<String, Object> payload, java.util.List<String> causes);
     }
 
     static Result remember(Context context, final Journal journal, ScreenText text, String packageName, long versionCode, boolean paymentsApp) {
+        return remember(context, journal, text, packageName, versionCode, paymentsApp, null);
+    }
+
+    static Result remember(Context context, final Journal journal, ScreenText text, String packageName, long versionCode,
+                           boolean paymentsApp, Rekeep rekeep) {
         return remember(context, journal, new Recorder() {
             @Override public Map<String, Object> append(String type, Map<String, Object> payload) {
                 return journal.append(type, payload);
             }
-        }, text, packageName, versionCode, paymentsApp);
+            @Override public Map<String, Object> appendCiting(String type, Map<String, Object> payload, java.util.List<String> causes) {
+                return journal.append(type, payload, causes);
+            }
+        }, text, packageName, versionCode, paymentsApp, rekeep);
     }
 
     static Result remember(Context context, Journal journal, Recorder recorder, ScreenText text, String packageName, long versionCode, boolean paymentsApp) {
+        return remember(context, journal, recorder, text, packageName, versionCode, paymentsApp, null);
+    }
+
+    /**
+     * As `remember`; with a `Rekeep` — the person's confirmation that they want this kept **again** after erasing it —
+     * the same text is sealed under a fresh key and the new `orb.assist.captured` cites the erasures it reverses.
+     */
+    static Result remember(Context context, Journal journal, Recorder recorder, ScreenText text, String packageName, long versionCode,
+                           boolean paymentsApp, Rekeep rekeep) {
         // Asked again at the moment of keeping, by the caller: an app may have been updated into a
         // payments app, or removed from the list, since the card opened.
         if (paymentsApp) return new Result(NOT_ALLOWED);
@@ -67,20 +94,23 @@ final class Capture {
             return new Result(JOURNAL_FAILED);
         }
 
-        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(text.document()));
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(text.document()), rekeep);
         if (stored.identity == null) {
             recorder.append(AssistFacts.CAPTURE_FAILED, AssistFacts.captureFailed(stored.outcome, versionCode));
-            return new Result(stored.outcome);
+            return new Result(stored.outcome, stored.erasedIdentity);
         }
 
         Map<String, Object> payload = AssistFacts.captured(
             packageName, text.textNodes, text.textChars, text.hasWebUri(),
-            stored.identity, stored.bytes, stored.outcome, versionCode, text.passwordFields);
-        if (recorder.append(AssistFacts.CAPTURED, payload) == null) {
+            stored.identity, stored.bytes, stored.outcome, versionCode, text.passwordFields, rekeep != null);
+        if (recorder.appendCiting(AssistFacts.CAPTURED, payload, rekeep == null ? java.util.Collections.<String>emptyList() : rekeep.causes) == null) {
             // Only content this call just wrote; content other events already cite stays.
             if (stored.outcome.equals(STORED)) {
                 try {
-                    Attachments.discard(context, stored.identity);
+                    // A re-keep that cannot be recorded goes back to *erased* — the marker returns with the key
+                    // gone — and not to *never kept*, which a plain store would accept.
+                    if (rekeep != null) Attachments.destroy(context, stored.identity);
+                    else Attachments.discard(context, stored.identity);
                 } catch (Exception leftBehind) {
                     // Cannot be helped here; the next erase pass cannot see it either, which is
                     // why this path is tested.

@@ -147,6 +147,14 @@ final class Shares {
     }
 
     /**
+     * The person was shown that these words were erased and chose to keep them again. A flag, never the words or the
+     * date; the declarations it reverses are the event's `causes`.
+     */
+    static void rekept(Map<String, Object> payload) {
+        payload.put("rekept", true);
+    }
+
+    /**
      * The grant was not live after all. Worth distinguishing from a read failure:
      * one is a permission, the other is availability.
      */

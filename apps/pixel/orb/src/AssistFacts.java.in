@@ -67,12 +67,20 @@ final class AssistFacts {
     static Map<String, Object> captured(
             String allowedPackage, long textNodes, long textChars, boolean webUri,
             String identity, long bytes, String outcome, long versionCode, long passwordFields) {
+        return captured(allowedPackage, textNodes, textChars, webUri, identity, bytes, outcome, versionCode, passwordFields, false);
+    }
+
+    /** As above; `rekept` says the person was shown it had been erased and chose to keep it again. */
+    static Map<String, Object> captured(
+            String allowedPackage, long textNodes, long textChars, boolean webUri,
+            String identity, long bytes, String outcome, long versionCode, long passwordFields, boolean rekept) {
         Map<String, Object> p = Json.obj();
         p.put("attachment", identityOrInvalid(identity));
         p.put("attachmentBytes", bytes);
         p.put("because", "user.remembered");
         p.put("package", packageOrInvalid(allowedPackage));
         p.put("passwordFields", passwordFields);
+        if (rekept) p.put("rekept", true);
         p.put("resolveOutcome", "stored".equals(outcome) || "held".equals(outcome) ? outcome : "other");
         p.put("textChars", textChars);
         p.put("textNodes", textNodes);

@@ -140,6 +140,7 @@ And in its `data`, under the phone's own names:
 | `itemCount` | 1, or n for `SEND_MULTIPLE`, 0 if nothing nameable arrived | |
 | `references` | what was handed over, colon-joined; empty for text from v25 on (older builds put the text itself here) | never the resolved bytes; **carried whole, never split** — a URI and a sentence both contain colons |
 | `textChars` | how many characters of text were shared (v25 on) | the count, never the words; the words are the sealed attachment |
+| `rekept` | `true` when the person had erased this content and confirmed keeping it again (v26 on) | a flag; the erasures it reverses are the event's `causes` (`REKEEP.md`) |
 | `resolved` | `true` / `false` | §6 |
 | `absenceReason` | `unfetched` while unresolved | omitted once the content is held |
 | `resolveOutcome` | `stored`, `held`, `refused`, `failed`, `openedNull`, `tooLarge`, `readFailed`, `sealFailed`, `noReference`, `notAContentUri`, `erased` | every outcome is recorded, including refusals |

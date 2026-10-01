@@ -163,6 +163,8 @@ under one key and nothing about *when* or *where* sits next to the words.
 password field** — by its input type, its autofill hints or its HTML `type` (Chrome's web fields may carry no
 Android input type) — dropped even if the platform delivered it, not assumed blanked already, and **counted**
 (`passwordFields`) so a login screen is visible without its contents. The picture is never kept.
+When the person had erased this exact text and, shown that, confirmed keeping it again, the record also says **`rekept: true`** (v26) and **cites the
+erasure declaration(s) in `causes`** (`REKEEP.md`).
 
 **`orb.assist.declined`** — `reason` from §5, the build's `versionCode`, and **no
 package**. **`orb.assist.captureFailed`** — when the person asked to keep and Orb could not

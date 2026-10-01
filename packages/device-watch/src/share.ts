@@ -50,6 +50,7 @@ export const SHARE_FIELDS_MAPPED = [
   "resolveDetail",
   "attachmentBytes",
   "textChars",
+  "rekept",
 ] as const;
 
 /**
@@ -99,6 +100,8 @@ export interface ShareReading {
    * clear (`docs/SENSOR_SHARE.md`); the count says how much there was, not what.
    */
   readonly textChars?: number;
+  /** The person had erased this content and chose to keep it again (`docs/REKEEP.md`). A flag; the erasures are the event's `causes`. */
+  readonly rekept?: boolean;
 }
 
 /** The Observation a share becomes, before it is drafted. */
@@ -142,6 +145,7 @@ export function shareFrom(payload: unknown): ShareTranslation | null {
   const resolveDetail = text("resolveDetail");
   const attachmentBytes = count("attachmentBytes");
   const textChars = count("textChars");
+  const rekept = flag("rekept");
 
   const data: ShareReading = {
     // Same convention as the grants reading: a missing reason is `unknown`, not
@@ -159,6 +163,7 @@ export function shareFrom(payload: unknown): ShareTranslation | null {
     ...(resolveDetail === undefined ? {} : { resolveDetail }),
     ...(attachmentBytes === undefined ? {} : { attachmentBytes }),
     ...(textChars === undefined ? {} : { textChars }),
+    ...(rekept === undefined ? {} : { rekept }),
   };
 
   const identity = text("attachment");

@@ -39,6 +39,7 @@ export const ASSIST_FIELDS_MAPPED = [
   "attachmentBytes",
   "versionCode",
   "passwordFields",
+  "rekept",
 ] as const;
 
 /** Fields that become `attachments` — by identity, never copied into `data` (inv. 5). */
@@ -62,6 +63,8 @@ export interface AssistReading {
   readonly versionCode?: number;
   /** How many password fields were on the screen and left out. A count; nothing about them was read. */
   readonly passwordFields?: number;
+  /** The person had erased this text and chose to keep it again (`docs/REKEEP.md`). */
+  readonly rekept?: boolean;
 }
 
 export interface AssistTranslation {
@@ -91,6 +94,7 @@ export function assistFrom(payload: unknown): AssistTranslation | null {
   const attachmentBytes = count("attachmentBytes");
   const versionCode = count("versionCode");
   const passwordFields = count("passwordFields");
+  const rekept = flag("rekept");
 
   const data: AssistReading = {
     because: text("because") ?? "unknown",
@@ -102,6 +106,7 @@ export function assistFrom(payload: unknown): AssistTranslation | null {
     ...(attachmentBytes === undefined ? {} : { attachmentBytes }),
     ...(versionCode === undefined ? {} : { versionCode }),
     ...(passwordFields === undefined ? {} : { passwordFields }),
+    ...(rekept === undefined ? {} : { rekept }),
   };
 
   const identity = text("attachment");
