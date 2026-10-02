@@ -156,6 +156,12 @@ final class PeopleTest {
         book.add(contact("4", "Dan Dale", new String[] {"+919000000012"}));
         book.add(contact("5", "Xena Xu", new String[] {}));
         book.add(contact("6", "Eli Ek", new String[] {}));
+        book.add(contact("7", "Quinn Quill", new String[] {}));
+        book.add(contact("8", "Dan Dane", new String[] {}));
+        book.add(contact("9", "Rita Ann", new String[] {}));
+        book.add(contact("10", "Anna Rao", new String[] {}));
+        book.add(contact("11", "Amit Rao", new String[] {}));
+        book.add(contact("12", "Rao Singh", new String[] {}));
         keep(context, journal, "mail shared@x.example");
         keep(context, journal, "Amy Adams and Zed Zhang met");
         keep(context, journal, "Bob Brown 90000 00011 ₹300");
@@ -180,6 +186,29 @@ final class PeopleTest {
         List<String> apart = new ArrayList<>();
         for (People.Person p : r.possible) apart.add(p.names.get(0));
         Harness.equal("the possible ones are ordered the same way, and apart", apart, Arrays.asList("Eli Ek", "Xena Xu"));
+
+        Harness.suite("you choose the person: a search over every contact, mentioned or not");
+        Harness.equal("everyone is there — grouped, and including those nothing mentions", r.all.size(), 11);
+        List<String> byZh = new ArrayList<>();
+        for (People.Person p : People.find(r.all, "ZH ")) byZh.add(p.display());
+        Harness.equal("case and edge blanks do not matter, and a group is found by either name", byZh, Arrays.asList("Zed Zhang (+1)"));
+        List<String> byAmy = new ArrayList<>();
+        for (People.Person p : People.find(r.all, "amy")) byAmy.add(p.display());
+        Harness.equal("by the other contact's name", byAmy, Arrays.asList("Zed Zhang (+1)"));
+        List<String> byAn = new ArrayList<>();
+        for (People.Person p : People.find(r.all, "an")) byAn.add(p.names.get(0));
+        Harness.equal("best first: the name starts with it, a word of it starts with it, then anywhere inside; ties by name",
+            byAn, Arrays.asList("Anna Rao", "Rita Ann", "Dan Dale", "Dan Dane", "Zed Zhang"));
+        List<String> byRa = new ArrayList<>();
+        for (People.Person p : People.find(r.all, "ra")) byRa.add(p.names.get(0));
+        Harness.equal("a name that starts with it comes before a word that does, whatever their order by name", byRa, Arrays.asList("Rao Singh", "Amit Rao", "Anna Rao"));
+        Harness.check("someone nothing mentions can be chosen, and has no items", People.find(r.all, "quill").size() == 1 && People.find(r.all, "quill").get(0).items.isEmpty());
+        Harness.check("one letter is not a search; nothing typed finds no one", People.find(r.all, "a").isEmpty() && People.find(r.all, "").isEmpty() && People.find(r.all, null).isEmpty() && People.find(r.all, "  ").isEmpty());
+        Harness.check("a name nobody has finds no one", People.find(r.all, "zzz").isEmpty());
+        List<People.Person> many = new ArrayList<>();
+        for (int i = 0; i < 40; i++) { People.Person p = new People.Person(); p.names.add(String.format("Test %02d", i)); many.add(p); }
+        List<People.Person> capped = People.find(many, "test");
+        Harness.check("at most " + People.FIND_LIMIT + " are shown, the first by name", capped.size() == People.FIND_LIMIT && capped.get(0).names.get(0).equals("Test 00") && capped.get(24).names.get(0).equals("Test 24"));
     }
 
     private static boolean contains(File dir, byte[] needle) throws Exception {
@@ -233,8 +262,8 @@ final class PeopleTest {
             && source.get("ContactsReader").contains("if (!permitted(context)) return null;"));
         Harness.check("the screen keeps the possible people apart: collapsed behind a button, under a heading that says it may be no one",
             activity.contains("result.possible") && activity.contains("Might be") && activity.contains("that only a name matches")
-            && activity.indexOf("for (final People.Person person : result.people)") < activity.indexOf("Might be")
-            && activity.split("list.addView\\(row\\(person\\)\\);", -1).length == 2);
+            && activity.indexOf("for (final People.Person person : result.people) mentions.addView(row(person));") < activity.indexOf("Might be")
+            && activity.split("addView\\(row\\(person\\)\\);", -1).length == 3);
         Harness.check("the record counts both kinds", activity.contains("ContactsFacts.read(result.contacts, result.people.size(), result.possible.size())"));
         Harness.check("a person's reminder goes through the existing flow, about no kept item, and People reaches nothing of the gate itself",
             activity.contains("flow.start(null, null, callNote)") && activity.contains(".setNeutralButton(\"Remind me about this person\\u2026\"") && activity.contains("\"Call \" + person.names.get(0)")
@@ -243,6 +272,9 @@ final class PeopleTest {
             source.get("RemindFlow").contains("if (presetNote != null) note.setText(presetNote);") && source.get("RemindFlow").contains("{presetNote == null ? \"\" : presetNote.trim()}")
             && activity.contains("flow.onPermissionResult(code, results)"));
         Harness.check("the note's window is secure, since it may start as a person's name", source.get("RemindFlow").split("FLAG_SECURE", -1).length - 1 >= 4);
+        Harness.check("the screen opens on a search of every contact, typed in a watcher and read by no accessor; what the words mention is collapsed behind a button",
+            activity.contains("People.find(result.all, typed)") && activity.contains("addTextChangedListener") && !activity.contains(".getText(")
+            && activity.contains("mentions.setVisibility(View.GONE)") && activity.contains("Who my words mention ("));
         Harness.check("Android's permission is asked only for the screen, at the grant", activity.contains("requestPermissions(") && !source.get("ContactsReader").contains("requestPermissions("));
         String access = source.get("ContactsAccess");
         int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");

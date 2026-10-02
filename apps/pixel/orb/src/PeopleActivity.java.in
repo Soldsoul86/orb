@@ -6,9 +6,12 @@ import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -155,7 +158,7 @@ public final class PeopleActivity extends Activity {
         }
     }
 
-    private void show(Journal journal, boolean readable, People.Result result) {
+    private void show(Journal journal, boolean readable, final People.Result result) {
         list.removeAllViews();
         list.addView(text("People", 17, true));
         if (!readable || result == null) {
@@ -167,36 +170,70 @@ public final class PeopleActivity extends Activity {
             // The read happened: said, with counts only — never a name, a number or an address.
             journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size(), result.possible.size()));
         }
+        // You choose the person: type a few letters of a contact's name. Nothing is listed until you do.
+        list.addView(text("Find a person in your contacts, then set a reminder about them.", 13, false));
+        final EditText search = new EditText(this);
+        search.setHint("A name, two letters or more");
+        search.setSingleLine(true);
+        list.addView(search);
+        final LinearLayout found = new LinearLayout(this);
+        found.setOrientation(LinearLayout.VERTICAL);
+        list.addView(found);
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) {
+                // Kept in memory for the screen and let go with it; never stored or logged.
+                found.removeAllViews();
+                String typed = s.toString();
+                List<People.Person> hits = People.find(result.all, typed);
+                for (People.Person person : hits) found.addView(row(person));
+                if (hits.isEmpty() && typed.trim().length() >= People.FIND_MIN) found.addView(text("No contact has that in its name.", 13, false));
+            }
+        });
+        // What the words mention is a guess, so it sits behind a button, not in front of you.
+        final LinearLayout mentions = new LinearLayout(this);
+        mentions.setOrientation(LinearLayout.VERTICAL);
+        mentions.setVisibility(View.GONE);
+        final Button toggle = new Button(this);
+        toggle.setText("Who my words mention (" + result.people.size() + " sure, " + result.possible.size() + " might be)");
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                mentions.setVisibility(mentions.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
+            }
+        });
+        list.addView(toggle);
+        list.addView(mentions);
         StringBuilder said = new StringBuilder();
         said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" tied by number or email · ")
             .append(result.possible.size()).append(" only by a name · ").append(result.contacts).append(" contacts looked at");
         if (result.looked.unreadable > 0) said.append(" · ").append(result.looked.unreadable).append(" items could not be read");
         if (result.looked.skipped > 0) said.append(" · looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
-        list.addView(text(said.toString(), 12, false));
+        mentions.addView(text(said.toString(), 12, false));
         if (result.people.isEmpty()) {
-            list.addView(text("None of your contacts' numbers or email addresses is in what you kept.", 14, false));
+            mentions.addView(text("None of your contacts' numbers or email addresses is in what you kept.", 14, false));
         }
-        for (final People.Person person : result.people) list.addView(row(person));
+        for (final People.Person person : result.people) mentions.addView(row(person));
         if (!result.possible.isEmpty()) {
             final Button more = new Button(this);
             more.setText("Show " + result.possible.size() + " that only a name matches");
             more.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) {
-                    list.removeView(more);
-                    list.addView(text("Might be — only a word matches a contact's name. It can be a different person, or no person.", 13, true), list.indexOfChild(note));
-                    int at = list.indexOfChild(note);
-                    for (People.Person person : result.possible) list.addView(row(person), at++);
+                    mentions.removeView(more);
+                    mentions.addView(text("Might be — only a word matches a contact's name. It can be a different person, or no person.", 13, true), mentions.indexOfChild(note));
+                    int at = mentions.indexOfChild(note);
+                    for (People.Person person : result.possible) mentions.addView(row(person), at++);
                 }
             });
-            list.addView(more);
+            mentions.addView(more);
         }
         if (result.sharedFirstNames > 0) {
-            list.addView(text(result.sharedFirstNames + (result.sharedFirstNames == 1 ? " first name is" : " first names are")
+            mentions.addView(text(result.sharedFirstNames + (result.sharedFirstNames == 1 ? " first name is" : " first names are")
                 + " shared by several contacts, so those are matched by full name or number only.", 12, false));
         }
         note = text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
             + "Matching by number or email is much surer. A name at the start of a sentence is not read: a capital there says nothing.", 12, false);
-        list.addView(note);
+        mentions.addView(note);
     }
 
     private View row(final People.Person person) {
@@ -204,7 +241,7 @@ public final class PeopleActivity extends Activity {
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(0, 16, 0, 16);
         row.addView(text(person.display(), 15, true));
-        row.addView(text(person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
+        row.addView(text(person.items.isEmpty() ? "nothing you kept mentions them" : person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) { showPerson(person); }
         });
@@ -227,6 +264,7 @@ public final class PeopleActivity extends Activity {
             column.addView(text(with.toString(), 13, false));
         }
         SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        if (person.items.isEmpty()) column.addView(text("Nothing you kept mentions them yet.", 13, false));
         for (People.Evidence item : person.items) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);

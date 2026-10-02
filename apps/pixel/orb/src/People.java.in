@@ -89,6 +89,8 @@ final class People {
         /** People only a *word* ties to — a name that may be a name or may not — most-mentioned first. Kept apart so they cannot crowd out the sure ones. */
         final List<Person> possible = new ArrayList<>();
         int contacts;
+        /** **Every** person in the book, mentioned or not (contacts sharing a number or an address are one) — what a search chooses from. */
+        final List<Person> all = new ArrayList<>();
         /** First names several contacts share: matched by full name or number only. */
         int sharedFirstNames;
         final Recall.Results looked = new Recall.Results();
@@ -194,6 +196,7 @@ final class People {
             }
         });
 
+        result.all.addAll(people);
         for (int g = 0; g < people.size(); g++) {
             Person p = people.get(g);
             if (p.items.isEmpty()) continue;
@@ -213,6 +216,41 @@ final class People {
         Collections.sort(result.people, order);
         Collections.sort(result.possible, order);
         return result;
+    }
+
+    /** At most this many search results are shown. */
+    static final int FIND_LIMIT = 25;
+    /** Fewer letters than this is not a search: it would list half the book. */
+    static final int FIND_MIN = 2;
+
+    /**
+     * The people whose contact names contain what was typed — **you choose the person; nothing is guessed from your words**. Case
+     * does not matter. Best first: the name starts with it, then a word of the name starts with it, then it is somewhere inside;
+     * equals in name order; at most `FIND_LIMIT`. Typing less than `FIND_MIN` letters finds no one.
+     */
+    static List<Person> find(List<Person> everyone, String typed) {
+        List<Person> out = new ArrayList<>();
+        if (typed == null) return out;
+        final String query = typed.trim().toLowerCase(java.util.Locale.ROOT);
+        if (query.length() < FIND_MIN) return out;
+        final Map<Person, Integer> rank = new HashMap<>();
+        for (Person p : everyone) {
+            int best = 3;
+            for (String name : p.names) {
+                String lower = name.toLowerCase(java.util.Locale.ROOT);
+                if (lower.startsWith(query)) best = Math.min(best, 0);
+                else if (lower.contains(" " + query)) best = Math.min(best, 1);
+                else if (lower.contains(query)) best = Math.min(best, 2);
+            }
+            if (best < 3) { out.add(p); rank.put(p, best); }
+        }
+        Collections.sort(out, new Comparator<Person>() {
+            @Override public int compare(Person a, Person b) {
+                int d = rank.get(a) - rank.get(b);
+                return d != 0 ? d : a.names.get(0).compareToIgnoreCase(b.names.get(0));
+            }
+        });
+        return out.size() > FIND_LIMIT ? new ArrayList<>(out.subList(0, FIND_LIMIT)) : out;
     }
 
     /** A one-line account of how a person's items were found, for the list: *3 by number, 1 by name*. */

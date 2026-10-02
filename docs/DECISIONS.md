@@ -1241,6 +1241,16 @@ the note's hash and length.
 **Consequence accepted:** a reminder about a person has no lineage to a kept item (`Capability.md`'s *show your working* is satisfied by the intent and confirmation chain, as for any request made directly). **Not in this ruling:** calling or messaging (a hand-off to another app needs its own declaration), reminders Orb proposes about people, recurring reminders.
 
 
+## DR-27 — People opens on a search: you choose the person; the guess is a side feature
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("How to eliminate the noise and make it easy for me to do actions, what's the right way?" → "Yes, go ahead with the search design") · **Amends:** DR-24/DR-25 (what the screen leads with)
+
+**The ruling.** The People screen **opens on a search over every contact** (two letters or more, case-insensitive, best-first: starts with, a word starts with, inside; at most 25; nothing listed until you type). Any contact — mentioned or not — can be chosen and acted on (DR-26's reminder). **What the words mention is behind a button**, collapsed, with its sure
+and *Might be* lists unchanged. The reason: a guess from words cannot be made reliable in a book of thousands (DR-25 made it less noisy, not trustworthy), and the right order is *you choose, Orb finds what it knows*. No new capability, permission or event; contacts are still read only while the screen is open, and nothing about a person is stored.
+
+**Not in this ruling:** a pinned or recent list of people (would be sealed like a note), starred contacts (a new attribute read), search by number, calling or messaging.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

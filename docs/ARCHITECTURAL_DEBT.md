@@ -628,6 +628,8 @@ a second source for the compiler's checksum exists (item 1).
 4. **Two contacts grouped as one person** start the note with the first contact's name.
 5. **No call, no message.** The reminder shows words; reaching the person is yours. Handing a number to the dialer or another app is a separate capability and decision.
 
+**Search (DR-27):** the search finds contacts by name only (not by number); it shows at most 25, best first; a contact that is a group or a shop is found like any other; a contact with the same name as another is listed separately, and Orb does not choose between them. Not built: pinned or recent people, starred contacts, search by number.
+
 ---
 
 ## AD-18 — the first action's limits, stated

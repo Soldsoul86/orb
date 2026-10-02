@@ -6702,3 +6702,42 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 5. Wait for the notification; look at the lock screen first if you can, then unlock. *(P160)*
 6. **Export and share journal**. *(P162)*
 
+
+### 7b72. People opens on a search — you choose the person (DR-27) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v35-search.apk`. v34 is §7b71 (awaiting its own run; v33 §7b70 likewise). Design: `docs/PEOPLE_SEARCH_PHONE.md`; decision `DECISIONS.md` DR-27; limits `ARCHITECTURAL_DEBT.md` AD-22.
+
+**Why:** the first real run (§7b69, and the operator's screenshots after v33/v34) showed a 2537-contact book of which most "people" were WhatsApp groups, shops and things. The operator asked what the right way is to remove the noise and make actions easy.
+
+#### What changed
+
+1. **People opens on a search box.** Type two letters or more of a contact's name and your matching contacts appear — nothing is listed until you type. Best first (the name starts with it, a word of it does, it is inside a name), at most 25.
+2. **Tap one:** the person window with **Remind me about this person…**, even if nothing you kept mentions them (it then says *Nothing you kept mentions them yet*).
+3. **What your words mention is behind a button**, *Who my words mention (N sure, M might be)*, collapsed; inside it the sure list and *Might be* as before.
+
+#### Checked before the device
+
+- 1045 phone-side checks (was 1035); Kotlin 378, TypeScript 600 unchanged; lint and type-check clean.
+- **Tests:** every contact can be found (grouped contacts by either name, contacts nothing mentions too); case and edge blanks; the best-first order and ties; one letter finds no one; the 25 cap; source guards (a text watcher and no accessor, collapsed by default, the search over everyone). Mutation-checked, every mutant fails a named check.
+- **Not testable off the phone:** the keyboard, the screen.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P163** | Open **People**: a search box, a one-line explanation, and a button *Who my words mention (N sure, M might be)* — **no wall of names** | the noise is still in front |
+| **P164** | Type two letters of a contact's name: matching contacts appear, **best first** (names that start with it before names that merely contain it); one letter lists nothing | search or order differs |
+| **P165** | Tap a contact: their window with their number(s) and **Remind me about this person…**; for a contact nothing you kept mentions it says *Nothing you kept mentions them yet* | no window, or no action |
+| **P166** | **Who my words mention** opens (and closes) the earlier lists | the guess is gone or always open |
+| **P167** | The reminder flow from §7b71 (P158–P162) works from a person found by search | the flow breaks |
+| **P168** | **Export and share journal**: one `orb.contacts.read` per opening (counts only); **nothing you typed** and no name anywhere | the search was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v35-search.apk` over v34; open Orb once.
+2. Open **People**. Look at the screen before typing anything. *(P163)*
+3. Type two letters of one real contact's name; then three; then one. *(P164)*
+4. Tap a contact; read the window. Tap **Remind me about this person…**, set a time two or three minutes ahead, confirm, and wait for the notification. *(P165, P167, and P158–P162 of §7b71)*
+5. Back on People, tap **Who my words mention** twice. *(P166)*
+6. **Export and share journal**. *(P168)*
+
