@@ -6514,7 +6514,7 @@ The operator reported *"All 5 done"*.
 
 ### 7b68. Relative days — "I'll send it Friday" — B4 slice 3 (DR-23) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v31-relative.apk`. v30 is §7b67 (verified). Design: `docs/RELATIVE_DAYS_PHONE.md`; decision `DECISIONS.md` DR-23; limits `ARCHITECTURAL_DEBT.md` AD-19.
+**Status: P137, P138 (including the same-weekday rule), P141, P142 held; P139 (the exclusions) and P140 (no dot for guesses) are on-screen and await the operator's word** — `orb-app-v31-relative.apk`. v30 is §7b67 (verified). Design: `docs/RELATIVE_DAYS_PHONE.md`; decision `DECISIONS.md` DR-23; limits `ARCHITECTURAL_DEBT.md` AD-19.
 
 #### What changed
 
@@ -6548,3 +6548,16 @@ The operator reported *"All 5 done"*.
 3. Look at the main screen's **Coming up** button, then open **Coming up**. *(P137–P140)*
 4. Tap **Remind me on …** for the Friday guess; read the card; **Confirm**; return to Coming up. *(P141)*
 5. **Export and share journal**. *(P142)*
+
+
+#### Results (one export, `orb-20261002-133459.txt` — 414 events, `verifyLane`-clean; v31 = versionCode 29848653)
+
+The export was sent without a comment. What it shows (2 Oct 2026 is a **Friday**):
+
+| | What the export shows |
+| --- | --- |
+| Shares | Three texts kept: **22**, **19** and **63** characters — the lengths of *Send the file tomorrow*, *I'll send it Friday* and the third sentence. |
+| **P137, P141** | **Held.** A reminder was confirmed for the first text (`orb.action.intent` citing it, then `confirmed`) for **Sat 3 Oct 09:00 — tomorrow**, the date a guess from *"tomorrow"* kept on Fri 2 Oct gives, set from the Coming up flow (the date pre-filled, the time at nine). |
+| **P138** | **Held — including the same-weekday rule on the device.** A reminder for the second text is for **Fri 9 Oct 09:00**: the text said *Friday* and **it was kept on a Friday**, so the guess is *next week's*, exactly as designed — a real test of the rule, not just of the weekday arithmetic. |
+| **P142** | **Held.** Since v31 started the journal gained only the shares and their Observations, two intents and two confirmations and the export — **no event for viewing Coming up, no event for the third text** — and none of `tomorrow`, `Friday`, `yesterday`, `next Friday` or `Send the file` is in the file. |
+| P139, P140 | **Not visible in an export**: that the third text (*next / every / Fridays / yesterday*) listed nothing, and that the dot stayed off with only guesses ahead. No reminder was made for the third text, which is consistent. **Awaiting the operator's word.** |
