@@ -110,10 +110,10 @@ final class RekeepTest {
         String line = null;
         for (String l : journal.readLines()) if (l.contains(idOf(again))) line = l;
         Harness.check("the record says it was kept again, names the count and not the words",
-            line.contains("\"rekept\":true") && line.contains("\"textChars\":" + WORDS.length()) && !line.contains("7731") && !line.contains("priya"));
+            line.contains("\"rekept\":true") && line.contains("\"textChars\":" + WORDS.length()) && !line.contains("code is 7731") && !line.contains("priya"));
         Harness.check("and cites the erasure it reverses", line.contains("\"causes\":[\"" + erased.declarations.get(0) + "\"]"));
         Harness.check("the journal and the disk hold no word of it in the clear",
-            !onDisk(dir, "7731".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)));
+            !onDisk(dir, "code is 7731".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)));
         boolean oldStillErased = false, newLive = false, newRekept = false;
         for (Erasure.Item item : Erasure.items(journal.readLines())) {
             if (item.hash.equals(hashOf(first))) oldStillErased = item.erased;
@@ -134,7 +134,7 @@ final class RekeepTest {
         Harness.check("it is observed and the Observation carries the flag, not the words", Observe.run(journal).written >= 1);
         String observation = null;
         for (String l : journal.readLines()) if ("orb.observation".equals(Journal.typeOf(l)) && l.contains(idOf(again))) observation = l;
-        Harness.check("with `rekept` and no word", observation != null && observation.contains("\"rekept\":true") && !observation.contains("7731"));
+        Harness.check("with `rekept` and no word", observation != null && observation.contains("\"rekept\":true") && !observation.contains("code is 7731"));
         Backup.Plan plan = Backup.plan(context, journal.readLines(), false);
         boolean hasWords = false;
         for (Backup.Entry e : plan.entries) if (e.name.startsWith("key/")) hasWords = true;

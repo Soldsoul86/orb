@@ -321,12 +321,16 @@ public final class RecallActivity extends Activity {
             return;
         }
         ScrollView scroll = new ScrollView(this);
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
         TextView text = new TextView(this);
         text.setTextSize(14);
         text.setPadding(48, 24, 48, 24);
         text.setTextIsSelectable(true);
         text.setText((doc.uri.isEmpty() ? "" : doc.uri + "\n\n") + doc.body);
-        scroll.addView(text);
+        column.addView(text);
+        addMentions(column, doc);
+        scroll.addView(column);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle(Provenance.SHARED_TEXT.equals(entry.type)
@@ -342,6 +346,96 @@ public final class RecallActivity extends Activity {
             })
             .create();
         // The words on screen are the person's own: no screenshots, no recording, no assistant.
+        dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        dialog.show();
+    }
+
+    /**
+     * What these words mention — phone numbers, sites, UPI ids, emails, amounts, dates — each a tap away from
+     * everything else that mentions the same thing. Found now, from the words in memory; written nowhere
+     * (`Mentions`, DR-19).
+     */
+    private void addMentions(LinearLayout column, Recall.Doc doc) {
+        List<Mentions.Handle> handles = Mentions.in(doc);
+        if (handles.isEmpty()) return;
+        TextView head = new TextView(this);
+        head.setTextSize(12);
+        head.setTypeface(Typeface.DEFAULT_BOLD);
+        head.setPadding(48, 24, 48, 8);
+        head.setText("Mentions");
+        column.addView(head);
+        for (final Mentions.Handle handle : handles) {
+            TextView row = new TextView(this);
+            row.setTextSize(14);
+            row.setPadding(48, 16, 48, 16);
+            row.setText(Mentions.line(handle) + "   \u203a");
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { showMentioning(handle); }
+            });
+            column.addView(row);
+        }
+    }
+
+    /** Everything kept that mentions one handle, and what most often appears beside it. */
+    private void showMentioning(final Mentions.Handle handle) {
+        Journal journal = journal();
+        if (journal == null) return;
+        Mentions.Result result;
+        try {
+            result = Mentions.of(this, journal, handle);
+        } catch (IOException error) {
+            new AlertDialog.Builder(this).setMessage("Could not look: " + error).setPositiveButton("OK", null).show();
+            return;
+        }
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(48, 24, 48, 24);
+        int n = result.found.entries.size();
+        TextView said = new TextView(this);
+        said.setTextSize(13);
+        StringBuilder summaryText = new StringBuilder();
+        summaryText.append(n).append(n == 1 ? " kept item mentions this" : " kept items mention this");
+        if (result.found.unreadable > 0) summaryText.append(" \u00b7 ").append(result.found.unreadable).append(" could not be read");
+        if (result.found.skipped > 0) summaryText.append(" \u00b7 looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.found.skipped).append(" not looked at");
+        said.setText(summaryText.toString());
+        column.addView(said);
+        if (!result.alsoWith.isEmpty()) {
+            TextView also = new TextView(this);
+            also.setTextSize(13);
+            also.setPadding(0, 16, 0, 0);
+            StringBuilder with = new StringBuilder("Often beside it:");
+            for (Mentions.Handle other : result.alsoWith) with.append("\n  ").append(Mentions.line(other));
+            also.setText(with.toString());
+            column.addView(also);
+        }
+        SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        for (final Recall.Entry entry : result.found.entries) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 20, 0, 20);
+            TextView head = new TextView(this);
+            head.setTextSize(12);
+            head.setTypeface(Typeface.DEFAULT_BOLD);
+            head.setText(when.format(new Date(entry.wallClock)) + "  \u00b7  " + (entry.packageName == null ? "" : entry.packageName)
+                + (Provenance.SHARED_TEXT.equals(entry.type) ? "  \u00b7  shared" : ""));
+            row.addView(head);
+            TextView body = new TextView(this);
+            body.setTextSize(14);
+            body.setText(entry.snippet);
+            row.addView(body);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { open(entry); }
+            });
+            column.addView(row);
+        }
+        scroll.addView(column);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(Mentions.line(handle))
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .create();
+        // A list of what a person's words mention is as private as the words.
         dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         dialog.show();
     }

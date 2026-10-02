@@ -1,0 +1,188 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * What a kept item mentions and what else mentions the same thing (`docs/ENTITIES_PHONE.md`, DR-19): found when
+ * asked, written nowhere, and gone with the words.
+ */
+final class MentionsTest {
+    private MentionsTest() {}
+
+    private static Mentions.Handle phone(String v) { return new Mentions.Handle("phone", v); }
+
+    private static ScreenText screen(String uri, String... lines) {
+        ScreenText s = new ScreenText();
+        for (String l : lines) s.add(l);
+        s.setWebUri(uri);
+        return s;
+    }
+
+    /** Names and sizes of every file under a directory — enough to see that nothing was written. */
+    private static Map<String, Long> listing(File dir, String prefix) {
+        Map<String, Long> out = new TreeMap<>();
+        File[] children = dir.listFiles();
+        if (children == null) return out;
+        for (File child : children) {
+            if (child.isDirectory()) out.putAll(listing(child, prefix + child.getName() + "/"));
+            else out.put(prefix + child.getName(), child.length());
+        }
+        return out;
+    }
+
+    /** Shares some words to Orb as `ShareActivity` does for text, off the phone. */
+    private static void keepText(Context context, Journal journal, String text) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, null);
+        SharedText.record(journal, context, payload, stored, null);
+    }
+
+    private static String hashOfCapture(Journal journal, int nth) throws Exception {
+        int seen = 0;
+        for (String l : journal.readLines()) {
+            if (AssistFacts.CAPTURED.equals(Journal.typeOf(l)) && seen++ == nth) return Erasure.envelopeHash(l);
+        }
+        return null;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("what one kept item mentions");
+        Recall.Doc doc = new Recall.Doc("https://shop.example.org/cart", "call 98765 43210 about ₹1,200 on 12/10/2026");
+        List<Mentions.Handle> handles = Mentions.in(doc);
+        Harness.equal("the page address counts, then the words in order",
+            handles.toString(), Arrays.asList(
+                new Mentions.Handle("site", "shop.example.org"), phone("+919876543210"),
+                new Mentions.Handle("amount", "INR 1200"), new Mentions.Handle("date", "2026-10-12")).toString());
+        Harness.equal("none in plain words", Mentions.in(new Recall.Doc("", "meet at the red door")).size(), 0);
+
+        Harness.suite("everything that mentions the same thing");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-mentions").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Harness.equal("kept A", Capture.remember(context, journal, screen("", "call Ravi on 98765 43210 about ₹1,200"), "com.example.chat", 7L, false).outcome, Capture.STORED);
+        Harness.equal("kept B", Capture.remember(context, journal, screen("", "Ravi's number +91-98765-43210", "site https://example.com/x"), "com.example.chat", 7L, false).outcome, Capture.STORED);
+        Harness.equal("kept C", Capture.remember(context, journal, screen("", "unrelated 12/10/2026"), "com.example.chat", 7L, false).outcome, Capture.STORED);
+        Map<String, Object> shared = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 40L);
+        Attachments.Stored stored = SharedText.seal(context, "Priya 9123456789 and 98765 43210", null);
+        Harness.equal("shared D", SharedText.record(journal, context, shared, stored, null) != null, true);
+
+        List<String> linesBefore = journal.readLines();
+        Map<String, Long> disk = listing(dir, "");
+        Mentions.Result ravi = Mentions.of(context, journal, phone("+919876543210"));
+        Harness.equal("A, B and D mention Ravi's number — not C", ravi.found.entries.size(), 3);
+        Harness.equal("newest first, shared text among them", ravi.found.entries.get(0).type, Provenance.SHARED_TEXT);
+        Harness.equal("beside it, in the order first seen: Priya's number, the site, the amount",
+            ravi.alsoWith.toString(), Arrays.asList(phone("+919123456789"), new Mentions.Handle("site", "example.com"), new Mentions.Handle("amount", "INR 1200")).toString());
+        Harness.equal("a number nobody else has is mentioned once", Mentions.of(context, journal, phone("+919123456789")).found.entries.size(), 1);
+        Harness.equal("a number nowhere is mentioned nowhere", Mentions.of(context, journal, phone("+919000000000")).found.entries.size(), 0);
+        Harness.equal("the same date in C only", Mentions.of(context, journal, new Mentions.Handle("date", "2026-10-12")).found.entries.size(), 1);
+
+        Harness.suite("nothing is written");
+        Harness.equal("the journal is unchanged", journal.readLines(), linesBefore);
+        Harness.equal("and so is every file on disk", listing(dir, ""), disk);
+        Harness.check("no handle is in the journal or on disk in the clear",
+            !contains(dir, "Ravi on 98765".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "Priya 9123456789".getBytes(StandardCharsets.UTF_8)));
+
+        Harness.suite("erasing the words removes what they mention");
+        Harness.equal("erased", Erase.execute(context, journal, hashOfCapture(journal, 0)).outcome, Erase.DESTROYED);
+        Harness.equal("A no longer mentions anything", Mentions.of(context, journal, phone("+919876543210")).found.entries.size(), 2);
+        Harness.equal("and the amount that was only in A is gone from every answer", Mentions.of(context, journal, new Mentions.Handle("amount", "INR 1200")).found.entries.size(), 0);
+        Harness.equal("erase B too", Erase.execute(context, journal, hashOfCapture(journal, 1)).outcome, Erase.DESTROYED);
+        Harness.equal("only the shared words remain", Mentions.of(context, journal, phone("+919876543210")).found.entries.size(), 1);
+        Harness.check("and the site that was only in B has nothing left", Mentions.of(context, journal, new Mentions.Handle("site", "example.com")).found.entries.isEmpty());
+
+        Harness.suite("beside it: the more items, the earlier");
+        Install.forget();
+        File dir2 = Files.createTempDirectory("orb-mentions-rank").toFile();
+        Context c2 = new Context(dir2);
+        Journal j2 = Journal.open(c2, Install.lane(c2), Install.id(c2));
+        keepText(c2, j2, "Ravi 98765 43210 ref ravi@oksbi");
+        keepText(c2, j2, "Ravi 98765 43210 again ravi@oksbi");
+        keepText(c2, j2, "Ravi 98765 43210 and https://shop.example.org/a");   // newest: its handle is seen first
+        Mentions.Result ranked = Mentions.of(c2, j2, phone("+919876543210"));
+        Harness.equal("the upi id in two items comes before the site in one, though the site was seen first",
+            ranked.alsoWith.toString(), Arrays.asList(new Mentions.Handle("upi", "ravi@oksbi"), new Mentions.Handle("site", "shop.example.org")).toString());
+
+        Harness.suite("only the newest items are looked at, and it says so");
+        Install.forget();
+        File dir3 = Files.createTempDirectory("orb-mentions-limit").toFile();
+        Context c3 = new Context(dir3);
+        Journal j3 = Journal.open(c3, Install.lane(c3), Install.id(c3));
+        for (int i = 0; i < Recall.SCAN_LIMIT + 2; i++) keepText(c3, j3, "item " + i + " Ravi 98765 43210");
+        Mentions.Result limited = Mentions.of(c3, j3, phone("+919876543210"));
+        Harness.equal("the newest " + Recall.SCAN_LIMIT + " are read", limited.found.entries.size(), Recall.SCAN_LIMIT);
+        Harness.equal("and the rest are counted as not looked at", limited.found.skipped, 2);
+
+        Harness.suite("how they read");
+        Harness.equal("an Indian mobile in its groups", Mentions.show(phone("+919876543210")), "+91 98765 43210");
+        Harness.equal("another country's as found", Mentions.show(phone("+14155552671")), "+14155552671");
+        Harness.equal("rupees with their sign", Mentions.show(new Mentions.Handle("amount", "INR 1200.50")), "₹1200.50");
+        Harness.equal("a line says what kind", Mentions.line(new Mentions.Handle("upi", "ravi@oksbi")), "UPI id  ravi@oksbi");
+
+        guard();
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The code that finds and shows mentions writes nothing and logs nothing. */
+    private static void guard() throws Exception {
+        Harness.suite("the mentions code reads and shows, and does nothing else");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String mentions = new String(Files.readAllBytes(root.resolve("src/Mentions.java.in")), StandardCharsets.UTF_8);
+        String activity = new String(Files.readAllBytes(root.resolve("src/RecallActivity.java.in")), StandardCharsets.UTF_8);
+        int from = activity.indexOf("private void addMentions");
+        int to = activity.indexOf("Where this came from, in plain words");
+        Harness.check("the screen code was found", from > 0 && to > from);
+        List<String> scanned = new ArrayList<>();
+        scanned.add(code(mentions));
+        scanned.add(code(activity.substring(from, to)));
+        List<String> forbidden = Arrays.asList(
+            ".append(", "Json.obj(", ".put(\"", "Log.", "System.out", "printStackTrace", "FileOutputStream", "RandomAccessFile",
+            "Files.write", "openFileOutput", "getSharedPreferences", "Toast", "Attachments.store", "Attachments.destroy", "Erase.");
+        for (String source : scanned) {
+            for (String bad : forbidden) {
+                // `StringBuilder.append` is how text is composed for the screen; only the journal's `append` is the concern.
+                if (bad.equals(".append(")) {
+                    Harness.check("no journal append", !source.contains("journal.append(") && !source.contains("Journal.append("));
+                } else {
+                    Harness.check("nothing like " + bad, !source.contains(bad));
+                }
+            }
+        }
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

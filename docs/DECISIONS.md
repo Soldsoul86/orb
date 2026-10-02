@@ -1101,6 +1101,24 @@ and remembered screens (`DEVICE_LOOP.md` §7b61). Pictures, files and the desk's
 are covered by tests and stay unverified on a device — verifying them needs those apps installed, and a wrong answer there fails *toward* keeping nothing.
 
 
+## DR-19 — The phone's first entities are computed, never recorded
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go with approach A") on `ENTITIES_PHONE.md` §4 ·
+  **Bears on:** `contracts/Entity.md` §2, `ROADMAP.md` B3, `ARCHITECTURAL_DEBT.md` AD-12/AD-13/AD-17
+
+**The question.** `Entity.md` §2 says a resolution is recorded as an Event. The phone's journal cannot seal payloads (AD-12), so a recorded entity — *"phone number +91 98…"* —
+would be written in the clear, beside records designed to say how much and not what.
+
+**The ruling.** Entities and relationships on the phone are a **projection**, as `Entity.md` §1 already allows ("recomputable from history"): found when a screen opens, from words held in
+memory for that call, and never written. The contract's recorded resolution is applied **when a person decides something** (a merge, a name) — meaning that cannot be recomputed —
+and that is **not built yet**. Consequences accepted: two handles of one person stay two; the lookup is linear in the number of items (AD-13).
+
+**What was built.** `runtime/entities` (TypeScript reference) and `Handles.kt` (the phone's Kotlin), both held to hand-written cases; `Mentions` and *Mentions* in Recall's item dialog.
+The kinds are phones (India first), sites, emails, UPI ids, amounts and dates that name themselves. People, places and organisations wait for a model or the contacts gate (B5).
+
+**Contract note.** `Entity.md` §2 gained one sentence: *a resolution that can be recomputed from sealed content is not recorded in a journal that cannot seal it.*
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

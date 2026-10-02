@@ -145,8 +145,8 @@ final class AssistGuardTest {
                 if (text.contains("dev.orb.brain")) brainUsers.add(file.getFileName().toString());
             }
         }
-        Harness.equal("only Observe and Provenance call the brain", new java.util.TreeSet<>(brainUsers),
-            new java.util.TreeSet<>(java.util.Arrays.asList("Observe.java.in", "Provenance.java.in")));
+        Harness.equal("only Observe, Provenance and Mentions call the brain", new java.util.TreeSet<>(brainUsers),
+            new java.util.TreeSet<>(java.util.Arrays.asList("Mentions.java.in", "Observe.java.in", "Provenance.java.in")));
         String provenance = new String(Files.readAllBytes(root.resolve("src/Provenance.java.in")), StandardCharsets.UTF_8);
         Harness.check("Observe writes and never reads the graph; Provenance reads and never writes",
             !observe.contains("Evidence.build") && provenance.contains("Evidence.build(") && !provenance.contains("journal.append(")

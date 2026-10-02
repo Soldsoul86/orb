@@ -583,3 +583,18 @@ a second source for the compiler's checksum exists (item 1).
 3. **A person who wants even the *fact* of an erasure gone is asking for something else.** The declaration is history and stays; the prompt shows its date.
 4. **A process killed while the share dialog is showing records nothing for that share.** Same exposure as a kill during sealing.
 
+---
+
+## AD-17 — the phone's entities are handles only, and not remembered between openings
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-19, `ENTITIES_PHONE.md`). Debts, stated.
+
+1. **Handles, not people.** A phone number, site, UPI id, email, amount or date names itself; "Ravi" does not. Names, places and organisations need a model or the contacts gate (B5). Until then
+   *everything about Ravi* is *everything mentioning this number*, which only helps if Ravi's number was written down.
+2. **No merge or split.** Two numbers of one person stay two entities. The contract's recorded resolution applies when a **person** decides (`Entity.md` §2, DR-19) — not built.
+3. **Linear cost, bounded to the newest 500 kept items** (AD-13), and every lookup reopens every item in memory. An index would have to be sealed and kept in step with every erase; revisit if the lookup
+   becomes slow (thousands of items).
+4. **Format limits are the rules' limits**: no landlines, no two-digit years, no relative dates, a ten-digit order id starting 6–9 reads as a mobile, other countries' numbers only as `+country…`.
+5. **The list is a sensitive index** of what a person's words mention. It lives behind the same secure window as Recall and is never exported or logged; a person who screenshots around the protection
+   (another device pointed at the screen) is outside what the app can prevent.
+

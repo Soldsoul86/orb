@@ -1,0 +1,540 @@
+{
+ "note": "Hand-written in runtime/entities/tests/handle-cases.ts; written by scripts/write-brain-vectors.mjs. Do not edit.",
+ "cases": [
+  {
+   "name": "empty",
+   "text": "",
+   "expect": []
+  },
+  {
+   "name": "plain words",
+   "text": "meet at the red door",
+   "expect": []
+  },
+  {
+   "name": "+91 with spaces",
+   "text": "call +91 98765 43210 now",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "bare ten digits",
+   "text": "9876543210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "+91 with hyphens",
+   "text": "+91-98765-43210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "leading zero",
+   "text": "09876543210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "91 prefix without a plus",
+   "text": "91 98765 43210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "in brackets",
+   "text": "(+91) 98765 43210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "two numbers, in order",
+   "text": "Ravi: 98765-43210, Priya: 91234 56789",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    },
+    {
+     "kind": "phone",
+     "value": "+919123456789"
+    }
+   ]
+  },
+  {
+   "name": "the same number two ways is one",
+   "text": "9876543210 and +91 98765 43210",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "a mobile does not start with 5",
+   "text": "5876543210",
+   "expect": []
+  },
+  {
+   "name": "eleven digits is not a mobile",
+   "text": "order 12345678901",
+   "expect": []
+  },
+  {
+   "name": "after a hash it is an id",
+   "text": "id#9876543210",
+   "expect": []
+  },
+  {
+   "name": "after a hash a +91 number is an id too",
+   "text": "id#+919876543210",
+   "expect": []
+  },
+  {
+   "name": "after a hyphen it is an id",
+   "text": "ref-9876543210",
+   "expect": []
+  },
+  {
+   "name": "inside a longer run it is not a mobile",
+   "text": "9876543210123",
+   "expect": []
+  },
+  {
+   "name": "an international number",
+   "text": "+1 415 555 2671",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+14155552671"
+    }
+   ]
+  },
+  {
+   "name": "another international number",
+   "text": "+44 20 7946 0958",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+442079460958"
+    }
+   ]
+  },
+  {
+   "name": "an invalid +91 is nothing, not an international guess",
+   "text": "+91 12345 67890",
+   "expect": []
+  },
+  {
+   "name": "beside emoji",
+   "text": "😀 9876543210 😀",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "a card number is excluded",
+   "text": "The 4111 1111 1111 1111 card",
+   "expect": []
+  },
+  {
+   "name": "a card-like run that fails the check is still no handle",
+   "text": "4111 1111 1111 1112",
+   "expect": []
+  },
+  {
+   "name": "a phone beside a card is still found",
+   "text": "9876543210 4111 1111 1111 1111",
+   "expect": [
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "a card with no spaces is excluded",
+   "text": "pay 4111111111111111",
+   "expect": []
+  },
+  {
+   "name": "a long amount that fails the card check is still an amount",
+   "text": "paid ₹ 1234567890123 today",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 1234567890123"
+    }
+   ]
+  },
+  {
+   "name": "a long amount that passes the card check is excluded",
+   "text": "paid ₹ 1234567890128 today",
+   "expect": []
+  },
+  {
+   "name": "a site, without www and path",
+   "text": "see https://www.Example.com/a/b?x=1.",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "example.com"
+    }
+   ]
+  },
+  {
+   "name": "a site, without the port",
+   "text": "http://sub.example.co.in:8080/path",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "sub.example.co.in"
+    }
+   ]
+  },
+  {
+   "name": "www alone",
+   "text": "www.test.org, ok",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "test.org"
+    }
+   ]
+  },
+  {
+   "name": "a host with no dot is not a site",
+   "text": "https://localhost/x",
+   "expect": []
+  },
+  {
+   "name": "a file name is not a site",
+   "text": "notes.txt",
+   "expect": []
+  },
+  {
+   "name": "a non-breaking space ends a link as a space does",
+   "text": "https://example.com/a 9876543210",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "example.com"
+    },
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "an email inside a link is the link's",
+   "text": "https://example.com/?mail=a@b.com",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "example.com"
+    }
+   ]
+  },
+  {
+   "name": "a number inside a link is the link's",
+   "text": "https://example.com/9876543210",
+   "expect": [
+    {
+     "kind": "site",
+     "value": "example.com"
+    }
+   ]
+  },
+  {
+   "name": "an email, lower-cased, without the full stop",
+   "text": "write to Priya.S@Gmail.com.",
+   "expect": [
+    {
+     "kind": "email",
+     "value": "priya.s@gmail.com"
+    }
+   ]
+  },
+  {
+   "name": "a UPI id",
+   "text": "pay ravi@oksbi.",
+   "expect": [
+    {
+     "kind": "upi",
+     "value": "ravi@oksbi"
+    }
+   ]
+  },
+  {
+   "name": "a UPI id made of a number is not also a phone",
+   "text": "9876543210@ybl",
+   "expect": [
+    {
+     "kind": "upi",
+     "value": "9876543210@ybl"
+    }
+   ]
+  },
+  {
+   "name": "two UPI ids",
+   "text": "name@paytm and name@ibl",
+   "expect": [
+    {
+     "kind": "upi",
+     "value": "name@paytm"
+    },
+    {
+     "kind": "upi",
+     "value": "name@ibl"
+    }
+   ]
+  },
+  {
+   "name": "a mention is not a UPI id",
+   "text": "@ravi hello",
+   "expect": []
+  },
+  {
+   "name": "one letter before the at is not a UPI id",
+   "text": "a@b",
+   "expect": []
+  },
+  {
+   "name": "an email with a one-letter ending is nothing",
+   "text": "xy@ab.c",
+   "expect": []
+  },
+  {
+   "name": "rupee sign and a comma",
+   "text": "paid ₹1,200 today",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 1200"
+    }
+   ]
+  },
+  {
+   "name": "Rs. and a short fraction",
+   "text": "Rs. 500.5 only",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 500.50"
+    }
+   ]
+  },
+  {
+   "name": "Indian grouping and a zero fraction",
+   "text": "rs 12,34,567.00",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 1234567"
+    }
+   ]
+  },
+  {
+   "name": "INR",
+   "text": "INR 5000",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 5000"
+    }
+   ]
+  },
+  {
+   "name": "a fraction",
+   "text": "₹ 99.99",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 99.99"
+    }
+   ]
+  },
+  {
+   "name": "rs inside a word is not rupees",
+   "text": "Hours 5",
+   "expect": []
+  },
+  {
+   "name": "no space",
+   "text": "RS5",
+   "expect": [
+    {
+     "kind": "amount",
+     "value": "INR 5"
+    }
+   ]
+  },
+  {
+   "name": "a sign with no number",
+   "text": "Rs.",
+   "expect": []
+  },
+  {
+   "name": "slashes",
+   "text": "on 12/10/2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "hyphens",
+   "text": "12-10-2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "ISO",
+   "text": "2026-10-12",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "day, month name, year",
+   "text": "12 Oct 2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "ordinal and a full month",
+   "text": "12th October, 2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "month first",
+   "text": "Oct 12, 2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-10-12"
+    }
+   ]
+  },
+  {
+   "name": "dots, two digits each",
+   "text": "01.02.2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-02-01"
+    }
+   ]
+  },
+  {
+   "name": "a version number is not a date",
+   "text": "version 1.2.2026",
+   "expect": []
+  },
+  {
+   "name": "the thirty-first of February",
+   "text": "31/02/2026",
+   "expect": []
+  },
+  {
+   "name": "a leap day",
+   "text": "29/02/2024",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2024-02-29"
+    }
+   ]
+  },
+  {
+   "name": "not a leap day",
+   "text": "29/02/2026",
+   "expect": []
+  },
+  {
+   "name": "two-digit years are not guessed",
+   "text": "12/10/26",
+   "expect": []
+  },
+  {
+   "name": "March is a month and marching is not",
+   "text": "5 March 2026 and 5 Marching 2026",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-03-05"
+    }
+   ]
+  },
+  {
+   "name": "a booking",
+   "text": "Booked for 3 pm on 5 Nov 2026 at ₹2,000, call 9876543210",
+   "expect": [
+    {
+     "kind": "date",
+     "value": "2026-11-05"
+    },
+    {
+     "kind": "amount",
+     "value": "INR 2000"
+    },
+    {
+     "kind": "phone",
+     "value": "+919876543210"
+    }
+   ]
+  },
+  {
+   "name": "devanagari digits are not read",
+   "text": "₹ १२३",
+   "expect": []
+  }
+ ]
+}

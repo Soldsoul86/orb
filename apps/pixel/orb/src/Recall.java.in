@@ -257,15 +257,28 @@ final class Recall {
         return out;
     }
 
+    /** Offered each readable kept item while walking, newest first. The words are in memory for the call only. */
+    interface Visitor {
+        void kept(Erasure.Item item, String app, boolean screen, Doc doc);
+    }
+
+    /** The entry a list shows for one kept item. */
+    static Entry entryFor(Erasure.Item item, String app, boolean screen, Doc doc, String query) {
+        return screen
+            ? new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query))
+            : new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query),
+                Provenance.SHARED_TEXT, null, null, item.bytes);
+    }
+
     /**
-     * Remembered screens matching `query` (and `packageFilter`, if not null), newest first. Every
-     * item looked at is opened in memory and let go.
+     * Walks the kept screens and shared words newest first (the newest `SCAN_LIMIT`), opening each in memory and
+     * letting go, and offers every readable one to the visitor. Counts what it could not read and what it did not
+     * look at in `results`. **Nothing is written, and no word outlives the visit.**
      */
-    static Results search(Context context, Journal journal, String query, String packageFilter) throws IOException {
+    static void walk(Context context, Journal journal, String packageFilter, Results results, Visitor visitor) throws IOException {
         List<String> lines = journal.readLines();
         List<Erasure.Item> items = Erasure.items(lines);
         Map<String, String> sharedApp = sealedTextApps(lines);
-        Results results = new Results();
         int looked = 0;
         for (int i = items.size() - 1; i >= 0; i--) {
             Erasure.Item item = items.get(i);
@@ -281,16 +294,24 @@ final class Recall {
                 if (bytes == null) continue;               // destroyed or gone: not an error
                 Doc doc = parse(bytes);
                 if (doc == null) { results.unreadable++; continue; }
-                if (matches(doc, app, query)) {
-                    results.entries.add(screen
-                        ? new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query))
-                        : new Entry(item.hash, item.id, item.identity, item.wallClock, app, snippet(doc, query),
-                            Provenance.SHARED_TEXT, null, null, item.bytes));
-                }
+                visitor.kept(item, app, screen, doc);
             } catch (Exception corrupt) {
                 results.unreadable++;
             }
         }
+    }
+
+    /**
+     * Remembered screens matching `query` (and `packageFilter`, if not null), newest first. Every
+     * item looked at is opened in memory and let go.
+     */
+    static Results search(Context context, Journal journal, final String query, String packageFilter) throws IOException {
+        final Results results = new Results();
+        walk(context, journal, packageFilter, results, new Visitor() {
+            @Override public void kept(Erasure.Item item, String app, boolean screen, Doc doc) {
+                if (matches(doc, app, query)) results.entries.add(entryFor(item, app, screen, doc, query));
+            }
+        });
         return results;
     }
 

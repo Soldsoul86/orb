@@ -1,6 +1,6 @@
 # The phone's entities — B3, first slice (proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go with approach A") and built** (`DEVICE_LOOP.md` §7b63, `orb-app-v27-mentions.apk`; `DECISIONS.md` DR-19). As-built notes in §9.
 > Implements `ROADMAP.md` Track B step B3 under `DECISIONS.md` DR-16 (Kotlin; **rules before any model**).
 > Contracts: `Entity.md`, `Relationship.md`, `Evidence.md`. **One reading of `Entity.md` §2 is applied narrowly here and is flagged in §4 for approval.**
 
@@ -65,3 +65,19 @@ People, places and organisations; merge/split by the person; any Event for an en
 1. **Approach A** — compute, never record — and the narrow reading of `Entity.md` §2 (§4).
 2. **The handle kinds** in the first column of §2 (and that names of people wait for the contacts gate or a model).
 3. **Where it shows:** *Mentions* in Recall's item dialog, and the list of other items sharing a handle.
+
+## 9. As built
+
+- **`runtime/entities`** (TypeScript reference, no dependencies) and **`runtime/brain/.../Handles.kt`** (the phone's Kotlin) — both checked against the same **hand-written** cases
+  (`runtime/entities/tests/handle-cases.ts`, serialised to `runtime/brain/tests/vectors/handles.json`), not against each other. 64 cases (25 of them must find nothing): what each kind must find and, as much, what it must **not**
+  (order ids, `#`/`-` ids, card numbers, version numbers, invalid dates, mentions, landlines).
+- **A card-like run that passes the Luhn check is excluded and never returned**; one that fails it is read as whatever else it is.
+- **Whitespace is spelled out** in the link rule, not `\s`: the JVM's and JavaScript's differ and the two must agree — found by a mutation that survived until a case was written for it.
+- **The page address counts** as part of an item's words (a remembered Chrome page mentions its own site), so *everything from this site* works.
+- **`Mentions`** (Java) is the only new brain caller (`AssistGuardTest`); it wraps handles in its own value so no other file touches the brain. It reads and shows and **writes nothing**: a test
+  compares the journal and every file on disk before and after, and a source guard forbids appends, logs, file writes and the sealed store in it and in the screen code.
+- **The screen:** an item's dialog lists **Mentions** (`Phone  +91 98765 43210 ›`); tapping one lists every kept item that mentions it, says how many items could not be read or were not looked at,
+  and shows the handles that most often appear **beside** it (*mentioned together*, derived, never stored). The list is as private as Recall: secure window, never exported.
+- **Known limits** (`ARCHITECTURAL_DEBT.md` AD-17): no names, places or organisations; no merging of a person's several numbers; landlines and STD numbers are not found; two-digit years and
+  "Friday" are not read; a ten-digit order number starting 6–9 is indistinguishable from a mobile; linear cost and the newest-500 bound (AD-13).
+

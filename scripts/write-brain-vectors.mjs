@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Regenerates `runtime/brain/tests/vectors/observations.json` (the translation) and `graph.json` (the Evidence
- * Graph) from the TypeScript implementations.
+ * Regenerates `runtime/brain/tests/vectors/observations.json` (the translation), `graph.json` (the Evidence
+ * Graph) and `handles.json` (the hand-written handle cases) from the TypeScript side.
  *
  *   npm run build && node scripts/write-brain-vectors.mjs
  *
@@ -11,8 +11,11 @@
 import { writeFile } from "node:fs/promises";
 import { buildVectors, vectorsPath } from "../packages/device-watch/dist/tests/brain-vectors-build.js";
 import { buildGraphVectors, graphVectorsPath } from "../packages/device-watch/dist/tests/graph-vectors-build.js";
+import { buildHandleVectors, handleVectorsPath } from "../runtime/entities/dist/tests/handle-vectors-build.js";
 
 await writeFile(vectorsPath, JSON.stringify(await buildVectors(), null, 1) + "\n");
 console.log(`wrote ${vectorsPath}`);
 await writeFile(graphVectorsPath, JSON.stringify(await buildGraphVectors(), null, 1) + "\n");
 console.log(`wrote ${graphVectorsPath}`);
+await writeFile(handleVectorsPath, JSON.stringify(buildHandleVectors(), null, 1) + "\n");
+console.log(`wrote ${handleVectorsPath}`);

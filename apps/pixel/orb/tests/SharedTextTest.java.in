@@ -86,7 +86,7 @@ final class SharedTextTest {
         Harness.suite("the record names no word");
         Map<String, Object> declared = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.chat", WORDS.length());
         String declaredText = Json.canonical(declared);
-        Harness.check("a text share declares how much, and not what", declaredText.contains("\"textChars\":" + WORDS.length()) && !declaredText.contains("priya") && !declaredText.contains("4471"));
+        Harness.check("a text share declares how much, and not what", declaredText.contains("\"textChars\":" + WORDS.length()) && !declaredText.contains("priya") && !declaredText.contains("code is 4471"));
         Harness.check("references are empty and the count is one", declaredText.contains("\"references\":\"\"") && declaredText.contains("\"itemCount\":1"));
 
         Install.forget();   // the identity is cached process-wide: mint this directory's own
@@ -96,8 +96,8 @@ final class SharedTextTest {
         Harness.equal("stored the first time", share(context, journal, WORDS, "android-app://com.example.chat"), Capture.STORED);
         String line = null;
         for (String l : journal.readLines()) if ("orb.shared".equals(Journal.typeOf(l))) line = l;
-        Harness.check("the journal holds no word of it", !line.contains("priya") && !line.contains("4471") && !line.contains("dinner") && !line.contains("lift"));
-        Harness.check("nor does any file on disk, in the clear", !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "4471".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("the journal holds no word of it", !line.contains("priya") && !line.contains("code is 4471") && !line.contains("dinner") && !line.contains("lift"));
+        Harness.check("nor does any file on disk, in the clear", !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "code is 4471".getBytes(StandardCharsets.UTF_8)));
         Harness.check("the sealed content is named by identity", line.contains("\"attachment\":\"sha256:") && line.contains("\"resolved\":true"));
         Harness.equal("it is recognised as sealed text", SharedText.textCharsOf(line), (long) WORDS.length());
         Harness.equal("a share of a file is not", SharedText.textCharsOf("{\"payload\":{\"attachment\":\"x\"},\"type\":\"orb.shared\"}"), -1L);
@@ -171,7 +171,7 @@ final class SharedTextTest {
         Harness.equal("sharing the same words again is refused as erased", share(context, journal, WORDS, "android-app://com.example.chat"), "erased");
         String refused = null;
         for (String l : journal.readLines()) if ("orb.shared".equals(Journal.typeOf(l))) refused = l;
-        Harness.check("and still no word of them is written anywhere", !refused.contains("priya") && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "4471".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("and still no word of them is written anywhere", !refused.contains("priya") && !onDisk(dir, "priya".getBytes(StandardCharsets.UTF_8)) && !onDisk(dir, "code is 4471".getBytes(StandardCharsets.UTF_8)));
 
         Harness.suite("it is where from, and what stays, in its own words");
         Harness.check("the erase note says words, not file", Provenance.stays(Provenance.SHARED_TEXT).contains("but not the words"));

@@ -52,6 +52,11 @@ This direction is deliberate (see Dependencies).
 2. **Recording.** The resolution is recorded as an Event; the Entity becomes part
    of the recomputable Digital Twin. Its *resolution decisions* are history; the
    Entity projection is rebuildable from them.
+   *Added 2026-10-02 (`../docs/DECISIONS.md` DR-19):* a resolution that can be
+   recomputed from sealed content is **not recorded in a journal that cannot seal
+   it** — recording it would write the content in the clear. Such Entities are a
+   projection, computed when asked and never stored; a resolution **a person
+   decides** (a merge, a name) is the part that is recorded.
 3. **Existence.** It is referenced by Facts, Beliefs, Relationships, Projects, and
    the Digital Twin as the subject they concern.
 4. **Revision (merge / split).** As evidence accumulates, two Entities may merge

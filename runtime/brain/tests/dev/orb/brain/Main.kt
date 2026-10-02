@@ -9,6 +9,7 @@ fun main(args: Array<String>) {
     ObserverTest.run()
     TranslateTest.run(File(args.firstOrNull() ?: "."))
     GraphTest.run(File(args.firstOrNull() ?: "."))
+    HandlesTest.run(File(args.firstOrNull() ?: "."))
     PurityTest.run(File(args.firstOrNull() ?: "."))
     exitProcess(Harness.report())
 }

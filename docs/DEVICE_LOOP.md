@@ -6256,3 +6256,47 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 | **P105** | Share some new text, erase it in Recall, share the same text again, tap **Not now**: the export has an `orb.shared` with `resolveOutcome: "erased"` and **no `rekept`**, and Recall does not list the text | a Not-now tap leaves no record, or keeps it |
 
 **Protocol.** (1) Restore from a backup on this phone and read what it says. (2) Do the share → erase → share → *Not now* sequence, then **Export and share journal**. Send the export.
+
+
+### 7b63. What my words mention — B3, first slice (DR-19) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v27-mentions.apk`. v26 is §7b61 (verified; P92/P105 in §7b62 are still small open taps). Design: `docs/ENTITIES_PHONE.md`; decision `DECISIONS.md` DR-19.
+
+#### What changed
+
+1. **Mentions.** Open a kept screen or shared text in Recall: under the words, a **Mentions** list shows the **phone numbers, sites, UPI ids, emails, amounts and dates** in it (and the page address, if it came from a page),
+   e.g. `Phone  +91 98765 43210 ›`, `Amount  ₹1200`, `Site  example.com`.
+2. **Tap one** to see **every other kept item that mentions the same thing** — the same number written two ways is one — with how many items could not be read or were not looked at, and the handles that most
+   often appear **beside** it.
+3. **Nothing is stored.** Found from the words when the screen opens, gone when it closes: no new event, no file, no log. **Erase an item and its handles vanish from every list**, because nothing ever named them.
+4. **A card number is never listed.** Digit runs that pass the card check are excluded.
+5. **Not in this slice:** people's names, places, organisations, merging a person's two numbers (`ARCHITECTURAL_DEBT.md` AD-17).
+
+#### Checked before the device
+
+- 64 hand-written cases (what each kind must find and must **not**), checked by the TypeScript reference *and* the phone's Kotlin; bounds (a million characters, 200 handles); 697 phone-side checks (was 638): handles of an item incl. its page address, who mentions a number (shared text among them,
+  newest first), what appears beside it, nothing written (journal and disk byte-for-byte unchanged), nothing in the clear, erase removes what the words mentioned, how handles read, and a source guard on the code.
+- **Mutation-checked, 29 ways across both implementations and the phone code.** Four survived at first and were fixed: *the card check dropped* (no case where a card-like run that fails the check still holds an amount) and *the link ending at a non-breaking space*
+  (no case where the difference mattered), *the ranking of what appears beside a number* (every count was one) and *the newest-500 bound* (no test had 500 items) — each now has a case. Two other things were found on the way: invisible characters in a Kotlin regex (now escapes), and **a flaky check** — the "no word in the clear" tests searched for digit strings such as `4471`, which can occur by chance inside the random hex hashes in a journal (a few percent of runs); they now search for phrases that contain a non-hex letter.
+- **Not testable off the phone:** the dialog rows and the list screen.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P110** | Open a kept item with a phone number: a **Mentions** list shows `Phone  +91 98765 43210 ›` | the dialog does not show it |
+| **P111** | Tapping it lists **every kept item that mentions that number** — including one that wrote it `+91-98765-43210` — and says how many | grouping misses a spelling |
+| **P112** | An item with an amount, a date, a UPI id and a link shows each as `Amount  ₹1200`, `Date  2026-10-12`, `UPI id  ravi@oksbi`, `Site  example.com` | a kind is missed or misread |
+| **P113** | The list shows **Often beside it** when other handles share items with it | the co-occurrence is wrong |
+| **P114** | **Erase** one of those items: reopening another and tapping the number shows **one fewer** item | a handle outlives its words |
+| **P115** | A shared text containing `4111 1111 1111 1111` (a well-known test card number) **does not list it** as anything | a card number is shown |
+| **P116** | After all that, **Export and share journal**: the file contains **none** of the numbers, and browsing Mentions added **no event** (the only new events are the shares, the erase and the export) | an entity leaked into the journal |
+
+#### The operator's protocol
+
+1. Install `orb-app-v27-mentions.apk` over v26; open Orb once.
+2. Share this text to Orb (all invented): *Call Ravi on 98765 43210 about ₹1,200 on 12/10/2026. Pay ravi@oksbi. Card 4111 1111 1111 1111. https://example.com/trip*
+3. Share a second text: *Ravi's number is +91-98765-43210*
+4. Recall → open the first → read **Mentions**. *(P110, P112, P115)* Tap the phone number. *(P111, P113)*
+5. Erase the **second** text; open the first again and tap the phone number. *(P114)*
+6. **Export and share journal**; search the file for `98765` and `4111`. *(P116)*

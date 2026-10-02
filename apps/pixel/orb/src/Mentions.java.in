@@ -1,0 +1,125 @@
+package @PKG@;
+
+import android.content.Context;
+import dev.orb.brain.Handles;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * What a kept item mentions, and what else mentions the same thing — the phone's first entities
+ * (`docs/ENTITIES_PHONE.md`, DR-19).
+ *
+ * **Computed, never recorded.** A phone number, a site or an amount is found in the words when a screen opens
+ * (`Handles`, the Kotlin reasoning layer) and let go when it closes. Nothing is written to the journal or to a
+ * file, nothing is logged, and nothing is kept between openings — so an entity cannot outlive the words it came
+ * from, and erasing an item removes its handles from every answer by construction. `MentionsTest` holds this
+ * file to that by reading its source.
+ *
+ * **Bounded like Recall:** the newest `Recall.SCAN_LIMIT` items, and the answer says what it did not look at.
+ */
+final class Mentions {
+    private Mentions() {}
+
+    /**
+     * One handle, as the screens hold it. A value of this file's own so that **no other file touches the brain**
+     * (`AssistGuardTest`: only `Observe`, `Provenance` and this one call it).
+     */
+    static final class Handle {
+        final String kind;
+        final String value;
+
+        Handle(String kind, String value) {
+            this.kind = kind;
+            this.value = value;
+        }
+
+        @Override public boolean equals(Object other) {
+            return other instanceof Handle && ((Handle) other).kind.equals(kind) && ((Handle) other).value.equals(value);
+        }
+
+        @Override public int hashCode() {
+            return kind.hashCode() * 31 + value.hashCode();
+        }
+
+        @Override public String toString() {
+            return kind + ":" + value;
+        }
+    }
+
+    /** How many co-occurring handles a lookup offers beside its list. */
+    static final int ALSO_WITH = 5;
+
+    /** The handles in one kept item — its words and the page address it came from, if any. */
+    static List<Handle> in(Recall.Doc doc) {
+        List<Handle> out = new ArrayList<>();
+        for (Handles.Handle h : Handles.extract(doc.uri.isEmpty() ? doc.body : doc.uri + "\n" + doc.body)) {
+            out.add(new Handle(h.getKind(), h.getValue()));
+        }
+        return out;
+    }
+
+    /** Every kept item that mentions one handle, and the handles that most often appear beside it. */
+    static final class Result {
+        final Recall.Results found = new Recall.Results();
+        final List<Handle> alsoWith = new ArrayList<>();
+    }
+
+    static Result of(Context context, Journal journal, final Handle target) throws IOException {
+        final Result result = new Result();
+        final Map<Handle, Integer> beside = new LinkedHashMap<>();
+        Recall.walk(context, journal, null, result.found, new Recall.Visitor() {
+            @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
+                List<Handle> handles = in(doc);
+                if (!handles.contains(target)) return;
+                result.found.entries.add(Recall.entryFor(item, app, screen, doc, null));
+                for (Handle other : handles) {
+                    if (other.equals(target)) continue;
+                    Integer n = beside.get(other);
+                    beside.put(other, n == null ? 1 : n + 1);
+                }
+            }
+        });
+        List<Map.Entry<Handle, Integer>> ranked = new ArrayList<>(beside.entrySet());
+        // Stable: the more items, the earlier; ties keep the order they were first seen.
+        Collections.sort(ranked, new Comparator<Map.Entry<Handle, Integer>>() {
+            @Override public int compare(Map.Entry<Handle, Integer> a, Map.Entry<Handle, Integer> b) {
+                return b.getValue() - a.getValue();
+            }
+        });
+        for (int i = 0; i < ranked.size() && i < ALSO_WITH; i++) result.alsoWith.add(ranked.get(i).getKey());
+        return result;
+    }
+
+    /** The word for a kind, for a person. */
+    static String kindLabel(String kind) {
+        switch (kind) {
+            case "phone": return "Phone";
+            case "site": return "Site";
+            case "email": return "Email";
+            case "upi": return "UPI id";
+            case "amount": return "Amount";
+            case "date": return "Date";
+            default: return "Other";
+        }
+    }
+
+    /** A handle as it reads: an Indian mobile in its usual groups, rupees with their sign, the rest as found. */
+    static String show(Handle h) {
+        String v = h.value;
+        if (h.kind.equals("phone") && v.startsWith("+91") && v.length() == 13) {
+            return "+91 " + v.substring(3, 8) + " " + v.substring(8);
+        }
+        if (h.kind.equals("amount") && v.startsWith("INR ")) return "₹" + v.substring(4);
+        return v;
+    }
+
+    /** One line: `Phone  +91 98765 43210`. */
+    static String line(Handle h) {
+        return kindLabel(h.kind) + "  " + show(h);
+    }
+}
