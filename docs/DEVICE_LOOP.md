@@ -6260,7 +6260,7 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 
 ### 7b63. What my words mention — B3, first slice (DR-19) — 2026-10-02
 
-**Status: P116 held (nothing leaked, no event written); the on-screen predictions P110–P115 are not visible in an export and await the operator's word** — `orb-app-v27-mentions.apk`. v26 is §7b61 (verified; P92/P105 in §7b62 are still small open taps). Design: `docs/ENTITIES_PHONE.md`; decision `DECISIONS.md` DR-19.
+**Status: verified on the device — P110–P116 held (P116 from the export; P110–P115 on the screen, by the operator's word: "Everything worked as intended")** — `orb-app-v27-mentions.apk`. v26 is §7b61 (verified; P92/P105 in §7b62 are still small open taps). Design: `docs/ENTITIES_PHONE.md`; decision `DECISIONS.md` DR-19.
 
 #### What changed
 
@@ -6309,5 +6309,5 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 | **P116** | **Held.** Since v27's first start the journal gained exactly: the two shares, their two Observations, one erasure, a start, two grants readings and the export — **no event for browsing Mentions, no new event type**. The file contains **none** of `98765`, `4111`, `ravi@oksbi` or `example.com/trip` (searched in the raw file). |
 | Shares | The first text is recorded at **119 characters, `references: ""`** — exactly the length of the text in the protocol — sealed (`attachmentBytes` 149 = 119 + the document header and the multi-byte `₹`). The second is 53 characters (a text of the operator's own, not the 32-character one in the protocol). |
 | Erasure | The operator erased the **first** share (the one with the handles), not the second as the protocol said, so the P114 check ran the other way round: erase the item that held the handles, then look at what is left. |
-| **P110–P115** | **Not visible in an export** (they are what the screen shows). No comment was sent with the file; the on-screen results stay **unconfirmed** until the operator says what Mentions displayed. |
+| **P110–P115** | **Not visible in an export** (they are what the screen shows). No comment was sent with the file; the operator then reported *"Everything worked as intended"* on the phone, so they are **confirmed on the operator's word** (an export cannot show them). |
 | P92, P105 | Not shown: no refused share and no restore attempt in this export. |
