@@ -6470,7 +6470,7 @@ The operator reported *"All 5 done"*.
 
 ### 7b67. Everything Orb reads, declared in one place — AD-7 closed (DR-22) — 2026-10-02
 
-**Status: P134 and P135 held (the revoke → refused scan → grant → scan sequence); P132, P133, P136 are on-screen and await the operator's word** — `orb-app-v30-declared.apk`. v29 is §7b65/§7b66 (verified). Design: `docs/GATE_READS_PHONE.md`; decision `DECISIONS.md` DR-22; what remains: `ARCHITECTURAL_DEBT.md` AD-20.
+**Status: verified on the device — P132–P136 held (P134/P135 from the export; P132, P133, P136 on the operator's word: "All three look correct")** — `orb-app-v30-declared.apk`. v29 is §7b65/§7b66 (verified). Design: `docs/GATE_READS_PHONE.md`; decision `DECISIONS.md` DR-22; what remains: `ARCHITECTURAL_DEBT.md` AD-20.
 
 #### What changed
 
@@ -6509,4 +6509,4 @@ The operator reported *"All 5 done"*.
 | --- | --- |
 | **P134** | **Held.** 10:44:52 `grants.capability.revoked` (`installedPackages.read`, `by: operator`, tier *Observe*) — from the new screen's control — and 10:45:05 `grants.capability.granted` brings it back. |
 | **P135** | **Held.** The scan at 10:45:00, taken while revoked, is `grants.packages` with **`installedPackageReadable: false`, `installedPackageScope: "ungranted"`** — recorded as a refusal, not as an empty set; after the re-grant the scan at 10:45:36 reads: **153 apps, scope `declared`, `changed: false`.** |
-| **P132, P133, P136** | **Not visible in an export** (they are what the screen shows: the four sections, the state and last-use lines, and that no name or word appears). No comment accompanied the file; **awaiting the operator's word.** |
+| **P132, P133, P136** | **Not visible in an export** (they are what the screen shows: the four sections, the state and last-use lines, and that no name or word appears). The operator then confirmed *"All three look correct"* — the four sections, the state and last-use lines, and no name or word on the screen. |

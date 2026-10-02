@@ -121,7 +121,7 @@ durable reflection-state need materializes.
 
 ## AD-7 — `device-watch` reads a person's whole package list outside the Capability boundary
 
-- **Status:** **Closed on the phone 2026-10-02 (DR-22, `GATE_READS_PHONE.md`)** — the package scan, the assistant's screen read and the grants watch are declared at tier *Observe* beside the reminder, shown and withdrawable in one place, and held by tests; what remains is a Policy language and the desk (below). *(Earlier: the gate for the first *action* landed with DR-20.)* · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
+- **Status:** **Closed on the phone 2026-10-02, verified on the device (DR-22, `GATE_READS_PHONE.md`)** — the package scan, the assistant's screen read and the grants watch are declared at tier *Observe* beside the reminder, shown and withdrawable in one place, and held by tests; what remains is a Policy language and the desk (below). *(Earlier: the gate for the first *action* landed with DR-20.)* · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
   Capability → Policy → permission → Action/read → Journal mechanism in Phase 3c ·
   **Raised:** 2026-09-28, at the Execution contracts' acceptance
 - **Domain:** Execution / Reality · **Kind (if adopted):** bring an existing read
