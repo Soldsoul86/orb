@@ -1,0 +1,221 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * *Everything about Ravi* — the contacts that the kept words mention, and the items that mention each (`docs/PEOPLE_PHONE.md`,
+ * DR-24). **Computed when the People screen opens, from contacts and words held in memory, and never recorded**: nothing here
+ * writes, stores or logs a name, a number or an address, and `PeopleTest` holds the source to that.
+ *
+ * **Who is one person.** Contacts that share a phone number or an email address are one person here — so *his two numbers* are one
+ * person without any merge being recorded (closing the gap `AD-17` named).
+ *
+ * **How an item is tied to a person, strongest first:** it contains **one of his numbers**; it contains **one of his email addresses**;
+ * it **names him** (`Mentions.names`: a full name, or a first name that is unique among the contacts and capitalised) — a word that
+ * happens to be a name, so it is labelled as one. An item is listed once per person, by the strongest.
+ */
+final class People {
+    private People() {}
+
+    /** One contact, as the phone's book holds it (`ContactsReader`) — numbers already in the form the kept words use. */
+    static final class Contact {
+        final String id;
+        final String name;
+        final List<String> phones = new ArrayList<>();
+        final List<String> emails = new ArrayList<>();
+
+        Contact(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+    }
+
+    /** How an item was tied to a person. */
+    static final String BY_NUMBER = "number";
+    static final String BY_EMAIL = "email";
+    static final String BY_NAME = "name";
+
+    static final class Evidence {
+        final Recall.Entry entry;
+        final String by;
+        /** For `name`: the word the text wrote. Null otherwise. */
+        final String word;
+
+        Evidence(Recall.Entry entry, String by, String word) {
+            this.entry = entry;
+            this.by = by;
+            this.word = word;
+        }
+    }
+
+    static final class Person {
+        /** The names of the contacts that are this person (usually one). */
+        final List<String> names = new ArrayList<>();
+        final List<String> phones = new ArrayList<>();
+        final List<String> emails = new ArrayList<>();
+        /** Newest first. */
+        final List<Evidence> items = new ArrayList<>();
+        /** What most often appears in those items besides this person's own numbers and addresses. */
+        final List<Mentions.Handle> alsoWith = new ArrayList<>();
+
+        String display() {
+            return names.get(0) + (names.size() > 1 ? " (+" + (names.size() - 1) + ")" : "");
+        }
+    }
+
+    static final class Result {
+        /** People that at least one kept item mentions, most-mentioned first. */
+        final List<Person> people = new ArrayList<>();
+        int contacts;
+        /** First names several contacts share: matched by full name or number only. */
+        int sharedFirstNames;
+        final Recall.Results looked = new Recall.Results();
+    }
+
+    /** A phone number as a kept item would write it (`+91…` / `+country…`), or null if it cannot be. */
+    static String normalPhone(String raw) {
+        if (raw == null) return null;
+        for (Mentions.Handle h : Mentions.in(new Recall.Doc("", raw))) if (h.kind.equals("phone")) return h.value;
+        return null;
+    }
+
+    /** A group of contacts that are one person (they share a number or an address). */
+    private static final class Group {
+        final List<Contact> contacts = new ArrayList<>();
+    }
+
+    private static List<Group> group(List<Contact> contacts) {
+        // Union by shared numbers and addresses.
+        int n = contacts.size();
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++) parent[i] = i;
+        Map<String, Integer> seen = new HashMap<>();
+        for (int i = 0; i < n; i++) {
+            List<String> keys = new ArrayList<>();
+            for (String p : contacts.get(i).phones) keys.add("p:" + p);
+            for (String e : contacts.get(i).emails) keys.add("e:" + e);
+            for (String key : keys) {
+                Integer other = seen.get(key);
+                if (other == null) seen.put(key, i);
+                else parent[find(parent, i)] = find(parent, other);
+            }
+        }
+        Map<Integer, Group> byRoot = new LinkedHashMap<>();
+        for (int i = 0; i < n; i++) {
+            int root = find(parent, i);
+            Group g = byRoot.get(root);
+            if (g == null) { g = new Group(); byRoot.put(root, g); }
+            g.contacts.add(contacts.get(i));
+        }
+        return new ArrayList<>(byRoot.values());
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+        return i;
+    }
+
+    static Result compute(Context context, Journal journal, final List<Contact> book) throws IOException {
+        final Result result = new Result();
+        result.contacts = book.size();
+        final List<Group> groups = group(book);
+        final List<String> ids = new ArrayList<>();
+        final List<String> names = new ArrayList<>();
+        for (Contact c : book) { ids.add(c.id); names.add(c.name); }
+        result.sharedFirstNames = Mentions.sharedFirstNames(ids, names);
+        final Map<String, Integer> groupOf = new HashMap<>();
+        for (int g = 0; g < groups.size(); g++) for (Contact c : groups.get(g).contacts) groupOf.put(c.id, g);
+
+        final List<Person> people = new ArrayList<>();
+        final List<Map<Mentions.Handle, Integer>> beside = new ArrayList<>();
+        final List<Set<String>> own = new ArrayList<>();
+        for (Group g : groups) {
+            Person p = new Person();
+            Set<String> mine = new HashSet<>();
+            for (Contact c : g.contacts) {
+                p.names.add(c.name);
+                for (String ph : c.phones) { if (!p.phones.contains(ph)) p.phones.add(ph); mine.add("phone:" + ph); }
+                for (String em : c.emails) { if (!p.emails.contains(em)) p.emails.add(em); mine.add("email:" + em); }
+            }
+            people.add(p);
+            beside.add(new LinkedHashMap<Mentions.Handle, Integer>());
+            own.add(mine);
+        }
+
+        Recall.walk(context, journal, null, result.looked, new Recall.Visitor() {
+            @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
+                List<Mentions.Handle> handles = Mentions.in(doc);
+                Set<String> inItem = new HashSet<>();
+                for (Mentions.Handle h : handles) inItem.add(h.kind + ":" + h.value);
+                // Who this item names by name (a word), grouped to people.
+                Map<Integer, Mentions.NameMatch> byName = new HashMap<>();
+                for (Mentions.NameMatch m : Mentions.names(doc.body, ids, names)) {
+                    Integer g = groupOf.get(m.contactId);
+                    if (g != null && !byName.containsKey(g)) byName.put(g, m);
+                }
+                Recall.Entry entry = null;
+                for (int g = 0; g < people.size(); g++) {
+                    String by = null;
+                    String word = null;
+                    for (String ph : people.get(g).phones) if (inItem.contains("phone:" + ph)) { by = BY_NUMBER; break; }
+                    if (by == null) for (String em : people.get(g).emails) if (inItem.contains("email:" + em)) { by = BY_EMAIL; break; }
+                    if (by == null && byName.containsKey(g)) { by = BY_NAME; word = byName.get(g).word; }
+                    if (by == null) continue;
+                    if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
+                    people.get(g).items.add(new Evidence(entry, by, word));
+                    for (Mentions.Handle h : handles) {
+                        if (own.get(g).contains(h.kind + ":" + h.value)) continue;
+                        Integer n = beside.get(g).get(h);
+                        beside.get(g).put(h, n == null ? 1 : n + 1);
+                    }
+                }
+            }
+        });
+
+        for (int g = 0; g < people.size(); g++) {
+            Person p = people.get(g);
+            if (p.items.isEmpty()) continue;
+            List<Map.Entry<Mentions.Handle, Integer>> ranked = new ArrayList<>(beside.get(g).entrySet());
+            Collections.sort(ranked, new Comparator<Map.Entry<Mentions.Handle, Integer>>() {
+                @Override public int compare(Map.Entry<Mentions.Handle, Integer> a, Map.Entry<Mentions.Handle, Integer> b) { return b.getValue() - a.getValue(); }
+            });
+            for (int i = 0; i < ranked.size() && i < Mentions.ALSO_WITH; i++) p.alsoWith.add(ranked.get(i).getKey());
+            result.people.add(p);
+        }
+        Collections.sort(result.people, new Comparator<Person>() {
+            @Override public int compare(Person a, Person b) {
+                if (b.items.size() != a.items.size()) return b.items.size() - a.items.size();
+                return a.names.get(0).compareToIgnoreCase(b.names.get(0));
+            }
+        });
+        return result;
+    }
+
+    /** A one-line account of how a person's items were found, for the list: *3 by number, 1 by name*. */
+    static String evidenceLine(Person p) {
+        int number = 0, email = 0, name = 0;
+        for (Evidence e : p.items) {
+            if (BY_NUMBER.equals(e.by)) number++;
+            else if (BY_EMAIL.equals(e.by)) email++;
+            else name++;
+        }
+        List<String> parts = new ArrayList<>();
+        if (number > 0) parts.add(number + " by number");
+        if (email > 0) parts.add(email + " by email");
+        if (name > 0) parts.add(name + " by name");
+        StringBuilder out = new StringBuilder();
+        for (String s : parts) { if (out.length() > 0) out.append(", "); out.append(s); }
+        return out.toString();
+    }
+}

@@ -12,4 +12,6 @@
 
 - `RelativeDays.extract(text, anchor): List<Day(date, phrase)>` — relative days read from `anchor` (`@JvmStatic`); the twin of `@orb/entities`' `relativeDays`.
 
+- `Names.match(text, contacts): List<Match(contactId, by, word)>` and `Names.sharedFirstNames(contacts): Set<String>` (`@JvmStatic`; `Names.Contact(id, name)`) — which contacts a text names, the twin of `@orb/entities`' `matchNames`. Given contacts the phone has just read; it reads nothing itself.
+
 Called from Java as `dev.orb.brain.Observer.plan(...)` (`@JvmStatic`).

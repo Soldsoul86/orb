@@ -589,14 +589,31 @@ a second source for the compiler's checksum exists (item 1).
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-19, `ENTITIES_PHONE.md`). Debts, stated.
 
-1. **Handles, not people.** A phone number, site, UPI id, email, amount or date names itself; "Ravi" does not. Names, places and organisations need a model or the contacts gate (B5). Until then
-   *everything about Ravi* is *everything mentioning this number*, which only helps if Ravi's number was written down.
-2. **No merge or split.** Two numbers of one person stay two entities. The contract's recorded resolution applies when a **person** decides (`Entity.md` §2, DR-19) — not built.
+1. **Handles, not people — partly closed (DR-24, 2026-10-02).** A phone number, site, UPI id, email, amount or date names itself; "Ravi" does not. **The People screen now resolves names through the contacts, opt-in** (see AD-21); **places and organisations still need a model** and are not read.
+   Mentions itself is still handles only.
+2. **No merge or split — partly closed (DR-24).** Contacts sharing a number or an address are one person **on the People screen, computed, with nothing recorded**. Mentions still treats two numbers as two entities, and a person's own *"these two are the same"* decision
+   (the contract's recorded resolution, `Entity.md` §2) is not built.
 3. **Linear cost, bounded to the newest 500 kept items** (AD-13), and every lookup reopens every item in memory. An index would have to be sealed and kept in step with every erase; revisit if the lookup
    becomes slow (thousands of items).
 4. **Format limits are the rules' limits**: no landlines, no two-digit years, no relative dates, a ten-digit order id starting 6–9 reads as a mobile, other countries' numbers only as `+country…`.
 5. **The list is a sensitive index** of what a person's words mention. It lives behind the same secure window as Recall and is never exported or logged; a person who screenshots around the protection
    (another device pointed at the screen) is outside what the app can prevent.
+
+
+---
+
+## AD-21 — what People reads, and what it cannot know
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-24, `PEOPLE_PHONE.md`). Debts, stated.
+
+1. **A name is a word.** *Mark*, *May*, *Will* are contacts and words; Orb cannot tell which was meant, so a by-name match is labelled *by name* and never counted as strong. A first name shared by two contacts is not matched at all (the screen says how many are shared).
+2. **Only the contacts the words mention are shown.** A person who is in your kept words under a nickname, an initial or a different script from the contact's is not found; the contact's name is matched as written (case-insensitive, accents and Devanagari as given).
+3. **Grouping trusts the book.** Two contacts sharing a number or address become one person, even if the book is wrong; an address book that shares one number between family members would group them. Nothing is recorded, so it is corrected by fixing the book, not Orb.
+4. **Numbers are matched as the kept words write them** (`+91…` / `+country…`, ten-digit mobiles); a landline or a number with a trunk prefix the reader does not know is not found (AD-17 point 4).
+5. **Read at every opening, linear cost.** Contacts are read once per opening and matched against the newest 500 kept items (AD-13); a very large book will be slow, and the screen says what it did not look at.
+6. **The screen is as sensitive as the Contacts app and Recall together** — a list of the people your words are about. It is behind the secure window and is never exported, logged or recorded; a person pointing another camera at the screen is outside what the app can prevent.
+7. **The grant's two halves can disagree.** Revoking in Android's settings leaves Orb's grant recorded; the People screen then says *Android's permission is off, nothing was read* and offers to ask again. Revoking in Orb removes the flag first and then says so.
+8. **Not built:** contact photos, groups, birthdays, a typed list (option C), turning *"call Ravi"* into an action (a gated, later step), other languages' name rules.
 
 ---
 

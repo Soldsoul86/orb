@@ -44,6 +44,9 @@
          Asked at the first confirmation, with a sentence saying why. No exact-alarm permission: a reminder
          may be a few minutes late while the phone dozes, and the confirmation card says so. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- People (docs/PEOPLE_PHONE.md): to read the contacts, only while the People screen is open, only after the person has
+         granted it in Orb and again in Android's own question. Read-only: there is no write permission. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 @QUERY_ALL_PACKAGES@
 
     <!--
@@ -105,6 +108,10 @@
 
         <activity
             android:name=".ComingUpActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PeopleActivity"
             android:exported="false" />
 
         <!-- An alarm Orb set for a reminder the person confirmed. Not exported: only Orb's own alarm reaches it. -->

@@ -1,0 +1,230 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.pm.PackageManager;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * People — the contacts your kept words mention, and everything about each (`docs/PEOPLE_PHONE.md`, DR-24).
+ *
+ * **This screen is the only place the contacts are read, and it reads them only while it is open.** Nothing is kept: the contacts
+ * and the words are held in memory for the screen and let go, no person is ever recorded, and the one thing written is a record
+ * that the read happened — **counts only** (`ContactsFacts`), so the read is never silent and never carries what it read. It asks
+ * Android's permission only at the first grant, after saying why; it is secure like Recall, because a person's contacts and what
+ * you wrote about them are as private as the words.
+ */
+public final class PeopleActivity extends Activity {
+    private static final int REQUEST_CONTACTS = 72;
+
+    private LinearLayout list;
+    /** The read is recorded once per opening, not per redraw. */
+    private boolean recorded;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        recorded = false;
+        render();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("People", 17, true));
+        final Journal journal = journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        if (!ContactsAccess.granted(this)) {
+            askToGrant(journal);
+            return;
+        }
+        if (!ContactsReader.permitted(this)) {
+            list.addView(text("You granted Orb access to your contacts, but Android's permission is off. Nothing was read.", 13, false));
+            Button again = new Button(this);
+            again.setText("Ask Android again");
+            again.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { requestPermissions(new String[] {ContactsReader.PERMISSION}, REQUEST_CONTACTS); }
+            });
+            list.addView(again);
+            return;
+        }
+        list.addView(text("Looking through your contacts and what you kept…", 13, false));
+        final android.content.Context context = this;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<People.Contact> book = ContactsReader.read(context);
+                People.Result computed = null;
+                if (book != null) {
+                    try {
+                        computed = People.compute(context, journal, book);
+                    } catch (IOException unreadable) {
+                        computed = null;
+                    }
+                }
+                final People.Result result = computed;
+                final boolean readable = book != null;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { show(journal, readable, result); }
+                });
+            }
+        }).start();
+    }
+
+    private void askToGrant(final Journal journal) {
+        list.addView(text(Capabilities.CONTACTS_SAYS, 13, false));
+        list.addView(text("Orb reads your contacts only while this screen is open, to tell you which people your kept words mention and "
+            + "to put everything about one person together — their several numbers become one. You can revoke this any time on What Orb may do.", 13, false));
+        Button grant = new Button(this);
+        grant.setText("Allow Orb to read my contacts");
+        grant.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                if (ContactsReader.permitted(PeopleActivity.this)) finishGrant(journal);
+                else requestPermissions(new String[] {ContactsReader.PERMISSION}, REQUEST_CONTACTS);
+            }
+        });
+        list.addView(grant);
+    }
+
+    /** Android said yes: now the person's own decision is recorded, and only then does anything read. */
+    private void finishGrant(Journal journal) {
+        try {
+            ContactsAccess.grant(this, journal);
+        } catch (IOException notRecorded) {
+            new AlertDialog.Builder(this).setMessage("Orb could not record this, so it did not grant anything.").setPositiveButton("OK", null).show();
+            return;
+        }
+        render();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != REQUEST_CONTACTS) return;
+        boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        Journal journal = journal();
+        if (ok && journal != null) {
+            if (!ContactsAccess.granted(this)) finishGrant(journal);
+            else render();
+        } else {
+            new AlertDialog.Builder(this).setMessage("Android did not allow it, so nothing changed and Orb read nothing.").setPositiveButton("OK", null).show();
+        }
+    }
+
+    private void show(Journal journal, boolean readable, People.Result result) {
+        list.removeAllViews();
+        list.addView(text("People", 17, true));
+        if (!readable || result == null) {
+            list.addView(text("Orb could not read your contacts or its history, so it shows nothing rather than guess.", 13, false));
+            return;
+        }
+        if (!recorded) {
+            recorded = true;
+            // The read happened: said, with counts only — never a name, a number or an address.
+            journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size()));
+        }
+        StringBuilder said = new StringBuilder();
+        said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" in what you kept · ")
+            .append(result.contacts).append(" contacts looked at");
+        if (result.looked.unreadable > 0) said.append(" · ").append(result.looked.unreadable).append(" items could not be read");
+        if (result.looked.skipped > 0) said.append(" · looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
+        list.addView(text(said.toString(), 12, false));
+        if (result.people.isEmpty()) {
+            list.addView(text("None of your contacts is mentioned in what you kept — by number, email or name.", 14, false));
+        }
+        for (final People.Person person : result.people) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 16, 0, 16);
+            row.addView(text(person.display(), 15, true));
+            row.addView(text(person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { showPerson(person); }
+            });
+            list.addView(row);
+        }
+        if (result.sharedFirstNames > 0) {
+            list.addView(text(result.sharedFirstNames + (result.sharedFirstNames == 1 ? " first name is" : " first names are")
+                + " shared by several contacts, so those are matched by full name or number only.", 12, false));
+        }
+        list.addView(text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
+            + "Matching by number or email is much surer.", 12, false));
+    }
+
+    private void showPerson(People.Person person) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(48, 24, 48, 24);
+        StringBuilder who = new StringBuilder();
+        for (String n : person.names) who.append(who.length() > 0 ? ", " : "").append(n);
+        column.addView(text(who.toString(), 14, true));
+        for (String p : person.phones) column.addView(text("Phone  " + Mentions.show(new Mentions.Handle("phone", p)), 13, false));
+        for (String e : person.emails) column.addView(text("Email  " + e, 13, false));
+        if (!person.alsoWith.isEmpty()) {
+            StringBuilder with = new StringBuilder("Often with:");
+            for (Mentions.Handle h : person.alsoWith) with.append("\n  ").append(Mentions.line(h));
+            column.addView(text(with.toString(), 13, false));
+        }
+        SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
+        for (People.Evidence item : person.items) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 16, 0, 16);
+            String how = People.BY_NAME.equals(item.by) ? "mentions the word “" + item.word + "”"
+                : People.BY_EMAIL.equals(item.by) ? "has their email" : "has their number";
+            row.addView(text(when.format(new Date(item.entry.wallClock)) + "  ·  " + (item.entry.packageName == null ? "" : item.entry.packageName)
+                + (Provenance.SHARED_TEXT.equals(item.entry.type) ? "  ·  shared" : "") + "  ·  " + how, 11, true));
+            row.addView(text(item.entry.snippet, 14, false));
+            column.addView(row);
+        }
+        scroll.addView(column);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(person.display())
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .create();
+        // A person's contact details and what you wrote about them are as private as the words.
+        dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        dialog.show();
+    }
+}

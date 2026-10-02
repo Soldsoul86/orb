@@ -76,6 +76,41 @@ final class Mentions {
         return out;
     }
 
+    /** A contact a text mentions **by name** — the plain kind of evidence, labelled as a word and not a fact. */
+    static final class NameMatch {
+        final String contactId;
+        /** `full` (the whole name) or `first` (a first name that is unique among the contacts, capitalised). */
+        final String by;
+        /** What the text wrote. */
+        final String word;
+
+        NameMatch(String contactId, String by, String word) {
+            this.contactId = contactId;
+            this.by = by;
+            this.word = word;
+        }
+    }
+
+    private static List<dev.orb.brain.Names.Contact> brainContacts(List<String> ids, List<String> names) {
+        List<dev.orb.brain.Names.Contact> out = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) out.add(new dev.orb.brain.Names.Contact(ids.get(i), names.get(i)));
+        return out;
+    }
+
+    /** Which contacts (`ids` and `names` are parallel) a text names. The brain is reached only here (`AssistGuardTest`). */
+    static List<NameMatch> names(String text, List<String> ids, List<String> names) {
+        List<NameMatch> out = new ArrayList<>();
+        for (dev.orb.brain.Names.Match m : dev.orb.brain.Names.match(text, brainContacts(ids, names))) {
+            out.add(new NameMatch(m.getId(), m.getBy(), m.getWord()));
+        }
+        return out;
+    }
+
+    /** How many first names more than one contact has — those are matched by full name or number only. */
+    static int sharedFirstNames(List<String> ids, List<String> names) {
+        return dev.orb.brain.Names.sharedFirstNames(brainContacts(ids, names)).size();
+    }
+
     /** How many co-occurring handles a lookup offers beside its list. */
     static final int ALSO_WITH = 5;
 

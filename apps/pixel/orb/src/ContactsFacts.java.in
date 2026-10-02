@@ -1,0 +1,23 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * The record of one use of the contacts read — **counts only**: how many contacts were looked at and how many people the kept
+ * words turned out to mention. Never a name, a number or an address. Built here and nowhere else (`PeopleActivity` appends it),
+ * so that a read of something this sensitive is never silent (`Capability.md` inv. 6) and never carries what it read.
+ */
+final class ContactsFacts {
+    private ContactsFacts() {}
+
+    static final String READ = "orb.contacts.read";
+
+    static Map<String, Object> read(long contacts, long people) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.CONTACTS);
+        p.put("contacts", contacts);
+        p.put("people", people);
+        p.put("version", 1L);
+        return p;
+    }
+}

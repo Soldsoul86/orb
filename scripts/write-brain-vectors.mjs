@@ -13,6 +13,7 @@ import { buildVectors, vectorsPath } from "../packages/device-watch/dist/tests/b
 import { buildGraphVectors, graphVectorsPath } from "../packages/device-watch/dist/tests/graph-vectors-build.js";
 import { buildHandleVectors, handleVectorsPath } from "../runtime/entities/dist/tests/handle-vectors-build.js";
 import { buildRelativeVectors, relativeVectorsPath } from "../runtime/entities/dist/tests/relative-vectors-build.js";
+import { buildNameVectors, nameVectorsPath } from "../runtime/entities/dist/tests/name-vectors-build.js";
 
 await writeFile(vectorsPath, JSON.stringify(await buildVectors(), null, 1) + "\n");
 console.log(`wrote ${vectorsPath}`);
@@ -22,3 +23,5 @@ await writeFile(handleVectorsPath, JSON.stringify(buildHandleVectors(), null, 1)
 console.log(`wrote ${handleVectorsPath}`);
 await writeFile(relativeVectorsPath, JSON.stringify(buildRelativeVectors(), null, 1) + "\n");
 console.log(`wrote ${relativeVectorsPath}`);
+await writeFile(nameVectorsPath, JSON.stringify(buildNameVectors(), null, 1) + "\n");
+console.log(`wrote ${nameVectorsPath}`);

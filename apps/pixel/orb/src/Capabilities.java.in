@@ -63,6 +63,7 @@ final class Capabilities {
     static final String PACKAGES = "installedPackages.read";
     static final String SCREEN = "orb.read.screen";
     static final String GRANTS = "orb.read.grants";
+    static final String CONTACTS = "orb.read.contacts";
 
     static final String PACKAGES_SAYS =
         "Reads which launcher apps, UPI-payment apps and device-admin apps are installed — about a hundred and fifty names. "
@@ -75,6 +76,10 @@ final class Capabilities {
         "Reads which apps hold accessibility, notification-listener and device-admin powers — the ones that could watch you. "
         + "It needs no permission and runs at every start; this is what lets Orb alert you when one changes. It is always on, "
         + "because it protects you.";
+
+    static final String CONTACTS_SAYS =
+        "Reads the names, phone numbers and email addresses in your contacts — only while the People screen is open, only on the phone. "
+        + "Nothing is kept, nothing leaves the phone, and nothing is written to your contacts. It needs your grant here and Android's own permission.";
 
     /** The declarations, in the order the screen shows them. */
     static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -91,6 +96,10 @@ final class Capabilities {
             "always on — it needs no permission and protects you", Arrays.asList("grants.observed"),
             "not switchable", false,
             Arrays.asList("GrantReader", "Grants", "Watch")),
+        new Declaration(CONTACTS, 1L, "Who your contacts are, when you open People", CONTACTS_SAYS, TIER_OBSERVE,
+            "your grant — a recorded decision — and Android's own permission",
+            Arrays.asList(ContactsFacts.READ), "Revoke contacts access", true,
+            Arrays.asList("ContactsReader", "ContactsAccess", "PeopleActivity")),
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
@@ -105,11 +114,11 @@ final class Capabilities {
     static final List<String> READ_APIS = Collections.unmodifiableList(Arrays.asList(
         "getInstalledPackages", "getInstalledApplications", "queryIntentActivities", "queryBroadcastReceivers", "queryIntentServices",
         "getActiveAdmins", "Settings.Secure", "enabled_notification_listeners", "AssistStructure", "ViewNode",
-        "onHandleScreenshot", "takeScreenshot"));
+        "onHandleScreenshot", "takeScreenshot", "ContactsContract", "READ_CONTACTS"));
 
     /** Reads Orb does not have. They appear nowhere in the source until a capability declares them. */
     static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
-        "ContactsContract", "CalendarContract", "LocationManager", "FusedLocation", "UsageStatsManager", "AudioRecord", "MediaRecorder",
+        "CalendarContract", "LocationManager", "FusedLocation", "UsageStatsManager", "AudioRecord", "MediaRecorder",
         "CameraManager", "ClipboardManager", "getPrimaryClip", "TelephonyManager", "SmsManager", "READ_SMS", "READ_CALL_LOG",
         "BODY_SENSORS", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"));
 
@@ -177,6 +186,19 @@ final class Capabilities {
             String captured = lastOfType(lines, "orb.assist.captured");
             return new Status(apps == 0 ? "OFF — no app is allowed" : "ON — " + apps + (apps == 1 ? " app allowed" : " apps allowed"),
                 wallClock(captured), captured == null ? "nothing remembered yet" : "something was remembered");
+        }
+        if (CONTACTS.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, CONTACTS);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown — the history could not be read", -1L, "");
+            }
+            String read = lastOfType(lines, ContactsFacts.READ);
+            long contacts = number(read, "contacts");
+            long people = number(read, "people");
+            String detail = read == null ? "never" : contacts + (contacts == 1 ? " contact" : " contacts") + " looked at, " + people + (people == 1 ? " person" : " people") + " mentioned";
+            return new Status(granted ? "ON — you granted it" : "OFF — not granted", wallClock(read), detail);
         }
         if (GRANTS.equals(id)) {
             String observed = lastOfType(lines, "grants.observed");

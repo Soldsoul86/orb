@@ -74,6 +74,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(comingUp);
 
+        // PEOPLE_PHONE.md: the contacts your kept words mention, and everything about each. Reads contacts only while open.
+        Button people = new Button(this);
+        people.setText("People");
+        people.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, PeopleActivity.class)); }
+        });
+        root.addView(people);
+
         // GATE_PHONE.md: everything Orb may do to the world, in one place, withdrawable.
         Button mayDo = new Button(this);
         mayDo.setText("What Orb may do");

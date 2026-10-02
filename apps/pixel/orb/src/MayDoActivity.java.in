@@ -80,6 +80,25 @@ public final class MayDoActivity extends Activity {
             b.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) { startActivity(new android.content.Intent(MayDoActivity.this, AllowActivity.class)); }
             });
+        } else if (d.id.equals(Capabilities.CONTACTS)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.CONTACTS);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+            }
+            final boolean contactsOn = known;
+            b.setText(contactsOn ? "Revoke contacts access" : "Allow contacts (opens People)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (contactsOn) {
+                        ContactsAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, PeopleActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Reminders.CAPABILITY)) {
             final boolean on = Reminders.enabled(lines);
             b.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");

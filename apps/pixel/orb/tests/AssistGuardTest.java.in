@@ -203,9 +203,9 @@ final class AssistGuardTest {
         List<String> permissions = new ArrayList<>();
         java.util.regex.Matcher pm = Pattern.compile("<uses-permission[^>]*android:name=\"([^\"]+)\"").matcher(manifest);
         while (pm.find()) permissions.add(pm.group(1));
-        Harness.check("the only permissions are the boot receiver's and the reminders' notification " + permissions,
-            permissions.size() == 2 && permissions.contains("android.permission.RECEIVE_BOOT_COMPLETED")
-                && permissions.contains("android.permission.POST_NOTIFICATIONS"));
+        Harness.check("the only permissions are the boot receiver's, the reminders' notification and read-only contacts " + permissions,
+            permissions.size() == 3 && permissions.contains("android.permission.RECEIVE_BOOT_COMPLETED")
+                && permissions.contains("android.permission.POST_NOTIFICATIONS") && permissions.contains("android.permission.READ_CONTACTS"));
         Harness.check("the assistant service is bound by the platform's own permission",
             manifest.contains("android.permission.BIND_VOICE_INTERACTION"));
     }

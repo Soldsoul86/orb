@@ -19,3 +19,7 @@ dates are `YYYY-MM-DD`, read day first.
 
 **Known limits.** Landline and STD numbers are not found; two-digit years are not guessed; relative dates ("Friday") are not read;
 a ten-digit order number starting 6–9 is indistinguishable from a mobile. Regional formats beyond India's are found only as `+country…`.
+
+## Names (DR-24)
+
+`matchNames` is the name half of *People*. It reads **no one's data itself**: the phone hands it the contacts it has just read and the text of one kept item, and it says which contacts the text names. Rules, not a model: a full name as a phrase (any case, extra spaces tolerated); a first name only if unique among the contacts, three letters or more, capitalised, a whole word. `fold` lower-cases **without ever changing a string's length**, so positions in the folded text are positions in the original (a character such as *İ* lower-cases to two and would otherwise shift every later match). It cannot tell a person from a word that happens to be a name, which is why the phone labels every by-name match as a word. Held to hand-written cases and a Kotlin twin through shared vectors, like the handle and day readers.

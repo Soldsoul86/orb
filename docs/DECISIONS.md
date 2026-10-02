@@ -1188,6 +1188,31 @@ within a date what was written comes before what was guessed. Still a computed v
 **Built the same way as the date finder:** a TypeScript reference (`runtime/entities`) and the phone's Kotlin, both held to **54 hand-written cases worked out on a calendar** (not computed from either), shared as vectors, mutation-checked.
 
 
+## DR-24 — People: your contacts, opt-in, read only while the People screen is open
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with option A") on `PEOPLE_PHONE.md` ·
+  **Bears on:** DR-19 (computed, never recorded), DR-22 (every read declared), `ARCHITECTURAL_DEBT.md` AD-17, AD-21
+
+**The ruling.** Orb may read the phone's contacts — names, phone numbers, email addresses — through a declared capability **`orb.read.contacts` v1, tier Observe**, whose words are pinned like the other reads'. It is allowed by **two** things: a recorded grant of the
+person's (`grants.granted` / `grants.revoked`, as the package scan's) **and Android's own `READ_CONTACTS`**, asked at the first grant — and only that permission; no write permission exists. The read happens **only while the People screen is open**, in memory, and is let go
+when it closes.
+
+**What People shows.** The contacts that the kept words mention, not the whole address book. Items are tied to a person by **number, then email, then name** (strongest first; once per person); *by name* is labelled as a word, never a fact. Contacts that **share a number
+or an address are one person** (*Ravi Kumar (+1)*), so *his two numbers* are one person without any merge being recorded — the gap AD-17 named. Name matching is plain: the full name in any case; a first name only when **unique among the contacts**, at least three letters, and
+capitalised (so *Will* the contact is not *will* the verb); whole words only. The screen says how many first names are shared and so matched by full name or number only.
+
+**Recorded: counts only.** Each opening appends one `orb.contacts.read` event — *how many contacts were looked at, how many people were mentioned* — and never a name, number or address, so the read is never silent (`Capability.md` inv. 6) and never carries what it read.
+Nothing about a person is stored, recorded or exported (DR-19); erasing an item removes it from every person; revoking empties the screen.
+
+**Held by source tests, not by good intentions:** only `ContactsReader` may touch `ContactsContract`; no write API anywhere; no logging, files or preferences in the People files; one append, and the grant is checked before the read; the manifest allows `READ_CONTACTS` and forbids
+`WRITE_CONTACTS` and everything else sensitive. The old guard's list of *reads Orb does not have* lost `ContactsContract`; every other undeclared read (calendar, location, microphone, camera, clipboard, SMS, usage stats) is still forbidden.
+
+**Built the same way as the handle and day readers:** a TypeScript reference (`runtime/entities`) and the phone's Kotlin brain `Names`, both held to the same hand-written vectors (`names.json`), mutation-checked in both languages; the Java side (grouping, evidence priority, ranking,
+the grant flow, the status line) is mutation-checked on the phone's suite.
+
+**Not decided here:** option C (a list you type, sealed like a note) can sit beside this later; no model is involved.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

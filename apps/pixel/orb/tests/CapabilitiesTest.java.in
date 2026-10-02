@@ -34,15 +34,16 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("four capabilities, each declared once and frozen");
+        Harness.suite("five capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.remind.local"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.remind.local"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
                 !d.says.isEmpty() && !d.authorizedBy.isEmpty() && !d.recordsAs.isEmpty() && !d.withdrawnBy.isEmpty() && !d.title.isEmpty() && d.version == 1L);
             Harness.check(d.id + " has one of the two tiers and is unique", (d.tier.equals(Capabilities.TIER_OBSERVE) || d.tier.equals(Capabilities.TIER_ACT_REVERSIBLE)) && seen.add(d.id));
         }
+        Harness.check("the contacts read is Observe and switchable", Capabilities.byId(Capabilities.CONTACTS).tier.equals("Observe") && Capabilities.byId(Capabilities.CONTACTS).switchable);
         Harness.check("the reads are Observe and the reminder is Act (reversible)",
             Capabilities.byId(Capabilities.PACKAGES).tier.equals("Observe") && Capabilities.byId(Capabilities.SCREEN).tier.equals("Observe")
             && Capabilities.byId(Capabilities.GRANTS).tier.equals("Observe") && Capabilities.byId(Reminders.CAPABILITY).tier.equals("Act (reversible)"));
@@ -51,6 +52,9 @@ final class CapabilitiesTest {
         Harness.equal("the package read's words are pinned: a change is a new capability", pin(Capabilities.PACKAGES_SAYS), "sha256:81e866d255902abc14864b5d10905fbfee8c7f03266582fd08b24fd467bbeb0c");
         Harness.equal("the screen read's words are pinned", pin(Capabilities.SCREEN_SAYS), "sha256:84f03c9fe03e2e86998ed1897d0694873086acc1dd541a499ff54fd7298f9e03");
         Harness.equal("the grants watch's words are pinned", pin(Capabilities.GRANTS_SAYS), "sha256:559ff8b71ce163ff7793114be79012cef725a64909e5cd48ac712d7e3fdeaab2");
+        Harness.equal("the contacts read's words are pinned", pin(Capabilities.CONTACTS_SAYS), "sha256:6507721ef30337a1ac574c226ff8cf951e12f2e3f73b0dc7c55cf716aeb9f662");
+        Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
+            && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",
             Capabilities.SCREEN_SAYS.contains("only when you invoke Orb") && Capabilities.SCREEN_SAYS.contains("never a login screen"));
         Harness.check("the package read says nothing leaves the phone", Capabilities.PACKAGES_SAYS.contains("Nothing leaves the phone"));
@@ -88,6 +92,19 @@ final class CapabilitiesTest {
         Harness.equal("remember something", Capture.remember(context, journal, text, "com.example.chat", 7L, false).outcome, Capture.STORED);
         Capabilities.Status after = Capabilities.status(Capabilities.SCREEN, journal.readLines());
         Harness.check("last use is a time and no content", after.lastAtMs > 0 && !after.lastDetail.contains("words") && !after.state.contains("example"));
+
+        Harness.check("the contacts read never granted: off, never", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF")
+            && Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail.equals("never"));
+        journal.append(PackageGrants.GRANTED, pkg(PackageGrants.GRANTED, "orb.read.contacts"));
+        Harness.check("granted: on — and the package scan's own state is not disturbed", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("ON")
+            && Capabilities.status(Capabilities.PACKAGES, journal.readLines()).state.startsWith("OFF"));
+        journal.append(ContactsFacts.READ, ContactsFacts.read(412L, 5L));
+        Capabilities.Status contactsUsed = Capabilities.status(Capabilities.CONTACTS, journal.readLines());
+        Harness.check("a use: when, and counts only", contactsUsed.lastAtMs > 0 && contactsUsed.lastDetail.equals("412 contacts looked at, 5 people mentioned"));
+        journal.append(ContactsFacts.READ, ContactsFacts.read(1L, 1L));
+        Harness.equal("one person is said in the singular", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail, "1 contact looked at, 1 person mentioned");
+        journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.contacts"));
+        Harness.check("revoked: off", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF"));
 
         Capabilities.Status watch = Capabilities.status(Capabilities.GRANTS, journal.readLines());
         Harness.check("the grants watch is always on, and has not yet looked", watch.state.equals("ALWAYS ON") && watch.lastAtMs < 0);
@@ -128,10 +145,12 @@ final class CapabilitiesTest {
             Harness.check(api + " is read nowhere — no capability declares it " + users, users.isEmpty());
         }
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
-        for (String permission : Arrays.asList("READ_CONTACTS", "READ_CALENDAR", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECORD_AUDIO", "CAMERA",
+        for (String permission : Arrays.asList("READ_CALENDAR", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECORD_AUDIO", "CAMERA",
                 "READ_SMS", "READ_CALL_LOG", "PACKAGE_USAGE_STATS", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES", "INTERNET")) {
             Harness.check("the manifest asks for no " + permission, !manifest.contains("android.permission." + permission));
         }
+
+        Harness.check("the manifest does ask to read contacts — a declared read — and is held to that alone", manifest.contains("android.permission.READ_CONTACTS"));
 
         Harness.suite("the package scan refuses unless granted, and nothing else reads the list");
         String watch = source.get("Watch");

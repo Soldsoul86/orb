@@ -18,6 +18,11 @@ final class PackageGrants {
      * skipped: skipping could return an older answer as though that line did not exist.
      */
     static boolean lastIsGrant(List<String> lines) throws IOException {
+        return lastIsGrant(lines, "installedPackages.read");
+    }
+
+    /** The same, for any capability whose grants are recorded as `grants.capability.granted` / `revoked` (`ContactsAccess` too). */
+    static boolean lastIsGrant(List<String> lines, String capability) throws IOException {
         for (int i = lines.size() - 1; i >= 0; i--) {
             String line = lines.get(i);
             String type = Journal.typeOf(line);
@@ -25,7 +30,7 @@ final class PackageGrants {
             boolean granted = GRANTED.equals(type);
             if (!granted && !REVOKED.equals(type)) continue;
             int payload = line.indexOf("\"payload\":");
-            if (payload < 0 || line.indexOf("\"capability\":\"installedPackages.read\"", payload) < 0) continue;
+            if (payload < 0 || line.indexOf("\"capability\":\"" + capability + "\"", payload) < 0) continue;
             return granted;
         }
         return false;

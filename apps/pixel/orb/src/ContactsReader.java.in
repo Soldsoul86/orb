@@ -1,0 +1,77 @@
+package @PKG@;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.provider.ContactsContract;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The one file that reads the phone's contacts (`orb.read.contacts` v1, `docs/PEOPLE_PHONE.md`) — **read-only, in memory, and
+ * only for a screen that is open**. It never writes, inserts, updates or deletes a contact, keeps nothing between calls, logs
+ * nothing, and returns null (not an empty book) when Android's permission is not there: *cannot read* is not *no contacts*.
+ *
+ * A phone number is kept only if it can be written the way the kept words write them (`Mentions`: `+91…` or `+country…`); one
+ * that cannot (a short code, a local landline) could never match a kept item, so it is not carried.
+ */
+final class ContactsReader {
+    private ContactsReader() {}
+
+    static final String PERMISSION = "android.permission.READ_CONTACTS";
+    private static final int MAX_CONTACTS = 5000;
+
+    static boolean permitted(Context context) {
+        return context.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** The contacts, or null if Android's permission is missing or the book cannot be read. */
+    static List<People.Contact> read(Context context) {
+        if (!permitted(context)) return null;
+        ContentResolver resolver = context.getContentResolver();
+        Map<String, People.Contact> byId = new LinkedHashMap<>();
+        try (Cursor names = resolver.query(ContactsContract.Contacts.CONTENT_URI,
+                new String[] {ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME}, null, null, null)) {
+            if (names == null) return null;
+            while (names.moveToNext() && byId.size() < MAX_CONTACTS) {
+                String id = names.getString(0);
+                String name = names.getString(1);
+                if (id != null && name != null && !name.trim().isEmpty()) byId.put(id, new People.Contact(id, name.trim()));
+            }
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        try (Cursor phones = resolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                new String[] {ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.NUMBER}, null, null, null)) {
+            if (phones != null) {
+                while (phones.moveToNext()) {
+                    People.Contact c = byId.get(phones.getString(0));
+                    String normal = c == null ? null : People.normalPhone(phones.getString(1));
+                    if (normal != null && !c.phones.contains(normal)) c.phones.add(normal);
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        try (Cursor emails = resolver.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+                new String[] {ContactsContract.CommonDataKinds.Email.CONTACT_ID, ContactsContract.CommonDataKinds.Email.ADDRESS}, null, null, null)) {
+            if (emails != null) {
+                while (emails.moveToNext()) {
+                    People.Contact c = byId.get(emails.getString(0));
+                    String address = emails.getString(1);
+                    if (c != null && address != null) {
+                        String lower = address.trim().toLowerCase(java.util.Locale.ROOT);
+                        if (!lower.isEmpty() && !c.emails.contains(lower)) c.emails.add(lower);
+                    }
+                }
+            }
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        return new ArrayList<>(byId.values());
+    }
+}

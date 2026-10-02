@@ -1,0 +1,832 @@
+{
+ "note": "Hand-written in runtime/entities/tests/name-cases.ts; written by scripts/write-brain-vectors.mjs. Do not edit.",
+ "cases": [
+  {
+   "name": "no contacts, nothing",
+   "contacts": [],
+   "text": "Ravi called",
+   "expect": []
+  },
+  {
+   "name": "empty text",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "",
+   "expect": []
+  },
+  {
+   "name": "a full name, in its own case",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Call Ravi Kumar tomorrow",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "Ravi Kumar"
+    }
+   ]
+  },
+  {
+   "name": "a full name in any case",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "RAVI KUMAR and priya shah",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "RAVI KUMAR"
+    },
+    {
+     "id": "2",
+     "by": "full",
+     "word": "priya shah"
+    }
+   ]
+  },
+  {
+   "name": "a unique first name, capitalised",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priya said hello",
+   "expect": [
+    {
+     "id": "2",
+     "by": "first",
+     "word": "Priya"
+    }
+   ]
+  },
+  {
+   "name": "a unique first name that is the whole contact name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Tell Anil",
+   "expect": [
+    {
+     "id": "3",
+     "by": "first",
+     "word": "Anil"
+    }
+   ]
+  },
+  {
+   "name": "a possessive is the name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priya's phone",
+   "expect": [
+    {
+     "id": "2",
+     "by": "first",
+     "word": "Priya"
+    }
+   ]
+  },
+  {
+   "name": "a shared first name alone is never matched",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Ravi called",
+   "expect": []
+  },
+  {
+   "name": "but the full name of one of them is",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Ravi Menon called",
+   "expect": [
+    {
+     "id": "5",
+     "by": "full",
+     "word": "Ravi Menon"
+    }
+   ]
+  },
+  {
+   "name": "the verb is not the contact",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "I will do it",
+   "expect": []
+  },
+  {
+   "name": "the capitalised word is",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Will is coming",
+   "expect": [
+    {
+     "id": "4",
+     "by": "first",
+     "word": "Will"
+    }
+   ]
+  },
+  {
+   "name": "a lower-case first name is not read",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "priya said hello",
+   "expect": []
+  },
+  {
+   "name": "part of a longer word is not the name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priyanka and Anilkumar",
+   "expect": []
+  },
+  {
+   "name": "a name inside a longer word with digits",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priya2",
+   "expect": []
+  },
+  {
+   "name": "two letters are too short for a first name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Jo is here",
+   "expect": []
+  },
+  {
+   "name": "several, in contact order, each once",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Anil and Priya and Anil",
+   "expect": [
+    {
+     "id": "2",
+     "by": "first",
+     "word": "Priya"
+    },
+    {
+     "id": "3",
+     "by": "first",
+     "word": "Anil"
+    }
+   ]
+  },
+  {
+   "name": "the full name wins over the first name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    }
+   ],
+   "text": "Ravi Kumar, Ravi",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "Ravi Kumar"
+    }
+   ]
+  },
+  {
+   "name": "a unique first name found later in the text",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    }
+   ],
+   "text": "ravi, then Ravi",
+   "expect": [
+    {
+     "id": "1",
+     "by": "first",
+     "word": "Ravi"
+    }
+   ]
+  },
+  {
+   "name": "extra spaces in the contact's name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi   Kumar"
+    }
+   ],
+   "text": "Ravi Kumar",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "Ravi Kumar"
+    }
+   ]
+  },
+  {
+   "name": "a phrase broken by a line is not the full name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Ravi Menon"
+    }
+   ],
+   "text": "Ravi\nKumar",
+   "expect": []
+  },
+  {
+   "name": "Devanagari has no case, so a first name is read",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "रवि कुमार"
+    },
+    {
+     "id": "2",
+     "name": "प्रिया"
+    }
+   ],
+   "text": "प्रिया ने कहा",
+   "expect": [
+    {
+     "id": "2",
+     "by": "first",
+     "word": "प्रिया"
+    }
+   ]
+  },
+  {
+   "name": "a full name in Devanagari",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "रवि कुमार"
+    }
+   ],
+   "text": "आज रवि कुमार आया",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "रवि कुमार"
+    }
+   ]
+  },
+  {
+   "name": "accented names",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "José García"
+    }
+   ],
+   "text": "Ask José García",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "José García"
+    }
+   ]
+  },
+  {
+   "name": "an accented first name, capitalised",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Élodie Martin"
+    }
+   ],
+   "text": "Élodie is here",
+   "expect": [
+    {
+     "id": "1",
+     "by": "first",
+     "word": "Élodie"
+    }
+   ]
+  },
+  {
+   "name": "punctuation ends a word",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "(Priya), Anil; Will.",
+   "expect": [
+    {
+     "id": "2",
+     "by": "first",
+     "word": "Priya"
+    },
+    {
+     "id": "3",
+     "by": "first",
+     "word": "Anil"
+    },
+    {
+     "id": "4",
+     "by": "first",
+     "word": "Will"
+    }
+   ]
+  },
+  {
+   "name": "a contact with only initials has no usable name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "A B"
+    }
+   ],
+   "text": "A B",
+   "expect": [
+    {
+     "id": "1",
+     "by": "full",
+     "word": "A B"
+    }
+   ]
+  },
+  {
+   "name": "characters that lower-case to two do not shift what is found",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Priya"
+    }
+   ],
+   "text": "İİİ Priya",
+   "expect": [
+    {
+     "id": "1",
+     "by": "first",
+     "word": "Priya"
+    }
+   ]
+  },
+  {
+   "name": "a contact with an empty name",
+   "contacts": [
+    {
+     "id": "1",
+     "name": ""
+    }
+   ],
+   "text": "anything",
+   "expect": []
+  },
+  {
+   "name": "shared first names are listed",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "",
+   "expect": [],
+   "shared": [
+    "ravi"
+   ]
+  },
+  {
+   "name": "no shared first names",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "2",
+     "name": "Anil"
+    }
+   ],
+   "text": "",
+   "expect": [],
+   "shared": []
+  },
+  {
+   "name": "a shared one-word name too",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Anil"
+    },
+    {
+     "id": "2",
+     "name": "Anil Rao"
+    }
+   ],
+   "text": "",
+   "expect": [],
+   "shared": [
+    "anil"
+   ]
+  }
+ ]
+}

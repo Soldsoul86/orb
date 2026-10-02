@@ -11,6 +11,7 @@ fun main(args: Array<String>) {
     GraphTest.run(File(args.firstOrNull() ?: "."))
     HandlesTest.run(File(args.firstOrNull() ?: "."))
     RelativeDaysTest.run(File(args.firstOrNull() ?: "."))
+    NamesTest.run(File(args.firstOrNull() ?: "."))
     PurityTest.run(File(args.firstOrNull() ?: "."))
     exitProcess(Harness.report())
 }

@@ -6561,3 +6561,51 @@ The export was sent without a comment. What it shows (2 Oct 2026 is a **Friday**
 | **P138** | **Held — including the same-weekday rule on the device.** A reminder for the second text is for **Fri 9 Oct 09:00**: the text said *Friday* and **it was kept on a Friday**, so the guess is *next week's*, exactly as designed — a real test of the rule, not just of the weekday arithmetic. |
 | **P142** | **Held.** Since v31 started the journal gained only the shares and their Observations, two intents and two confirmations and the export — **no event for viewing Coming up, no event for the third text** — and none of `tomorrow`, `Friday`, `yesterday`, `next Friday` or `Send the file` is in the file. |
 | P139, P140 | **Not visible in an export**: that the third text (*next / every / Fridays / yesterday*) listed nothing, and that the dot stayed off with only guesses ahead. No reminder was made for the third text, which is consistent. **Confirmed by the operator: no dot, and nothing listed for the third text.** |
+
+
+### 7b69. People — "everything about Ravi" — B3 slice 2 (DR-24) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v32-people.apk`. v31 is §7b68 (verified). Design: `docs/PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-24; limits `ARCHITECTURAL_DEBT.md` AD-21 (and AD-17, partly closed).
+
+#### What changed
+
+1. **A new button, People.** The first time, it explains in plain words what it will read, and asks. **Allow Orb to read my contacts** records *your* decision and then Android asks its own question (the contacts permission). Both must say yes before anything is read.
+2. **The list is the contacts your kept words mention** — not your address book. Each person shows how many kept items, and *how Orb knew*: **by number** and **by email** (sure) or **by name** (a word that happens to be a name — said so).
+3. **Two numbers, one person.** Contacts that share a number or an email address are shown once (*Ravi Kumar (+1)*) — no merge is recorded, it is worked out each time the screen opens.
+4. **Tap a person:** their numbers and emails, what most often appears with them, and every kept item that mentions them, newest first, each saying why it is there.
+5. **Names are matched plainly:** the full name in any case; a first name only if **no other contact has it**, it has three letters or more, and it is **capitalised** (*Will* the contact, not *will* the verb); whole words only. The screen says how many first names are shared and therefore not matched alone.
+6. **Read only while People is open; nothing kept.** The contacts are read when the screen opens and let go when it closes. Nothing about a person is stored or recorded. What *is* recorded is that a read happened: **one event per opening, with two counts** — contacts looked at, people mentioned — and never a name, number or address.
+7. **Revocable.** *What Orb may do* now lists the contacts read, with *Revoke* and its last use; Android's own settings can withdraw the permission too (People then says so and reads nothing).
+
+#### Checked before the device
+
+- 1018 phone-side checks (was 952), Kotlin 364 (was 325), TypeScript 586 (was 551); the **31 hand-written name cases** are checked by **both** implementations; lint and the independent type-check clean.
+- **Mutation-checked:** 9 ways in the name matcher (each in both languages) and over 30 in the phone code — grouping by number and by email, the strongest-evidence order, the first-name-must-be-unique rule, capitalisation, whole words, the length-preserving lower-casing, ranking, the grant and revoke order, the status line, the record's fields. Every survivor became a test; one is equivalent (sharing one in-memory entry between people) and is noted.
+- **Held by source tests:** only `ContactsReader` touches the contacts provider; no write API; no logging, files or preferences in the People files; the screen's only write is the counts record; the grant is checked before the read; the manifest asks for `READ_CONTACTS` and not `WRITE_CONTACTS`.
+- **Not testable off the phone:** the permission prompt, the real contacts provider, the screen.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P143** | Tap **People** the first time: it explains what it reads and offers **Allow Orb to read my contacts**; tapping asks Android for the contacts permission; after you allow, the list appears. Nothing is listed before both | something is read before both yeses |
+| **P144** | The list shows **only people your kept words mention**, with **N kept items · … by number / by email / by name** | the whole book is listed, or the wrong people |
+| **P145** | A text containing a contact's **number** lists that contact, and in their detail the item says **has their number** | numbers are not matched |
+| **P146** | A text with a contact's **first name capitalised** lists them **by name**, and the item says **mentions the word "…"**. The same name in **lower case** does **not** | names are matched too loosely or too strictly |
+| **P147** | If **two contacts share a first name**, that first name alone matches **neither**, and the screen says *1 first name is shared…* (skip if your contacts have none) | a guess between two people |
+| **P148** | If one contact has **two numbers** (or two contacts share a number), a text with each number lands on **one person** | two numbers stay two |
+| **P149** | **What Orb may do** lists *Who your contacts are, when you open People* as **ON — you granted it**, last use as counts only (*N contacts looked at, M people mentioned*); **Revoke** turns it OFF, and **People then asks again** and lists nobody | the grant is not honoured |
+| **P150** | **Erase** one kept item that mentions someone (in Recall), then open People: that person has **one fewer** | an erased item still counted |
+| **P151** | **Export and share journal**: the file has the **grant, the revoke and one `orb.contacts.read` per opening** — each with **numbers only** — and **no contact name, number or email anywhere in it**, and none of the words you shared | People wrote or leaked something |
+
+#### The operator's protocol
+
+You need two people from your own contacts: **A** (with a phone number saved) and **B** (a first name no other contact has). Use their real names only in the texts you share — they will not appear in the export.
+
+1. Install `orb-app-v32-people.apk` over v31; open Orb once.
+2. Share to Orb as separate texts: **(1)** *Call A's full name tomorrow* · **(2)** *A's number, written with spaces, for the loan* · **(3)** *B's first name said hello* · **(4)** *B's first name in lower case, said hello*. If two contacts share a first name, add **(5)** *that first name called*. If someone has two numbers, add one text for each number.
+3. Tap **People**. Read the explanation; tap **Allow Orb to read my contacts**; allow Android's question. *(P143)*
+4. Read the list and open A and B. *(P144–P148)*
+5. Open **What Orb may do**; read the contacts line; tap **Revoke**; open **People** again. *(P149)*
+6. Allow it again (so the export has a use), open **Recall**, erase one item that mentions A, open **People**. *(P150)*
+7. **Export and share journal**. *(P151)*

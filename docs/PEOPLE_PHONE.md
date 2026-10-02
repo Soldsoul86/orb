@@ -1,6 +1,6 @@
 # People — "everything about Ravi" (B3, second slice; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with option A") and built** (`DEVICE_LOOP.md` §7b69, `orb-app-v32-people.apk`; `DECISIONS.md` DR-24; limits `ARCHITECTURAL_DEBT.md` AD-21). As-built notes in §8.
 > Builds on `ENTITIES_PHONE.md` (DR-19: computed, never recorded), `GATE_READS_PHONE.md` (DR-22: every read declared) and `ARCHITECTURAL_DEBT.md` AD-17. Contracts: `Capability.md`, `Entity.md`. **This is the first read of something Orb has never read, so it needs a new declared capability and a new Android permission — which is why it is a design for your decision, not a quiet build.**
 
 ## 1. Why, in plain words
@@ -53,3 +53,10 @@ Writing or editing contacts; contact photos, groups and birthdays; *"remind me t
 1. **Option A** — your contacts, opt-in, read only while the People screen is open — and that **C (your own list) can come later** beside it.
 2. **The declaration** in §3.1 (`orb.read.contacts` v1, tier *Observe*) and **`READ_CONTACTS` only**, asked at the first grant.
 3. **The matching rules** in §3.4: capitalised whole words, three letters or more, first names only when unique, every by-name match labelled as a word.
+
+## 8. As built
+
+- **As designed:** capability `orb.read.contacts` v1 (Observe), `READ_CONTACTS` only, asked at the first grant; read only while People is open; computed, never stored; matching rules exactly §3.4; the first name is matched only when unique among the contacts, three letters or more, capitalised; by-name matches say *mentions the word “…”*; grouping by shared number or email.
+- **Added to the design:** (a) the evidence is shown as *by number / by email / by name* (email is its own, strong kind); (b) **one record per opening, counts only** (`orb.contacts.read`: contacts looked at, people mentioned) — §4 said *no new journal event types*; a read this sensitive that left no trace would break `Capability.md` inv. 6, and the record carries no name, number or address; (c) the grant and revoke are the existing `grants.granted` / `grants.revoked` events with this capability's id; (d) a person's detail also shows *what often appears with them* (the same ranking Mentions uses).
+- **Where it lives:** `runtime/entities/src/names.ts` (reference), `runtime/brain/.../Names.kt` (the phone's twin, held to the same 31 hand-written vectors), `Mentions` (the only Java file that calls the brain's `Names`), `ContactsReader` (the only file that touches the provider), `ContactsAccess` (the grant), `People` (grouping and evidence), `PeopleActivity` (the screen), `ContactsFacts` (the record).
+- **Not built:** §6, unchanged.
