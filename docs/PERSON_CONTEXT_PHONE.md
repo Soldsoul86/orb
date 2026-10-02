@@ -1,6 +1,6 @@
 # A person's context, and reaching them from it (B3/B4, People slices 3 and 4; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Direction chosen by the operator ("orb building a context of them and to invoke a communication from there"; "Yes, go ahead with slice 1 and 2"); the details in §6 are what is left to approve. Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b73, `orb-app-v36-reach.apk`; `DECISIONS.md` DR-28). As-built notes in §8. Direction chosen by the operator: "orb building a context of them and to invoke a communication from there".
 > Builds on `PEOPLE_PHONE.md` (DR-24), `PEOPLE_SEARCH_PHONE.md` (DR-27), `PERSON_ACTION_PHONE.md` (DR-26) and `GATE_PHONE.md` (DR-20). The *intelligent chat* that comes after (drafting, a model) is **not** in this document; §7 says what it will need.
 
 ## 1. Why, in plain words
@@ -56,3 +56,11 @@ Three buttons in the person's window: **WhatsApp**, **Message** (SMS) and **Call
 ## 7. What comes next, and what it will need (not in this document)
 
 **Drafts from rules** (a message started from the context, you edit it) need nothing new beyond this. **A model that writes or answers** needs its own decision: a remote model is an outbound disclosure of your history (DR-9) — a declared, revocable capability that shows you exactly what leaves the phone before it does, with the provider never hard-coded — or a model on the phone, which this hardware and build do not have.
+
+## 8. As built
+
+- **As designed:** the context block (last and first mentioned, how many items, where from, what often appears, dates ahead — the Coming up reader restricted to the person's own items, guesses marked, *Remind me on…* on each); the three buttons WhatsApp, Message, Call; a review card with Cancel the default; the new capability `orb.handoff.communicate` v1 (Act reversible, switchable, every tap confirmed); **no new permission and no `<queries>`**; WhatsApp by its own scheme (`whatsapp://send?phone=…`), never a web link; channel-only records; no text pre-filled.
+- **Details the design left open:** (a) a person with **several numbers** is asked *Which number?* first; (b) the buttons are **greyed when no number is saved**; (c) **release is recorded before the other app opens**, so if no app handles the link, a **refusal follows the release** (*released* says Orb issued it, as for reminders — AD-18's reading); (d) the dates ahead are computed **once with the people** (a second pass over the newest 500 kept items) and a person's are those in their own items; (e) a **bad number** (not `+` and 8–15 digits) is refused before an app is named.
+- **Records:** `orb.handoff.intent → confirmed | cancelled → released | refused`, plus `revoked` / `allowed` for the switch. Fields: capability, version, channel (`whatsapp`, `sms`, `dial`, or `other`), the build or a reason. A source test holds that the records cannot take a number or a name.
+- **Held by tests:** only `HandoffFlow` and `Handoff` name an app to open; `Handoff` has no `Intent` and starts nothing; the flow starts an app only after `Handoff.release`; no web link anywhere in the three files; both ways out of the card are recorded; the picker and the card are secure; the manifest has no `CALL_PHONE`, `SEND_SMS` or `<package>`; the reminders are untouched by the switch.
+- **Not testable off the phone:** whether `whatsapp://` opens WhatsApp from an app with no `<queries>` (expected: starting an activity does not need package visibility — the device run settles it; if not, the card says WhatsApp is not on the phone and nothing opens).

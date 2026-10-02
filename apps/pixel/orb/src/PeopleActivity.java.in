@@ -32,6 +32,8 @@ import java.util.Locale;
  */
 public final class PeopleActivity extends Activity {
     private static final int REQUEST_CONTACTS = 72;
+    /** At most this many dates ahead are shown in a person's window. */
+    private static final int MAX_DAYS = 8;
 
     private LinearLayout list;
     /** The read is recorded once per opening, not per redraw. */
@@ -39,6 +41,9 @@ public final class PeopleActivity extends Activity {
     /** The closing explanation: the section of possible people is placed above it. */
     private View note;
     private RemindFlow flow;
+    private HandoffFlow handoff;
+    /** The dates ahead in all kept items, computed once with the people; a person's are the ones in their own items. */
+    private ComingUp.Result ahead;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -101,13 +106,16 @@ public final class PeopleActivity extends Activity {
             @Override public void run() {
                 final List<People.Contact> book = ContactsReader.read(context);
                 People.Result computed = null;
+                ComingUp.Result dates = null;
                 if (book != null) {
                     try {
                         computed = People.compute(context, journal, book);
+                        dates = ComingUp.compute(context, journal, System.currentTimeMillis(), java.util.TimeZone.getDefault().getID());
                     } catch (IOException unreadable) {
                         computed = null;
                     }
                 }
+                ahead = dates;
                 final People.Result result = computed;
                 final boolean readable = book != null;
                 runOnUiThread(new Runnable() {
@@ -248,6 +256,48 @@ public final class PeopleActivity extends Activity {
         return row;
     }
 
+    /** The dates ahead in this person's own items — the Coming up reader, restricted; a guess is marked as one. */
+    private void addDatesAhead(LinearLayout column, People.Person person) {
+        if (ahead == null || person.items.isEmpty()) return;
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (People.Evidence e : person.items) if (e.entry.id != null) ids.add(e.entry.id);
+        ComingUp.Result mine = ComingUp.restrict(ahead, ids);
+        if (mine.days.isEmpty()) return;
+        column.addView(text("Dates ahead in these items", 13, true));
+        SimpleDateFormat nice = new SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault());
+        int shown = 0;
+        for (ComingUp.Day day : mine.days) {
+            if (shown++ >= MAX_DAYS) break;
+            final String[] ymd = day.date.split("-");
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.clear();
+            c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
+            for (final ComingUp.Item item : day.items) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.VERTICAL);
+                row.setPadding(0, 8, 0, 8);
+                row.addView(text(nice.format(c.getTime()) + (item.guess ? "  \u00b7  a guess: \u201c" + item.phrase + "\u201d" : ""), 13, !item.guess));
+                row.addView(text(item.entry.snippet, 12, false));
+                if (item.reminded) {
+                    row.addView(text("A reminder is set.", 12, true));
+                } else {
+                    Button remind = new Button(this);
+                    remind.setText("Remind me on " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(c.getTime()));
+                    final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+                    remind.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View view) {
+                            if (flow == null) flow = new RemindFlow(PeopleActivity.this);
+                            flow.start(item.entry.id, picked);
+                        }
+                    });
+                    row.addView(remind);
+                }
+                column.addView(row);
+            }
+        }
+        column.addView(text("Orb knows only what you shared or let it remember. A guess is read from when you kept the item.", 11, false));
+    }
+
     private void showPerson(People.Person person) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout column = new LinearLayout(this);
@@ -258,11 +308,40 @@ public final class PeopleActivity extends Activity {
         column.addView(text(who.toString(), 14, true));
         for (String p : person.phones) column.addView(text("Phone  " + Mentions.show(new Mentions.Handle("phone", p)), 13, false));
         for (String e : person.emails) column.addView(text("Email  " + e, 13, false));
+        // Reach them from here: each opens another app after a confirmation; Orb sends nothing and calls no one (`Handoff`).
+        LinearLayout reach = new LinearLayout(this);
+        reach.setOrientation(LinearLayout.HORIZONTAL);
+        for (final String[] channel : new String[][] {{HandoffFacts.WHATSAPP, "WhatsApp"}, {HandoffFacts.SMS, "Message"}, {HandoffFacts.DIAL, "Call"}}) {
+            Button open = new Button(this);
+            open.setText(channel[1]);
+            open.setEnabled(!person.phones.isEmpty());
+            open.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (handoff == null) handoff = new HandoffFlow(PeopleActivity.this);
+                    handoff.start(channel[0], person);
+                }
+            });
+            reach.addView(open);
+        }
+        column.addView(reach);
+        People.Glance context = People.context(person);
+        if (context.count > 0) {
+            SimpleDateFormat day = new SimpleDateFormat("d MMM yyyy", Locale.getDefault());
+            StringBuilder glance = new StringBuilder("Last mentioned ").append(day.format(new Date(context.last)));
+            if (context.first != context.last) glance.append(" \u00b7 first ").append(day.format(new Date(context.first)));
+            glance.append(" \u00b7 ").append(context.count).append(context.count == 1 ? " kept item" : " kept items");
+            column.addView(text(glance.toString(), 13, true));
+            StringBuilder from = new StringBuilder();
+            for (String f : context.from) from.append(from.length() > 0 ? " \u00b7 " : "").append(f);
+            if (context.shared > 0) from.append(from.length() > 0 ? " \u00b7 " : "").append("shared \u00d7").append(context.shared);
+            if (from.length() > 0) column.addView(text("From: " + from, 12, false));
+        }
         if (!person.alsoWith.isEmpty()) {
             StringBuilder with = new StringBuilder("Often with:");
             for (Mentions.Handle h : person.alsoWith) with.append("\n  ").append(Mentions.line(h));
             column.addView(text(with.toString(), 13, false));
         }
+        addDatesAhead(column, person);
         SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
         if (person.items.isEmpty()) column.addView(text("Nothing you kept mentions them yet.", 13, false));
         for (People.Evidence item : person.items) {

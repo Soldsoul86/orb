@@ -1,0 +1,134 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.view.WindowManager;
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * *Reach them from there* — the person taps WhatsApp, Message or Call on a person's page, sees exactly what will open and with which
+ * number, and confirms (`docs/PERSON_CONTEXT_PHONE.md` §3, DR-28). It draws and asks; `Handoff` records and decides. **This is the
+ * only file that starts another app on a person's behalf**, and it does so only after a confirmation and only through `Handoff.release`.
+ * Orb sends nothing and calls no one: the other app opens and the person presses send or call there.
+ */
+final class HandoffFlow {
+    private final Activity host;
+
+    HandoffFlow(Activity host) {
+        this.host = host;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void say(String message) {
+        new AlertDialog.Builder(host).setMessage(message).setPositiveButton("OK", null).show();
+    }
+
+    private static String named(String channel) {
+        if (HandoffFacts.WHATSAPP.equals(channel)) return "WhatsApp";
+        if (HandoffFacts.SMS.equals(channel)) return "your messaging app";
+        return "the dialer";
+    }
+
+    /** Step 1: which number, if there are several. */
+    void start(final String channel, final People.Person person) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        try {
+            if (!Handoff.enabled(journal.readLines())) {
+                say("Reaching a person from here is turned off. You can turn it on in What Orb may do.");
+                return;
+            }
+        } catch (IOException unreadable) {
+            say("Orb could not read its history, so it did not open anything.");
+            return;
+        }
+        final List<String> numbers = person.phones;
+        if (numbers.isEmpty()) {
+            say("No phone number is saved for them.");
+            return;
+        }
+        if (numbers.size() == 1) {
+            review(channel, numbers.get(0));
+            return;
+        }
+        String[] labels = new String[numbers.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = Mentions.show(new Mentions.Handle("phone", numbers.get(i)));
+        AlertDialog which = new AlertDialog.Builder(host)
+            .setTitle("Which number?")
+            .setItems(labels, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int index) { review(channel, numbers.get(index)); }
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        which.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        which.show();
+    }
+
+    /** Step 2: the review card — exactly what will open, with which number — and the intent recorded. Not confirming is recorded too. */
+    private void review(final String channel, final String number) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        Orb orb = Orb.get();
+        final String intentId = Handoff.intend(journal, channel, orb == null ? Start.VERSION_UNREADABLE : orb.versionCode());
+        if (intentId == null) {
+            say("Orb could not record this, so it did not open anything.");
+            return;
+        }
+        final boolean[] answered = {false};
+        AlertDialog card = new AlertDialog.Builder(host)
+            .setTitle("Open " + named(channel) + "?")
+            .setMessage("Orb will open " + named(channel) + " with " + Mentions.show(new Mentions.Handle("phone", number))
+                + ".\n\nOrb sends nothing and calls no one \u2014 you press send or call there.")
+            .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; Handoff.cancel(journal, intentId, HandoffFacts.DECLINED); }
+            })
+            .setPositiveButton("Open", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; open(journal, intentId, channel, number); }
+            })
+            .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override public void onCancel(DialogInterface d) { if (!answered[0]) { answered[0] = true; Handoff.cancel(journal, intentId, HandoffFacts.DECLINED); } }
+            })
+            .create();
+        // The number is on the card: no screenshots of it.
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    /** Step 3: the confirmation is recorded, then the gate decides, then the other app opens. */
+    private void open(Journal journal, String intentId, final String channel, String number) {
+        String confirmedId = Handoff.confirm(journal, intentId, channel);
+        if (confirmedId == null) {
+            say("Orb could not record this, so it did not open anything.");
+            return;
+        }
+        String answer;
+        try {
+            answer = Handoff.release(journal, confirmedId, channel, number, new Handoff.Launcher() {
+                @Override public boolean open(String kind, String uri) {
+                    String action = HandoffFacts.DIAL.equals(kind) ? Intent.ACTION_DIAL : HandoffFacts.SMS.equals(kind) ? Intent.ACTION_SENDTO : Intent.ACTION_VIEW;
+                    try {
+                        host.startActivity(new Intent(action, Uri.parse(uri)));
+                        return true;
+                    } catch (ActivityNotFoundException | SecurityException noApp) {
+                        return false;
+                    }
+                }
+            });
+        } catch (IOException unreadable) {
+            say("Orb could not read its history, so it did not open anything.");
+            return;
+        }
+        if (("refused:" + HandoffFacts.APP_MISSING).equals(answer)) say(named(channel).substring(0, 1).toUpperCase() + named(channel).substring(1) + " is not on this phone, so nothing opened.");
+        else if (!Handoff.RELEASED.equals(answer)) say("Orb did not open it (" + answer.substring(answer.indexOf(':') + 1) + ").");
+    }
+}

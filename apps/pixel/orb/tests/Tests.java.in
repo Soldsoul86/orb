@@ -22,6 +22,7 @@ public final class Tests {
         ComingUpTest.run();
         CapabilitiesTest.run();
         PeopleTest.run();
+        HandoffTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

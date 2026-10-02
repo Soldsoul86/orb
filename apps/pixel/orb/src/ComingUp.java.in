@@ -124,6 +124,17 @@ final class ComingUp {
         return result;
     }
 
+    /** Only the proposals from these kept items (by event id) — a person's dates ahead are the dates in the items that mention them. */
+    static Result restrict(Result all, java.util.Set<String> entryIds) {
+        Result out = new Result();
+        for (Day day : all.days) {
+            Day kept = new Day(day.date);
+            for (Item item : day.items) if (item.entry.id != null && entryIds.contains(item.entry.id)) kept.items.add(item);
+            if (!kept.items.isEmpty()) out.days.add(kept);
+        }
+        return out;
+    }
+
     private static boolean remindedOn(List<Reminders.Reminder> waiting, Recall.Entry entry, String date, String zoneId) {
         for (Reminders.Reminder r : waiting) {
             if (entry.id != null && entry.id.equals(r.itemEventId) && dateOf(r.dueAtMs, zoneId).equals(date)) return true;

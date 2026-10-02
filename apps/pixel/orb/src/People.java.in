@@ -218,6 +218,50 @@ final class People {
         return result;
     }
 
+    /** A person's context at a glance — **computed from the person's own items, never stored**. */
+    static final class Glance {
+        final int count;
+        /** When the oldest and the newest of the items were kept (epoch ms); 0 if there are none. */
+        final long first;
+        final long last;
+        /** Where they came from: `app ×n`, most first, at most `CONTEXT_APPS`. */
+        final List<String> from = new ArrayList<>();
+        /** How many were shared to Orb (as opposed to remembered from a screen). */
+        final int shared;
+
+        Glance(int count, long first, long last, int shared) {
+            this.count = count;
+            this.first = first;
+            this.last = last;
+            this.shared = shared;
+        }
+    }
+
+    static final int CONTEXT_APPS = 4;
+
+    static Glance context(Person p) {
+        long first = Long.MAX_VALUE, last = 0L;
+        int shared = 0;
+        final Map<String, Integer> byApp = new HashMap<>();
+        for (Evidence e : p.items) {
+            first = Math.min(first, e.entry.wallClock);
+            last = Math.max(last, e.entry.wallClock);
+            if (Provenance.SHARED_TEXT.equals(e.entry.type)) shared++;
+            String app = e.entry.packageName == null || e.entry.packageName.isEmpty() ? null : e.entry.packageName;
+            if (app != null) byApp.put(app, byApp.containsKey(app) ? byApp.get(app) + 1 : 1);
+        }
+        Glance c = new Glance(p.items.size(), p.items.isEmpty() ? 0L : first, last, shared);
+        List<Map.Entry<String, Integer>> ranked = new ArrayList<>(byApp.entrySet());
+        Collections.sort(ranked, new Comparator<Map.Entry<String, Integer>>() {
+            @Override public int compare(Map.Entry<String, Integer> a, Map.Entry<String, Integer> b) {
+                int d = b.getValue() - a.getValue();
+                return d != 0 ? d : a.getKey().compareTo(b.getKey());
+            }
+        });
+        for (int i = 0; i < ranked.size() && i < CONTEXT_APPS; i++) c.from.add(ranked.get(i).getKey() + " \u00d7" + ranked.get(i).getValue());
+        return c;
+    }
+
     /** At most this many search results are shown. */
     static final int FIND_LIMIT = 25;
     /** Fewer letters than this is not a search: it would list half the book. */

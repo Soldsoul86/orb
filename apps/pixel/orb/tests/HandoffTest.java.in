@@ -1,0 +1,197 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Reaching a person from their page (`docs/PERSON_CONTEXT_PHONE.md` §3, DR-28): the link that opens each channel, the gate, the chain
+ * recorded in order and before the other app opens, the record that never carries the number, and the one file that starts an app.
+ */
+final class HandoffTest {
+    private HandoffTest() {}
+
+    /** The other app, as a recorder: what it was asked to open, and what the journal held at that moment. */
+    private static final class Recorder implements Handoff.Launcher {
+        final List<String> opened = new ArrayList<>();
+        final List<Boolean> releasedBefore = new ArrayList<>();
+        boolean installed = true;
+        Journal watching;
+
+        @Override public boolean open(String channel, String uri) {
+            opened.add(channel + " " + uri);
+            try {
+                boolean held = false;
+                for (String line : watching.readLines()) if (HandoffFacts.RELEASED.equals(Journal.typeOf(line))) held = true;
+                releasedBefore.add(held);
+            } catch (Exception e) {
+                releasedBefore.add(false);
+            }
+            return installed;
+        }
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static String lastOf(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) found = l;
+        return found;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the capability is declared once and frozen");
+        Harness.equal("its identity and version", Handoff.CAPABILITY + " v" + Handoff.VERSION, "orb.handoff.communicate v1");
+        Harness.check("it says it sends nothing, calls no one, and keeps no number",
+            Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number"));
+
+        Harness.suite("the link that opens each channel: its own scheme, never the web");
+        Harness.equal("dial", Handoff.uri("dial", "+919876543210"), "tel:+919876543210");
+        Harness.equal("message", Handoff.uri("sms", "+919876543210"), "smsto:+919876543210");
+        Harness.equal("WhatsApp: its own scheme, digits only", Handoff.uri("whatsapp", "+919876543210"), "whatsapp://send?phone=919876543210");
+        Harness.check("another country's number", "whatsapp://send?phone=14155552671".equals(Handoff.uri("whatsapp", "+14155552671")));
+        Harness.check("an unknown channel has no link", Handoff.uri("telegram", "+919876543210") == null && Handoff.uri(null, "+919876543210") == null);
+        Harness.check("a number that is not +digits has no link: nothing smuggled into a link",
+            Handoff.uri("dial", "9876543210") == null && Handoff.uri("dial", "+91 98765") == null && Handoff.uri("whatsapp", "+9198765432100&text=hi") == null
+            && Handoff.uri("sms", "+91987654321;x") == null && Handoff.uri("dial", "") == null && Handoff.uri("dial", null) == null);
+        Harness.check("seven digits are too few, sixteen too many", Handoff.uri("dial", "+1234567") == null && Handoff.uri("dial", "+1234567890123456") == null
+            && Handoff.uri("dial", "+12345678") != null && Handoff.uri("dial", "+123456789012345") != null);
+        for (String channel : HandoffFacts.CHANNELS) {
+            Harness.check(channel + " never builds a web link", !Handoff.uri(channel, "+919876543210").startsWith("http"));
+        }
+
+        Harness.suite("the chain: intent, confirmation, release — in order, and before the other app opens");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-handoff").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Recorder app = new Recorder();
+        app.watching = journal;
+        String intent = Handoff.intend(journal, "whatsapp", 7L);
+        Harness.check("the intent is recorded", intent != null && lastOf(journal, HandoffFacts.INTENT).contains("\"channel\":\"whatsapp\""));
+        String confirmed = Handoff.confirm(journal, intent, "whatsapp");
+        Harness.check("the confirmation cites the intent", confirmed != null && lastOf(journal, HandoffFacts.CONFIRMED).contains("\"causes\":[\"" + intent + "\"]"));
+        Harness.equal("it is released", Handoff.release(journal, confirmed, "whatsapp", "+919876543210", app), Handoff.RELEASED);
+        Harness.equal("the other app was asked to open exactly that link", app.opened, Arrays.asList("whatsapp whatsapp://send?phone=919876543210"));
+        Harness.equal("and the release was already on record when it opened", app.releasedBefore, Arrays.asList(true));
+        Harness.check("the release cites the confirmation", lastOf(journal, HandoffFacts.RELEASED).contains("\"causes\":[\"" + confirmed + "\"]"));
+        Harness.equal("a second release of the same confirmation is refused, and nothing opens", Handoff.release(journal, confirmed, "whatsapp", "+919876543210", app), "refused:alreadyReleased");
+        Harness.equal("so only one app was opened", app.opened.size(), 1);
+        Harness.check("the refusal is on record, citing the confirmation", lastOf(journal, HandoffFacts.REFUSED).contains("\"reason\":\"alreadyReleased\"") && lastOf(journal, HandoffFacts.REFUSED).contains(confirmed));
+
+        Harness.suite("not confirming is recorded as confirming is");
+        int before = count(journal, HandoffFacts.CANCELLED);
+        String declined = Handoff.intend(journal, "sms", 7L);
+        Handoff.cancel(journal, declined, HandoffFacts.DECLINED);
+        Harness.equal("one more cancellation", count(journal, HandoffFacts.CANCELLED), before + 1);
+        Harness.check("citing the intent, with its reason", lastOf(journal, HandoffFacts.CANCELLED).contains("\"causes\":[\"" + declined + "\"]") && lastOf(journal, HandoffFacts.CANCELLED).contains("\"reason\":\"declined\""));
+        Harness.equal("nothing was opened by a decline", app.opened.size(), 1);
+
+        Harness.suite("when no app handles it, a refusal follows the release");
+        Recorder none = new Recorder();
+        none.watching = journal;
+        none.installed = false;
+        String intent2 = Handoff.intend(journal, "whatsapp", 7L);
+        String confirmed2 = Handoff.confirm(journal, intent2, "whatsapp");
+        Harness.equal("refused: the app is missing", Handoff.release(journal, confirmed2, "whatsapp", "+919876543210", none), "refused:appMissing");
+        Harness.check("it was released first (Orb tried), then refused, both citing the confirmation",
+            lastOf(journal, HandoffFacts.REFUSED).contains("\"reason\":\"appMissing\"") && lastOf(journal, HandoffFacts.REFUSED).contains(confirmed2) && none.releasedBefore.equals(Arrays.asList(true)));
+
+        Harness.suite("a bad number is refused before any app is named");
+        Recorder bad = new Recorder();
+        bad.watching = journal;
+        String confirmed3 = Handoff.confirm(journal, Handoff.intend(journal, "dial", 7L), "dial");
+        int releasedBefore = count(journal, HandoffFacts.RELEASED);
+        Harness.equal("refused", Handoff.release(journal, confirmed3, "dial", "98765", bad), "refused:badNumber");
+        Harness.check("nothing opened and no release was written", bad.opened.isEmpty() && count(journal, HandoffFacts.RELEASED) == releasedBefore);
+        Harness.check("and the refusal is on record, citing the confirmation", lastOf(journal, HandoffFacts.REFUSED).contains("\"reason\":\"badNumber\"") && lastOf(journal, HandoffFacts.REFUSED).contains(confirmed3));
+
+        Harness.suite("the switch: off refuses, on allows, and the reminders are not touched");
+        Harness.check("on until the person says otherwise", Handoff.enabled(journal.readLines()));
+        Handoff.turnOff(journal);
+        Harness.check("off", !Handoff.enabled(journal.readLines()));
+        Harness.check("and the reminders' own switch is unaffected", Reminders.enabled(journal.readLines()));
+        Recorder off = new Recorder();
+        off.watching = journal;
+        String confirmed4 = Handoff.confirm(journal, Handoff.intend(journal, "sms", 7L), "sms");
+        Harness.equal("a confirmed hand-off is refused when switched off", Handoff.release(journal, confirmed4, "sms", "+919876543210", off), "refused:switchedOff");
+        Harness.check("and nothing opened", off.opened.isEmpty());
+        Handoff.turnOn(journal);
+        Harness.check("on again", Handoff.enabled(journal.readLines()));
+        Harness.equal("and the same confirmation now goes through", Handoff.release(journal, confirmed4, "sms", "+919876543210", off), Handoff.RELEASED);
+
+        Harness.suite("the record carries a channel and never a number");
+        String all = String.join("\n", journal.readLines());
+        Harness.check("no number anywhere in the journal", !all.contains("9876543210") && !all.contains("919876543210"));
+        Harness.equal("the fields of a release", new java.util.TreeSet<>(HandoffFacts.released("whatsapp").keySet()).toString(), "[capability, channel, version]");
+        Harness.equal("the fields of an intent", new java.util.TreeSet<>(HandoffFacts.intent("dial", 7L).keySet()).toString(), "[capability, channel, version, versionCode]");
+        Harness.equal("a channel the record does not know is `other`, never free text", HandoffFacts.released("+919876543210; rm").get("channel"), "other");
+        Harness.check("hand-off records are not reminders' records: the reminders see none", Reminders.pending(journal.readLines()).isEmpty());
+
+        guard();
+    }
+
+    /** One file starts another app on a person's behalf, and it has no web link and records no number. */
+    private static void guard() throws Exception {
+        Harness.suite("one file opens another app, and it cannot reach the web or write a number down");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> openers = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) {
+            String t = e.getValue();
+            if (t.contains("ACTION_DIAL") || t.contains("ACTION_SENDTO") || t.contains("whatsapp://") || t.contains("\"tel:\"") || t.contains("\"smsto:\"")) openers.add(e.getKey());
+        }
+        Harness.equal("only the flow and the gate name an app to open", openers.toString(), "[Handoff, HandoffFlow]");
+        Harness.check("the gate builds links but starts nothing: it has no Intent and no startActivity", !source.get("Handoff").contains("Intent") && !source.get("Handoff").contains("startActivity"));
+        Harness.check("the flow starts the app only inside the launcher the gate calls, after release",
+            source.get("HandoffFlow").split("startActivity\\(", -1).length == 2 && source.get("HandoffFlow").contains("Handoff.release(")
+            && source.get("HandoffFlow").indexOf("Handoff.release(") < source.get("HandoffFlow").indexOf("startActivity("));
+        for (String name : Arrays.asList("Handoff", "HandoffFlow", "HandoffFacts")) {
+            String t = source.get(name);
+            Harness.check(name + " has no web link", !t.contains("http:") && !t.contains("https:") && !t.contains("wa.me") && !t.contains("ACTION_VIEW_URL"));
+            Harness.check(name + " logs nothing and keeps nothing", !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace") && !t.contains("FileOutputStream")
+                && !t.contains("RandomAccessFile") && !t.contains("getSharedPreferences") && !t.contains("Toast"));
+        }
+        String flow = source.get("HandoffFlow");
+        Harness.check("not confirming is recorded on both ways out of the card (Cancel, and backing out), and the intent is recorded before the card",
+            flow.split("Handoff\\.cancel\\(", -1).length == 3 && flow.indexOf("Handoff.intend(") < flow.indexOf("new AlertDialog.Builder(host)\n            .setTitle(\"Open \"")
+            && flow.contains("requestFocus()"));
+        Harness.check("the number is on two windows (the picker and the card), and both are secure", flow.split("FLAG_SECURE", -1).length - 1 >= 4);
+        Harness.check("the confirmation is recorded, then the gate decides: confirm comes before release", flow.indexOf("Handoff.confirm(") > 0 && flow.indexOf("Handoff.confirm(") < flow.indexOf("Handoff.release("));
+        Harness.check("a switched-off capability is checked before anything is shown", flow.indexOf("Handoff.enabled(") > 0 && flow.indexOf("Handoff.enabled(") < flow.indexOf("review(channel, numbers.get(0))"));
+        Harness.check("only HandoffFacts builds the records", source.get("Handoff").indexOf("Json.obj(") < 0 && source.get("HandoffFlow").indexOf("Json.obj(") < 0);
+        Harness.check("the records never take a number or a name", !source.get("HandoffFacts").contains("number") && !source.get("HandoffFacts").contains("phone") && !source.get("HandoffFacts").contains("name\""));
+        Harness.check("the person's page reaches an app only through the flow", !source.get("PeopleActivity").contains("Intent.ACTION") && !source.get("PeopleActivity").contains("startActivity(") 
+            && source.get("PeopleActivity").contains("handoff.start(channel[0], person)"));
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("no new permission and no <queries> package for it", !manifest.contains("CALL_PHONE") && !manifest.contains("SEND_SMS") && !manifest.contains("<package "));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

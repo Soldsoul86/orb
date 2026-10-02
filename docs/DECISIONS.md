@@ -1251,6 +1251,20 @@ and *Might be* lists unchanged. The reason: a guess from words cannot be made re
 **Not in this ruling:** a pinned or recent list of people (would be sealed like a note), starred contacts (a new attribute read), search by number, calling or messaging.
 
 
+## DR-28 — A person's context, and a hand-off to reach them: a new declared capability
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("orb building a context of them and to invoke a communication from there"; "Yes, go ahead with slice 1 and 2"; "Yes, go ahead with the design") on `PERSON_CONTEXT_PHONE.md` · **Bears on:** DR-20 (the gate), DR-26, DR-27
+
+**The ruling.** (1) A person's window shows **their context**, computed from their own kept items when it opens and never stored: when they were last and first mentioned, how many items, where from, what often appears with them, and the **dates ahead** in those items (written, and relative days as marked guesses — the Coming up reader restricted to the person's items), each with the existing *Remind me on…*. Orb says
+it knows only what you shared or let it remember. (2) A person's window offers **WhatsApp, Message and Call**: each **opens that app with the number filled in; you press send or call**. **Orb sends nothing and calls no one.** It is a **new declared capability `orb.handoff.communicate` v1, tier Act (reversible)**, switchable on *What Orb may do*, **every tap confirmed** on a card that names the app and the number
+(Cancel the default); **no standing authorization**, because nothing here needs to happen when you are not looking.
+
+**Its record is its own family** — `orb.handoff.intent / confirmed / cancelled / released / refused / revoked / allowed` — so the code that lists or turns off reminders cannot mistake one for the other. **Channel only** (`whatsapp`, `sms`, `dial`) and the build or a reason; **never the number, the name or any text**. Recorded **before** the other app opens; if nothing handles the link, a refusal follows. **No new Android
+permission, no `<queries>`.** WhatsApp is reached by **its own scheme, never a web link**, so a missing WhatsApp opens nothing rather than sending the number to a website.
+
+**Not in this ruling:** pre-filled text or drafts, any model, reading chats, reminders listed by person (a reminder cites no item and never records the person, DR-26), search by number, pinned people.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

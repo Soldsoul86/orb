@@ -103,7 +103,11 @@ final class Capabilities {
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
-            Collections.<String>emptyList())));
+            Collections.<String>emptyList()),
+        new Declaration(Handoff.CAPABILITY, Handoff.VERSION, "Reach a person from their page", Handoff.DECLARATION, TIER_ACT_REVERSIBLE,
+            "your confirmation of each hand-off, every time", Arrays.asList(HandoffFacts.RELEASED),
+            "What Orb may do: turn off", true,
+            Arrays.asList("Handoff", "HandoffFacts", "HandoffFlow"))));
 
     static Declaration byId(String id) {
         for (Declaration d : ALL) if (d.id.equals(id)) return d;
@@ -201,6 +205,13 @@ final class Capabilities {
             String detail = read == null ? "never" : contacts + (contacts == 1 ? " contact" : " contacts") + " looked at, " + people + (people == 1 ? " person" : " people")
                 + " tied by number or email, " + possible + " only by a name";
             return new Status(granted ? "ON — you granted it" : "OFF — not granted", wallClock(read), detail);
+        }
+        if (Handoff.CAPABILITY.equals(id)) {
+            int opened = 0;
+            for (String line : lines) if (HandoffFacts.RELEASED.equals(Journal.typeOf(line))) opened++;
+            String released = lastOfType(lines, HandoffFacts.RELEASED);
+            String state = Handoff.enabled(lines) ? "ON — every tap is confirmed" : "OFF — you turned it off";
+            return new Status(state, wallClock(released), released == null ? "none opened yet" : opened + " opened — Orb sent nothing");
         }
         if (GRANTS.equals(id)) {
             String observed = lastOfType(lines, "grants.observed");

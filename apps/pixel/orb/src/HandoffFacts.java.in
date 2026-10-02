@@ -1,0 +1,90 @@
+package @PKG@;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Every record of a hand-off — built here and nowhere else (`docs/PERSON_CONTEXT_PHONE.md` §3, DR-28). It is **its own family of
+ * events**, not `orb.action.*`, so the code that lists or turns off reminders can never mistake one for the other.
+ *
+ * **Channel only.** A record says *which kind* of app was opened — `whatsapp`, `sms` or `dial` — and the build. **Never the number,
+ * the name or any text.** `released` says Orb *issued* the hand-off, not that anything was sent: Orb sends nothing.
+ */
+final class HandoffFacts {
+    private HandoffFacts() {}
+
+    static final String INTENT = "orb.handoff.intent";
+    static final String CONFIRMED = "orb.handoff.confirmed";
+    static final String CANCELLED = "orb.handoff.cancelled";
+    static final String RELEASED = "orb.handoff.released";
+    static final String REFUSED = "orb.handoff.refused";
+    static final String REVOKED = "orb.handoff.revoked";
+    static final String ALLOWED = "orb.handoff.allowed";
+
+    static final String WHATSAPP = "whatsapp";
+    static final String SMS = "sms";
+    static final String DIAL = "dial";
+    static final List<String> CHANNELS = Arrays.asList(WHATSAPP, SMS, DIAL);
+
+    /** Why a hand-off did not happen. */
+    static final String DECLINED = "declined";
+    static final String SWITCHED_OFF = "switchedOff";
+    static final String ALREADY_RELEASED = "alreadyReleased";
+    static final String BAD_NUMBER = "badNumber";
+    static final String APP_MISSING = "appMissing";
+
+    /** A channel as the record spells it: one of the three, or `other` — the record never carries free text. */
+    static String channelOrOther(String channel) {
+        return CHANNELS.contains(channel) ? channel : "other";
+    }
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Handoff.CAPABILITY);
+        p.put("version", Handoff.VERSION);
+        return p;
+    }
+
+    /** The person tapped a channel on a person's window: which kind, and the build. */
+    static Map<String, Object> intent(String channel, long versionCode) {
+        Map<String, Object> p = base();
+        p.put("channel", channelOrOther(channel));
+        p.put("versionCode", versionCode);
+        return p;
+    }
+
+    /** The person confirmed exactly this: this kind of app. */
+    static Map<String, Object> confirmed(String channel) {
+        Map<String, Object> p = base();
+        p.put("channel", channelOrOther(channel));
+        return p;
+    }
+
+    static Map<String, Object> cancelled(String reason) {
+        Map<String, Object> p = base();
+        p.put("reason", reason);
+        return p;
+    }
+
+    /** Orb issued the hand-off. Not that the other app opened, and never that anything was sent. */
+    static Map<String, Object> released(String channel) {
+        Map<String, Object> p = base();
+        p.put("channel", channelOrOther(channel));
+        return p;
+    }
+
+    static Map<String, Object> refused(String reason) {
+        Map<String, Object> p = base();
+        p.put("reason", reason);
+        return p;
+    }
+
+    static Map<String, Object> revoked() {
+        return base();
+    }
+
+    static Map<String, Object> allowed() {
+        return base();
+    }
+}

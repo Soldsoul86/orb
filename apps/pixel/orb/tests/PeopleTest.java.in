@@ -121,6 +121,19 @@ final class PeopleTest {
         for (Mentions.Handle h : ravi.alsoWith) beside.add(h.kind);
         Harness.check("what appears with him: the amount, never his own numbers or address", beside.contains("amount") && !beside.contains("phone") && !beside.contains("email"));
 
+        Harness.suite("a person's context at a glance: from their own items, computed");
+        People.Glance glance = People.context(ravi);
+        Harness.equal("how many items", glance.count, 6);
+        Harness.check("oldest and newest kept", glance.first > 0 && glance.last >= glance.first);
+        Harness.equal("where from, most first", glance.from, Arrays.asList("com.example.notes \u00d76"));
+        Harness.equal("and how many were shared", glance.shared, 6);
+        People.Person manyApps = new People.Person();
+        String[] apps = {"zz", "zz", "zz", "yy", "yy", "aa", "bb", "cc"};
+        for (int i = 0; i < apps.length; i++) manyApps.items.add(new People.Evidence(new Recall.Entry("h" + i, "id" + i, "sha256:x", 1000L + i, apps[i], "words"), People.BY_NUMBER, null));
+        Harness.equal("where from: most items first, ties by name, at most " + People.CONTEXT_APPS, People.context(manyApps).from, Arrays.asList("zz \u00d73", "yy \u00d72", "aa \u00d71", "bb \u00d71"));
+        People.Glance empty = People.context(new People.Person());
+        Harness.check("a person nothing mentions has an empty context", empty.count == 0 && empty.first == 0L && empty.last == 0L && empty.from.isEmpty() && empty.shared == 0);
+
         Harness.suite("a view: nothing written, nothing in the clear");
         Harness.equal("the journal is unchanged", journal.readLines(), linesBefore);
         Harness.equal("and so is every file on disk", listing(dir, ""), diskBefore);
@@ -171,6 +184,8 @@ final class PeopleTest {
         keep(context, journal, "Dan Dale rang again 90000 00012");
         keep(context, journal, "Xena Xu spoke");
         keep(context, journal, "Eli Ek spoke");
+        keep(context, journal, "Dan Dale says call on 12/10/2026");
+        keep(context, journal, "pay the bill on 15/10/2026");
         People.Result r = People.compute(context, journal, book);
         People.Person zed = find(r, "Zed Zhang");
         Harness.equal("two contacts that share only an email address are one person", zed.names, Arrays.asList("Zed Zhang", "Amy Adams"));
@@ -186,6 +201,19 @@ final class PeopleTest {
         List<String> apart = new ArrayList<>();
         for (People.Person p : r.possible) apart.add(p.names.get(0));
         Harness.equal("the possible ones are ordered the same way, and apart", apart, Arrays.asList("Eli Ek", "Xena Xu"));
+
+        Harness.suite("a person's dates ahead are the dates in their own items");
+        java.util.Calendar noon = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        noon.clear();
+        noon.set(2026, 9, 2, 12, 0, 0);
+        ComingUp.Result everything = ComingUp.compute(context, journal, noon.getTimeInMillis(), "UTC");
+        Harness.equal("everyone's: two dates ahead", everything.days.size(), 2);
+        java.util.Set<String> danIds = new java.util.HashSet<>();
+        for (People.Evidence e : find(r, "Dan Dale").items) danIds.add(e.entry.id);
+        ComingUp.Result danOnly = ComingUp.restrict(everything, danIds);
+        Harness.check("Dan's: only the one in an item that mentions him", danOnly.days.size() == 1 && danOnly.days.get(0).date.equals("2026-10-12") && danOnly.days.get(0).items.size() == 1);
+        Harness.check("the other date is in no one's items", ComingUp.restrict(everything, new java.util.HashSet<String>()).days.isEmpty());
+        Harness.check("restricting changes nothing in the whole", everything.days.size() == 2);
 
         Harness.suite("you choose the person: a search over every contact, mentioned or not");
         Harness.equal("everyone is there — grouped, and including those nothing mentions", r.all.size(), 11);
@@ -265,6 +293,7 @@ final class PeopleTest {
             && activity.indexOf("for (final People.Person person : result.people) mentions.addView(row(person));") < activity.indexOf("Might be")
             && activity.split("addView\\(row\\(person\\)\\);", -1).length == 3);
         Harness.check("the record counts both kinds", activity.contains("ContactsFacts.read(result.contacts, result.people.size(), result.possible.size())"));
+        Harness.check("a contact with no number gets greyed hand-off buttons", activity.contains("open.setEnabled(!person.phones.isEmpty());"));
         Harness.check("a person's reminder goes through the existing flow, about no kept item, and People reaches nothing of the gate itself",
             activity.contains("flow.start(null, null, callNote)") && activity.contains(".setNeutralButton(\"Remind me about this person\\u2026\"") && activity.contains("\"Call \" + person.names.get(0)")
             && !activity.contains("Reminders.") && !activity.contains("Remind.") && !activity.contains("ReminderAlarms") && !activity.contains("ReminderNotifier"));

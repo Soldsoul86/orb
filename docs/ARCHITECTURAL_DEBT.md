@@ -630,6 +630,22 @@ a second source for the compiler's checksum exists (item 1).
 
 **Search (DR-27):** the search finds contacts by name only (not by number); it shows at most 25, best first; a contact that is a group or a shop is found like any other; a contact with the same name as another is listed separately, and Orb does not choose between them. Not built: pinned or recent people, starred contacts, search by number.
 
+
+---
+
+## AD-23 — what a person's context and a hand-off do not know
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-28). Debts, stated.
+
+1. **The context is what you gave Orb.** It does not read chats or the other apps; a person you talk to daily in an app you never shared from has an empty context. It says so.
+2. **No reminders listed by person.** A reminder cites no kept item and never records the person (DR-26), so a person's window cannot say *you have a reminder about them*.
+3. **A hand-off is an intent, not a result.** `released` says Orb issued it; whether the other app opened, whether you pressed send or call, and what was said are not seen and not recorded. Orb never learns the outcome.
+4. **The app decides what it does with the number.** WhatsApp, the messaging app and the dialer receive it by design; once handed over, what they do with it is theirs.
+5. **A bad contact number is refused, not fixed.** Only `+` and 8–15 digits is accepted; a contact whose number the reader could not normalise has no button enabled.
+6. **No text, no drafts.** The other app opens empty. Writing a message from the context is a separate step (and, if a model writes it, a separate decision about what leaves the phone).
+7. **Dates ahead cost a second pass** over the newest 500 kept items each time People opens (AD-13).
+8. **Whether `whatsapp://` opens from an app with no `<queries>` entry** is expected, not yet seen on a device.
+
 ---
 
 ## AD-18 — the first action's limits, stated

@@ -113,6 +113,16 @@ public final class MayDoActivity extends Activity {
                     render();
                 }
             });
+        } else if (d.id.equals(Handoff.CAPABILITY)) {
+            final boolean handoffOn = Handoff.enabled(lines);
+            b.setText(handoffOn ? "Turn off (no person's page can open another app)" : "Turn on");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (handoffOn) Handoff.turnOff(journal);
+                    else Handoff.turnOn(journal);
+                    render();
+                }
+            });
         } else {
             return;   // The grants watch is always on: shown, with no control.
         }

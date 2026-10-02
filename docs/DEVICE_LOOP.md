@@ -6741,3 +6741,48 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 5. Back on People, tap **Who my words mention** twice. *(P166)*
 6. **Export and share journal**. *(P168)*
 
+
+### 7b73. A person's context, and reaching them from it — B3/B4 slices 3 and 4 (DR-28) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v36-reach.apk`. v35 is §7b72 (the search; its export showed the reminder from a person worked up to confirming). Design: `docs/PERSON_CONTEXT_PHONE.md`; decision `DECISIONS.md` DR-28; limits `ARCHITECTURAL_DEBT.md` AD-23.
+
+#### What changed
+
+1. **A person's window shows their context:** *Last mentioned … · first … · N kept items*, *From: com.whatsapp ×9 · …*, *Often with*, and **Dates ahead in these items** (a relative day like *Friday* is marked **a guess**), each with **Remind me on …**. It says Orb knows only what you shared or let it remember.
+2. **Three buttons under their numbers: WhatsApp, Message, Call** (greyed if no number is saved). Tap one (pick the number if there are several): a card says **what will open and with which number**, *Orb sends nothing and calls no one — you press send or call there*. **Cancel is the default.** *Open* opens that app with the number filled in; **you press send or call.**
+3. **A new line on What Orb may do:** *Reach a person from their page* — **ON — every tap is confirmed**, with how many were opened and *Orb sent nothing*, and **Turn off**.
+4. **No text is pre-filled**, no new Android permission, WhatsApp is opened by its own link (never a web page): if WhatsApp is not installed, nothing opens.
+
+#### Checked before the device
+
+- 1125 phone-side checks (was 1045); Kotlin 378, TypeScript 600 unchanged; lint and type-check clean.
+- **Tests:** the link for each channel (and that no number can smuggle anything into one); the chain in order and the release **recorded before the app opens**; a second release refused; a decline and a back-out recorded; an uninstalled app refused after the release; a bad number refused first; the switch off/on, and the reminders untouched by it; the records carry a channel and never a number; **one file opens an app**, no web link, nothing logged or kept; the manifest has no call or SMS permission; the context and dates-ahead restriction.
+- **Mutation-checked:** the number rule's bounds, each link, the switch, each refusal and its order, the causes, the channel guard, the context's first/last/ranking/cap, the restriction, the status line and the flow's guards each fail a named check.
+- **Not testable off the phone:** that the three apps open with the number filled in — in particular **whether `whatsapp://` opens WhatsApp from Orb** (expected; the run settles it).
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P169** | A person with kept items: their window shows **Last mentioned … · N kept items** and **From: …**; a contact nothing mentions says *Nothing you kept mentions them yet* and no context line | the context is missing or wrong |
+| **P170** | If one of their items names a future date: **Dates ahead in these items** lists it with **Remind me on …** (a guess says so); otherwise the block is absent | the dates are wrong or leak other people's |
+| **P171** | **WhatsApp, Message, Call** are under their numbers; with no number saved they are greyed | the buttons are missing or enabled with no number |
+| **P172** | **Call** → the card names the dialer and the number, Cancel is the default → **Open** → the **dialer opens with the number filled in and nothing is called** until you press call | it calls by itself, or the number is wrong |
+| **P173** | **Message** → the card → **Open** → your messaging app opens with the number and **an empty message** | text is pre-filled, or it sends |
+| **P174** | **WhatsApp** → the card → **Open** → a WhatsApp chat with that number opens and **nothing is sent**. If WhatsApp is not on the phone: *WhatsApp is not on this phone, so nothing opened* and **no browser opens** | a browser or web page opens, or it sends |
+| **P175** | **Cancel**, or the back button, on the card: nothing opens | something opens anyway |
+| **P176** | **What Orb may do** shows *Reach a person from their page*: **ON — every tap is confirmed**, *N opened — Orb sent nothing*; **Turn off** → the buttons then say it is turned off and nothing opens; your reminders are **unaffected** | the switch does not hold, or touches reminders |
+| **P177** | **Export and share journal**: for each tap an `orb.handoff.intent`; for each *Open* a `confirmed` then `released` with **`channel` only**; for each Cancel a `cancelled`; **no phone number anywhere in the file** | a number or name was recorded |
+
+#### The operator's protocol
+
+Pick **one real contact with a number saved** whom you are happy to open a chat or dial screen for — **you will not send or call anyone**; you only look at what opens, then back out.
+
+1. Install `orb-app-v36-reach.apk` over v35; open Orb once.
+2. **People** → search for that contact → tap them. Read the window: the numbers, the three buttons, the context lines, any dates ahead. *(P169–P171)*
+3. Tap **Call** → read the card → **Cancel**. *(P175)* Tap **Call** again → **Open** → look at the dialer, **do not press call**, go back to Orb. *(P172)*
+4. Tap **Message** → **Open** → look at the messaging app (empty message), go back, **do not send**. *(P173)*
+5. Tap **WhatsApp** → **Open** → look at the chat, go back, **send nothing**. *(P174)*
+6. **What Orb may do** → read the new line; tap **Turn off**; go back to the person and tap **Call**; then **What Orb may do → Turn on**. *(P176)*
+7. **Export and share journal**. *(P177)*
+

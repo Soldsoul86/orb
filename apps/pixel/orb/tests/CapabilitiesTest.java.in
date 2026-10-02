@@ -34,9 +34,9 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("five capabilities, each declared once and frozen");
+        Harness.suite("six capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.remind.local"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
@@ -53,6 +53,10 @@ final class CapabilitiesTest {
         Harness.equal("the screen read's words are pinned", pin(Capabilities.SCREEN_SAYS), "sha256:84f03c9fe03e2e86998ed1897d0694873086acc1dd541a499ff54fd7298f9e03");
         Harness.equal("the grants watch's words are pinned", pin(Capabilities.GRANTS_SAYS), "sha256:559ff8b71ce163ff7793114be79012cef725a64909e5cd48ac712d7e3fdeaab2");
         Harness.equal("the contacts read's words are pinned", pin(Capabilities.CONTACTS_SAYS), "sha256:6507721ef30337a1ac574c226ff8cf951e12f2e3f73b0dc7c55cf716aeb9f662");
+        Harness.equal("the hand-off's words are pinned", pin(Handoff.DECLARATION), "sha256:5a19d49a10a333e1560d36261ba05bb751d6fce82e2323f0666e4516038d59eb");
+        Harness.check("the hand-off is Act (reversible), switchable, and says it sends nothing and keeps no number",
+            Capabilities.byId(Handoff.CAPABILITY).tier.equals("Act (reversible)") && Capabilities.byId(Handoff.CAPABILITY).switchable
+            && Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number"));
         Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
             && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",
@@ -112,6 +116,16 @@ final class CapabilitiesTest {
         Harness.equal("a record from before the split says none by name, not -1", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail, "3 contacts looked at, 2 people tied by number or email, 0 only by a name");
         journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.contacts"));
         Harness.check("revoked: off", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF"));
+
+        Capabilities.Status handoffNever = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
+        Harness.check("the hand-off is on, every tap confirmed, and none opened yet", handoffNever.state.startsWith("ON") && handoffNever.lastAtMs < 0 && handoffNever.lastDetail.equals("none opened yet"));
+        journal.append(HandoffFacts.RELEASED, HandoffFacts.released("whatsapp"));
+        Capabilities.Status handoffUsed = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
+        Harness.check("a use: when, how many, and that Orb sent nothing — no channel, no number", handoffUsed.lastAtMs > 0 && handoffUsed.lastDetail.equals("1 opened — Orb sent nothing"));
+        Handoff.turnOff(journal);
+        Harness.check("turned off: off, and the reminders are not touched", Capabilities.status(Handoff.CAPABILITY, journal.readLines()).state.startsWith("OFF") && Reminders.enabled(journal.readLines()));
+        Handoff.turnOn(journal);
+        Harness.check("turned on again", Capabilities.status(Handoff.CAPABILITY, journal.readLines()).state.startsWith("ON"));
 
         Capabilities.Status watch = Capabilities.status(Capabilities.GRANTS, journal.readLines());
         Harness.check("the grants watch is always on, and has not yet looked", watch.state.equals("ALWAYS ON") && watch.lastAtMs < 0);
