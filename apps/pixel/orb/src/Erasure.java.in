@@ -139,6 +139,12 @@ final class Erasure {
         return m.find() ? m.group(1) : null;
     }
 
+    /** The event's own id, or null. */
+    static String eventId(String line) {
+        Matcher m = EVENT_ID.matcher(line);
+        return m.find() ? m.group(1) : null;
+    }
+
     /** The Attachment this event's content is, or null. */
     static String attachmentOf(String line) {
         int payload = line.indexOf("\"payload\":");

@@ -1,6 +1,6 @@
 # The phone's first action, and the gate it passes through — B5 + B4, first slice (proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b64, `orb-app-v28-gate.apk`; `DECISIONS.md` DR-20). As-built notes and deviations in §11.
 > Implements `ROADMAP.md` B5 (the Capability → Policy → permission gate) with the smallest honest B4 (a first thing Orb does for you) on top.
 > Contracts: `Capability.md`, `Policy.md`, `Action.md`; decisions DR-5 (the chain), DR-9, and the narrow ruling on standing authorization (`CLAIMS.md` §5 Ruling 1).
 > **No contract text changes.** This is the first *use* of contracts that have been Accepted and never exercised on the phone.
@@ -97,3 +97,15 @@ the package scan and assistant reads as declared capabilities (slice 3, closes A
 2. **The declaration** in §2 (tier *Act (reversible)*; lock-screen text generic; nothing leaves the phone).
 3. **The authorization reading** in §3: your confirmation of this exact reminder is the standing authorization, justified by *"a reminder must fire when you are not looking"*.
 4. **The Android permission:** `POST_NOTIFICATIONS` only, asked at first confirm; no exact alarms (so a reminder can be minutes late).
+
+## 11. As built
+
+- **Files.** `ActionFacts` (the only builder of these records), `Reminders` (the gate: pending, enabled, derived authorization, `decide`), `Remind` (doing what the gate allows; the alarm and the notification are reached only through two
+  small interfaces, so it runs off the phone), `ReminderNote`, `ReminderAlarms`, `ReminderNotifier` (the only file that shows a notification), `ReminderReceiver`, `MayDoActivity`; *Remind me…* in Recall's item dialog.
+- **Deviations** are recorded in `DECISIONS.md` DR-20: the core is Java, not Kotlin; the capability is on until turned off; reminders about an erased item are stopped at the erase *and* checked at release.
+- **Held by tests (790 phone-side checks, mutation-checked):** the declaration is pinned; the authorization is derived and stable; each refusal (permission withdrawn, turned off, item erased, reminder erased, already released, note unreadable) is
+  recorded with its reason and shows nothing; the release is on record **before** the notification is posted; not confirming is recorded as confirming is; withdrawing one and turning everything off; erasing the item stops its reminders and destroys their notes;
+  after a reboot alarms are set again and an overdue reminder is released late and recorded as late; a note erased before cannot be quietly kept again; a backup carries a note as words; **no word of a note is in the journal or on disk**; and source guards:
+  only `ReminderNotifier` touches the notification system, only `Remind` calls it, only `ReminderAlarms` touches the alarm clock, the manifest asks for `POST_NOTIFICATIONS` and no exact-alarm and no network.
+- **Not testable off the phone:** the pickers and cards, Android's permission question, the alarm actually waking, the notification on the lock screen.
+

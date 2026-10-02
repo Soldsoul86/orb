@@ -65,6 +65,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(backupButton);
 
+        // GATE_PHONE.md: everything Orb may do to the world, in one place, withdrawable.
+        Button mayDo = new Button(this);
+        mayDo.setText("What Orb may do");
+        mayDo.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, MayDoActivity.class)); }
+        });
+        root.addView(mayDo);
+
         // Step 7 / A8: read back, search, and erase what Orb remembered.
         Button recall = new Button(this);
         recall.setText("What Orb remembered");

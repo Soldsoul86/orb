@@ -1,0 +1,26 @@
+package @PKG@;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import java.io.IOException;
+
+/**
+ * An alarm fired. This does not decide anything: it hands the reminder to `Remind.release`, which asks the gate
+ * (`Reminders.decide`) at this moment and either shows it or records why not. Not exported — only Orb's own alarm reaches it.
+ */
+public final class ReminderReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent == null || !ReminderAlarms.FIRE.equals(intent.getAction())) return;
+        String id = intent.getStringExtra(ReminderAlarms.EXTRA_ID);
+        Orb orb = Orb.get();
+        Journal journal = orb == null ? null : orb.journal();
+        if (id == null || journal == null) return;
+        try {
+            Remind.release(context, journal, id, ReminderNotifier.permitted(context), System.currentTimeMillis(), new ReminderNotifier(context));
+        } catch (IOException unreadable) {
+            // History that cannot be read is not history that says "go ahead": nothing is shown. The next start tries again.
+        }
+    }
+}

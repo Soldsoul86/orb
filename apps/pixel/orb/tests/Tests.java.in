@@ -18,6 +18,7 @@ public final class Tests {
         SharedTextTest.run();
         RekeepTest.run();
         MentionsTest.run();
+        RemindersTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

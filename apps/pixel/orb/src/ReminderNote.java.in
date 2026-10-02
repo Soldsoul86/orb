@@ -1,0 +1,25 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * The words a person typed into a reminder, as the sealed document that holds them — never written anywhere in the
+ * clear. Its own header, so nothing mistakes it for a screen's text or a share's (`Recall.parse` does not accept it,
+ * and so a note is never listed in search).
+ */
+final class ReminderNote {
+    private ReminderNote() {}
+
+    static final String HEADER = "orb.reminder.note.v1";
+
+    static byte[] document(String text) {
+        return (HEADER + "\n---\n" + text).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The note's words, or null if these bytes are not a note. */
+    static String parse(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = HEADER + "\n---\n";
+        return s.startsWith(prefix) ? s.substring(prefix.length()) : null;
+    }
+}

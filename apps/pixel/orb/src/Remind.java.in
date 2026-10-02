@@ -1,0 +1,207 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Doing what the gate (`Reminders`) allows — the imperative half, written so it can run off the phone: the alarm and
+ * the notification are reached only through the two small interfaces below, which the app wires to Android and a test
+ * wires to a recorder.
+ *
+ * **Recorded first, then done** — the order `Erase` and `PackageAccess` keep. A release is written to the journal
+ * *before* the notification is posted, so there is never an action Orb took that history does not hold; a crash in
+ * between leaves a reminder recorded as issued and not shown, which fails toward doing less. Every path that does not
+ * release writes *why* (`refused`) — the refusals are what shows the gate works.
+ */
+final class Remind {
+    private Remind() {}
+
+    /** Posts the reminder. Android in the app; a recorder in tests. The only way anything reaches the notification. */
+    interface Notifier {
+        /** Shows it. `note` is the person's words, or null if they wrote none. */
+        void post(String note);
+    }
+
+    /** Sets and clears alarms. */
+    interface Scheduler {
+        void schedule(String confirmedId, long dueAtMs);
+        void cancel(String confirmedId);
+    }
+
+    /** The person confirmed this exact reminder: seal the note, record the confirmation, and say what it is. */
+    static final class Confirmed {
+        final Reminders.Reminder reminder;
+        /** Non-null when it could not be confirmed (`noteErased`, `journalFailed`). */
+        final String failure;
+
+        Confirmed(Reminders.Reminder reminder, String failure) {
+            this.reminder = reminder;
+            this.failure = failure;
+        }
+    }
+
+    /**
+     * Records the intent — the person has asked and is about to be shown the review card. Returns the event id of the
+     * intent, or null if it could not be written. `itemEventId` is the kept item it is about (the event's `causes`).
+     */
+    static String intend(Journal journal, String itemEventId, long dueAtMs, String zone, long versionCode) {
+        Map<String, Object> event = journal.append(ActionFacts.INTENT, ActionFacts.intent(dueAtMs, zone, versionCode),
+            itemEventId == null ? Collections.<String>emptyList() : Arrays.asList(itemEventId));
+        return event == null ? null : (String) event.get("id");
+    }
+
+    /** The person did not confirm. Recorded exactly as a confirmation is. */
+    static void cancel(Journal journal, String intentId, String reason) {
+        if (intentId == null) return;
+        journal.append(ActionFacts.CANCELLED, ActionFacts.cancelled(reason), Arrays.asList(intentId));
+    }
+
+    /**
+     * The person confirmed. The note (if any) is sealed first; only then is the confirmation written, citing the intent.
+     * If it cannot be written the note goes back — to *erased* if it was a re-keep of erased words, otherwise to nothing.
+     */
+    static Confirmed confirm(Context context, Journal journal, String intentId, String itemEventId, long dueAtMs, String zone, String note) {
+        String noteIdentity = null;
+        long noteBytes = 0L;
+        boolean sealedNow = false;
+        if (note != null && !note.isEmpty()) {
+            Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(ReminderNote.document(note)));
+            if (stored.identity == null) {
+                return new Confirmed(null, "erased".equals(stored.outcome) ? "noteErased" : "noteFailed");
+            }
+            noteIdentity = stored.identity;
+            noteBytes = stored.bytes;
+            sealedNow = "stored".equals(stored.outcome);
+        }
+        String authorization = Reminders.authorization(dueAtMs, itemEventId, noteIdentity);
+        Map<String, Object> event = journal.append(ActionFacts.CONFIRMED,
+            ActionFacts.confirmed(dueAtMs, zone, authorization, noteIdentity, noteBytes), Arrays.asList(intentId));
+        if (event == null) {
+            if (sealedNow) {
+                try {
+                    Attachments.discard(context, noteIdentity);
+                } catch (Exception leftBehind) {
+                    // Nothing cites it; the next erase pass cannot see it, which is why this path is tested.
+                }
+            }
+            return new Confirmed(null, "journalFailed");
+        }
+        String id = (String) event.get("id");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return new Confirmed(new Reminders.Reminder(id, (String) integrity.get("hash"), intentId, itemEventId, authorization,
+            noteIdentity, dueAtMs, ActionFacts.zoneOrUtc(zone)), null);
+    }
+
+    /** What a release attempt came to. */
+    static final String RELEASED = "released";
+    static final String SETTLED = "settled";
+    static final String FAILED = "failed";
+
+    /**
+     * The time has come. Asks the gate; releases or refuses, and **records which**. Returns `released`, `settled`
+     * (already dealt with: nothing written), `refused:<reason>` or `failed` (the record could not be written, so
+     * nothing was shown).
+     */
+    static String release(Context context, Journal journal, String confirmedId, boolean permissionOk, long nowMs, Notifier notifier) throws IOException {
+        List<String> lines = journal.readLines();
+        Reminders.Decision decision = Reminders.decide(lines, confirmedId, permissionOk, nowMs);
+        if (decision.settled) return SETTLED;
+        if (!decision.release) {
+            if (journal.append(ActionFacts.REFUSED, ActionFacts.refused(decision.reason), Arrays.asList(confirmedId)) == null) return FAILED;
+            return "refused:" + decision.reason;
+        }
+        String note = null;
+        if (decision.reminder.noteIdentity != null) {
+            byte[] bytes = null;
+            try {
+                bytes = Attachments.open(context, decision.reminder.noteIdentity);
+            } catch (Exception unreadable) {
+                bytes = null;
+            }
+            note = bytes == null ? null : ReminderNote.parse(bytes);
+            if (note == null) {
+                if (journal.append(ActionFacts.REFUSED, ActionFacts.refused(ActionFacts.NOTE_UNREADABLE), Arrays.asList(confirmedId)) == null) return FAILED;
+                return "refused:" + ActionFacts.NOTE_UNREADABLE;
+            }
+        }
+        // Recorded first: an action Orb took is never missing from history.
+        if (journal.append(ActionFacts.RELEASED, ActionFacts.released(decision.reminder.authorization, decision.lateMs), Arrays.asList(confirmedId)) == null) {
+            return FAILED;
+        }
+        notifier.post(note);
+        return RELEASED;
+    }
+
+    /** The person cancelled one pending reminder. */
+    static boolean withdraw(Journal journal, Reminders.Reminder reminder, Scheduler scheduler) {
+        scheduler.cancel(reminder.confirmedId);
+        return journal.append(ActionFacts.REVOKED, ActionFacts.revoked(ActionFacts.ONE), Arrays.asList(reminder.confirmedId)) != null;
+    }
+
+    /** The person turned the capability off: every pending reminder is withdrawn, each recorded, and none can be released. */
+    static int turnOff(Journal journal, Scheduler scheduler) throws IOException {
+        List<Reminders.Reminder> pending = Reminders.pending(journal.readLines());
+        // The switch first, so a reminder that fires in between is refused rather than shown.
+        journal.append(ActionFacts.REVOKED, ActionFacts.revoked(ActionFacts.ALL));
+        int n = 0;
+        for (Reminders.Reminder r : pending) if (withdraw(journal, r, scheduler)) n++;
+        return n;
+    }
+
+    /** The person turned it back on. */
+    static void turnOn(Journal journal) {
+        journal.append(ActionFacts.ALLOWED, ActionFacts.allowed());
+    }
+
+    /**
+     * A kept item was erased: the reminders about it are refused now (`itemErased`), their alarms cleared, and their
+     * sealed notes erased with them (`ERASURE.md` §3: erasure is a graph operation). Reminders already shown stay as history.
+     *
+     * @return how many pending reminders were stopped
+     */
+    static int itemErased(Context context, Journal journal, String itemEventId, Scheduler scheduler) throws IOException {
+        int n = 0;
+        for (Reminders.Reminder r : Reminders.aboutItem(journal.readLines(), itemEventId)) {
+            scheduler.cancel(r.confirmedId);
+            if (journal.append(ActionFacts.REFUSED, ActionFacts.refused(ActionFacts.ITEM_ERASED), Arrays.asList(r.confirmedId)) == null) continue;
+            n++;
+            // The note's only reader was this confirmation; declaring it erased destroys the note with it.
+            if (r.noteIdentity != null) Erase.execute(context, journal, r.confirmedHash);
+        }
+        return n;
+    }
+
+    /**
+     * At every start and at boot: set the alarm for each pending reminder, and release any whose time has already
+     * passed — late, and recorded as late, never silently dropped.
+     *
+     * @return how many were released late
+     */
+    static int rearm(Context context, Journal journal, boolean permissionOk, long nowMs, Scheduler scheduler, Notifier notifier) throws IOException {
+        int late = 0;
+        for (Reminders.Reminder r : Reminders.pending(journal.readLines())) {
+            if (r.dueAtMs > nowMs) {
+                scheduler.schedule(r.confirmedId, r.dueAtMs);
+            } else if (RELEASED.equals(release(context, journal, r.confirmedId, permissionOk, nowMs, notifier))) {
+                late++;
+            }
+        }
+        return late;
+    }
+
+    /** Pending reminders, soonest first — for the screen. */
+    static List<Reminders.Reminder> pending(Journal journal) {
+        try {
+            return Reminders.pending(journal.readLines());
+        } catch (IOException unreadable) {
+            return new ArrayList<>();
+        }
+    }
+}

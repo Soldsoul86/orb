@@ -1,0 +1,342 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The gate for the phone's first action (`docs/GATE_PHONE.md`): confirmed exactly, checked again at the moment, every
+ * refusal recorded with its reason, nothing authorizing itself, and no word of a note anywhere in the clear.
+ */
+final class RemindersTest {
+    private RemindersTest() {}
+
+    private static final String NOTE = "bring the red folder for the loan office";
+    private static final long DAY = 24L * 60L * 60L * 1000L;
+
+    /** A notification that only records that it was asked. */
+    static final class Recorder implements Remind.Notifier {
+        final List<String> posted = new ArrayList<>();
+        /** How many releases were already in the journal at the moment each notification was posted. */
+        final List<Integer> releasedWhenPosted = new ArrayList<>();
+        Journal watching;
+        @Override public void post(String note) {
+            posted.add(note == null ? "(no note)" : note);
+            int n = -1;
+            try {
+                if (watching != null) { n = 0; for (String l : watching.readLines()) if (ActionFacts.RELEASED.equals(Journal.typeOf(l))) n++; }
+            } catch (Exception unreadable) { n = -2; }
+            releasedWhenPosted.add(n);
+        }
+    }
+
+    /** An alarm clock that only records. */
+    static final class Alarms implements Remind.Scheduler {
+        final List<String> set = new ArrayList<>();
+        final List<String> cleared = new ArrayList<>();
+        @Override public void schedule(String id, long due) { set.add(id); }
+        @Override public void cancel(String id) { cleared.add(id); }
+    }
+
+    private static String idOf(Map<String, Object> event) { return (String) event.get("id"); }
+
+    private static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static Journal fresh(Context[] out, String name) throws Exception {
+        Install.forget();
+        out[0] = new Context(Files.createTempDirectory(name).toFile());
+        return Journal.open(out[0], Install.lane(out[0]), Install.id(out[0]));
+    }
+
+    /** A kept item, as a share of words — what a reminder is about. */
+    private static Map<String, Object> keep(Context context, Journal journal, String text) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, null);
+        return SharedText.record(journal, context, payload, stored, null);
+    }
+
+    /** What the screens do: intend, then confirm. Returns the reminder, or null. */
+    private static Reminders.Reminder remind(Context context, Journal journal, Map<String, Object> item, long dueAtMs, String note) {
+        String intent = Remind.intend(journal, idOf(item), dueAtMs, "Asia/Kolkata", 7L);
+        Remind.Confirmed done = Remind.confirm(context, journal, intent, idOf(item), dueAtMs, "Asia/Kolkata", note);
+        return done.reminder;
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static String lastOf(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) found = l;
+        return found;
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the capability is declared once and frozen");
+        Harness.equal("its identity", Reminders.CAPABILITY, "orb.remind.local");
+        Harness.equal("and version", Reminders.VERSION, 1L);
+        Harness.check("it says what it does and does not do",
+            Reminders.DECLARATION.contains("Nothing is sent off the phone and nothing is read") && Reminders.DECLARATION.contains("lock screen"));
+        Harness.equal("a change to the declaration is a different capability: this text is pinned",
+            Attachments.identity(Reminders.DECLARATION.getBytes(StandardCharsets.UTF_8)), "sha256:29f155dfc38ced6c8dccda30998d3d65e5c80df072c778d9756d150ed3a6de42");
+        Harness.check("the argument for acting in advance is part of what is authorized", Reminders.URGENCY.contains("when you are not looking"));
+
+        Harness.suite("an authorization is derived from what it authorizes");
+        String a1 = Reminders.authorization(1000L, "ITEM", "sha256:" + "a".repeat(64));
+        Harness.equal("the same reminder, the same identity", a1, Reminders.authorization(1000L, "ITEM", "sha256:" + "a".repeat(64)));
+        Harness.check("another time is another authorization", !a1.equals(Reminders.authorization(2000L, "ITEM", "sha256:" + "a".repeat(64))));
+        Harness.check("another item is another", !a1.equals(Reminders.authorization(1000L, "OTHER", "sha256:" + "a".repeat(64))));
+        Harness.check("another note is another", !a1.equals(Reminders.authorization(1000L, "ITEM", "sha256:" + "b".repeat(64))));
+        Harness.check("no note is another again", !a1.equals(Reminders.authorization(1000L, "ITEM", null)));
+        Harness.check("it is a content identity", a1.matches("sha256:[0-9a-f]{64}"));
+
+        Context[] box = new Context[1];
+        Journal journal = fresh(box, "orb-remind");
+        Context context = box[0];
+        File dir = context.getFilesDir();
+        Map<String, Object> item = keep(context, journal, "Meeting with the bank on Friday, loan file 12/10/2026");
+        long now = 1_800_000_000_000L;
+        long due = now + DAY;
+
+        Harness.suite("setting one: intent, then confirmation, each citing what it rests on");
+        String intentId = Remind.intend(journal, idOf(item), due, "Asia/Kolkata", 7L);
+        Harness.check("the intent is recorded and cites the item", intentId != null && lastOf(journal, ActionFacts.INTENT).contains("\"causes\":[\"" + idOf(item) + "\"]"));
+        Remind.Confirmed confirmed = Remind.confirm(context, journal, intentId, idOf(item), due, "Asia/Kolkata", NOTE);
+        Harness.check("the confirmation succeeds", confirmed.reminder != null && confirmed.failure == null);
+        String line = lastOf(journal, ActionFacts.CONFIRMED);
+        Harness.check("it cites the intent", line.contains("\"causes\":[\"" + intentId + "\"]"));
+        Harness.check("it carries the derived authorization and the argument for urgency",
+            line.contains("\"authorization\":\"" + Reminders.authorization(due, idOf(item), confirmed.reminder.noteIdentity) + "\"") && line.contains("when you are not looking"));
+        Harness.check("it names the sealed note and no word of it", line.contains("\"attachment\":\"sha256:") && !line.contains("red folder") && !line.contains("loan office"));
+        Harness.check("no word of the note is in the journal or on disk in the clear",
+            !contains(dir, "red folder".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "loan office".getBytes(StandardCharsets.UTF_8)));
+        List<Reminders.Reminder> pending = Reminders.pending(journal.readLines());
+        Harness.equal("one reminder is pending", pending.size(), 1);
+        Harness.check("with its time, zone, item and note", pending.get(0).dueAtMs == due && pending.get(0).zone.equals("Asia/Kolkata")
+            && idOf(item).equals(pending.get(0).itemEventId) && pending.get(0).noteIdentity != null);
+        Harness.check("a replay finds the same reminder with the same authorization",
+            Reminders.pending(journal.readLines()).get(0).authorization.equals(pending.get(0).authorization));
+        Harness.equal("a zone that is not a zone is UTC, never free text", ActionFacts.zoneOrUtc("../etc; rm"), "UTC");
+
+        Harness.suite("the time comes: asked again, shown once, recorded first");
+        Recorder shown = new Recorder();
+        shown.watching = journal;
+        Harness.equal("released, five seconds late", Remind.release(context, journal, pending.get(0).confirmedId, true, due + 5000L, shown), Remind.RELEASED);
+        Harness.equal("the notification carried the note", shown.posted, Arrays.asList(NOTE));
+        Harness.equal("and the release was already on record when it was shown", shown.releasedWhenPosted, Arrays.asList(1));
+        String released = lastOf(journal, ActionFacts.RELEASED);
+        Harness.check("the release cites the confirmation, says how late, and names the authorization",
+            released.contains("\"causes\":[\"" + pending.get(0).confirmedId + "\"]") && released.contains("\"lateMs\":5000") && released.contains(pending.get(0).authorization));
+        Harness.check("and says nothing of the words", !released.contains("red folder"));
+        Harness.equal("nothing is pending now", Reminders.pending(journal.readLines()).size(), 0);
+        Harness.equal("a second attempt is settled and writes nothing", Remind.release(context, journal, pending.get(0).confirmedId, true, due + 9000L, shown), Remind.SETTLED);
+        Harness.equal("and shows nothing again", shown.posted.size(), 1);
+        Harness.equal("one release on record", count(journal, ActionFacts.RELEASED), 1);
+
+        Harness.suite("every refusal is recorded with its reason, and nothing is shown");
+        // permission withdrawn
+        Reminders.Reminder r1 = remind(context, journal, item, due + 1, NOTE + " one");
+        Recorder none = new Recorder();
+        Harness.equal("Android's permission was withdrawn", Remind.release(context, journal, r1.confirmedId, false, due + 2, none), "refused:permissionWithdrawn");
+        Harness.check("recorded, citing the confirmation", lastOf(journal, ActionFacts.REFUSED) != null && lastOf(journal, ActionFacts.REFUSED).contains("\"reason\":\"permissionWithdrawn\"") && lastOf(journal, ActionFacts.REFUSED).contains(r1.confirmedId));
+        // switched off while it was pending (no per-reminder withdrawal written)
+        Reminders.Reminder r2 = remind(context, journal, item, due + 3, NOTE + " two");
+        journal.append(ActionFacts.REVOKED, ActionFacts.revoked(ActionFacts.ALL));
+        Harness.equal("the capability was turned off", Remind.release(context, journal, r2.confirmedId, true, due + 4, none), "refused:revoked");
+        Remind.turnOn(journal);
+        // the item was erased
+        Map<String, Object> other = keep(context, journal, "a different kept note about the garage");
+        Reminders.Reminder r3 = remind(context, journal, other, due + 5, NOTE + " three");
+        Harness.equal("erase the item", Erase.execute(context, journal, hashOf(other)).outcome, Erase.DESTROYED);
+        Harness.equal("what it was about is gone", Remind.release(context, journal, r3.confirmedId, true, due + 6, none), "refused:itemErased");
+        // the confirmation itself was erased
+        Reminders.Reminder r4 = remind(context, journal, item, due + 7, NOTE + " four");
+        Harness.equal("erase the reminder's note", Erase.execute(context, journal, r4.confirmedHash).outcome, Erase.DESTROYED);
+        boolean stillPending = false;
+        for (Reminders.Reminder p : Reminders.pending(journal.readLines())) if (p.confirmedId.equals(r4.confirmedId)) stillPending = true;
+        Harness.check("an erased reminder is no longer pending", !stillPending);
+        Harness.equal("a reminder that was erased is not shown", Remind.release(context, journal, r4.confirmedId, true, due + 8, none), "refused:cancelled");
+        // the same decision is never carried out twice
+        Reminders.Reminder r5 = remind(context, journal, item, due + 9, null);
+        Reminders.Reminder r6 = remind(context, journal, item, due + 9, null);
+        Harness.equal("two confirmations of exactly the same thing share an authorization", r5.authorization, r6.authorization);
+        Harness.equal("the first is released", Remind.release(context, journal, r5.confirmedId, true, due + 10, none), Remind.RELEASED);
+        Harness.equal("the second is the same decision: refused", Remind.release(context, journal, r6.confirmedId, true, due + 10, none), "refused:alreadyReleased");
+        Harness.equal("a reminder without a note shows the generic text", none.posted, Arrays.asList("(no note)"));
+        // the note cannot be read
+        Reminders.Reminder r7 = remind(context, journal, item, due + 11, NOTE + " seven");
+        Attachments.destroy(context, r7.noteIdentity);
+        Harness.equal("a note that is gone cannot be shown", Remind.release(context, journal, r7.confirmedId, true, due + 12, none), "refused:noteUnreadable");
+        Harness.equal("through all of that the only notification was the one that was allowed", none.posted.size(), 1);
+        Harness.equal("and each refusal is on record", count(journal, ActionFacts.REFUSED), 6);
+
+        Harness.suite("not confirming is recorded as confirming is");
+        int cancelledBefore = count(journal, ActionFacts.CANCELLED);
+        String declinedIntent = Remind.intend(journal, idOf(item), due, "Asia/Kolkata", 7L);
+        Remind.cancel(journal, declinedIntent, ActionFacts.DECLINED);
+        Harness.equal("one more cancellation on record", count(journal, ActionFacts.CANCELLED), cancelledBefore + 1);
+        Harness.check("citing the intent, with its reason", lastOf(journal, ActionFacts.CANCELLED).contains("\"causes\":[\"" + declinedIntent + "\"]") && lastOf(journal, ActionFacts.CANCELLED).contains("\"reason\":\"declined\""));
+        Remind.cancel(journal, Remind.intend(journal, idOf(item), due, "Asia/Kolkata", 7L), ActionFacts.PERMISSION_DENIED);
+        Harness.check("a denied permission says so", lastOf(journal, ActionFacts.CANCELLED).contains("\"reason\":\"permissionDenied\""));
+        Harness.equal("a cancelled intent is never pending", Reminders.pending(journal.readLines()).size(), 0);
+
+        Harness.suite("withdrawing one, and turning the whole capability off");
+        Journal j2 = fresh(box, "orb-remind-2");
+        Context c2 = box[0];
+        Map<String, Object> item2 = keep(c2, j2, "something to remember on 12/10/2026");
+        Alarms alarms = new Alarms();
+        Reminders.Reminder a = remind(c2, j2, item2, due, null);
+        Reminders.Reminder b = remind(c2, j2, item2, due + DAY, NOTE);
+        Harness.check("one withdrawn", Remind.withdraw(j2, a, alarms) && alarms.cleared.equals(Arrays.asList(a.confirmedId)));
+        Harness.check("recorded as one, citing it", lastOf(j2, ActionFacts.REVOKED).contains("\"scope\":\"one\"") && lastOf(j2, ActionFacts.REVOKED).contains(a.confirmedId));
+        Harness.equal("it can no longer be released", Remind.release(c2, j2, a.confirmedId, true, due + 1, new Recorder()), Remind.SETTLED);
+        Harness.equal("the other is still pending", Reminders.pending(j2.readLines()).size(), 1);
+        Harness.equal("turn it all off: one more withdrawn", Remind.turnOff(j2, alarms), 1);
+        Harness.check("the switch is recorded, then each withdrawal", count(j2, ActionFacts.REVOKED) == 3 && !Reminders.enabled(j2.readLines()));
+        Harness.equal("and its alarm was cleared", alarms.cleared, Arrays.asList(a.confirmedId, b.confirmedId));
+        Harness.equal("nothing is pending", Reminders.pending(j2.readLines()).size(), 0);
+        Remind.turnOn(j2);
+        Harness.check("turned back on, and recorded", Reminders.enabled(j2.readLines()) && count(j2, ActionFacts.ALLOWED) == 1);
+
+        Harness.suite("erasing what a reminder is about stops it, and says why");
+        Journal j3 = fresh(box, "orb-remind-3");
+        Context c3 = box[0];
+        Map<String, Object> item3 = keep(c3, j3, "the dentist on 12/10/2026");
+        Map<String, Object> keepMe = keep(c3, j3, "an unrelated kept note");
+        Alarms alarms3 = new Alarms();
+        Reminders.Reminder about = remind(c3, j3, item3, due, NOTE + " dentist");
+        Reminders.Reminder unrelated = remind(c3, j3, keepMe, due, NOTE + " other");
+        Harness.equal("two pending, one about each item", Reminders.pending(j3.readLines()).size(), 2);
+        Harness.equal("erase the dentist note", Erase.execute(c3, j3, hashOf(item3)).outcome, Erase.DESTROYED);
+        Harness.equal("one reminder stopped", Remind.itemErased(c3, j3, idOf(item3), alarms3), 1);
+        Harness.equal("its alarm cleared", alarms3.cleared, Arrays.asList(about.confirmedId));
+        Harness.check("refused with the reason, citing the reminder", lastRefusedReason(j3).equals("itemErased"));
+        Harness.equal("its note is destroyed with it", Attachments.state(c3, about.noteIdentity), Attachments.DESTROYED_STATE);
+        Harness.equal("the unrelated reminder is untouched", Reminders.pending(j3.readLines()).size(), 1);
+        Harness.equal("and its note is still held", Attachments.state(c3, unrelated.noteIdentity), Attachments.HELD_STATE);
+        Harness.equal("the stopped one can never be released", Remind.release(c3, j3, about.confirmedId, true, due + 1, new Recorder()), Remind.SETTLED);
+
+        Harness.suite("after a reboot: alarms are set again, and what is overdue is released late");
+        Journal j4 = fresh(box, "orb-remind-4");
+        Context c4 = box[0];
+        Map<String, Object> item4 = keep(c4, j4, "pay the bill on 12/10/2026");
+        Reminders.Reminder soon = remind(c4, j4, item4, now + DAY, null);
+        Reminders.Reminder overdue = remind(c4, j4, item4, now - 3_600_000L, NOTE + " overdue");
+        Alarms boot = new Alarms();
+        Recorder lateShown = new Recorder();
+        Harness.equal("one released late", Remind.rearm(c4, j4, true, now, boot, lateShown), 1);
+        Harness.equal("the one in the future gets its alarm", boot.set, Arrays.asList(soon.confirmedId));
+        Harness.equal("the overdue one was shown, with its note", lateShown.posted, Arrays.asList(NOTE + " overdue"));
+        Harness.check("and recorded as late by an hour", lastOf(j4, ActionFacts.RELEASED).contains("\"lateMs\":3600000"));
+        Alarms again = new Alarms();
+        Harness.equal("a second start releases nothing more", Remind.rearm(c4, j4, true, now, again, lateShown), 0);
+        Harness.equal("and sets the same alarm again", again.set, Arrays.asList(soon.confirmedId));
+        Harness.equal("overdue but with no permission: refused, recorded, never silently dropped", count(j4, ActionFacts.REFUSED), 0);
+        Reminders.Reminder overdue2 = remind(c4, j4, item4, now - 1000L, null);
+        Harness.equal("it is refused when permission is gone", Remind.rearm(c4, j4, false, now, new Alarms(), new Recorder()), 0);
+        Harness.check("and the refusal says so", lastRefusedReason(j4).equals("permissionWithdrawn") && overdue2 != null);
+
+        Harness.suite("a note that was erased cannot be quietly kept again");
+        Journal j5 = fresh(box, "orb-remind-5");
+        Context c5 = box[0];
+        Map<String, Object> item5 = keep(c5, j5, "the school form on 12/10/2026");
+        Reminders.Reminder first = remind(c5, j5, item5, due, NOTE + " school");
+        Erase.execute(c5, j5, first.confirmedHash);
+        String intent5 = Remind.intend(j5, idOf(item5), due, "Asia/Kolkata", 7L);
+        Remind.Confirmed refused = Remind.confirm(c5, j5, intent5, idOf(item5), due, "Asia/Kolkata", NOTE + " school");
+        Harness.check("the same note is refused, so the card can say why", refused.reminder == null && "noteErased".equals(refused.failure));
+
+        Harness.suite("a backup carries a reminder's note as words");
+        Backup.Plan plan = Backup.plan(c3, j3.readLines(), false);
+        boolean hasKey = false;
+        for (Backup.Entry e : plan.entries) if (e.name.startsWith("key/")) hasKey = true;
+        Harness.check("with pictures off, the note's key is in", hasKey && plan.skippedPictures == 0);
+
+        guard();
+    }
+
+    private static String lastRefusedReason(Journal journal) throws Exception {
+        String line = lastOf(journal, ActionFacts.REFUSED);
+        int at = line.indexOf("\"reason\":\"");
+        return at < 0 ? "" : line.substring(at + 10, line.indexOf('"', at + 10));
+    }
+
+    /** The action boundary is held by reading the source: one file shows, one file sets alarms, one file builds records. */
+    private static void guard() throws Exception {
+        Harness.suite("nothing reaches the notification except through the gate");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (!name.endsWith(".java.in")) continue;
+                source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> showing = new ArrayList<>();
+        List<String> posting = new ArrayList<>();
+        List<String> alarming = new ArrayList<>();
+        List<String> constructing = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) {
+            String t = e.getValue();
+            if (t.contains("NotificationManager") || t.contains("Notification.Builder") || t.contains("NotificationChannel")) showing.add(e.getKey());
+            if (t.contains("notifier.post(")) posting.add(e.getKey());
+            if (t.contains("AlarmManager")) alarming.add(e.getKey());
+            if (t.contains("new ReminderNotifier(")) constructing.add(e.getKey());
+        }
+        Harness.equal("only ReminderNotifier touches the notification system", showing.toString(), "[ReminderNotifier]");
+        Harness.equal("only Remind calls the notifier, and only from release", posting.toString(), "[Remind]");
+        Harness.equal("only ReminderAlarms touches the alarm clock", alarming.toString(), "[ReminderAlarms]");
+        Harness.equal("the notifier is made only where a release is wired: start-up and the alarm's receiver", constructing.toString(), "[Orb, ReminderReceiver]");
+        Harness.check("the decision touches no Android", !source.get("Reminders").contains("android.") && !source.get("ActionFacts").contains("android."));
+        for (String name : Arrays.asList("Remind", "Reminders", "ReminderNotifier", "ReminderAlarms", "ReminderReceiver", "MayDoActivity", "ReminderNote")) {
+            String t = source.get(name);
+            Harness.check(name + " builds no record of its own and logs nothing",
+                !t.contains("Json.obj(") && !t.contains(".put(\"") && !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace"));
+        }
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("the notification permission is asked for, and no exact-alarm permission", manifest.contains("android.permission.POST_NOTIFICATIONS")
+            && !manifest.contains("SCHEDULE_EXACT_ALARM") && !manifest.contains("USE_EXACT_ALARM"));
+        Harness.check("the alarm's receiver is not exported", manifest.contains("android:name=\".ReminderReceiver\"\n            android:exported=\"false\""));
+        Harness.check("the app still asks for no network", !manifest.contains("android.permission.INTERNET"));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

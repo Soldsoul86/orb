@@ -1,0 +1,43 @@
+package @PKG@;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+
+/**
+ * Sets and clears the alarm for a confirmed reminder (`docs/GATE_PHONE.md` §5).
+ *
+ * **No exact-alarm permission.** `setAndAllowWhileIdle` needs none, and costs the reminder being up to a few minutes late
+ * while the phone dozes — which the confirmation card says. The alarm only *wakes `ReminderReceiver`*; whether anything
+ * is shown is decided there, at that moment, by the gate. Alarms do not survive a reboot or an update, so `Remind.rearm`
+ * sets them again from the journal at every start.
+ */
+final class ReminderAlarms implements Remind.Scheduler {
+    static final String FIRE = "orb.remind.fire";
+    static final String EXTRA_ID = "confirmedId";
+
+    private final Context context;
+
+    ReminderAlarms(Context context) {
+        this.context = context;
+    }
+
+    private PendingIntent pendingFor(String confirmedId) {
+        Intent intent = new Intent(context, ReminderReceiver.class).setAction(FIRE).putExtra(EXTRA_ID, confirmedId);
+        return PendingIntent.getBroadcast(context, confirmedId.hashCode(), intent,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    @Override
+    public void schedule(String confirmedId, long dueAtMs) {
+        AlarmManager alarms = context.getSystemService(AlarmManager.class);
+        if (alarms != null) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueAtMs, pendingFor(confirmedId));
+    }
+
+    @Override
+    public void cancel(String confirmedId) {
+        AlarmManager alarms = context.getSystemService(AlarmManager.class);
+        if (alarms != null) alarms.cancel(pendingFor(confirmedId));
+    }
+}

@@ -1119,6 +1119,26 @@ The kinds are phones (India first), sites, emails, UPI ids, amounts and dates th
 **Contract note.** `Entity.md` §2 gained one sentence: *a resolution that can be recomputed from sealed content is not recorded in a journal that cannot seal it.*
 
 
+## DR-20 — The phone's first action: a reminder you set, through a gate that records what it stops
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with the design") on `GATE_PHONE.md` ·
+  **Bears on:** `contracts/Capability.md`, `contracts/Policy.md`, `contracts/Action.md`, DR-5, `ARCHITECTURAL_DEBT.md` AD-7/AD-18
+
+**The ruling.** Orb's first action is **`orb.remind.local` v1** — *one notification on this phone, at a time you chose, that you asked for; nothing sent, nothing read.* It is declared once and
+frozen (a test pins the declaration's text; a change is a new capability). **Your confirmation of exactly this reminder is the authorization** — a standing one, justified by the narrow ruling
+(`Policy.md`, `CLAIMS.md` §5 Ruling 1) because *a reminder exists to appear when you are not looking*; that argument is written into the confirmation record. Its identity is derived from what it
+authorizes (capability, version, time, item, note), never minted at use. **At the moment of release the gate asks again**, against history: still wanted, still on, the item not erased, Android's
+permission still there, the note readable, and not already done. Each refusal is recorded **with its reason**.
+
+**Android.** `POST_NOTIFICATIONS` only, asked at the first confirmation. **No exact-alarm permission**: a reminder may be minutes late while the phone dozes, and the card says so.
+
+**Deviations from the design, recorded.** (1) The gate's pure core is **Java** (`Reminders`, `ActionFacts`, `Remind`), not Kotlin as `GATE_PHONE.md` §8 said: it is policy over the journal's own text fields, the same shape as
+`Erasure` and `AllowList`, not reasoning (DR-16's Kotlin is for reasoning layers). (2) The capability is **on until the person turns it off**; creating a reminder is itself the authorization. (3) Reminders about an erased item are
+stopped **at the erase** (alarm cleared, refused `itemErased`, note destroyed) *and* checked again at release. (4) The notification's text, once shown, is held by Android like any app's — stated, not hidden.
+
+**Not done:** Orb *proposing* a reminder (next slice, through this gate); the result (that you saw it — `Capability.md` inv. 7); the package scan and the assistant's reads as declared capabilities (AD-7, slice 3).
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

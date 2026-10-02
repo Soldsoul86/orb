@@ -153,7 +153,7 @@ final class Backup {
             if (item.erased) continue;
             boolean[] kinds = kept.get(item.identity);
             if (kinds == null) { kinds = new boolean[2]; kept.put(item.identity, kinds); }
-            if (AssistFacts.CAPTURED.equals(item.type) || sharedWords.contains(item.hash)) kinds[0] = true; else kinds[1] = true;
+            if (AssistFacts.CAPTURED.equals(item.type) || ActionFacts.CONFIRMED.equals(item.type) || sharedWords.contains(item.hash)) kinds[0] = true; else kinds[1] = true;
         }
 
         StringBuilder journal = new StringBuilder();

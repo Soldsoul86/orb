@@ -1,0 +1,115 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.graphics.Typeface;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * What Orb may do — the capability as it was declared, in plain words, the reminders waiting, and the switch
+ * (`docs/GATE_PHONE.md` §5). **The same sentences the gate is held to.** Anything Orb does to the world is listed here and
+ * can be withdrawn here; turning it off cancels every pending reminder, each one recorded.
+ *
+ * Secure like Recall: a reminder's note is the person's own words.
+ */
+public final class MayDoActivity extends Activity {
+    private LinearLayout list;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("What Orb may do", 17, true));
+        final Orb app = Orb.get();
+        final Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        List<String> lines;
+        try {
+            lines = journal.readLines();
+        } catch (IOException error) {
+            list.addView(text("read failed: " + error, 13, false));
+            return;
+        }
+
+        list.addView(text("Remind me", 15, true));
+        list.addView(text(Reminders.DECLARATION, 13, false));
+        list.addView(text(Reminders.CAPABILITY + " · version " + Reminders.VERSION, 11, false));
+
+        final boolean on = Reminders.enabled(lines);
+        list.addView(text(on ? "Orb may remind me: ON" : "Orb may remind me: OFF", 14, true));
+        Button toggle = new Button(this);
+        toggle.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                try {
+                    if (on) Remind.turnOff(journal, new ReminderAlarms(MayDoActivity.this));
+                    else Remind.turnOn(journal);
+                } catch (IOException ignored) {
+                    // Nothing changed if the history cannot be read.
+                }
+                render();
+            }
+        });
+        list.addView(toggle);
+
+        List<Reminders.Reminder> pending = Reminders.pending(lines);
+        list.addView(text(pending.isEmpty() ? "No reminders waiting." : pending.size() + (pending.size() == 1 ? " reminder waiting" : " reminders waiting"), 14, true));
+        SimpleDateFormat when = new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault());
+        for (final Reminders.Reminder r : pending) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 16, 0, 16);
+            row.addView(text(when.format(new Date(r.dueAtMs)) + (r.noteIdentity == null ? "" : "  ·  with a note"), 14, false));
+            Button cancel = new Button(this);
+            cancel.setText("Cancel this reminder");
+            cancel.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    Remind.withdraw(journal, r, new ReminderAlarms(MayDoActivity.this));
+                    render();
+                }
+            });
+            row.addView(cancel);
+            list.addView(row);
+        }
+        list.addView(text("Orb records every reminder it is asked for, confirms, shows, refuses or cancels. The words of a note are sealed and never in that record. "
+            + "When a reminder is shown, Android holds its text like any app's notification until you dismiss it.", 12, false));
+    }
+}

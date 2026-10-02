@@ -1,0 +1,240 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * The gate for the phone's first action — a reminder you set (`docs/GATE_PHONE.md`, DR-5, `Capability.md`, `Policy.md`).
+ * The part that decides, and touches no Android.
+ *
+ * **Declared once, then frozen.** `orb.remind.local` v1: *shows one notification on this phone, at a time you chose,
+ * that you asked for.* Nothing is sent off the phone; nothing is read. A change to what it may do is a **new**
+ * capability, not an edit of this one (`Capability.md` §5).
+ *
+ * **Nothing authorizes itself.** The capability declares consequence; what permits it is *your* confirmation of
+ * exactly this reminder, and that confirmation is a standing authorization because — and only because — a reminder exists to
+ * appear when you are not looking (`Policy.md`, `CLAIMS.md` §5 Ruling 1). The argument is written into what is authorized.
+ * Its identity is **derived from what it authorizes**, never minted at the moment of use, so replay gives the same one.
+ *
+ * **Everything here is a projection over the journal.** What is pending, whether the capability is on, and whether a
+ * release may happen are read from the lines; nothing is stored beside them, so a reboot, a restore and a replay all
+ * agree. Canonical JSON, so each field sits where `Erasure` and `AllowList` look for it.
+ */
+final class Reminders {
+    private Reminders() {}
+
+    static final String CAPABILITY = "orb.remind.local";
+    static final long VERSION = 1L;
+
+    /** The declaration, in the words a person reads (`What Orb may do`). Frozen with the version. */
+    static final String DECLARATION =
+        "Shows one notification on this phone, at a time you chose, that you asked for. "
+        + "Nothing is sent off the phone and nothing is read. On the lock screen it says only that a reminder you set is due; "
+        + "the words appear once the phone is unlocked. You can cancel any reminder, or turn this off, at any time.";
+
+    /** Why a confirmation stands in advance: the narrow ruling's required argument. */
+    static final String URGENCY =
+        "A reminder exists to appear when you are not looking; asking again at the moment it fires would defeat it.";
+
+    private static final Pattern CAUSES = Pattern.compile("^\\{\"causes\":\\[([^\\]]*)\\]");
+    private static final Pattern DUE = Pattern.compile("\"dueAtUtcMs\":(\\d+)");
+    private static final Pattern ZONE = Pattern.compile("\"zone\":\"([^\"\\\\]*)\"");
+    private static final Pattern AUTH = Pattern.compile("\"authorization\":\"(sha256:[0-9a-f]{64})\"");
+    private static final Pattern SCOPE = Pattern.compile("\"scope\":\"(one|all)\"");
+
+    /** One confirmed reminder, as history shows it. */
+    static final class Reminder {
+        final String confirmedId;
+        final String confirmedHash;
+        final String intentId;
+        /** The kept item it is about (the intent's cause), or null. */
+        final String itemEventId;
+        final String authorization;
+        /** The sealed note's identity, or null if it has none. */
+        final String noteIdentity;
+        final long dueAtMs;
+        final String zone;
+
+        Reminder(String confirmedId, String confirmedHash, String intentId, String itemEventId, String authorization,
+                 String noteIdentity, long dueAtMs, String zone) {
+            this.confirmedId = confirmedId;
+            this.confirmedHash = confirmedHash;
+            this.intentId = intentId;
+            this.itemEventId = itemEventId;
+            this.authorization = authorization;
+            this.noteIdentity = noteIdentity;
+            this.dueAtMs = dueAtMs;
+            this.zone = zone;
+        }
+    }
+
+    /** What the gate says about releasing one reminder now. */
+    static final class Decision {
+        /** The reminder was already released, refused or withdrawn: nothing more to do or to record. */
+        final boolean settled;
+        final boolean release;
+        /** Why not, when it is not released and not settled. */
+        final String reason;
+        final long lateMs;
+        final Reminder reminder;
+
+        private Decision(boolean settled, boolean release, String reason, long lateMs, Reminder reminder) {
+            this.settled = settled;
+            this.release = release;
+            this.reason = reason;
+            this.lateMs = lateMs;
+            this.reminder = reminder;
+        }
+    }
+
+    // ---- reading the lines
+
+    static List<String> causesOf(String line) {
+        Matcher m = CAUSES.matcher(line);
+        if (!m.find() || m.group(1).isEmpty()) return Collections.emptyList();
+        List<String> out = new ArrayList<>();
+        for (String part : m.group(1).split(",")) out.add(part.replace("\"", "").trim());
+        return out;
+    }
+
+    private static String payloadField(Pattern pattern, String line) {
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return null;
+        Matcher m = pattern.matcher(line);
+        return m.find(payload) ? m.group(1) : null;
+    }
+
+    private static String firstCause(String line) {
+        List<String> causes = causesOf(line);
+        return causes.isEmpty() ? null : causes.get(0);
+    }
+
+    /** Whether the capability is on: the last of *allowed* and *revoked (all)* wins; on until the person says otherwise. */
+    static boolean enabled(List<String> lines) {
+        boolean on = true;
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            if (ActionFacts.ALLOWED.equals(type)) on = true;
+            else if (ActionFacts.REVOKED.equals(type) && ActionFacts.ALL.equals(payloadField(SCOPE, line))) on = false;
+        }
+        return on;
+    }
+
+    /** The authorization's identity: derived from what it authorizes. The same reminder, the same identity, on every replay. */
+    static String authorization(long dueAtMs, String itemEventId, String noteIdentity) {
+        String basis = CAPABILITY + "\n" + VERSION + "\n" + dueAtMs + "\n" + (itemEventId == null ? "" : itemEventId)
+            + "\n" + (noteIdentity == null ? "" : noteIdentity);
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(basis.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder("sha256:");
+            for (byte b : digest) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException unreachable) {
+            throw new IllegalStateException(unreachable);
+        }
+    }
+
+    /** Ids of the confirmed reminders that have been released, refused or withdrawn one at a time. */
+    private static Set<String> settled(List<String> lines) {
+        Set<String> out = new HashSet<>();
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            boolean settles = ActionFacts.RELEASED.equals(type) || ActionFacts.REFUSED.equals(type)
+                || (ActionFacts.REVOKED.equals(type) && ActionFacts.ONE.equals(payloadField(SCOPE, line)));
+            if (settles) {
+                String cited = firstCause(line);
+                if (cited != null) out.add(cited);
+            }
+        }
+        return out;
+    }
+
+    /** Every confirmed reminder in these lines, oldest first, settled or not. */
+    private static List<Reminder> confirmed(List<String> lines) {
+        Map<String, String> intentItem = new HashMap<>();
+        for (String line : lines) {
+            if (ActionFacts.INTENT.equals(Journal.typeOf(line))) intentItem.put(Erasure.eventId(line), firstCause(line));
+        }
+        List<Reminder> out = new ArrayList<>();
+        for (String line : lines) {
+            if (!ActionFacts.CONFIRMED.equals(Journal.typeOf(line))) continue;
+            String id = Erasure.eventId(line);
+            String hash = Erasure.envelopeHash(line);
+            String due = payloadField(DUE, line);
+            String auth = payloadField(AUTH, line);
+            String intent = firstCause(line);
+            if (id == null || hash == null || due == null || auth == null || intent == null) continue;
+            String zone = payloadField(ZONE, line);
+            out.add(new Reminder(id, hash, intent, intentItem.get(intent), auth, Erasure.attachmentOf(line),
+                Long.parseLong(due), zone == null ? "UTC" : zone));
+        }
+        return out;
+    }
+
+    /** The reminders still waiting to be released: confirmed, not settled, not erased. Oldest due first. */
+    static List<Reminder> pending(List<String> lines) {
+        Set<String> settled = settled(lines);
+        Set<String> erased = Erasure.erasedHashes(lines);
+        List<Reminder> out = new ArrayList<>();
+        for (Reminder r : confirmed(lines)) {
+            if (!settled.contains(r.confirmedId) && !erased.contains(r.confirmedHash)) out.add(r);
+        }
+        Collections.sort(out, new java.util.Comparator<Reminder>() {
+            @Override public int compare(Reminder a, Reminder b) { return Long.compare(a.dueAtMs, b.dueAtMs); }
+        });
+        return out;
+    }
+
+    /** The pending reminders that are about one kept item. */
+    static List<Reminder> aboutItem(List<String> lines, String itemEventId) {
+        List<Reminder> out = new ArrayList<>();
+        for (Reminder r : pending(lines)) if (itemEventId != null && itemEventId.equals(r.itemEventId)) out.add(r);
+        return out;
+    }
+
+    /** Whether the kept item with this event id has been declared erased. */
+    private static boolean itemErased(List<String> lines, String itemEventId) {
+        if (itemEventId == null) return false;
+        Set<String> erased = Erasure.erasedHashes(lines);
+        for (String line : lines) {
+            if (itemEventId.equals(Erasure.eventId(line))) {
+                String hash = Erasure.envelopeHash(line);
+                return hash != null && erased.contains(hash);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether this reminder may be released now, and if not why not — checked **at the moment of release**, against
+     * history, because the person may have changed their mind, turned it off, erased what it was about or withdrawn
+     * Android's permission since they confirmed. Order matters and is the order of the reasons in the docs.
+     */
+    static Decision decide(List<String> lines, String confirmedId, boolean permissionOk, long nowMs) {
+        Reminder found = null;
+        for (Reminder r : confirmed(lines)) if (r.confirmedId.equals(confirmedId)) found = r;
+        if (found == null) return new Decision(true, false, null, 0L, null);
+        if (settled(lines).contains(confirmedId)) return new Decision(true, false, null, 0L, found);
+
+        // The same decision is never carried out twice (Capability.md inv. 9).
+        for (String line : lines) {
+            if (ActionFacts.RELEASED.equals(Journal.typeOf(line)) && found.authorization.equals(payloadField(AUTH, line))) {
+                return new Decision(false, false, ActionFacts.ALREADY_RELEASED, 0L, found);
+            }
+        }
+        if (Erasure.erasedHashes(lines).contains(found.confirmedHash)) return new Decision(false, false, ActionFacts.CANCELLED_R, 0L, found);
+        if (!enabled(lines)) return new Decision(false, false, ActionFacts.REVOKED_R, 0L, found);
+        if (itemErased(lines, found.itemEventId)) return new Decision(false, false, ActionFacts.ITEM_ERASED, 0L, found);
+        if (!permissionOk) return new Decision(false, false, ActionFacts.PERMISSION_WITHDRAWN, 0L, found);
+        return new Decision(false, true, null, Math.max(0L, nowMs - found.dueAtMs), found);
+    }
+}

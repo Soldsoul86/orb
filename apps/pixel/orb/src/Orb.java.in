@@ -93,6 +93,15 @@ public final class Orb extends Application {
         // refuses to write if any line cannot be read; never blocks launching.
         Observe.run(journal);
 
+        // Reminders: set the alarms again (they do not survive a reboot or an update) and release any whose time has
+        // passed — late, and recorded as late. The gate decides each one (`Remind`, `Reminders`); never blocks launching.
+        try {
+            Remind.rearm(this, journal, ReminderNotifier.permitted(this), System.currentTimeMillis(),
+                new ReminderAlarms(this), new ReminderNotifier(this));
+        } catch (IOException unreadable) {
+            // History that cannot be read releases nothing.
+        }
+
         // Ported from pass 2 B (§7b36). The grant reads cost nothing and run
         // unconditionally; the package scan is gated by `PackageAccess`.
         watch = new Watch(this, journal);

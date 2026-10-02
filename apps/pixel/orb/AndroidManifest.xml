@@ -40,6 +40,10 @@
     <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Reminders (docs/GATE_PHONE.md): to show the notification the person asked for, and nothing else.
+         Asked at the first confirmation, with a sentence saying why. No exact-alarm permission: a reminder
+         may be a few minutes late while the phone dozes, and the confirmation card says so. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 @QUERY_ALL_PACKAGES@
 
     <!--
@@ -93,6 +97,15 @@
 
         <activity
             android:name=".BackupActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MayDoActivity"
+            android:exported="false" />
+
+        <!-- An alarm Orb set for a reminder the person confirmed. Not exported: only Orb's own alarm reaches it. -->
+        <receiver
+            android:name=".ReminderReceiver"
             android:exported="false" />
 
         <activity

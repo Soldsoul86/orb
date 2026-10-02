@@ -6311,3 +6311,51 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 | Erasure | The operator erased the **first** share (the one with the handles), not the second as the protocol said, so the P114 check ran the other way round: erase the item that held the handles, then look at what is left. |
 | **P110–P115** | **Not visible in an export** (they are what the screen shows). No comment was sent with the file; the operator then reported *"Everything worked as intended"* on the phone, so they are **confirmed on the operator's word** (an export cannot show them). |
 | P92, P105 | Not shown: no refused share and no restore attempt in this export. |
+
+
+### 7b64. The phone's first action, through a gate — B5 + B4 slice 1 (DR-20) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v28-gate.apk`. v27 is §7b63 (verified). Design: `docs/GATE_PHONE.md`; decision `DECISIONS.md` DR-20; limits `ARCHITECTURAL_DEBT.md` AD-18.
+
+#### What changed
+
+1. **Remind me…** in Recall's item dialog (remembered screens and shared text). Pick a date (it starts from a date the words name, else tomorrow) and a time, add an optional note, and a **review card** says exactly what will happen — *Orb will show a
+   notification on this phone on … Nothing is sent anywhere; it may come a few minutes late if the phone is dozing.* **Cancel is the default.** The first confirmation asks Android's notification permission, with nothing else requested.
+2. **A gate, recorded whole.** Each step is a journal event of ids, times and identities — never words: `orb.action.intent` (cites the item), `confirmed` (derived authorization, the argument for acting in advance, the sealed note) or `cancelled`,
+   then at the time `released` (and how late) or `refused` **with the reason**; `revoked` when you withdraw one or turn it off. The note is sealed; the journal holds no word of it.
+3. **Asked again at the moment.** When the time comes the gate checks history: still wanted, switched on, the item not erased, Android's permission still granted, the note readable, and not already done. Otherwise **nothing is shown** and the reason is recorded.
+4. **What Orb may do** (main screen): the capability in plain words, whether it is **on**, the reminders waiting (cancel any), and a switch that cancels all of them. Erasing the item a reminder is about stops it and destroys its note.
+5. **Reboot-proof.** Pending reminders are a projection over the journal; at every start Orb sets the alarms again and releases any that are overdue — late, and recorded as late.
+6. The lock screen shows only *"A reminder you set"*; the note appears once unlocked. Once shown, Android holds the text like any app's notification (AD-18).
+
+#### Checked before the device
+
+- 790 phone-side checks (was 697): the list in `GATE_PHONE.md` §11 — the declaration pinned; derived authorization; every refusal recorded and nothing shown; **recorded before shown**; cancel recorded as confirm is; withdraw one / turn all off; erase stops reminders and destroys notes; reboot re-arming and late release;
+  no word of a note in the journal or on disk; source guards (one file shows, one calls it, one sets alarms; the manifest asks for the notification permission only, no exact-alarm, no network).
+- Mutation-checked, 21 ways (each check of the gate removed in turn — the settled check, already-released, item erased, permission, switched off, reminder erased; the note and time in the derived authorization; the lateness; the order record-then-show; the record of a refusal; the citations; the destruction of a note with its item; re-arming; turning everything off; the urgency argument; a backup carrying a note). **Two survived at first and were fixed:** *an erased reminder still listed as pending* (no test looked at the list) and *a refusal that was not recorded* (it was only caught by crashing a later check, now a named failure). A third, *recorded before shown*, was added while writing the tests because no check could see the order — the notifier now looks at the journal at the moment it is asked to show.
+- A TypeScript reading of a **phone-written fixture** (`tests/fixtures/action-export.txt`, 15 events from `Remind` and `ActionFacts` on real keys): the lane verifies, every kind of record is there including the cancel and the refusal, lineage is in `causes`, each record carries only the fields it may, the argument for acting in advance is in every confirmation, and **no word of a note is in the file**; the desk imports it whole and observes only the share. 492 TypeScript checks (was 482).
+- **Not testable off the phone:** the pickers and cards, the permission question, the alarm waking, the notification on the lock screen.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P117** | The main screen has **What Orb may do**; it shows the declaration, *Orb may remind me: ON* and *No reminders waiting* | the screen or the declaration is missing |
+| **P118** | **Remind me…** on a kept item, a time 3 minutes ahead, a note, **Confirm**: Android asks for notification permission once; allow it; *Reminder set*. The export has `intent` (citing the item), `confirmed` (an `authorization`, an `urgency`, an `attachment`) and **none of the note's words** | the chain is wrong or leaks |
+| **P119** | At the time (within a few minutes) the notification appears; **locked, it says only *A reminder you set***; unlocked, it shows the note. The export has `released` citing the confirmation, with `lateMs` | it does not fire, or shows words on the lock screen |
+| **P120** | Set another and tap **Cancel** on the card: the export has `orb.action.cancelled` (`declined`) citing the intent, and nothing fires | a cancel leaves no record |
+| **P121** | Set one 10 minutes ahead, then **Cancel this reminder** in What Orb may do: nothing appears at the time; the export has `revoked` (`one`) citing it | a withdrawn reminder fires |
+| **P122** | Set one, then **Erase** the item it is about before the time: nothing appears; the export has `refused` (`itemErased`); the note's key is destroyed | an erased item's reminder fires |
+| **P123** | **Turn off** in What Orb may do: every pending reminder is cancelled (one `revoked all`, one `revoked one` each); *Remind me…* then says it is turned off; **Turn on** works | the master switch does not hold |
+| **P124** | *(optional)* Set a reminder 15 minutes ahead and **restart the phone**: it still appears (on time or late), and the export shows `released` | alarms do not survive a reboot |
+
+#### The operator's protocol
+
+1. Install `orb-app-v28-gate.apk` over v27; open Orb once; open **What Orb may do**. *(P117)*
+2. In Recall open any kept item → **Remind me…** → 3 minutes ahead → a note (words you will recognise; invented) → **Next** → read the card → **Confirm** → allow notifications. *(P118)* **Lock the phone** and wait. *(P119)*
+3. Another reminder: get to the card and tap **Cancel**. *(P120)*
+4. Another, 10 minutes ahead: confirm it, then **What Orb may do → Cancel this reminder**. *(P121)*
+5. Another on a kept item you do not mind erasing; confirm it, then **Erase** that item before the time. *(P122)*
+6. **What Orb may do → Turn off**, try *Remind me…*, then **Turn on**. *(P123)*
+7. *(optional)* Confirm one 15 minutes ahead and restart the phone. *(P124)*
+8. **Export and share journal** and send it.

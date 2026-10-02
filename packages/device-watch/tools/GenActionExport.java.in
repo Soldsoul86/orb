@@ -1,0 +1,71 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Writes an export containing every kind of record the phone's first action leaves, for the TypeScript side to read
+ * (`docs/GATE_PHONE.md` §4). The records come out of **`Remind` and `ActionFacts`, the classes the phone runs**, on real
+ * keys; only the inputs are invented. The note's words are invented too — and the test asserts they appear nowhere.
+ */
+public final class GenActionExport {
+    private static long clock = 1000;
+
+    public static void main(String[] args) throws Exception {
+        File dir = Files.createTempDirectory("orb-gen-action").toFile();
+        Context context = new Context(dir);
+        String install = "orb-000000000000000000000003";
+        Journal journal = Journal.open(context, Install.lane(context), install);
+
+        journal.append("orb.process.start", Start.record(
+            "16", 36L, "2026-01-01", "TEST.000000.000", "Test phone", "test", tick(), 1234L, "0.1-test"));
+
+        // The kept item a reminder is about: a text share, sealed.
+        Map<String, Object> shared = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 40L);
+        Attachments.Stored words = SharedText.seal(context, "dentist appointment, bring the insurance card", null);
+        Map<String, Object> item = SharedText.record(journal, context, shared, words, null);
+        String itemId = (String) item.get("id");
+
+        long due = 1_900_000_000_000L;
+        final Remind.Scheduler alarms = new Remind.Scheduler() {
+            @Override public void schedule(String id, long dueAtMs) {}
+            @Override public void cancel(String id) {}
+        };
+        final Remind.Notifier shown = new Remind.Notifier() {
+            @Override public void post(String note) {}
+        };
+
+        // 1. Confirmed with a sealed note, then released (the whole chain).
+        String intent1 = Remind.intend(journal, itemId, due, "Asia/Kolkata", 7L);
+        Remind.Confirmed one = Remind.confirm(context, journal, intent1, itemId, due, "Asia/Kolkata", "bring the insurance card to the clinic");
+        Remind.release(context, journal, one.reminder.confirmedId, true, due + 5000L, shown);
+
+        // 2. Asked for and not confirmed.
+        Remind.cancel(journal, Remind.intend(journal, itemId, due + 1000L, "Asia/Kolkata", 7L), ActionFacts.DECLINED);
+
+        // 3. Confirmed, then withdrawn by the person.
+        String intent3 = Remind.intend(journal, itemId, due + 2000L, "Asia/Kolkata", 7L);
+        Remind.Confirmed three = Remind.confirm(context, journal, intent3, itemId, due + 2000L, "Asia/Kolkata", null);
+        Remind.withdraw(journal, three.reminder, alarms);
+
+        // 4. Confirmed, and refused at the moment because Android's permission had been withdrawn.
+        String intent4 = Remind.intend(journal, itemId, due + 3000L, "Asia/Kolkata", 7L);
+        Remind.Confirmed four = Remind.confirm(context, journal, intent4, itemId, due + 3000L, "Asia/Kolkata", null);
+        Remind.release(context, journal, four.reminder.confirmedId, false, due + 3500L, shown);
+
+        // 5. The capability turned off, then on.
+        Remind.turnOff(journal, alarms);
+        Remind.turnOn(journal);
+
+        for (String line : journal.readLines()) System.out.println(line);
+    }
+
+    private static long tick() {
+        clock += 1000;
+        return clock;
+    }
+}

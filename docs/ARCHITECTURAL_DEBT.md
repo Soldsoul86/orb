@@ -121,7 +121,7 @@ durable reflection-state need materializes.
 
 ## AD-7 — `device-watch` reads a person's whole package list outside the Capability boundary
 
-- **Status:** Open · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
+- **Status:** Open — **the gate now exists (2026-10-02, DR-20, `GATE_PHONE.md`) for the first *action*; the package scan and the assistant's reads are still not declared in it (slice 3).** · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
   Capability → Policy → permission → Action/read → Journal mechanism in Phase 3c ·
   **Raised:** 2026-09-28, at the Execution contracts' acceptance
 - **Domain:** Execution / Reality · **Kind (if adopted):** bring an existing read
@@ -597,4 +597,17 @@ a second source for the compiler's checksum exists (item 1).
 4. **Format limits are the rules' limits**: no landlines, no two-digit years, no relative dates, a ten-digit order id starting 6–9 reads as a mobile, other countries' numbers only as `+country…`.
 5. **The list is a sensitive index** of what a person's words mention. It lives behind the same secure window as Recall and is never exported or logged; a person who screenshots around the protection
    (another device pointed at the screen) is outside what the app can prevent.
+
+---
+
+## AD-18 — the first action's limits, stated
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-20, `GATE_PHONE.md`). Debts, not defects.
+
+1. **The result is not recorded.** `released` says Orb *issued* the reminder, not that you saw it (`Capability.md` inv. 7). Seeing it would need a sensor observing the notification being shown or opened; not built.
+2. **A reminder can be minutes late** while the phone dozes (no exact-alarm permission, on purpose). It is recorded as late (`lateMs`), never dropped. A battery saver that kills Orb's alarms is outside what the app can prevent; Orb sets them again at every start and boot.
+3. **Once shown, the notification's words live in Android**, like any app's, until dismissed — beyond Orb's reach. The lock screen shows only *a reminder you set*.
+4. **A process killed between recording a release and posting the notification** leaves it recorded as issued and not shown (fails toward doing less, and says so).
+5. **Two confirmations of exactly the same reminder** (same item, time and note) are one decision: the second is refused `alreadyReleased`.
+6. **Only Orb's own gate decides.** There is no second device and no remote path; a desk that later acts on the phone's behalf will need its own declaration.
 

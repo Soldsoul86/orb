@@ -115,3 +115,6 @@ unreadable kind.
 Anything about the phone. The readings are constructed, because what is under
 test is the loop rather than the sensor — and the sensor was tested where it
 lives, on the device, five times.
+
+`tests/action-export.test.ts` — the phone's first action (`docs/GATE_PHONE.md`): a fixture **written by `Remind` and `ActionFacts`** on real keys (`tools/gen-action-export.sh`) — a reminder confirmed with a sealed note and released, one not confirmed, one withdrawn, one refused at the moment, the capability turned off and on. Asserts the lane verifies, every record kind is present (including the cancel and the refusal), lineage in `causes`, the fields each record may carry, the argument for urgency in every confirmation, that no word of a note is in the file, and that the desk imports it whole and observes only the share.
+

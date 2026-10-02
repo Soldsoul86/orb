@@ -1,0 +1,61 @@
+package @PKG@;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+
+/**
+ * The only file that shows a notification — and it is reached only through `Remind.release`, after the gate has said yes
+ * (`RemindersTest` holds the notification API to this file and the call to that one).
+ *
+ * **The lock screen says almost nothing.** The notification is `VISIBILITY_PRIVATE` with a public version that reads only
+ * *a reminder you set*; the person's words appear once the phone is unlocked. Said plainly in the docs: once shown, the
+ * Android system holds the notification's text, as it does for any app's — beyond Orb's reach, and cleared when you
+ * dismiss it.
+ */
+final class ReminderNotifier implements Remind.Notifier {
+    static final String CHANNEL = "orb.reminders";
+    private static final String POST = "android.permission.POST_NOTIFICATIONS";
+
+    private final Context context;
+
+    ReminderNotifier(Context context) {
+        this.context = context;
+    }
+
+    /** Whether a reminder can be shown right now: Android's permission is granted and notifications are on for Orb. */
+    static boolean permitted(Context context) {
+        if (context.checkSelfPermission(POST) != PackageManager.PERMISSION_GRANTED) return false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        return manager != null && manager.areNotificationsEnabled();
+    }
+
+    @Override
+    public void post(String note) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Reminders you set", NotificationManager.IMPORTANCE_DEFAULT));
+
+        Notification publicVersion = new Notification.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Orb")
+            .setContentText("A reminder you set")
+            .build();
+        PendingIntent open = PendingIntent.getActivity(context, 0, new Intent(context, RecallActivity.class),
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification shown = new Notification.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Orb reminder")
+            .setContentText(note == null || note.isEmpty() ? "You asked Orb to remind you." : note)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicVersion)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build();
+        manager.notify((int) (System.currentTimeMillis() & 0x7fffffff), shown);
+    }
+}

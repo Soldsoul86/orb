@@ -1,0 +1,113 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * Every record of Orb *acting* — built here and nowhere else, as `AssistFacts` does for what Orb perceives.
+ *
+ * `docs/GATE_PHONE.md` §4, DR-5: **the whole chain is recorded, including what was stopped** —
+ * `intent → confirm | cancel → release | refuse`, and a withdrawal. Each record names **ids, times and identities,
+ * never words**: what a reminder says is a sealed note (`ReminderNote`) cited by identity, and what it is *about*
+ * is the event it cites in `causes`. A source guard (`RemindersTest`) holds that nothing else builds these.
+ *
+ * `released` says Orb **issued** the reminder, not that you saw it (`Capability.md` inv. 7); the result is not
+ * recorded in this slice and the docs say so.
+ */
+final class ActionFacts {
+    private ActionFacts() {}
+
+    static final String INTENT = "orb.action.intent";
+    static final String CONFIRMED = "orb.action.confirmed";
+    static final String CANCELLED = "orb.action.cancelled";
+    static final String RELEASED = "orb.action.released";
+    static final String REFUSED = "orb.action.refused";
+    static final String REVOKED = "orb.action.revoked";
+    static final String ALLOWED = "orb.action.allowed";
+
+    /** Why a confirmation was not given. */
+    static final String DECLINED = "declined";
+    static final String PERMISSION_DENIED = "permissionDenied";
+
+    /** Why a release did not happen — the refusals are the evidence the gate works. */
+    static final String CANCELLED_R = "cancelled";
+    static final String REVOKED_R = "revoked";
+    static final String ITEM_ERASED = "itemErased";
+    static final String ALREADY_RELEASED = "alreadyReleased";
+    static final String PERMISSION_WITHDRAWN = "permissionWithdrawn";
+    static final String NOTE_UNREADABLE = "noteUnreadable";
+
+    static final String ONE = "one";
+    static final String ALL = "all";
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Reminders.CAPABILITY);
+        p.put("version", Reminders.VERSION);
+        return p;
+    }
+
+    /** A time zone id as the platform spells them, or `UTC` for anything else: the record never carries free text. */
+    static String zoneOrUtc(String zone) {
+        return zone != null && zone.matches("[A-Za-z0-9_/+-]{1,64}") ? zone : "UTC";
+    }
+
+    /** The person asked to be reminded: when, and the build. About which item is the event's `causes`. */
+    static Map<String, Object> intent(long dueAtMs, String zone, long versionCode) {
+        Map<String, Object> p = base();
+        p.put("dueAtUtcMs", dueAtMs);
+        p.put("versionCode", versionCode);
+        p.put("zone", zoneOrUtc(zone));
+        return p;
+    }
+
+    /** The person confirmed exactly this. The authorization is derived from what it authorizes (`Reminders.authorization`). */
+    static Map<String, Object> confirmed(long dueAtMs, String zone, String authorization, String noteIdentity, long noteBytes) {
+        Map<String, Object> p = base();
+        p.put("authorization", authorization);
+        p.put("dueAtUtcMs", dueAtMs);
+        if (noteIdentity != null) {
+            p.put("attachment", noteIdentity);
+            p.put("attachmentBytes", noteBytes);
+        }
+        // The argument the standing-authorization ruling requires, written into what it authorizes.
+        p.put("urgency", Reminders.URGENCY);
+        p.put("zone", zoneOrUtc(zone));
+        return p;
+    }
+
+    /** The person did not confirm. Recorded exactly as a confirmation is. */
+    static Map<String, Object> cancelled(String reason) {
+        Map<String, Object> p = base();
+        p.put("reason", PERMISSION_DENIED.equals(reason) ? PERMISSION_DENIED : DECLINED);
+        return p;
+    }
+
+    /** Orb issued the reminder, `lateMs` after it was due (0 if on time). Not a claim that it was seen. */
+    static Map<String, Object> released(String authorization, long lateMs) {
+        Map<String, Object> p = base();
+        p.put("authorization", authorization);
+        p.put("lateMs", Math.max(0L, lateMs));
+        return p;
+    }
+
+    /** The gate stopped it, and why. */
+    static Map<String, Object> refused(String reason) {
+        Map<String, Object> p = base();
+        boolean known = CANCELLED_R.equals(reason) || REVOKED_R.equals(reason) || ITEM_ERASED.equals(reason)
+            || ALREADY_RELEASED.equals(reason) || PERMISSION_WITHDRAWN.equals(reason) || NOTE_UNREADABLE.equals(reason);
+        p.put("reason", known ? reason : "other");
+        return p;
+    }
+
+    /** The person withdrew one reminder (`causes` names it) or the whole capability. */
+    static Map<String, Object> revoked(String scope) {
+        Map<String, Object> p = base();
+        p.put("scope", ALL.equals(scope) ? ALL : ONE);
+        return p;
+    }
+
+    /** The person turned the capability back on. */
+    static Map<String, Object> allowed() {
+        return base();
+    }
+}

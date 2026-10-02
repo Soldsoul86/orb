@@ -19,7 +19,7 @@ BRAIN="$(cd ../../../runtime/brain && ./build.sh | tail -1)"
 BRAIN_CLASSES="$(cd ../../../runtime/brain && pwd)/build/classes"
 
 for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/Install.java.in \
-              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in src/Observe.java.in src/Provenance.java.in src/Shares.java.in src/Backup.java.in src/DeclaredPackages.java.in src/SharedText.java.in src/PackageGrants.java.in src/Rekeep.java.in src/Mentions.java.in \
+              src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in src/Observe.java.in src/Provenance.java.in src/Shares.java.in src/Backup.java.in src/DeclaredPackages.java.in src/SharedText.java.in src/PackageGrants.java.in src/Rekeep.java.in src/Mentions.java.in src/ActionFacts.java.in src/Reminders.java.in src/ReminderNote.java.in src/Remind.java.in \
               ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do
