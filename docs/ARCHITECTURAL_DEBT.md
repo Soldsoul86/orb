@@ -615,6 +615,19 @@ a second source for the compiler's checksum exists (item 1).
 7. **The grant's two halves can disagree.** Revoking in Android's settings leaves Orb's grant recorded; the People screen then says *Android's permission is off, nothing was read* and offers to ask again. Revoking in Orb removes the flag first and then says so.
 8. **Not built:** contact photos, groups, birthdays, a typed list (option C), turning *"call Ravi"* into an action (a gated, later step), other languages' name rules.
 
+
+---
+
+## AD-22 — a reminder about a person is your words and a date, nothing more
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-26). Debts, stated.
+
+1. **No lineage to a kept item.** It cites none by design (so erasing an old note cannot cancel it); the cost is that nothing ties it to *why* you set it. The note is the only memory of that.
+2. **The name is a snapshot.** The note holds the contact's name as spelled when you set it; renaming or deleting the contact later changes nothing. Orb does not follow a person.
+3. **Offered on possible people too.** A *Might be* match (a word that matches a contact's name) can be reminded about; the note is yours to edit, and nothing asserts the match is a person.
+4. **Two contacts grouped as one person** start the note with the first contact's name.
+5. **No call, no message.** The reminder shows words; reaching the person is yours. Handing a number to the dialer or another app is a separate capability and decision.
+
 ---
 
 ## AD-18 — the first action's limits, stated

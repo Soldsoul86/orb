@@ -59,6 +59,14 @@ final class RemindFlow {
      * The time starts at nine; the person sets it.
      */
     void start(final String itemEventId, int[] ymd) {
+        start(itemEventId, ymd, "");
+    }
+
+    /**
+     * The same, with a note to start from (the person edits or clears it) — and, with no `itemEventId`, a reminder about nothing
+     * kept: *Remind me about this person* (`docs/PERSON_ACTION_PHONE.md`), which no erase of some other note can cancel.
+     */
+    void start(final String itemEventId, int[] ymd, final String presetNote) {
         final Journal journal = journal();
         if (journal == null) return;
         try {
@@ -80,7 +88,7 @@ final class RemindFlow {
                         Calendar due = Calendar.getInstance();
                         due.clear();
                         due.set(year, month, day, hour, minute, 0);
-                        askNote(itemEventId, due.getTimeInMillis());
+                        askNote(itemEventId, due.getTimeInMillis(), presetNote);
                     }
                 }, 9, 0, DateFormat.is24HourFormat(host)).show();
             }
@@ -88,7 +96,7 @@ final class RemindFlow {
     }
 
     /** Step 2: an optional note, in the person's own words. */
-    private void askNote(final String itemEventId, final long dueAtMs) {
+    private void askNote(final String itemEventId, final long dueAtMs, final String presetNote) {
         if (dueAtMs < System.currentTimeMillis() + 60_000L) {
             say("That time has passed. Pick a time in the future.");
             return;
@@ -97,13 +105,14 @@ final class RemindFlow {
         note.setHint("A note (optional)");
         note.setFilters(new InputFilter[] {new InputFilter.LengthFilter(200)});
         // Kept from the text watcher, as the search box is, so no screen needs a text accessor.
-        final String[] typed = {""};
+        final String[] typed = {presetNote == null ? "" : presetNote.trim()};
         note.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void afterTextChanged(Editable s) { typed[0] = s.toString().trim(); }
         });
-        new AlertDialog.Builder(host)
+        if (presetNote != null) note.setText(presetNote);
+        AlertDialog ask = new AlertDialog.Builder(host)
             .setTitle("Remind you when?")
             .setMessage(when(dueAtMs))
             .setView(note)
@@ -111,7 +120,10 @@ final class RemindFlow {
             .setPositiveButton("Next", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int which) { review(itemEventId, dueAtMs, typed[0]); }
             })
-            .show();
+            .create();
+        // A note may start as a person's name: no screenshots of it, as of the review card after it.
+        ask.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ask.show();
     }
 
     /** Step 3: the review card — exactly what will happen — and the intent recorded. Not confirming is recorded too. */

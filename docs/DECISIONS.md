@@ -1230,6 +1230,17 @@ blanks (space, tab, no-break space) may sit between. **A script with no case (De
 **Recorded.** The counts-only record gains `possible` (people tied only by a name) and is version 2; `people` now means *tied by number or email*. Still never a name, number or address.
 
 
+## DR-26 — The first action on a person: a reminder you set, citing no kept item
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Remind me about them", then "Yes, go ahead with the design") on `PERSON_ACTION_PHONE.md` · **Bears on:** DR-20 (the gate), DR-24/DR-25 (People)
+
+**The ruling.** A person's window on the People screen offers **Remind me about this person…**, which opens the existing reminder flow with the note started as *Call (name)*. It is **the same capability** (`orb.remind.local` v1, Act reversible), **the same gate**, the same sealed note, the same review card with Cancel as the default — **no new
+capability, permission or event type**. The reminder **cites no kept item**: a person is not an item, it is *your* request, and erasing some old note must not silently cancel *Call Ravi*. Its intent has empty `causes`; the confirmation cites the intent. **The person is never recorded**: the name exists only in the sealed note; the journal holds
+the note's hash and length.
+
+**Consequence accepted:** a reminder about a person has no lineage to a kept item (`Capability.md`'s *show your working* is satisfied by the intent and confirmation chain, as for any request made directly). **Not in this ruling:** calling or messaging (a hand-off to another app needs its own declaration), reminders Orb proposes about people, recurring reminders.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

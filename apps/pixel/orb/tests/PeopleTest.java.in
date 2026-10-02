@@ -236,6 +236,13 @@ final class PeopleTest {
             && activity.indexOf("for (final People.Person person : result.people)") < activity.indexOf("Might be")
             && activity.split("list.addView\\(row\\(person\\)\\);", -1).length == 2);
         Harness.check("the record counts both kinds", activity.contains("ContactsFacts.read(result.contacts, result.people.size(), result.possible.size())"));
+        Harness.check("a person's reminder goes through the existing flow, about no kept item, and People reaches nothing of the gate itself",
+            activity.contains("flow.start(null, null, callNote)") && activity.contains(".setNeutralButton(\"Remind me about this person\\u2026\"") && activity.contains("\"Call \" + person.names.get(0)")
+            && !activity.contains("Reminders.") && !activity.contains("Remind.") && !activity.contains("ReminderAlarms") && !activity.contains("ReminderNotifier"));
+        Harness.check("the note starts as the preset, in the field and in what is kept if untouched, and Android's answer reaches the flow",
+            source.get("RemindFlow").contains("if (presetNote != null) note.setText(presetNote);") && source.get("RemindFlow").contains("{presetNote == null ? \"\" : presetNote.trim()}")
+            && activity.contains("flow.onPermissionResult(code, results)"));
+        Harness.check("the note's window is secure, since it may start as a person's name", source.get("RemindFlow").split("FLAG_SECURE", -1).length - 1 >= 4);
         Harness.check("Android's permission is asked only for the screen, at the grant", activity.contains("requestPermissions(") && !source.get("ContactsReader").contains("requestPermissions("));
         String access = source.get("ContactsAccess");
         int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");

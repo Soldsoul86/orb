@@ -6662,3 +6662,43 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 3. Pick **one real contact** with a number saved (call them C). Share to Orb, as two texts: *Call (C's full name) tomorrow* · *(C's number, with spaces) for the loan*. Open **People**: C should be in the main list. Tap C. *(P154)*
 4. Pick a contact D whose first name **no other contact has** (a search in Contacts tells you). Share two texts: *(D's first name) said hello* · *I told (D's first name) about it*. Open **People** and **Show … that only a name matches**: D should be there with **one** item, not two. *(P155)*
 5. **Export and share journal**. *(P156)*
+
+
+### 7b71. Remind me about a person — B4, the first action on someone (DR-26) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v34-person.apk`. v33 is §7b70 (awaiting its own run). Design: `docs/PERSON_ACTION_PHONE.md`; decision `DECISIONS.md` DR-26; limits `ARCHITECTURAL_DEBT.md` AD-22.
+
+#### What changed
+
+1. **A button on a person's window in People: *Remind me about this person…*** (beside *Close*), on sure and possible people alike.
+2. It opens **the same reminder screens as before**: pick a date, a time, then a note that **starts as *Call (their name)***, which you can change or clear; then the review card (Cancel is the default).
+3. **The reminder is about no kept item**, so erasing some note cannot cancel it. **The person is never written down** — the name lives only in the reminder's sealed note.
+4. The note window is now **secure** (no screenshots), since the note may hold a person's name.
+5. At the time: the same notification (*Orb: a reminder you set* on the lock screen; the note once unlocked). Listed and cancellable on **What Orb may do**.
+
+#### Checked before the device
+
+- 1035 phone-side checks (was 1025); Kotlin and TypeScript unchanged (378, 600); lint and type-check clean.
+- **Tests:** a reminder with no item is pending, survives the erase of another note, is shown at its time with its note, and the name is nowhere in the journal; People reaches nothing of the gate itself; the note starts as the preset; the note window is secure. Mutation-checked: removing the preset, the secure window, the null item, the permission forwarding, the *Call* prefix and the button's place each fails a named check.
+- **Not testable off the phone:** the button, the dialogs, the notification.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P157** | Open **People**, tap a person: their window has **Remind me about this person…** next to *Close* | the button is missing |
+| **P158** | Tapping it asks for a **date**, then a **time**, then a **note that already says *Call (their name)***, which you can edit | the note is empty or the flow differs |
+| **P159** | The review card shows the exact time and your note, **Cancel is the default**; *Confirm* says **Reminder set** | the card or the default differs |
+| **P160** | At the time (set it two minutes ahead), a notification appears; the lock screen says only *Orb: a reminder you set*; unlocked, it shows **Call (name)** | no notification, or the name on the lock screen |
+| **P161** | **What Orb may do** lists the reminder; erase **any other** kept note in Recall: the reminder is **still there** | an unrelated erase cancelled it |
+| **P162** | **Export and share journal**: an intent with **no cause**, a confirmation, a release; **no name, number or email anywhere** in the file | the person was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v34-person.apk` over v33; open Orb once.
+2. Open **People**; tap any person (a *Might be* one is fine). Tap **Remind me about this person…**. *(P157, P158)*
+3. Pick today's date and a time **two or three minutes ahead**; leave the note as it is (or edit it); **Next**; read the card; **Confirm**. *(P158, P159)*
+4. Before the time: open **What Orb may do** and see the reminder; open **Recall** and **erase some other kept note**; look again at **What Orb may do**. *(P161)*
+5. Wait for the notification; look at the lock screen first if you can, then unlock. *(P160)*
+6. **Export and share journal**. *(P162)*
+

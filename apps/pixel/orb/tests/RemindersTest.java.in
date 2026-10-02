@@ -275,6 +275,23 @@ final class RemindersTest {
         Remind.Confirmed refused = Remind.confirm(c5, j5, intent5, idOf(item5), due, "Asia/Kolkata", NOTE + " school");
         Harness.check("the same note is refused, so the card can say why", refused.reminder == null && "noteErased".equals(refused.failure));
 
+        Harness.suite("a reminder about a person cites no kept item, so no erase of another note can cancel it");
+        Journal j6 = fresh(box, "orb-remind-6");
+        Context c6 = box[0];
+        Map<String, Object> someNote = keep(c6, j6, "an old note that mentions nobody in particular");
+        long due6 = System.currentTimeMillis() + DAY;
+        String intent6 = Remind.intend(j6, null, due6, "Asia/Kolkata", 7L);
+        Remind.Confirmed person = Remind.confirm(c6, j6, intent6, null, due6, "Asia/Kolkata", "Call Ravi Kumar");
+        Harness.check("the intent cites nothing, and the confirmation cites only the intent", intent6 != null && lastOf(j6, ActionFacts.INTENT).contains("\"causes\":[]")
+            && lastOf(j6, ActionFacts.CONFIRMED).contains("\"causes\":[\"" + intent6 + "\"]"));
+        Harness.check("it is confirmed and pending", person.reminder != null && person.reminder.itemEventId == null && Reminders.pending(j6.readLines()).size() == 1);
+        Harness.equal("erase some other note", Erase.execute(c6, j6, hashOf(someNote)).outcome, Erase.DESTROYED);
+        Harness.equal("it stops nothing", Remind.itemErased(c6, j6, idOf(someNote), new Alarms()), 0);
+        Recorder callShown = new Recorder();
+        Harness.equal("and it is still shown at its time, with the person's name in the note only", Remind.release(c6, j6, person.reminder.confirmedId, true, due6 + 1, callShown), Remind.RELEASED);
+        Harness.equal("the words were the note", callShown.posted, Arrays.asList("Call Ravi Kumar"));
+        Harness.check("the name is nowhere in the journal", !String.join("\n", j6.readLines()).contains("Ravi"));
+
         Harness.suite("a backup carries a reminder's note as words");
         Backup.Plan plan = Backup.plan(c3, j3.readLines(), false);
         boolean hasKey = false;

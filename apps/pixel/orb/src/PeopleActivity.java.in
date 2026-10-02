@@ -2,6 +2,7 @@ package @PKG@;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -34,6 +35,7 @@ public final class PeopleActivity extends Activity {
     private boolean recorded;
     /** The closing explanation: the section of possible people is placed above it. */
     private View note;
+    private RemindFlow flow;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -141,6 +143,7 @@ public final class PeopleActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
+        if (flow != null) flow.onPermissionResult(code, results);
         if (code != REQUEST_CONTACTS) return;
         boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         Journal journal = journal();
@@ -236,10 +239,18 @@ public final class PeopleActivity extends Activity {
             column.addView(row);
         }
         scroll.addView(column);
+        final String callNote = "Call " + person.names.get(0);
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle(person.display())
             .setView(scroll)
             .setPositiveButton("Close", null)
+            // A reminder you set, about no kept item: the name only ever sits in its sealed note (`PERSON_ACTION_PHONE.md`).
+            .setNeutralButton("Remind me about this person\u2026", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    if (flow == null) flow = new RemindFlow(PeopleActivity.this);
+                    flow.start(null, null, callNote);
+                }
+            })
             .create();
         // A person's contact details and what you wrote about them are as private as the words.
         dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);

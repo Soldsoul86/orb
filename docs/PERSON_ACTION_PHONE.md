@@ -1,6 +1,6 @@
 # Remind me about a person — the first action on someone (B4, People's next step; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** The direction was chosen ("Remind me about them"); the three details in §6 are what is left to approve. Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b71, `orb-app-v34-person.apk`; `DECISIONS.md` DR-26). As-built notes in §8.
 > Builds on `PEOPLE_PHONE.md` (DR-24, DR-25: who a person is, computed, never recorded) and `GATE_PHONE.md` (DR-20: the reminder and the gate). **No new capability, no new Android permission, no new journal event type.**
 
 ## 1. Why, in plain words
@@ -48,3 +48,10 @@ A reminder today cites **the kept item it is about**, and erasing that item canc
 ## 7. Not in this slice
 
 Opening the dialer or a messaging app; reminders that Orb proposes on its own ("you mentioned Ravi on Friday"); recurring reminders; birthdays; a reminder about a person who is not in your contacts.
+
+## 8. As built
+
+- **As designed:** the neutral button *Remind me about this person…* on a person's window (sure or possible); the existing reminder flow; the note starts as *Call (first contact's name)* and is editable or clearable; **the reminder cites no kept item** (option A) — the intent's `causes` is empty and the confirmation cites only the intent; no new capability, permission or event type.
+- **Added:** the note window is now **secure** (no screenshots) for every reminder, since a note may start as a person's name — it was only the review card before; Android's notification-permission answer is forwarded from People to the flow.
+- **Held by tests:** a reminder with no item stays pending when another note is erased and is shown at its time with the note; the name is nowhere in the journal; People reaches nothing of the gate itself (only `RemindFlow`); the note starts as the preset; the note window is secure.
+- **Not built:** §7, unchanged.
