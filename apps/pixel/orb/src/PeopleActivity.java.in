@@ -32,6 +32,8 @@ public final class PeopleActivity extends Activity {
     private LinearLayout list;
     /** The read is recorded once per opening, not per redraw. */
     private boolean recorded;
+    /** The closing explanation: the section of possible people is placed above it. */
+    private View note;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -160,34 +162,50 @@ public final class PeopleActivity extends Activity {
         if (!recorded) {
             recorded = true;
             // The read happened: said, with counts only — never a name, a number or an address.
-            journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size()));
+            journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size(), result.possible.size()));
         }
         StringBuilder said = new StringBuilder();
-        said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" in what you kept · ")
-            .append(result.contacts).append(" contacts looked at");
+        said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" tied by number or email · ")
+            .append(result.possible.size()).append(" only by a name · ").append(result.contacts).append(" contacts looked at");
         if (result.looked.unreadable > 0) said.append(" · ").append(result.looked.unreadable).append(" items could not be read");
         if (result.looked.skipped > 0) said.append(" · looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
         list.addView(text(said.toString(), 12, false));
         if (result.people.isEmpty()) {
-            list.addView(text("None of your contacts is mentioned in what you kept — by number, email or name.", 14, false));
+            list.addView(text("None of your contacts' numbers or email addresses is in what you kept.", 14, false));
         }
-        for (final People.Person person : result.people) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(0, 16, 0, 16);
-            row.addView(text(person.display(), 15, true));
-            row.addView(text(person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View view) { showPerson(person); }
+        for (final People.Person person : result.people) list.addView(row(person));
+        if (!result.possible.isEmpty()) {
+            final Button more = new Button(this);
+            more.setText("Show " + result.possible.size() + " that only a name matches");
+            more.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    list.removeView(more);
+                    list.addView(text("Might be — only a word matches a contact's name. It can be a different person, or no person.", 13, true), list.indexOfChild(note));
+                    int at = list.indexOfChild(note);
+                    for (People.Person person : result.possible) list.addView(row(person), at++);
+                }
             });
-            list.addView(row);
+            list.addView(more);
         }
         if (result.sharedFirstNames > 0) {
             list.addView(text(result.sharedFirstNames + (result.sharedFirstNames == 1 ? " first name is" : " first names are")
                 + " shared by several contacts, so those are matched by full name or number only.", 12, false));
         }
-        list.addView(text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
-            + "Matching by number or email is much surer.", 12, false));
+        note = text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
+            + "Matching by number or email is much surer. A name at the start of a sentence is not read: a capital there says nothing.", 12, false);
+        list.addView(note);
+    }
+
+    private View row(final People.Person person) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, 16, 0, 16);
+        row.addView(text(person.display(), 15, true));
+        row.addView(text(person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { showPerson(person); }
+        });
+        return row;
     }
 
     private void showPerson(People.Person person) {

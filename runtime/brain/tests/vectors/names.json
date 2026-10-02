@@ -145,7 +145,7 @@
      "name": "Jo Lee"
     }
    ],
-   "text": "Priya said hello",
+   "text": "Tell Priya hello",
    "expect": [
     {
      "id": "2",
@@ -219,7 +219,7 @@
      "name": "Jo Lee"
     }
    ],
-   "text": "Priya's phone",
+   "text": "Take Priya's phone",
    "expect": [
     {
      "id": "2",
@@ -355,7 +355,7 @@
      "name": "Jo Lee"
     }
    ],
-   "text": "Will is coming",
+   "text": "Is Will coming",
    "expect": [
     {
      "id": "4",
@@ -516,7 +516,7 @@
      "name": "Jo Lee"
     }
    ],
-   "text": "Anil and Priya and Anil",
+   "text": "Ask Anil and Priya and Anil",
    "expect": [
     {
      "id": "2",
@@ -659,7 +659,7 @@
      "name": "Élodie Martin"
     }
    ],
-   "text": "Élodie is here",
+   "text": "Meet Élodie",
    "expect": [
     {
      "id": "1",
@@ -759,6 +759,444 @@
    ],
    "text": "anything",
    "expect": []
+  },
+  {
+   "name": "a first name that starts the text is not read: it may only be a capitalised word",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priya said hello",
+   "expect": []
+  },
+  {
+   "name": "nor one that starts a sentence",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "It rained. Priya laughed",
+   "expect": []
+  },
+  {
+   "name": "nor after a question or an exclamation",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Really? Anil came! Will left",
+   "expect": []
+  },
+  {
+   "name": "nor one that starts a line",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "ok\nAnil called",
+   "expect": []
+  },
+  {
+   "name": "nor after an ellipsis",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Wait… Anil came",
+   "expect": []
+  },
+  {
+   "name": "blanks between do not hide a sentence start",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Done.   Anil called",
+   "expect": []
+  },
+  {
+   "name": "a tab between does not hide it either",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Done.\tAnil called",
+   "expect": []
+  },
+  {
+   "name": "nor does a carriage return",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "ok\rAnil called",
+   "expect": []
+  },
+  {
+   "name": "a Devanagari full stop ends a sentence for the name after it",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "आज। Anil आया",
+   "expect": []
+  },
+  {
+   "name": "but inside a sentence it is read, after one that ended",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "It rained. Then Anil called",
+   "expect": [
+    {
+     "id": "3",
+     "by": "first",
+     "word": "Anil"
+    }
+   ]
+  },
+  {
+   "name": "a full name is read wherever it is",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Priya Shah called",
+   "expect": [
+    {
+     "id": "2",
+     "by": "full",
+     "word": "Priya Shah"
+    }
+   ]
+  },
+  {
+   "name": "a caseless script has no sentence start to read",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "प्रिया"
+    }
+   ],
+   "text": "आज। प्रिया आई",
+   "expect": [
+    {
+     "id": "1",
+     "by": "first",
+     "word": "प्रिया"
+    }
+   ]
+  },
+  {
+   "name": "an abbreviation's full stop looks like a sentence's end: a known cost",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "Mr. Anil called",
+   "expect": []
+  },
+  {
+   "name": "an opening bracket is not a sentence's end",
+   "contacts": [
+    {
+     "id": "1",
+     "name": "Ravi Kumar"
+    },
+    {
+     "id": "2",
+     "name": "Priya Shah"
+    },
+    {
+     "id": "3",
+     "name": "Anil"
+    },
+    {
+     "id": "4",
+     "name": "Will Smith"
+    },
+    {
+     "id": "5",
+     "name": "Ravi Menon"
+    },
+    {
+     "id": "6",
+     "name": "Jo Lee"
+    }
+   ],
+   "text": "(Anil called)",
+   "expect": [
+    {
+     "id": "3",
+     "by": "first",
+     "word": "Anil"
+    }
+   ]
   },
   {
    "name": "shared first names are listed",

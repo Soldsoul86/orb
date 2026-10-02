@@ -197,7 +197,9 @@ final class Capabilities {
             String read = lastOfType(lines, ContactsFacts.READ);
             long contacts = number(read, "contacts");
             long people = number(read, "people");
-            String detail = read == null ? "never" : contacts + (contacts == 1 ? " contact" : " contacts") + " looked at, " + people + (people == 1 ? " person" : " people") + " mentioned";
+            long possible = Math.max(0L, number(read, "possible"));
+            String detail = read == null ? "never" : contacts + (contacts == 1 ? " contact" : " contacts") + " looked at, " + people + (people == 1 ? " person" : " people")
+                + " tied by number or email, " + possible + " only by a name";
             return new Status(granted ? "ON — you granted it" : "OFF — not granted", wallClock(read), detail);
         }
         if (GRANTS.equals(id)) {

@@ -54,6 +54,11 @@ final class PeopleTest {
         return null;
     }
 
+    private static People.Person findPossible(People.Result r, String name) {
+        for (People.Person p : r.possible) if (p.names.contains(name)) return p;
+        return null;
+    }
+
     static void run() throws Exception {
         Harness.suite("a phone number as the kept words would write it");
         Harness.equal("a local number with a leading zero", People.normalPhone("098765 43210"), "+919876543210");
@@ -78,8 +83,9 @@ final class PeopleTest {
         keep(context, journal, "second number 91234 56789");
         keep(context, journal, "mail ravi@kumar.example");
         keep(context, journal, "Ravi called");
-        keep(context, journal, "Priya said Anil will call");
-        keep(context, journal, "Will is coming");
+        keep(context, journal, "Tell Priya that Anil will call");
+        keep(context, journal, "Is Will coming");
+        keep(context, journal, "Priya said hello. Anil is here");
         keep(context, journal, "pay 90000 00001");
         keep(context, journal, "Ravi Kumar at 98765 43210");
         keep(context, journal, "Ravi Kumar owes ₹1,200");
@@ -92,8 +98,12 @@ final class PeopleTest {
         Harness.equal("one first name is shared (Ravi)", r.sharedFirstNames, 1);
         List<String> shown = new ArrayList<>();
         for (People.Person p : r.people) shown.add(p.names.get(0) + "x" + p.items.size());
-        Harness.equal("Ravi, Priya, then the two with one item each by name — Ravi Menon, mentioned only as 'Ravi', is not listed",
-            shown, Arrays.asList("Ravi Kumarx6", "Priya Shahx2", "Anilx1", "Will Smithx1"));
+        Harness.equal("those tied by a number or an address: Ravi and Priya — Ravi Menon, mentioned only as 'Ravi', is not listed",
+            shown, Arrays.asList("Ravi Kumarx6", "Priya Shahx2"));
+        List<String> maybe = new ArrayList<>();
+        for (People.Person p : r.possible) maybe.add(p.names.get(0) + "x" + p.items.size());
+        Harness.equal("those only a name ties are apart, and a name that starts a sentence is not read", maybe, Arrays.asList("Anilx1", "Will Smithx1"));
+        Harness.check("a sure person is never also listed as possible", find(r, "Anil") == null && find(r, "Will Smith") == null && findPossible(r, "Ravi Kumar") == null && findPossible(r, "Priya Shah") == null);
         People.Person ravi = find(r, "Ravi Kumar");
         Harness.equal("contacts that share a number are one person", ravi.names, Arrays.asList("Ravi Kumar", "R. Kumar (work)"));
         Harness.equal("so he is shown once, with the other name counted", ravi.display(), "Ravi Kumar (+1)");
@@ -102,11 +112,11 @@ final class PeopleTest {
         Harness.equal("an item that has both his number and his name is listed once, by number", ravi.items.size(), 6);
         Harness.check("a first name alone, shared by two contacts, matches neither", find(r, "Ravi Menon") == null);
         People.Person priya = find(r, "Priya Shah");
-        Harness.equal("a unique first name, capitalised, and a number: two items", People.evidenceLine(priya), "1 by number, 1 by name");
+        Harness.equal("a unique first name inside a sentence, and a number: two items", People.evidenceLine(priya), "1 by number, 1 by name");
         boolean wordShown = false;
         for (People.Evidence e : priya.items) if (People.BY_NAME.equals(e.by) && "Priya".equals(e.word)) wordShown = true;
         Harness.check("a name match carries the word it found, to be labelled as a word", wordShown);
-        Harness.equal("the verb 'will' is not Will Smith, the capitalised word is", find(r, "Will Smith").items.size(), 1);
+        Harness.equal("the verb 'will' is not Will Smith, the capitalised word is", findPossible(r, "Will Smith").items.size(), 1);
         List<String> beside = new ArrayList<>();
         for (Mentions.Handle h : ravi.alsoWith) beside.add(h.kind);
         Harness.check("what appears with him: the amount, never his own numbers or address", beside.contains("amount") && !beside.contains("phone") && !beside.contains("email"));
@@ -123,9 +133,10 @@ final class PeopleTest {
         Harness.check("an empty book mentions nobody", People.compute(context, journal, new ArrayList<People.Contact>()).people.isEmpty());
 
         Harness.suite("the record of a read carries counts and nothing else");
-        Map<String, Object> read = ContactsFacts.read(412L, 5L);
-        Harness.equal("its fields", new java.util.TreeSet<>(read.keySet()).toString(), "[capability, contacts, people, version]");
+        Map<String, Object> read = ContactsFacts.read(412L, 5L, 30L);
+        Harness.equal("its fields", new java.util.TreeSet<>(read.keySet()).toString(), "[capability, contacts, people, possible, version]");
         Harness.check("and names no one", !Json.canonical(read).contains("Ravi") && Json.canonical(read).contains("\"contacts\":412"));
+        Harness.check("it is the second shape: the count of those only a name ties is there", Json.canonical(read).contains("\"possible\":30") && Json.canonical(read).contains("\"version\":2"));
 
         second();
         guard();
@@ -142,14 +153,18 @@ final class PeopleTest {
         book.add(contact("1", "Zed Zhang", new String[] {}, "shared@x.example"));
         book.add(contact("2", "Amy Adams", new String[] {}, "shared@x.example"));
         book.add(contact("3", "Bob Brown", new String[] {"+919000000011"}));
-        book.add(contact("4", "Dan Dale", new String[] {}));
+        book.add(contact("4", "Dan Dale", new String[] {"+919000000012"}));
+        book.add(contact("5", "Xena Xu", new String[] {}));
+        book.add(contact("6", "Eli Ek", new String[] {}));
         keep(context, journal, "mail shared@x.example");
         keep(context, journal, "Amy Adams and Zed Zhang met");
         keep(context, journal, "Bob Brown 90000 00011 ₹300");
         keep(context, journal, "Bob Brown ₹1,200");
         keep(context, journal, "Bob Brown ₹1,200 again");
-        keep(context, journal, "Dan Dale rang");
-        keep(context, journal, "Dan Dale rang again");
+        keep(context, journal, "Dan Dale rang 90000 00012");
+        keep(context, journal, "Dan Dale rang again 90000 00012");
+        keep(context, journal, "Xena Xu spoke");
+        keep(context, journal, "Eli Ek spoke");
         People.Result r = People.compute(context, journal, book);
         People.Person zed = find(r, "Zed Zhang");
         Harness.equal("two contacts that share only an email address are one person", zed.names, Arrays.asList("Zed Zhang", "Amy Adams"));
@@ -162,6 +177,9 @@ final class PeopleTest {
         List<String> order = new ArrayList<>();
         for (People.Person p : r.people) order.add(p.names.get(0));
         Harness.equal("most items first; equals in name order, not the book's", order, Arrays.asList("Bob Brown", "Dan Dale", "Zed Zhang"));
+        List<String> apart = new ArrayList<>();
+        for (People.Person p : r.possible) apart.add(p.names.get(0));
+        Harness.equal("the possible ones are ordered the same way, and apart", apart, Arrays.asList("Eli Ek", "Xena Xu"));
     }
 
     private static boolean contains(File dir, byte[] needle) throws Exception {
@@ -213,6 +231,11 @@ final class PeopleTest {
         Harness.check("the contacts are read only after the grant is checked and Android's permission is there",
             activity.contains("ContactsAccess.granted(this)") && activity.indexOf("ContactsAccess.granted(this)") < activity.indexOf("ContactsReader.read(context)")
             && source.get("ContactsReader").contains("if (!permitted(context)) return null;"));
+        Harness.check("the screen keeps the possible people apart: collapsed behind a button, under a heading that says it may be no one",
+            activity.contains("result.possible") && activity.contains("Might be") && activity.contains("that only a name matches")
+            && activity.indexOf("for (final People.Person person : result.people)") < activity.indexOf("Might be")
+            && activity.split("list.addView\\(row\\(person\\)\\);", -1).length == 2);
+        Harness.check("the record counts both kinds", activity.contains("ContactsFacts.read(result.contacts, result.people.size(), result.possible.size())"));
         Harness.check("Android's permission is asked only for the screen, at the grant", activity.contains("requestPermissions(") && !source.get("ContactsReader").contains("requestPermissions("));
         String access = source.get("ContactsAccess");
         int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");

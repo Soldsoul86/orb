@@ -7,7 +7,8 @@
  * - the **full name** (two words or more) matches as a whole-word phrase, in any case — it is distinctive;
  * - a **first name** (the first word, three letters or more) matches **only if it is unique among the contacts** — two Ravis are
  *   matched by full name or number, never by "Ravi" alone — **and only when capitalised** (so *Will* the contact is not *will* the verb;
- *   a script with no case, such as Devanagari, is always "capitalised");
+ *   a script with no case, such as Devanagari, is always "capitalised"), **and never as the first word of the text, a line or a
+ *   sentence** — there a capital says nothing (*Home is where…*), so only a name written *inside* a sentence is read (cased scripts only);
  * - a one-word contact name is a first name by the same rules;
  * - whole words only, letters and digits bound a word, a possessive (*Ravi's*) is the name.
  *
@@ -99,6 +100,25 @@ function capitalised(ch: string): boolean {
   return ch === ch.toUpperCase();
 }
 
+/** A letter with a case (Latin, Cyrillic, Greek…), as opposed to one of a script with none (Devanagari, Arabic…). */
+function cased(ch: string): boolean {
+  return ch.toLowerCase() !== ch.toUpperCase();
+}
+
+/** Blanks that may sit between a sentence's end and the next word. */
+const BLANKS = new Set([" ", "\t", "\u00a0"]);
+/** What ends a sentence. */
+const SENTENCE_ENDS = new Set([".", "!", "?", "\u2026", "\u0964"]);
+
+/** Is the word at `at` the first of the text, of a line, or of a sentence? Only blanks may come between. */
+function startsSentence(text: string, at: number): boolean {
+  let i = at - 1;
+  while (i >= 0 && BLANKS.has(text[i] as string)) i--;
+  if (i < 0) return true;
+  const prev = text[i] as string;
+  return prev === "\n" || prev === "\r" || SENTENCE_ENDS.has(prev);
+}
+
 /** The contacts a text mentions by name, each at most once (the first way it was found), in contact order. Never throws. */
 export function matchNames(input: string, contacts: readonly NameContact[]): NameMatch[] {
   const text = input.length > NAME_MAX_CHARS ? input.slice(0, NAME_MAX_CHARS) : input;
@@ -120,7 +140,7 @@ export function matchNames(input: string, contacts: readonly NameContact[]): Nam
     if (first === null || shared.has(fold(first))) continue;
     for (const at of occurrences(text, lower, first)) {
       const ch = [...text.slice(at)][0] ?? "";
-      if (capitalised(ch)) {
+      if (capitalised(ch) && !(cased(ch) && startsSentence(text, at))) {
         out.push({ id: c.id, by: "first", word: text.slice(at, at + first.length) });
         break;
       }

@@ -98,11 +98,18 @@ final class CapabilitiesTest {
         journal.append(PackageGrants.GRANTED, pkg(PackageGrants.GRANTED, "orb.read.contacts"));
         Harness.check("granted: on — and the package scan's own state is not disturbed", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("ON")
             && Capabilities.status(Capabilities.PACKAGES, journal.readLines()).state.startsWith("OFF"));
-        journal.append(ContactsFacts.READ, ContactsFacts.read(412L, 5L));
+        journal.append(ContactsFacts.READ, ContactsFacts.read(412L, 5L, 30L));
         Capabilities.Status contactsUsed = Capabilities.status(Capabilities.CONTACTS, journal.readLines());
-        Harness.check("a use: when, and counts only", contactsUsed.lastAtMs > 0 && contactsUsed.lastDetail.equals("412 contacts looked at, 5 people mentioned"));
-        journal.append(ContactsFacts.READ, ContactsFacts.read(1L, 1L));
-        Harness.equal("one person is said in the singular", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail, "1 contact looked at, 1 person mentioned");
+        Harness.check("a use: when, and counts only", contactsUsed.lastAtMs > 0 && contactsUsed.lastDetail.equals("412 contacts looked at, 5 people tied by number or email, 30 only by a name"));
+        journal.append(ContactsFacts.READ, ContactsFacts.read(1L, 1L, 0L));
+        Harness.equal("one person is said in the singular", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail, "1 contact looked at, 1 person tied by number or email, 0 only by a name");
+        Map<String, Object> old = Json.obj();
+        old.put("capability", "orb.read.contacts");
+        old.put("contacts", 3L);
+        old.put("people", 2L);
+        old.put("version", 1L);
+        journal.append(ContactsFacts.READ, old);
+        Harness.equal("a record from before the split says none by name, not -1", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).lastDetail, "3 contacts looked at, 2 people tied by number or email, 0 only by a name");
         journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.contacts"));
         Harness.check("revoked: off", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF"));
 

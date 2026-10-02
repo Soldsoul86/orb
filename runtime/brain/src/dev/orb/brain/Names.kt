@@ -7,7 +7,8 @@ package dev.orb.brain
  *
  * Deliberately plain, because a name is a word that happens to be a name: the **full name** (two words or more) matches as a
  * whole-word phrase in any case; a **first name** (three letters or more) matches only if it is **unique among the contacts** and
- * **capitalised** (a script with no case always is); whole words only. Every match says which kind it is.
+ * **capitalised** (a script with no case always is) and **not the first word of the text, a line or a sentence** (cased scripts only);
+ * whole words only. Every match says which kind it is.
  */
 object Names {
     data class Contact(val id: String, val name: String)
@@ -94,6 +95,23 @@ object Names {
         return ch == ch.uppercase()
     }
 
+    private fun cased(text: String, at: Int): Boolean {
+        val ch = String(Character.toChars(text.codePointAt(at)))
+        return ch.lowercase() != ch.uppercase()
+    }
+
+    private val BLANKS = setOf(' ', '\t', '\u00a0')
+    private val SENTENCE_ENDS = setOf('.', '!', '?', '\u2026', '\u0964')
+
+    /** Is the word at [at] the first of the text, of a line, or of a sentence? Only blanks may come between. */
+    private fun startsSentence(text: String, at: Int): Boolean {
+        var i = at - 1
+        while (i >= 0 && text[i] in BLANKS) i--
+        if (i < 0) return true
+        val prev = text[i]
+        return prev == '\n' || prev == '\r' || prev in SENTENCE_ENDS
+    }
+
     /** The contacts a text mentions by name, each at most once (the first way it was found), in contact order. */
     @JvmStatic
     fun match(input: String, contacts: List<Contact>): List<Match> {
@@ -114,7 +132,7 @@ object Names {
             val first = firstName(c.name) ?: continue
             if (fold(first) in shared) continue
             for (at in occurrences(text, lower, first)) {
-                if (capitalised(text, at)) {
+                if (capitalised(text, at) && !(cased(text, at) && startsSentence(text, at))) {
                     out.add(Match(c.id, "first", text.substring(at, at + first.length)))
                     break
                 }

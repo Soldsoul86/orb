@@ -1213,6 +1213,23 @@ the grant flow, the status line) is mutation-checked on the phone's suite.
 **Not decided here:** option C (a list you type, sealed like a note) can sit beside this later; no model is involved.
 
 
+## DR-25 — People separates the sure from the possible, and reads a name only inside a sentence
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with both") after the first device run of v32 · **Amends:** DR-24 (the matching rule and the screen)
+
+**What the device showed.** On a phone with **2537 contacts**, five invented texts and a few older ones produced **32 "people"** — every one a by-name match: a contact named like an ordinary capitalised word (*Home*, *Bank*, a one-word nickname) matched the word. In the six-contact book the
+rules were tested on, this did not show; in a real book it buried everything else. The failure was in the design's assumption, not in a defect: the rules did what DR-24 said.
+
+**The ruling.** (1) **Sure and possible are separate.** A person tied to **a number or an email address** by at least one item is *sure* and is listed first. A person **only a name ties** is *possible*: listed apart, hidden behind *Show N that only a name matches*, under *Might be — only a
+word matches a contact's name*. (2) **A first name is never read as the first word of the text, of a line or of a sentence** — a capital there says nothing (*Home is where…*). It is read inside a sentence. A sentence ends at `.` `!` `?` `…` or `।`; a line break also starts one; only
+blanks (space, tab, no-break space) may sit between. **A script with no case (Devanagari) is exempt**: it has no capital to be fooled by. The full name (two words or more) is unchanged: it is distinctive wherever it stands.
+
+**Known costs, accepted:** *Priya said hello* is not read (a real name at the start of a sentence is missed); *Mr. Anil called* is not read (an abbreviation's full stop looks like a sentence's end); a one-word contact name is still matched mid-sentence and so can still be noise, but now only in the
+*possible* list. Not reading is better than reading wrong.
+
+**Recorded.** The counts-only record gains `possible` (people tied only by a name) and is version 2; `people` now means *tied by number or email*. Still never a name, number or address.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

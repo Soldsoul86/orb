@@ -22,8 +22,11 @@ import java.util.Set;
  * person without any merge being recorded (closing the gap `AD-17` named).
  *
  * **How an item is tied to a person, strongest first:** it contains **one of his numbers**; it contains **one of his email addresses**;
- * it **names him** (`Mentions.names`: a full name, or a first name that is unique among the contacts and capitalised) — a word that
- * happens to be a name, so it is labelled as one. An item is listed once per person, by the strongest.
+ * it **names them** (`Mentions.names`: a full name, or a first name that is unique among the contacts, capitalised and not the first
+ * word of a sentence) — a word that happens to be a name, so it is labelled as one. An item is listed once per person, by the strongest.
+ *
+ * **Sure and possible.** A person with at least one item tied by number or address is *sure*; a person only a name ties to is
+ * *possible* and is listed apart (`Result.possible`) — in a book of thousands, some contacts are named like ordinary words.
  */
 final class People {
     private People() {}
@@ -69,14 +72,22 @@ final class People {
         /** What most often appears in those items besides this person's own numbers and addresses. */
         final List<Mentions.Handle> alsoWith = new ArrayList<>();
 
+        /** Tied to this person by a number or an address, not only by a word. */
+        boolean sure() {
+            for (Evidence e : items) if (!BY_NAME.equals(e.by)) return true;
+            return false;
+        }
+
         String display() {
             return names.get(0) + (names.size() > 1 ? " (+" + (names.size() - 1) + ")" : "");
         }
     }
 
     static final class Result {
-        /** People that at least one kept item mentions, most-mentioned first. */
+        /** People that at least one kept item ties to a number or an address, most-mentioned first. */
         final List<Person> people = new ArrayList<>();
+        /** People only a *word* ties to — a name that may be a name or may not — most-mentioned first. Kept apart so they cannot crowd out the sure ones. */
+        final List<Person> possible = new ArrayList<>();
         int contacts;
         /** First names several contacts share: matched by full name or number only. */
         int sharedFirstNames;
@@ -191,14 +202,16 @@ final class People {
                 @Override public int compare(Map.Entry<Mentions.Handle, Integer> a, Map.Entry<Mentions.Handle, Integer> b) { return b.getValue() - a.getValue(); }
             });
             for (int i = 0; i < ranked.size() && i < Mentions.ALSO_WITH; i++) p.alsoWith.add(ranked.get(i).getKey());
-            result.people.add(p);
+            (p.sure() ? result.people : result.possible).add(p);
         }
-        Collections.sort(result.people, new Comparator<Person>() {
+        Comparator<Person> order = new Comparator<Person>() {
             @Override public int compare(Person a, Person b) {
                 if (b.items.size() != a.items.size()) return b.items.size() - a.items.size();
                 return a.names.get(0).compareToIgnoreCase(b.names.get(0));
             }
-        });
+        };
+        Collections.sort(result.people, order);
+        Collections.sort(result.possible, order);
         return result;
     }
 

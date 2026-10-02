@@ -6565,7 +6565,7 @@ The export was sent without a comment. What it shows (2 Oct 2026 is a **Friday**
 
 ### 7b69. People — "everything about Ravi" — B3 slice 2 (DR-24) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v32-people.apk`. v31 is §7b68 (verified). Design: `docs/PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-24; limits `ARCHITECTURAL_DEBT.md` AD-21 (and AD-17, partly closed).
+**Status: first run done (two exports) — P143 and P151 held; P144 failed on a 2537-contact book (by-name noise); revised in §7b70 (v33)** — `orb-app-v32-people.apk`. v31 is §7b68 (verified). Design: `docs/PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-24; limits `ARCHITECTURAL_DEBT.md` AD-21 (and AD-17, partly closed).
 
 #### What changed
 
@@ -6609,3 +6609,56 @@ You need two people from your own contacts: **A** (with a phone number saved) an
 5. Open **What Orb may do**; read the contacts line; tap **Revoke**; open **People** again. *(P149)*
 6. Allow it again (so the export has a use), open **Recall**, erase one item that mentions A, open **People**. *(P150)*
 7. **Export and share journal**. *(P151)*
+
+
+#### Results (two exports, `orb-20261002-145252.txt` and `orb-20261002-145430.txt`; v32 = versionCode 29848836)
+
+On the operator's phone: **2537 contacts**. The operator shared five invented texts (55, 73, 53, 70 and 92 characters, twice) and **did not pick real contacts** — "A" and "B" in the protocol were stand-ins that I did not say were stand-ins — so the matching of a real contact's name or number was **not tested**.
+
+| | What the exports and the operator's report show |
+| --- | --- |
+| **P143** | **Held.** `grants.capability.granted` for `orb.read.contacts` by the operator, then the first `orb.contacts.read` a second later (Android's permission had been allowed). |
+| **P144** | **Failed — and the reason matters.** Every opening read **2537 contacts and found 32 "people"**, though the texts were invented. Thirty-two by-name matches of ordinary capitalised words (a contact named like a word matches the word), **"noise under it"** in the operator's words. In the six-contact book the rules were tested on this was invisible. |
+| P145–P148 | **Not tested** (no real contact was used). |
+| **P149** | **Partly:** `grants.capability.revoked` then `granted` again were recorded; what People showed between is not in an export. |
+| P150 | Not tested. |
+| **P151** | **Held.** The file has the grant, the revoke, the grant again and **eleven `orb.contacts.read` events with numbers only** (eight in the first file) (`contacts: 2537, people: 32`); **no contact name, number or address and none of the shared words** is in either file. |
+
+**What it taught:** a real address book is two orders of magnitude larger than the one the rules were tested on, and by-name matching of one-word contact names is mostly noise there. The operator approved the fix ("Yes, go ahead with both"): **DR-25** (below, v33).
+
+
+### 7b70. People, revised — sure and possible, and a name inside a sentence (DR-25) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v33-people.apk`. v32 is §7b69 (first run). Decision `DECISIONS.md` DR-25; limits `ARCHITECTURAL_DEBT.md` AD-21.
+
+#### What changed
+
+1. **The list is split.** The main list shows only **people tied to a number or an email address** that is in what you kept. The summary line says *N people tied by number or email · M only by a name · K contacts looked at*.
+2. **People only a name ties are kept apart and collapsed.** A button, **Show M that only a name matches**, opens a section headed **Might be — only a word matches a contact's name. It can be a different person, or no person.**
+3. **A first name is not read as the first word of the text, of a line or of a sentence** — *Home is where…* is not the contact *Home*, and *Priya said hello* is not read at all. *I told Priya* is. A full name (two words or more) is read wherever it is; Devanagari and other scripts without capitals are exempt.
+4. **Known costs:** a real name at the start of a sentence is missed, and *Mr. Anil called* is missed (the full stop looks like a sentence's end).
+5. The counts-only record gains **`possible`** and is version 2 (`people` now means tied by number or email). Still no name, number or address.
+
+#### Checked before the device
+
+- 1025 phone-side checks (was 1018), Kotlin 378 (was 364), TypeScript 600 (was 586); the **45 hand-written name cases** (14 new, 5 reworded) are checked by **both** implementations; lint and the independent type-check clean.
+- **Mutation-checked:** every part of the sentence-start rule in **both languages** (start of text, each sentence-ending mark, line breaks, each kind of blank, the caseless exemption, the blank-skipping loop), and the split on the phone (a person with a number is never *possible*, the order of each list, the record's new field). Each fails a named check.
+- **Not testable off the phone:** the collapsed section and button, and what a 2537-contact book does.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P152** | Open **People** with your own invented texts and no real contact's number or email in them: the summary says **0 people tied by number or email**, the main list says *None of your contacts' numbers or email addresses is in what you kept.*, and **far fewer than 32** are only-by-name | the noise is still in the main list |
+| **P153** | **Show M that only a name matches** opens a **Might be…** section; a row shows how many items and *by name*; tapping one shows *mentions the word “…”*. The button and the section are the only place those people appear | a name-only person is in the main list |
+| **P154** | With a **real contact who has a number saved**: share *Call (their full name) tomorrow* and *(their number, with spaces) for the loan*. They are in the **main list**, *1 by number, 1 by name*, and the number item says **has their number** | a number is not matched |
+| **P155** | A text that **starts** with a contact's unique first name (*Priya said hello*) does **not** list them; *I told Priya about it* lists them **only under Might be** (unless a number also ties them) | a sentence-start name is read, or a mid-sentence one is not |
+| **P156** | **Export and share journal**: each `orb.contacts.read` has `contacts`, `people`, **`possible`** and `version: 2` — numbers only — and no name, number or email anywhere | the record leaks or lacks the count |
+
+#### The operator's protocol
+
+1. Install `orb-app-v33-people.apk` over v32; open Orb once.
+2. Open **People** (no new shares). Read the top line and the list; tap **Show … that only a name matches** and look at what is there. *(P152, P153)*
+3. Pick **one real contact** with a number saved (call them C). Share to Orb, as two texts: *Call (C's full name) tomorrow* · *(C's number, with spaces) for the loan*. Open **People**: C should be in the main list. Tap C. *(P154)*
+4. Pick a contact D whose first name **no other contact has** (a search in Contacts tells you). Share two texts: *(D's first name) said hello* · *I told (D's first name) about it*. Open **People** and **Show … that only a name matches**: D should be there with **one** item, not two. *(P155)*
+5. **Export and share journal**. *(P156)*

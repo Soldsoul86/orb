@@ -606,7 +606,7 @@ a second source for the compiler's checksum exists (item 1).
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-24, `PEOPLE_PHONE.md`). Debts, stated.
 
-1. **A name is a word.** *Mark*, *May*, *Will* are contacts and words; Orb cannot tell which was meant, so a by-name match is labelled *by name* and never counted as strong. A first name shared by two contacts is not matched at all (the screen says how many are shared).
+1. **A name is a word — and in a real book, often noise (DR-25).** *Mark*, *May*, *Will*, *Home* are contacts and words; Orb cannot tell which was meant. A person tied only by a name is **possible**, listed apart and collapsed; only a number or an email makes a person *sure*. A first name shared by two contacts is not matched at all (the screen says how many are shared), and a first name is not read at the start of a sentence — which misses a real *Priya said hello* and *Mr. Anil called*. A one-word contact name can still be noise inside a sentence, in the *possible* list.
 2. **Only the contacts the words mention are shown.** A person who is in your kept words under a nickname, an initial or a different script from the contact's is not found; the contact's name is matched as written (case-insensitive, accents and Devanagari as given).
 3. **Grouping trusts the book.** Two contacts sharing a number or address become one person, even if the book is wrong; an address book that shares one number between family members would group them. Nothing is recorded, so it is corrected by fixing the book, not Orb.
 4. **Numbers are matched as the kept words write them** (`+91…` / `+country…`, ten-digit mobiles); a landline or a number with a trunk prefix the reader does not know is not found (AD-17 point 4).
