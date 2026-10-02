@@ -6514,7 +6514,7 @@ The operator reported *"All 5 done"*.
 
 ### 7b68. Relative days — "I'll send it Friday" — B4 slice 3 (DR-23) — 2026-10-02
 
-**Status: P137, P138 (including the same-weekday rule), P141, P142 held; P139 (the exclusions) and P140 (no dot for guesses) are on-screen and await the operator's word** — `orb-app-v31-relative.apk`. v30 is §7b67 (verified). Design: `docs/RELATIVE_DAYS_PHONE.md`; decision `DECISIONS.md` DR-23; limits `ARCHITECTURAL_DEBT.md` AD-19.
+**Status: verified on the device — P137–P142 held (P137, P138 incl. the same-weekday rule, P141, P142 from the export; P139 and P140 on the operator's word: "no dot, and for the 3rd text nothing was there")** — `orb-app-v31-relative.apk`. v30 is §7b67 (verified). Design: `docs/RELATIVE_DAYS_PHONE.md`; decision `DECISIONS.md` DR-23; limits `ARCHITECTURAL_DEBT.md` AD-19.
 
 #### What changed
 
