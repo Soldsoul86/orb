@@ -6260,7 +6260,7 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 
 ### 7b63. What my words mention — B3, first slice (DR-19) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v27-mentions.apk`. v26 is §7b61 (verified; P92/P105 in §7b62 are still small open taps). Design: `docs/ENTITIES_PHONE.md`; decision `DECISIONS.md` DR-19.
+**Status: P116 held (nothing leaked, no event written); the on-screen predictions P110–P115 are not visible in an export and await the operator's word** — `orb-app-v27-mentions.apk`. v26 is §7b61 (verified; P92/P105 in §7b62 are still small open taps). Design: `docs/ENTITIES_PHONE.md`; decision `DECISIONS.md` DR-19.
 
 #### What changed
 
@@ -6300,3 +6300,14 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 4. Recall → open the first → read **Mentions**. *(P110, P112, P115)* Tap the phone number. *(P111, P113)*
 5. Erase the **second** text; open the first again and tap the phone number. *(P114)*
 6. **Export and share journal**; search the file for `98765` and `4111`. *(P116)*
+
+
+#### Results (one export, `orb-20261002-082913.txt` — 331 events, `verifyLane`-clean; v27 = versionCode 29848488)
+
+| | What the export shows |
+| --- | --- |
+| **P116** | **Held.** Since v27's first start the journal gained exactly: the two shares, their two Observations, one erasure, a start, two grants readings and the export — **no event for browsing Mentions, no new event type**. The file contains **none** of `98765`, `4111`, `ravi@oksbi` or `example.com/trip` (searched in the raw file). |
+| Shares | The first text is recorded at **119 characters, `references: ""`** — exactly the length of the text in the protocol — sealed (`attachmentBytes` 149 = 119 + the document header and the multi-byte `₹`). The second is 53 characters (a text of the operator's own, not the 32-character one in the protocol). |
+| Erasure | The operator erased the **first** share (the one with the handles), not the second as the protocol said, so the P114 check ran the other way round: erase the item that held the handles, then look at what is left. |
+| **P110–P115** | **Not visible in an export** (they are what the screen shows). No comment was sent with the file; the on-screen results stay **unconfirmed** until the operator says what Mentions displayed. |
+| P92, P105 | Not shown: no refused share and no restore attempt in this export. |
