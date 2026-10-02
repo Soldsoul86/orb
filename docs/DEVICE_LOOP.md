@@ -6938,7 +6938,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b77. The Safety check — what else on this phone can see too much (DR-32) — 2026-10-02
 
-**Status: built, awaiting the device.** `orb-app-v41-safety.apk`. v40 is §7b76 (verified). Design: `docs/SAFETY_CHECK_PHONE.md`; decision `DECISIONS.md` DR-32; limits `ARCHITECTURAL_DEBT.md` AD-27.
+**Status: verified on the device — the operator: "Nothing looks wrong, just that it should be grouped by severity. That can be later." The export (`8afd14e6`, 565 events) shows, for v41 (versionCode 29849212): the install was **not** blocked (P204), `orb.safety.deferred` from *Not now* (P206), then — after the grant was recorded — `orb.safety.checked` with **299 apps looked at, 1 to look at now, 42 worth a look**; a revoke and a re-grant (P211) and a second identical check; counts only, `capability`/`version` and no app, package or permission in any safety record (P212). Predictions P204–P207, P209–P212 held on the export and the operator's word; P208 (the rows are right) is the operator's reading — nothing wrong.** Open: *group by severity* (the operator, later) — §7b77 follow-ups below. `orb-app-v41-safety.apk`. v40 is §7b76 (verified). Design: `docs/SAFETY_CHECK_PHONE.md`; decision `DECISIONS.md` DR-32; limits `ARCHITECTURAL_DEBT.md` AD-27.
 
 **Why:** your flow starts here — before Orb holds your commitments, people and messages, it should look at what else on the phone can read your screen, your notifications or your messages, and tell you plainly. It cannot *certify* a phone (nothing on a phone can see everything), so it **says what matched, what it cannot see, and never says "safe"**.
 
@@ -6980,3 +6980,9 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 6. **What Orb may do**: find the new line; **Revoke the safety check**; open **Safety check** again; **Check my phone** once more. *(P211)*
 7. **Export and share journal**. *(P212)*
 8. Tell me: **which rows were wrong, which apps you expected but did not see, and how many rows felt like noise.**
+
+#### What the export showed, and what comes next
+
+- **Scale:** 299 apps looked at; **1 now, 42 worth a look** — 14% of apps flagged is a lot of *worth a look*. The operator's note, **grouped by severity**, is the answer to that: the two levels are too coarse for 42 rows. Not built; a candidate (e.g. within *Worth a look*, groups by what the app can do — texts and calls, location, files, drawing over apps — with the strongest first).
+- **The order held:** *Not now* was recorded **before** the grant, then the check, as designed; revoking and re-checking each produced one record.
+- **Play Protect did not object** to the three added `<queries>` entries (AD-27 item 3 now answered for this phone).
