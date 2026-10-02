@@ -1,0 +1,380 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Commitments — what you owe, what you are waiting for, and where each stands (`docs/COMMITMENTS_PHONE.md`, DR-30). **A commitment is
+ * something the person confirms**; Orb never files one. Its **words and who it is with are in a sealed note** (own key, never in the clear
+ * journal, never listed in Recall); the journal holds the note's identity, the direction and the date.
+ *
+ * **The state is computed**: `open`, `due today`, `overdue` from the date and *today*; `done` and `dropped` from the last event the person
+ * made. **Orb never marks anything done** — it cannot see what the person sent — and *overdue* says *still open*, never *not done*.
+ *
+ * A reminder asked for from a commitment cites it, so **deleting the commitment** (the existing erasure of its opening) stops the reminder.
+ * Erasing the item a commitment was made from does **not** touch it: it is the person's own.
+ */
+final class Commitments {
+    private Commitments() {}
+
+    static final String HEADER = "orb.commitment.note.v1";
+
+    /** The most words a commitment holds. */
+    static final int MAX_WORDS = 200;
+
+    /** What the state is, read with today's date. */
+    static final String OPEN = "open";
+    static final String DUE_TODAY = "dueToday";
+    static final String OVERDUE = "overdue";
+    static final String DONE = "done";
+    static final String DROPPED = "dropped";
+
+    /** One live commitment, as the journal and its sealed note show it. */
+    static final class Commitment {
+        final String eventId;
+        final String eventHash;
+        /** The kept item it was made from (its lineage), or null. */
+        final String itemId;
+        final String direction;
+        final String words;
+        final PersonLink.Who who;
+        /** `YYYY-MM-DD`, or null for none — after any moves. */
+        String dueDate;
+        /** The last thing the person did with it: `open`, `done` or `dropped`. */
+        String last = OPEN;
+        final long openedAtMs;
+        long changedAtMs;
+
+        Commitment(String eventId, String eventHash, String itemId, String direction, String words, PersonLink.Who who, String dueDate, long openedAtMs) {
+            this.eventId = eventId;
+            this.eventHash = eventHash;
+            this.itemId = itemId;
+            this.direction = direction;
+            this.words = words;
+            this.who = who;
+            this.dueDate = dueDate;
+            this.openedAtMs = openedAtMs;
+            this.changedAtMs = openedAtMs;
+        }
+
+        boolean closed() {
+            return !OPEN.equals(last);
+        }
+    }
+
+    // ---- the sealed note
+
+    private static String oneLine(String value) {
+        return value.replace('\n', ' ').replace('\r', ' ').trim();
+    }
+
+    /** The sealed document: a header, a nonce, the words, and (if it is with someone) who. */
+    static byte[] document(String words, People.Person person, String nonce) {
+        StringBuilder out = new StringBuilder(HEADER).append("\n---\n").append("nonce:").append(nonce).append('\n').append("words:").append(oneLine(words)).append('\n');
+        if (person != null) {
+            for (String n : person.names) out.append("name:").append(oneLine(n)).append('\n');
+            for (String p : person.phones) out.append("phone:").append(oneLine(p)).append('\n');
+            for (String e : person.emails) out.append("email:").append(oneLine(e)).append('\n');
+        }
+        return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** What a commitment's note holds. */
+    static final class Note {
+        final String words;
+        final PersonLink.Who who;
+
+        Note(String words, PersonLink.Who who) {
+            this.words = words;
+            this.who = who;
+        }
+    }
+
+    /** The note, or null if these bytes are not one. */
+    static Note parse(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = HEADER + "\n---\n";
+        if (!s.startsWith(prefix)) return null;
+        String words = null;
+        PersonLink.Who who = new PersonLink.Who();
+        for (String line : s.substring(prefix.length()).split("\n")) {
+            if (line.startsWith("words:")) words = line.substring(6);
+            else if (line.startsWith("name:")) who.names.add(line.substring(5));
+            else if (line.startsWith("phone:")) who.phones.add(line.substring(6));
+            else if (line.startsWith("email:")) who.emails.add(line.substring(6));
+        }
+        return words == null ? null : new Note(words, who);
+    }
+
+    private static String nonce() {
+        byte[] b = new byte[12];
+        new SecureRandom().nextBytes(b);
+        StringBuilder out = new StringBuilder();
+        for (byte x : b) out.append(String.format(Locale.ROOT, "%02x", x));
+        return out.toString();
+    }
+
+    // ---- making one
+
+    /** Writes the opening event. The journal in the app; a test makes it fail, to see the sealed note go back. */
+    interface Recorder {
+        Map<String, Object> record(Map<String, Object> payload, List<String> causes);
+    }
+
+    /** What `open` came to. */
+    static final class Opened {
+        final String outcome;
+        /** The commitment's event id when it was opened. */
+        final String eventId;
+
+        Opened(String outcome, String eventId) {
+            this.outcome = outcome;
+            this.eventId = eventId;
+        }
+    }
+
+    static final String OPENED = "opened";
+    static final String NO_WORDS = "noWords";
+    static final String NOTE_FAILED = "noteFailed";
+    static final String JOURNAL_FAILED = "journalFailed";
+
+    /**
+     * The person confirmed. The note is sealed first; only then is the opening written, citing the item it was made from (if any). If it
+     * cannot be written the note goes back. The words must be something, and are cut at `MAX_WORDS`.
+     */
+    static Opened open(Context context, final Journal journal, String itemEventId, String words, String direction, String dueDate, People.Person person) {
+        return open(context, itemEventId, words, direction, dueDate, person, new Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload, List<String> causes) {
+                return journal.append(CommitmentFacts.OPENED, payload, causes);
+            }
+        });
+    }
+
+    static Opened open(Context context, String itemEventId, String words, String direction, String dueDate, People.Person person, Recorder recorder) {
+        String text = words == null ? "" : oneLine(words);
+        if (text.isEmpty()) return new Opened(NO_WORDS, null);
+        if (text.length() > MAX_WORDS) text = text.substring(0, MAX_WORDS);
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(document(text, person, nonce())));
+        if (stored.identity == null) return new Opened(NOTE_FAILED, null);
+        boolean sealedNow = "stored".equals(stored.outcome);
+        List<String> causes = itemEventId == null ? Collections.<String>emptyList() : Arrays.asList(itemEventId);
+        Map<String, Object> event = recorder.record(CommitmentFacts.opened(stored.identity, stored.bytes, direction, dueDate), causes);
+        if (event == null) {
+            if (sealedNow) {
+                try {
+                    Attachments.discard(context, stored.identity);
+                } catch (Exception leftBehind) {
+                    // Nothing cites it; the next erase pass cannot see it.
+                }
+            }
+            return new Opened(JOURNAL_FAILED, null);
+        }
+        return new Opened(OPENED, (String) event.get("id"));
+    }
+
+    // ---- reading them: a projection over the journal
+
+    private static final Pattern PHYSICAL = Pattern.compile("\"physical\":(\\d+)");
+    private static final Pattern DUE = Pattern.compile("\"dueDate\":\"([0-9-]*)\"");
+    private static final Pattern DIRECTION = Pattern.compile("\"direction\":\"([a-z]+)\"");
+
+    private static String field(Pattern pattern, String line) {
+        int payload = line.indexOf("\"payload\":");
+        if (payload < 0) return null;
+        Matcher m = pattern.matcher(line);
+        return m.find(payload) ? m.group(1) : null;
+    }
+
+    private static long physical(String line) {
+        Matcher m = PHYSICAL.matcher(line);
+        return m.find() ? Long.parseLong(m.group(1)) : 0L;
+    }
+
+    /** How many commitments are read at most. */
+    static final int READ_LIMIT = 500;
+
+    /** Every live commitment, oldest first, with its state as the person last left it. A note that cannot be opened is skipped, never guessed. */
+    static List<Commitment> all(Context context, Journal journal) throws IOException {
+        List<String> lines = journal.readLines();
+        Set<String> erased = Erasure.erasedHashes(lines);
+        Map<String, Erasure.Item> byHash = new LinkedHashMap<>();
+        for (Erasure.Item item : Erasure.items(lines)) if (CommitmentFacts.OPENED.equals(item.type)) byHash.put(item.hash, item);
+        Map<String, Commitment> byId = new LinkedHashMap<>();
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            if (type == null || !type.startsWith("orb.commitment.")) continue;
+            List<String> causes = Reminders.causesOf(line);
+            if (CommitmentFacts.OPENED.equals(type)) {
+                String hash = Erasure.envelopeHash(line);
+                Erasure.Item item = hash == null ? null : byHash.get(hash);
+                if (item == null || erased.contains(hash) || byId.size() >= READ_LIMIT) continue;
+                Note note = null;
+                try {
+                    byte[] bytes = Attachments.open(context, item.identity);
+                    note = bytes == null ? null : parse(bytes);
+                } catch (Exception unreadable) {
+                    note = null;
+                }
+                if (note == null) continue;
+                String due = field(DUE, line);
+                String direction = field(DIRECTION, line);
+                byId.put(Erasure.eventId(line), new Commitment(Erasure.eventId(line), hash, causes.isEmpty() ? null : causes.get(0), CommitmentFacts.directionOrOwe(direction),
+                    note.words, note.who, due == null || due.isEmpty() ? null : due, physical(line)));
+            } else if (!causes.isEmpty() && byId.containsKey(causes.get(0))) {
+                Commitment c = byId.get(causes.get(0));
+                c.changedAtMs = physical(line);
+                if (CommitmentFacts.MOVED.equals(type)) {
+                    String due = field(DUE, line);
+                    c.dueDate = due == null || due.isEmpty() ? null : due;
+                } else if (CommitmentFacts.DONE.equals(type)) c.last = DONE;
+                else if (CommitmentFacts.DROPPED.equals(type)) c.last = DROPPED;
+                else if (CommitmentFacts.REOPENED.equals(type)) c.last = OPEN;
+            }
+        }
+        return new ArrayList<>(byId.values());
+    }
+
+    // ---- what the person does with one
+
+    private static boolean act(Journal journal, Commitment c, String type, Map<String, Object> payload) {
+        return journal.append(type, payload, Arrays.asList(c.eventId)) != null;
+    }
+
+    static boolean done(Journal journal, Commitment c) { return act(journal, c, CommitmentFacts.DONE, CommitmentFacts.done()); }
+
+    static boolean drop(Journal journal, Commitment c) { return act(journal, c, CommitmentFacts.DROPPED, CommitmentFacts.dropped()); }
+
+    static boolean reopen(Journal journal, Commitment c) { return act(journal, c, CommitmentFacts.REOPENED, CommitmentFacts.reopened()); }
+
+    /** A new date, or null for none. */
+    static boolean move(Journal journal, Commitment c, String dueDate) { return act(journal, c, CommitmentFacts.MOVED, CommitmentFacts.moved(dueDate)); }
+
+    /**
+     * Deletes it: the opening is erased (its note's key is destroyed), and the reminders that cite it are stopped with it. Returns whether it
+     * was erased. The item it was made from is untouched.
+     */
+    static boolean delete(Context context, Journal journal, Commitment c, Remind.Scheduler scheduler) throws IOException {
+        Erase.Result done = Erase.execute(context, journal, c.eventHash);
+        if (!Erase.DESTROYED.equals(done.outcome) && !Erase.KEPT_BY_OTHERS.equals(done.outcome)) return false;
+        Remind.itemErased(context, journal, c.eventId, scheduler);
+        return true;
+    }
+
+    // ---- the state, and Today
+
+    /** The state today (`YYYY-MM-DD`): what the person last did, else the date against today. */
+    static String status(Commitment c, String today) {
+        if (DONE.equals(c.last)) return DONE;
+        if (DROPPED.equals(c.last)) return DROPPED;
+        if (c.dueDate == null) return OPEN;
+        int cmp = c.dueDate.compareTo(today);
+        return cmp < 0 ? OVERDUE : cmp == 0 ? DUE_TODAY : OPEN;
+    }
+
+    /** Whole days from one `YYYY-MM-DD` date to a later one. */
+    static int daysBetween(String from, String to) {
+        return (int) ((utc(to) - utc(from)) / 86_400_000L);
+    }
+
+    private static long utc(String date) {
+        String[] p = date.split("-");
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        c.clear();
+        c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+        return c.getTimeInMillis();
+    }
+
+    /** A line for a commitment's date against today: *due today*, *2 days past 3 Oct* … never *not done*. */
+    static String say(Commitment c, String today) {
+        if (c.dueDate == null) return "no date";
+        int days = daysBetween(today, c.dueDate);
+        if (days == 0) return "due today";
+        if (days > 0) return days == 1 ? "due tomorrow" : "due in " + days + " days";
+        int past = -days;
+        return "still open, " + past + (past == 1 ? " day" : " days") + " past " + c.dueDate;
+    }
+
+    /** How far ahead *This week* looks. */
+    static final int WEEK_DAYS = 7;
+
+    /** What Today shows: who owes what, ordered. */
+    static final class Today {
+        final List<Commitment> overdue = new ArrayList<>();
+        final List<Commitment> today = new ArrayList<>();
+        final List<Commitment> week = new ArrayList<>();
+        final List<Commitment> waiting = new ArrayList<>();
+        final List<Commitment> undated = new ArrayList<>();
+        /** Open commitments of yours dated beyond the week. */
+        int later;
+        /** The written dates ahead in what you kept, within the week, that are not yet a commitment. */
+        final List<ComingUp.Day> dates = new ArrayList<>();
+    }
+
+    static Today today(List<Commitment> all, ComingUp.Result ahead, String todayDate) {
+        Today t = new Today();
+        String last = ComingUp.plusDays(todayDate, WEEK_DAYS);
+        for (Commitment c : all) {
+            if (c.closed()) continue;
+            if (CommitmentFacts.WAITING.equals(c.direction)) { t.waiting.add(c); continue; }
+            if (c.dueDate == null) t.undated.add(c);
+            else if (c.dueDate.compareTo(todayDate) < 0) t.overdue.add(c);
+            else if (c.dueDate.equals(todayDate)) t.today.add(c);
+            else if (c.dueDate.compareTo(last) <= 0) t.week.add(c);
+            else t.later++;
+        }
+        // `all` is oldest first, so the lists are already in the order they were opened; a stable sort by date keeps that within a date.
+        final Comparator<Commitment> byDate = new Comparator<Commitment>() {
+            @Override public int compare(Commitment a, Commitment b) { return a.dueDate.compareTo(b.dueDate); }
+        };
+        Collections.sort(t.overdue, byDate);
+        Collections.sort(t.week, byDate);
+        Collections.sort(t.waiting, datedFirst());
+        if (ahead != null) {
+            java.util.Set<String> tracked = new java.util.HashSet<>();
+            for (Commitment c : all) if (c.itemId != null && c.dueDate != null) tracked.add(c.itemId + "|" + c.dueDate);
+            for (ComingUp.Day day : ahead.days) {
+                if (day.date.compareTo(todayDate) < 0 || day.date.compareTo(last) > 0) continue;
+                ComingUp.Day kept = new ComingUp.Day(day.date);
+                for (ComingUp.Item item : day.items) if (item.entry.id == null || !tracked.contains(item.entry.id + "|" + day.date)) kept.items.add(item);
+                if (!kept.items.isEmpty()) t.dates.add(kept);
+            }
+        }
+        return t;
+    }
+
+    /** By date, soonest first; those with no date last, in the order they were opened (the sort is stable). */
+    private static Comparator<Commitment> datedFirst() {
+        return new Comparator<Commitment>() {
+            @Override public int compare(Commitment a, Commitment b) {
+                if (a.dueDate == null && b.dueDate == null) return 0;
+                if (a.dueDate == null) return 1;
+                if (b.dueDate == null) return -1;
+                return a.dueDate.compareTo(b.dueDate);
+            }
+        };
+    }
+
+    /** The commitments that are with this person (a number or an address in common, else the same name), open ones first. */
+    static List<Commitment> forPerson(List<Commitment> all, People.Person person) {
+        List<Commitment> out = new ArrayList<>();
+        for (Commitment c : all) if (!c.closed() && PersonLink.matches(c.who, person)) out.add(c);
+        Collections.sort(out, datedFirst());
+        return out;
+    }
+}

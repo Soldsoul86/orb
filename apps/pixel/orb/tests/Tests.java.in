@@ -24,6 +24,7 @@ public final class Tests {
         PeopleTest.run();
         HandoffTest.run();
         PersonLinkTest.run();
+        CommitmentsTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

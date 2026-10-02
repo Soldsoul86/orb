@@ -1,0 +1,61 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * Every record of a commitment — built here and nowhere else (`docs/COMMITMENTS_PHONE.md`, DR-30). **The words and who it is with are in a
+ * sealed note** (`Commitments`); the journal holds only the note's identity, the **direction** (`owe` or `waiting`), the **date**, and which
+ * way the state last moved. The state itself is **the last of these events**, read each time — never stored — so a restore and a replay agree.
+ */
+final class CommitmentFacts {
+    private CommitmentFacts() {}
+
+    static final String OPENED = "orb.commitment.opened";
+    static final String MOVED = "orb.commitment.moved";
+    static final String DONE = "orb.commitment.done";
+    static final String DROPPED = "orb.commitment.dropped";
+    static final String REOPENED = "orb.commitment.reopened";
+
+    /** I owe it. */
+    static final String OWE = "owe";
+    /** I am waiting for them. */
+    static final String WAITING = "waiting";
+
+    /** A date as the record spells it — `YYYY-MM-DD` — or empty for none: the record never carries free text. */
+    static String dateOrNone(String date) {
+        return date != null && date.matches("\\d{4}-\\d{2}-\\d{2}") ? date : "";
+    }
+
+    static String directionOrOwe(String direction) {
+        return WAITING.equals(direction) ? WAITING : OWE;
+    }
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("version", 1L);
+        return p;
+    }
+
+    /** The person confirmed a commitment: the sealed note's identity and size, the direction and the date. */
+    static Map<String, Object> opened(String identity, long bytes, String direction, String dueDate) {
+        Map<String, Object> p = base();
+        p.put("attachment", identity);
+        p.put("attachmentBytes", bytes);
+        p.put("direction", directionOrOwe(direction));
+        p.put("dueDate", dateOrNone(dueDate));
+        return p;
+    }
+
+    /** A new date, or none (`""`). */
+    static Map<String, Object> moved(String dueDate) {
+        Map<String, Object> p = base();
+        p.put("dueDate", dateOrNone(dueDate));
+        return p;
+    }
+
+    static Map<String, Object> done() { return base(); }
+
+    static Map<String, Object> dropped() { return base(); }
+
+    static Map<String, Object> reopened() { return base(); }
+}

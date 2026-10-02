@@ -661,6 +661,23 @@ a second source for the compiler's checksum exists (item 1).
 7. **A link is not a merge.** Two contacts for one person, or one contact for two, are still as the contacts book has them.
 8. **Cost:** each opening of People opens every live link's note (one decrypt each) with the newest 500 kept items (AD-13).
 
+
+---
+
+## AD-25 — what commitments and Today do not know
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-30). Debts, stated.
+
+1. **Only what you confirm.** Orb finds no commitment by itself; a promise made in a chat you never track is invisible. Proposing them needs language understanding (a model), which is its own decision (DR-9).
+2. **"Done" is your word.** Orb cannot see that you sent the document or that the refund arrived, so *still open* can be stale: you did it and did not say. *Overdue* is only ever *the date passed and nothing was closed*.
+3. **No person after the fact.** A commitment made from an item has no person; to add one you delete it and make it again from the person's page.
+4. **A date is a day, not a time.** No time of day, no timezone beyond *today in your zone*; a reminder gives the time.
+5. **No duplicates check.** The same thing tracked twice is two commitments; drop or delete one.
+6. **No recurring commitments, no projects, no goals.** Each is a single line with a state; grouping them is a later step.
+7. **Dates in what you kept are offered only for the next seven days** and only if not already tracked on that item and date; further ahead is in Coming up.
+8. **The newest 500 kept items and the first 500 commitments** are read each time Today opens (AD-13).
+9. **A restore on a phone with other contacts** may show a commitment's person under a different contact, matched by number, address or name as for a link (AD-24).
+
 ---
 
 ## AD-18 — the first action's limits, stated

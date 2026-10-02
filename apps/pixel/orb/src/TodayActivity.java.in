@@ -1,0 +1,174 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
+
+/**
+ * Today — *what matters now* (`docs/COMMITMENTS_PHONE.md`, DR-30): what is overdue, what is due today and this week, what you are waiting for,
+ * and what has no date — your commitments, and the written dates ahead in what you kept that are not one yet. **Computed each time it
+ * opens; nothing is stored here.** Orb never marks anything done: *overdue* says *still open*. Secure like Recall, because it shows your words.
+ */
+public final class TodayActivity extends Activity {
+    private LinearLayout list;
+    private CommitmentFlow commitments;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+        commitments = new CommitmentFlow(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        commitments.onPermissionResult(code, results);
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void render() {
+        final Journal journal = journal();
+        list.removeAllViews();
+        list.addView(text("Today", 17, true));
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        list.addView(text("Looking at what you owe and what you kept…", 13, false));
+        final android.content.Context context = this;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                List<Commitments.Commitment> all = null;
+                ComingUp.Result dates = null;
+                try {
+                    all = Commitments.all(context, journal);
+                    dates = ComingUp.compute(context, journal, System.currentTimeMillis(), TimeZone.getDefault().getID());
+                } catch (IOException unreadable) {
+                    all = null;
+                }
+                final List<Commitments.Commitment> found = all;
+                final ComingUp.Result ahead = dates;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { show(found, ahead); }
+                });
+            }
+        }).start();
+    }
+
+    private void section(String title, List<Commitments.Commitment> items, String today, Runnable refresh) {
+        if (items.isEmpty()) return;
+        list.addView(text(title + " (" + items.size() + ")", 15, true));
+        for (Commitments.Commitment c : items) list.addView(commitments.row(c, today, refresh));
+    }
+
+    private void show(List<Commitments.Commitment> all, ComingUp.Result ahead) {
+        list.removeAllViews();
+        list.addView(text("Today", 17, true));
+        if (all == null) {
+            list.addView(text("Orb could not read its history, so it shows nothing rather than guess.", 13, false));
+            return;
+        }
+        final Runnable refresh = new Runnable() {
+            @Override public void run() { render(); }
+        };
+        final String today = CommitmentFlow.today();
+        String[] ymd = today.split("-");
+        Calendar c = Calendar.getInstance();
+        c.clear();
+        c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
+        list.addView(text(new SimpleDateFormat("EEEE d MMMM yyyy", Locale.getDefault()).format(c.getTime()), 13, false));
+        Button add = new Button(this);
+        add.setText("Add a commitment…");
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { commitments.start(null, "", null, null, refresh); }
+        });
+        list.addView(add);
+        Commitments.Today t = Commitments.today(all, ahead, today);
+        boolean any = !(t.overdue.isEmpty() && t.today.isEmpty() && t.week.isEmpty() && t.waiting.isEmpty() && t.undated.isEmpty() && t.dates.isEmpty() && t.later == 0);
+        if (!any) {
+            list.addView(text("Nothing is open. Track something from a person's page, a kept item, or a date in Coming up — or add one here.", 14, false));
+            return;
+        }
+        section("Overdue — still open", t.overdue, today, refresh);
+        section("Today", t.today, today, refresh);
+        section("This week", t.week, today, refresh);
+        addDates(t, refresh);
+        section("Waiting for", t.waiting, today, refresh);
+        section("No date", t.undated, today, refresh);
+        if (t.later > 0) list.addView(text(t.later + " more, dated further ahead", 12, false));
+        list.addView(text("Orb never marks anything done — only you. “Still open” means the date passed and you have not closed it.", 11, false));
+    }
+
+    /** The written dates ahead in what you kept, this week, that are not yet a commitment — each can become one. */
+    private void addDates(Commitments.Today t, final Runnable refresh) {
+        if (t.dates.isEmpty()) return;
+        list.addView(text("Dates in what you kept, this week", 14, true));
+        SimpleDateFormat nice = new SimpleDateFormat("EEE d MMM", Locale.getDefault());
+        for (ComingUp.Day day : t.dates) {
+            final String[] ymd = day.date.split("-");
+            Calendar c = Calendar.getInstance();
+            c.clear();
+            c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
+            for (final ComingUp.Item item : day.items) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.VERTICAL);
+                row.setPadding(0, 8, 0, 8);
+                row.addView(text(nice.format(c.getTime()) + (item.guess ? "  ·  a guess: “" + item.phrase + "”" : ""), 13, !item.guess));
+                row.addView(text(item.entry.snippet, 12, false));
+                Button track = new Button(this);
+                track.setText("Track this…");
+                final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+                final String preset = firstWords(item.entry.snippet);
+                track.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) { commitments.start(item.entry.id, preset, picked, null, refresh); }
+                });
+                row.addView(track);
+                list.addView(row);
+            }
+        }
+    }
+
+    /** The first words of an item, to start a commitment from — the person edits them. */
+    static String firstWords(String snippet) {
+        String flat = snippet == null ? "" : snippet.replace('\n', ' ').trim();
+        return flat.length() > 80 ? flat.substring(0, 80) : flat;
+    }
+}

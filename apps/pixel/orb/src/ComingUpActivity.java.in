@@ -27,12 +27,14 @@ public final class ComingUpActivity extends Activity {
 
     private LinearLayout list;
     private RemindFlow flow;
+    private CommitmentFlow commitments;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         flow = new RemindFlow(this);
+        commitments = new CommitmentFlow(this);
         ScrollView scroll = new ScrollView(this);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -51,6 +53,7 @@ public final class ComingUpActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         flow.onPermissionResult(code, results);
+        commitments.onPermissionResult(code, results);
     }
 
     /** `Tue 6 Oct` for a `YYYY-MM-DD` day. */
@@ -135,6 +138,13 @@ public final class ComingUpActivity extends Activity {
                     });
                     row.addView(remind);
                 }
+                Button track = new Button(this);
+                track.setText("Track this\u2026");
+                final int[] when = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+                track.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) { commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), when, null, null); }
+                });
+                row.addView(track);
                 list.addView(row);
             }
         }

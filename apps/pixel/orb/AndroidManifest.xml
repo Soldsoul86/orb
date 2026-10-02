@@ -114,6 +114,11 @@
             android:name=".PeopleActivity"
             android:exported="false" />
 
+        <!-- Today: what matters now. Not exported; secure like Recall. -->
+        <activity
+            android:name=".TodayActivity"
+            android:exported="false" />
+
         <!-- An alarm Orb set for a reminder the person confirmed. Not exported: only Orb's own alarm reaches it. -->
         <receiver
             android:name=".ReminderReceiver"

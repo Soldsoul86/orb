@@ -332,6 +332,7 @@ public final class RecallActivity extends Activity {
         addMentions(column, doc);
         addRemind(column, entry, doc);
         addLink(column, entry);
+        addTrack(column, entry);
         scroll.addView(column);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -352,6 +353,20 @@ public final class RecallActivity extends Activity {
         dialog.show();
     }
 
+    /** *Track this…* — a commitment you confirm, started from the item's first words; it cites the item and is not undone by erasing it. */
+    private void addTrack(LinearLayout column, final Recall.Entry entry) {
+        if (entry.id == null) return;
+        Button row = new Button(this);
+        row.setText("Track this\u2026");
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                if (commitments == null) commitments = new CommitmentFlow(RecallActivity.this);
+                commitments.start(entry.id, TodayActivity.firstWords(entry.snippet), null, null, null);
+            }
+        });
+        column.addView(row);
+    }
+
     /** *This is about a person…* — opens People in its choose mode; the contacts are read there, never here (`PERSON_LINK_PHONE.md`). */
     private void addLink(LinearLayout column, final Recall.Entry entry) {
         if (entry.id == null) return;
@@ -368,6 +383,7 @@ public final class RecallActivity extends Activity {
     // ---- Remind me… lives in RemindFlow (shared with Coming up); this screen only offers it.
 
     private RemindFlow flow;
+    private CommitmentFlow commitments;
 
     private void addRemind(LinearLayout column, final Recall.Entry entry, final Recall.Doc doc) {
         TextView row = new TextView(this);
@@ -395,6 +411,7 @@ public final class RecallActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (flow != null) flow.onPermissionResult(code, results);
+        if (commitments != null) commitments.onPermissionResult(code, results);
     }
 
     /**

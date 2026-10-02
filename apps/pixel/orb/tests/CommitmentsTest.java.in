@@ -1,0 +1,360 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/**
+ * Commitments (`docs/COMMITMENTS_PHONE.md`, DR-30): sealed words and who, a direction and a date; a state that is computed and never
+ * marked done by Orb; Today's order; deleting one stops its reminder; erasing its source item does not touch it.
+ */
+final class CommitmentsTest {
+    private CommitmentsTest() {}
+
+    private static Map<String, Object> keep(Context context, Journal journal, String text) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.chat", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, null);
+        return SharedText.record(journal, context, payload, stored, null);
+    }
+
+    private static String idOf(Map<String, Object> event) { return (String) event.get("id"); }
+
+    private static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static String lastOf(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) found = l;
+        return found;
+    }
+
+    private static Map<String, Long> listing(File dir, String prefix) {
+        Map<String, Long> out = new TreeMap<>();
+        File[] children = dir.listFiles();
+        if (children == null) return out;
+        for (File child : children) {
+            if (child.isDirectory()) out.putAll(listing(child, prefix + child.getName() + "/"));
+            else out.put(prefix + child.getName(), child.length());
+        }
+        return out;
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static People.Person ravi() {
+        People.Person p = new People.Person();
+        p.names.add("Ravi Kumar");
+        p.phones.add("+919000000022");
+        p.emails.add("ravi@x.example");
+        return p;
+    }
+
+    private static String opened(Context context, Journal journal, String item, String words, String direction, String due, People.Person person) {
+        Commitments.Opened o = Commitments.open(context, journal, item, words, direction, due, person);
+        return o.eventId;
+    }
+
+    private static Commitments.Commitment find(List<Commitments.Commitment> all, String id) {
+        for (Commitments.Commitment c : all) if (c.eventId.equals(id)) return c;
+        return null;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the sealed note: the words, and who it is with");
+        byte[] doc = Commitments.document("Send the GST certificate", ravi(), "ab12");
+        Commitments.Note note = Commitments.parse(doc);
+        Harness.check("it reads back", note != null && note.words.equals("Send the GST certificate") && note.who.names.equals(Arrays.asList("Ravi Kumar"))
+            && note.who.phones.equals(Arrays.asList("+919000000022")) && note.who.emails.equals(Arrays.asList("ravi@x.example")));
+        Commitments.Note alone = Commitments.parse(Commitments.document("Renew the licence", null, "n"));
+        Harness.check("with no one, it names no one", alone != null && alone.who.names.isEmpty() && alone.who.phones.isEmpty());
+        Harness.check("other bytes are not a commitment's note", Commitments.parse("hello".getBytes(StandardCharsets.UTF_8)) == null
+            && Commitments.parse(ReminderNote.document("Call Ravi")) == null && Commitments.parse(PersonLink.document(ravi(), "n")) == null);
+        Harness.check("and it is never listed in Recall", Recall.parse(doc) == null);
+        Harness.check("each note has its own nonce", !Arrays.equals(Commitments.document("x", null, "a"), Commitments.document("x", null, "b")));
+        Harness.equal("a line break cannot forge a line", Commitments.parse(Commitments.document("one\nname:Mallory", null, "n")).who.names.size(), 0);
+
+        Harness.suite("the record: a date or none, a direction, and no words");
+        Harness.equal("a date as written", CommitmentFacts.dateOrNone("2026-10-05"), "2026-10-05");
+        Harness.check("anything else is none", CommitmentFacts.dateOrNone("5 Oct").isEmpty() && CommitmentFacts.dateOrNone(null).isEmpty() && CommitmentFacts.dateOrNone("2026-10-05; x").isEmpty());
+        Harness.check("a direction is owe or waiting; anything else is owe", CommitmentFacts.directionOrOwe("waiting").equals("waiting") && CommitmentFacts.directionOrOwe("x").equals("owe") && CommitmentFacts.directionOrOwe(null).equals("owe"));
+        Harness.equal("the fields of an opening", new java.util.TreeSet<>(CommitmentFacts.opened("sha256:x", 5L, "owe", "2026-10-05").keySet()).toString(), "[attachment, attachmentBytes, direction, dueDate, version]");
+
+        Harness.suite("making one: sealed first, then written, citing where it came from");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-commit").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Map<String, Object> source = keep(context, journal, "ok will send the certificate by friday");
+        Harness.equal("no words, no commitment", Commitments.open(context, journal, null, "   ", "owe", null, null).outcome, Commitments.NO_WORDS);
+        Harness.equal("and nothing was written", count(journal, CommitmentFacts.OPENED), 0);
+        Commitments.Opened a = Commitments.open(context, journal, idOf(source), "Send the GST certificate", "owe", "2026-10-02", ravi());
+        Harness.check("opened, citing the item", a.outcome.equals(Commitments.OPENED) && a.eventId != null && lastOf(journal, CommitmentFacts.OPENED).contains("\"causes\":[\"" + idOf(source) + "\"]"));
+        Commitments.Opened b = Commitments.open(context, journal, null, "Invoice from Arun", "waiting", null, null);
+        Harness.check("one made by hand cites nothing", b.outcome.equals(Commitments.OPENED) && lastOf(journal, CommitmentFacts.OPENED).contains("\"causes\":[]"));
+        String all = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no words and no name", !all.contains("GST certificate") && !all.contains("Ravi") && !all.contains("9000000022") && !all.contains("Invoice from Arun"));
+        Harness.check("nor does anything on disk, in the clear", !contains(dir, "GST certificate".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "Ravi".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "Arun".getBytes(StandardCharsets.UTF_8)));
+        Commitments.Opened twin = Commitments.open(context, journal, null, "Invoice from Arun", "waiting", null, null);
+        Harness.check("the same words again are another commitment, not refused", twin.outcome.equals(Commitments.OPENED) && !twin.eventId.equals(b.eventId));
+        String longWords = "x";
+        for (int i = 0; i < 9; i++) longWords += longWords;
+        Commitments.Opened cut = Commitments.open(context, journal, null, longWords, "owe", null, null);
+        Harness.check("the words are cut at " + Commitments.MAX_WORDS, longWords.length() > Commitments.MAX_WORDS && cut.outcome.equals(Commitments.OPENED)
+            && find(Commitments.all(context, journal), cut.eventId).words.length() == Commitments.MAX_WORDS);
+        Map<String, Long> before = listing(dir, "");
+        Commitments.Recorder failing = new Commitments.Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload, List<String> causes) { return null; }
+        };
+        Harness.equal("if the event cannot be written, it is refused", Commitments.open(context, null, "words that will not be recorded", "owe", null, null, failing).outcome, Commitments.JOURNAL_FAILED);
+        Harness.equal("and the sealed note goes back: nothing is left on disk", listing(dir, ""), before);
+
+        Harness.suite("reading them: direction, date, words, who, and the last thing you did");
+        List<Commitments.Commitment> read = Commitments.all(context, journal);
+        Commitments.Commitment ca = find(read, a.eventId);
+        Harness.check("the first, as made", ca != null && ca.direction.equals("owe") && "2026-10-02".equals(ca.dueDate) && ca.words.equals("Send the GST certificate")
+            && ca.who.names.equals(Arrays.asList("Ravi Kumar")) && idOf(source).equals(ca.itemId) && !ca.closed() && ca.openedAtMs > 0);
+        Commitments.Commitment cb = find(read, b.eventId);
+        Harness.check("the second: waiting, no date, no item, no one", cb.direction.equals("waiting") && cb.dueDate == null && cb.itemId == null && cb.who.names.isEmpty());
+        Harness.check("moved to a date", Commitments.move(journal, cb, "2026-10-09") && "2026-10-09".equals(find(Commitments.all(context, journal), b.eventId).dueDate));
+        Harness.check("moved to none", Commitments.move(journal, cb, null) && find(Commitments.all(context, journal), b.eventId).dueDate == null);
+        Harness.check("moves are recorded, citing the opening, with a date or none", lastOf(journal, CommitmentFacts.MOVED).contains("\"causes\":[\"" + b.eventId + "\"]") && lastOf(journal, CommitmentFacts.MOVED).contains("\"dueDate\":\"\""));
+        Harness.check("done: closed, and said by the person", Commitments.done(journal, ca) && find(Commitments.all(context, journal), a.eventId).closed()
+            && Commitments.DONE.equals(find(Commitments.all(context, journal), a.eventId).last));
+        Harness.check("reopened: open again", Commitments.reopen(journal, ca) && !find(Commitments.all(context, journal), a.eventId).closed());
+        Harness.check("dropped: closed, differently", Commitments.drop(journal, ca) && Commitments.DROPPED.equals(find(Commitments.all(context, journal), a.eventId).last));
+        Harness.check("each is recorded citing the opening, carrying no words", lastOf(journal, CommitmentFacts.DROPPED).contains("\"causes\":[\"" + a.eventId + "\"]")
+            && !String.join("\n", journal.readLines()).contains("GST certificate"));
+        Commitments.reopen(journal, ca);
+        Commitments.Commitment unreadable = find(Commitments.all(context, journal), twin.eventId);
+        for (Erasure.Item it : Erasure.items(journal.readLines())) if (CommitmentFacts.OPENED.equals(it.type) && twin.eventId.equals(it.id)) Attachments.destroy(context, it.identity);
+        Harness.check("a commitment whose note is gone is skipped, never guessed at", unreadable != null && find(Commitments.all(context, journal), twin.eventId) == null);
+
+        Harness.suite("the state is computed from the date and today — and Orb never marks anything done");
+        Commitments.Commitment c = new Commitments.Commitment("e", "h", null, "owe", "w", new PersonLink.Who(), "2026-10-02", 1L);
+        Harness.equal("the date is today", Commitments.status(c, "2026-10-02"), Commitments.DUE_TODAY);
+        Harness.equal("the date is ahead", Commitments.status(c, "2026-10-01"), Commitments.OPEN);
+        Harness.equal("the date has passed", Commitments.status(c, "2026-10-03"), Commitments.OVERDUE);
+        c.dueDate = null;
+        Harness.equal("no date: open, never overdue", Commitments.status(c, "2030-01-01"), Commitments.OPEN);
+        c.dueDate = "2026-10-02";
+        c.last = Commitments.DONE;
+        Harness.equal("done stays done, whatever the date", Commitments.status(c, "2027-01-01"), Commitments.DONE);
+        c.last = Commitments.DROPPED;
+        Harness.equal("and dropped", Commitments.status(c, "2027-01-01"), Commitments.DROPPED);
+        c.last = Commitments.OPEN;
+        Harness.check("time passing never closes one: a year late is still overdue", Commitments.status(c, "2027-10-02").equals(Commitments.OVERDUE));
+        Harness.equal("days between, across a month end", Commitments.daysBetween("2026-09-28", "2026-10-02"), 4);
+        Harness.equal("across a year end", Commitments.daysBetween("2026-12-30", "2027-01-02"), 3);
+        Harness.equal("across a leap day", Commitments.daysBetween("2028-02-28", "2028-03-01"), 2);
+        Harness.equal("and none", Commitments.daysBetween("2026-10-02", "2026-10-02"), 0);
+        c.dueDate = null;
+        Harness.equal("said: no date", Commitments.say(c, "2026-10-02"), "no date");
+        c.dueDate = "2026-10-02";
+        Harness.equal("said: due today", Commitments.say(c, "2026-10-02"), "due today");
+        c.dueDate = "2026-10-03";
+        Harness.equal("said: due tomorrow", Commitments.say(c, "2026-10-02"), "due tomorrow");
+        c.dueDate = "2026-10-05";
+        Harness.equal("said: due in 3 days", Commitments.say(c, "2026-10-02"), "due in 3 days");
+        c.dueDate = "2026-10-01";
+        Harness.equal("said: still open, a day past — never *not done*", Commitments.say(c, "2026-10-02"), "still open, 1 day past 2026-10-01");
+        c.dueDate = "2026-09-30";
+        Harness.equal("said: still open, days past", Commitments.say(c, "2026-10-02"), "still open, 2 days past 2026-09-30");
+
+        Harness.suite("Today: overdue, today, this week, waiting for, no date — in order");
+        Install.forget();
+        File dir2 = Files.createTempDirectory("orb-commit2").toFile();
+        Context c2 = new Context(dir2);
+        Journal j2 = Journal.open(c2, Install.lane(c2), Install.id(c2));
+        Map<String, Object> meeting = keep(c2, j2, "meet the client on 5/10/2026 at the stall");
+        Map<String, Object> far = keep(c2, j2, "the fair is on 20/10/2026");
+        String newOverdue = opened(c2, j2, null, "new overdue", "owe", "2026-10-01", null);
+        String oldOverdue = opened(c2, j2, null, "old overdue", "owe", "2026-09-30", null);
+        String dueToday = opened(c2, j2, null, "due today", "owe", "2026-10-02", null);
+        String later = opened(c2, j2, null, "later in the week", "owe", "2026-10-05", null);
+        String sooner = opened(c2, j2, null, "sooner in the week", "owe", "2026-10-03", null);
+        String edge = opened(c2, j2, null, "the last day of the week", "owe", "2026-10-09", null);
+        String beyond = opened(c2, j2, null, "beyond the week", "owe", "2026-10-10", null);
+        String undatedOld = opened(c2, j2, null, "undated, older", "owe", null, null);
+        String undatedNew = opened(c2, j2, null, "undated, newer", "owe", null, null);
+        String waitDated = opened(c2, j2, null, "waiting, dated", "waiting", "2026-10-03", null);
+        String waitOverdue = opened(c2, j2, null, "waiting, overdue", "waiting", "2026-09-28", null);
+        String waitNone = opened(c2, j2, null, "waiting, no date", "waiting", null, null);
+        String finished = opened(c2, j2, null, "already done", "owe", "2026-10-01", null);
+        Commitments.done(j2, find(Commitments.all(c2, j2), finished));
+        String tracked = opened(c2, j2, idOf(meeting), "meeting already tracked", "owe", "2026-10-05", null);
+        List<Commitments.Commitment> everything = Commitments.all(c2, j2);
+        Calendar noon = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        noon.clear();
+        noon.set(2026, 9, 2, 12, 0, 0);
+        ComingUp.Result dates = ComingUp.compute(c2, j2, noon.getTimeInMillis(), "UTC");
+        Commitments.Today today = Commitments.today(everything, dates, "2026-10-02");
+        Harness.equal("overdue: the most overdue first", words(today.overdue), Arrays.asList("old overdue", "new overdue"));
+        Harness.equal("today", words(today.today), Arrays.asList("due today"));
+        Harness.equal("this week: soonest first, and the seventh day is in", words(today.week), Arrays.asList("sooner in the week", "later in the week", "meeting already tracked", "the last day of the week"));
+        Harness.equal("further out is only counted", today.later, 1);
+        Harness.equal("waiting for: by date, overdue ones first, undated last", words(today.waiting), Arrays.asList("waiting, overdue", "waiting, dated", "waiting, no date"));
+        Harness.equal("no date: the oldest first", words(today.undated), Arrays.asList("undated, older", "undated, newer"));
+        Harness.check("a finished commitment is nowhere", !words(today.overdue).contains("already done"));
+        Harness.equal("a written date in what you kept, in the week and not yet a commitment: none, because it is tracked", today.dates.size(), 0);
+        Commitments.Today untracked = Commitments.today(Commitments.all(c2, j2).subList(0, 0), dates, "2026-10-02");
+        Harness.check("untracked, the date in the week is offered; the one beyond the week is not", untracked.dates.size() == 1 && untracked.dates.get(0).date.equals("2026-10-05"));
+        Commitments.Today none = Commitments.today(new ArrayList<Commitments.Commitment>(), null, "2026-10-02");
+        Harness.check("nothing at all is an empty Today", none.overdue.isEmpty() && none.today.isEmpty() && none.week.isEmpty() && none.waiting.isEmpty() && none.undated.isEmpty() && none.later == 0 && none.dates.isEmpty());
+
+        Harness.suite("a person's page: what is open with them");
+        List<Commitments.Commitment> mine = Commitments.forPerson(Commitments.all(context, journal), ravi());
+        Harness.equal("only the open ones that name them", words(mine), Arrays.asList("Send the GST certificate"));
+        People.Person other = new People.Person();
+        other.names.add("Someone Else");
+        Harness.check("nobody else sees it", Commitments.forPerson(Commitments.all(context, journal), other).isEmpty());
+        Commitments.done(journal, find(Commitments.all(context, journal), a.eventId));
+        Harness.check("and once done it is not open with them", Commitments.forPerson(Commitments.all(context, journal), ravi()).isEmpty());
+        Commitments.reopen(journal, find(Commitments.all(context, journal), a.eventId));
+
+        Harness.suite("deleting one stops its reminder; erasing its source item does not touch it");
+        Commitments.Commitment target = find(Commitments.all(context, journal), a.eventId);
+        long due = System.currentTimeMillis() + 86_400_000L;
+        String intent = Remind.intend(journal, target.eventId, due, "Asia/Kolkata", 7L);
+        Remind.Confirmed reminder = Remind.confirm(context, journal, intent, target.eventId, due, "Asia/Kolkata", "Send the GST certificate");
+        Harness.check("a reminder that cites the commitment is waiting", reminder.reminder != null && Reminders.pending(journal.readLines()).size() == 1);
+        Harness.equal("erase the source item", Erase.execute(context, journal, hashOf(source)).outcome, Erase.DESTROYED);
+        Harness.check("the commitment is untouched, and so is the reminder", find(Commitments.all(context, journal), a.eventId) != null && Reminders.pending(journal.readLines()).size() == 1);
+        final List<String> cleared = new ArrayList<>();
+        Remind.Scheduler alarms = new Remind.Scheduler() {
+            @Override public void schedule(String confirmedId, long dueAtMs) {}
+            @Override public void cancel(String confirmedId) { cleared.add(confirmedId); }
+        };
+        Harness.check("delete it", Commitments.delete(context, journal, target, alarms));
+        Harness.check("it is gone", find(Commitments.all(context, journal), a.eventId) == null);
+        Harness.check("its note's key is destroyed", noteDestroyed(context, journal, a.eventId));
+        Harness.check("and its reminder is stopped, its alarm cleared", Reminders.pending(journal.readLines()).isEmpty() && cleared.equals(Arrays.asList(reminder.reminder.confirmedId)));
+        Harness.check("deleting what is already gone does nothing", !Commitments.delete(context, journal, target, alarms));
+
+        guard();
+    }
+
+    private static boolean noteDestroyed(Context context, Journal journal, String openedId) throws Exception {
+        for (Erasure.Item it : Erasure.items(journal.readLines())) {
+            if (CommitmentFacts.OPENED.equals(it.type) && openedId.equals(it.id)) return Attachments.state(context, it.identity).equals(Attachments.DESTROYED_STATE);
+        }
+        return false;
+    }
+
+    private static List<String> words(List<Commitments.Commitment> list) {
+        List<String> out = new ArrayList<>();
+        for (Commitments.Commitment c : list) out.add(c.words);
+        return out;
+    }
+
+    /** One file builds the records; the words are sealed before the event; nothing logs or keeps. */
+    private static void guard() throws Exception {
+        Harness.suite("the records are built in one place, and the words are sealed first");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> builders = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) {
+            String t = e.getValue();
+            if (t.contains("\"orb.commitment.opened\"") || t.contains("\"orb.commitment.done\"") || t.contains("\"orb.commitment.moved\"")) builders.add(e.getKey());
+        }
+        Harness.equal("only CommitmentFacts names the events", builders.toString(), "[CommitmentFacts]");
+        Harness.check("the records take no words, name, number or address", !source.get("CommitmentFacts").contains("words") && !source.get("CommitmentFacts").contains("name")
+            && !source.get("CommitmentFacts").contains("phone") && !source.get("CommitmentFacts").contains("email"));
+        for (String name : Arrays.asList("Commitments", "CommitmentFacts")) {
+            String t = source.get(name);
+            Harness.check(name + " logs nothing and keeps nothing but through the sealed note",
+                !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace") && !t.contains("FileOutputStream") && !t.contains("RandomAccessFile")
+                && !t.contains("getSharedPreferences") && !t.contains("Toast"));
+        }
+        Harness.check("Commitments builds no record of its own", !source.get("Commitments").contains("Json.obj("));
+        Harness.check("the words are sealed before the event is written", source.get("Commitments").indexOf("Attachments.store(") < source.get("Commitments").indexOf("recorder.record(CommitmentFacts.opened("));
+        Harness.check("and the note goes back if the event cannot be written", source.get("Commitments").contains("Attachments.discard("));
+        String flow = source.get("CommitmentFlow");
+        List<String> actors = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) {
+            String t = e.getValue();
+            if (t.contains("Commitments.done(") || t.contains("Commitments.drop(") || t.contains("Commitments.reopen(") || t.contains("Commitments.move(") || t.contains("Commitments.delete(")
+                || t.contains("Commitments.open(")) actors.add(e.getKey());
+        }
+        Harness.equal("only the flow changes a commitment — no screen, and no background code", actors.toString(), "[CommitmentFlow]");
+        Harness.check("every window the flow opens is secure: each dialog is created, and each is marked", flow.split("\\.create\\(\\)", -1).length - 1 == flow.split("setFlags\\(WindowManager", -1).length - 1
+            && flow.split("setFlags\\(WindowManager", -1).length - 1 >= 7);
+        Harness.check("the cards that decide something put Cancel first: keeping and deleting", flow.split("BUTTON_NEGATIVE\\)\\.requestFocus\\(\\)", -1).length - 1 == 2);
+        Harness.check("the words are typed in a watcher, read by no accessor", flow.contains("addTextChangedListener") && !flow.contains(".getText(") && !source.get("TodayActivity").contains(".getText("));
+        Harness.check("a reminder asked for from a commitment cites the commitment, so deleting it stops the reminder", flow.contains("remind.start(c.eventId, ymd, c.words)")
+            && flow.contains("Commitments.delete(host, journal, c, new ReminderAlarms(host))"));
+        Harness.check("the screens that offer it: Today, a person's page, Recall, Coming up",
+            source.get("TodayActivity").contains("commitments.start(null, \"\", null, null, refresh)") && source.get("PeopleActivity").contains("commitmentFlow.start(null, \"\", null, person,")
+            && source.get("RecallActivity").contains("commitments.start(entry.id, TodayActivity.firstWords(entry.snippet), null, null, null)")
+            && source.get("ComingUpActivity").contains("commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), when, null, null)"));
+        Harness.check("erasing the source item does not touch a commitment: Recall's erase never mentions them", !source.get("RecallActivity").contains("Commitments.delete") && !source.get("RecallActivity").contains("Commitments.all"));
+        Harness.check("Today is secure and computes nothing it keeps", source.get("TodayActivity").contains("FLAG_SECURE") && !source.get("TodayActivity").contains("getSharedPreferences") && !source.get("TodayActivity").contains("FileOutputStream"));
+        Harness.check("a person's page lists what is open with them, through the same rows", source.get("PeopleActivity").contains("Open with them") && source.get("PeopleActivity").contains("Commitments.forPerson(commitments, person)"));
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("Today is declared and not exported", manifest.replaceAll("\\s+", " ").contains("android:name=\".TodayActivity\" android:exported=\"false\""));
+        Harness.check("the main screen opens Today", source.get("MainActivity").contains("TodayActivity.class"));
+        Harness.check("the form refuses empty words, starts as I owe it, and the choices follow the state",
+            flow.contains("if (typed[0].isEmpty()) { say(\"Say what it is first.\"); return; }") && flow.contains("direction.check(owe.getId());")
+            && flow.contains("c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE}"));
+        Harness.check("each action does what it says: Done is done, Drop is dropped, Reopen reopens",
+            flow.contains("if (DONE.equals(what)) changed(Commitments.done(journal, c), onChanged);") && flow.contains("else if (DROP.equals(what)) changed(Commitments.drop(journal, c), onChanged);")
+            && flow.contains("else if (REOPEN.equals(what)) changed(Commitments.reopen(journal, c), onChanged);"));
+        String todayScreen = source.get("TodayActivity");
+        Harness.check("Today lists every section, in order: overdue, today, this week, the dates, waiting for, no date",
+            todayScreen.indexOf("section(\"Overdue") > 0 && todayScreen.indexOf("section(\"Overdue") < todayScreen.indexOf("section(\"Today\"") && todayScreen.indexOf("section(\"Today\"") < todayScreen.indexOf("section(\"This week\"")
+            && todayScreen.indexOf("section(\"This week\"") < todayScreen.indexOf("addDates(t, refresh)") && todayScreen.indexOf("addDates(t, refresh)") < todayScreen.indexOf("section(\"Waiting for\"")
+            && todayScreen.indexOf("section(\"Waiting for\"") < todayScreen.indexOf("section(\"No date\""));
+        Harness.check("a person's page forwards Android's answer to the commitment flow and shows their open ones through the same rows",
+            source.get("PeopleActivity").contains("if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);")
+            && source.get("PeopleActivity").contains("column.addView(commitmentFlow.row(c, today, reopenAfter(person)))"));
+        Harness.check("Orb never marks one done by itself: the only place a done is built is the person's action",
+            source.get("Commitments").split("CommitmentFacts\\.done\\(\\)", -1).length == 2);
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

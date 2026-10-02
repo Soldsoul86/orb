@@ -52,6 +52,9 @@ public final class PeopleActivity extends Activity {
     private View note;
     private RemindFlow flow;
     private HandoffFlow handoff;
+    private CommitmentFlow commitmentFlow;
+    /** Every live commitment, read with the people; a person's are the ones that name them. */
+    private List<Commitments.Commitment> commitments;
     /** The dates ahead in all kept items, computed once with the people; a person's are the ones in their own items. */
     private ComingUp.Result ahead;
     /** Choose mode: the item whose person is being chosen; null when this screen is just People. */
@@ -123,8 +126,10 @@ public final class PeopleActivity extends Activity {
                 final List<People.Contact> book = ContactsReader.read(context);
                 People.Result computed = null;
                 ComingUp.Result dates = null;
+                List<Commitments.Commitment> owed = null;
                 if (book != null) {
                     try {
+                        owed = Commitments.all(context, journal);
                         computed = People.compute(context, journal, book);
                         dates = ComingUp.compute(context, journal, System.currentTimeMillis(), java.util.TimeZone.getDefault().getID());
                     } catch (IOException unreadable) {
@@ -132,6 +137,7 @@ public final class PeopleActivity extends Activity {
                     }
                 }
                 ahead = dates;
+                commitments = owed;
                 final People.Result result = computed;
                 final boolean readable = book != null;
                 runOnUiThread(new Runnable() {
@@ -171,6 +177,7 @@ public final class PeopleActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (flow != null) flow.onPermissionResult(code, results);
+        if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);
         if (code != REQUEST_CONTACTS) return;
         boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         Journal journal = journal();
@@ -416,6 +423,27 @@ public final class PeopleActivity extends Activity {
         sure.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
     }
 
+    /** After a commitment is kept or changed, the screen is recomputed and the same person's page opens again. */
+    private Runnable reopenAfter(final People.Person person) {
+        return new Runnable() {
+            @Override public void run() {
+                reopenName = person.names.get(0);
+                if (shown != null) shown.dismiss();
+                render();
+            }
+        };
+    }
+
+    /** What is open with this person: commitments that name them, each with Done, Move, Drop, Remind me and Delete. */
+    private void addOpenWithThem(LinearLayout column, People.Person person) {
+        if (commitments == null || commitmentFlow == null) return;
+        List<Commitments.Commitment> mine = Commitments.forPerson(commitments, person);
+        if (mine.isEmpty()) return;
+        column.addView(text("Open with them (" + mine.size() + ")", 13, true));
+        String today = CommitmentFlow.today();
+        for (Commitments.Commitment c : mine) column.addView(commitmentFlow.row(c, today, reopenAfter(person)));
+    }
+
     /** The dates ahead in this person's own items — the Coming up reader, restricted; a guess is marked as one. */
     private void addDatesAhead(LinearLayout column, People.Person person) {
         if (ahead == null || person.items.isEmpty()) return;
@@ -493,6 +521,17 @@ public final class PeopleActivity extends Activity {
             }
         });
         column.addView(add);
+        // Commitments with them: what you owe, what you are waiting for — your confirmation, their sealed words (`COMMITMENTS_PHONE.md`).
+        if (commitmentFlow == null) commitmentFlow = new CommitmentFlow(this);
+        Button track = new Button(this);
+        track.setText("Add a commitment\u2026");
+        track.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                if (shown != null) shown.dismiss();
+                commitmentFlow.start(null, "", null, person, reopenAfter(person));
+            }
+        });
+        column.addView(track);
         People.Glance context = People.context(person);
         if (context.count > 0) {
             SimpleDateFormat day = new SimpleDateFormat("d MMM yyyy", Locale.getDefault());
@@ -510,6 +549,7 @@ public final class PeopleActivity extends Activity {
             for (Mentions.Handle h : person.alsoWith) with.append("\n  ").append(Mentions.line(h));
             column.addView(text(with.toString(), 13, false));
         }
+        addOpenWithThem(column, person);
         addDatesAhead(column, person);
         SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
         if (person.items.isEmpty()) column.addView(text("Nothing you kept mentions them yet.", 13, false));

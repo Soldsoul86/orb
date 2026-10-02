@@ -6828,3 +6828,50 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 6. In **Recall**, erase the first linked chat; look at her page and at **Everything Orb keeps**. *(P183)*
 7. **Export and share journal**. *(P184)*
 
+
+### 7b75. Commitments and Today — the first life state (DR-30) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v38-today.apk`. v37 is §7b74 (verified; the reminder set from a person **fired** — the operator, "Reminder fired"). Design: `docs/COMMITMENTS_PHONE.md`; decision `DECISIONS.md` DR-30; limits `ARCHITECTURAL_DEBT.md` AD-25.
+
+**Why:** after the *Personal Life OS* framing (World, State, Intent), the first state worth keeping is **what you owe and what you are waiting for** — and where each stands. Orb cannot see what you did, so **you** confirm a commitment and **you** close it; Orb only shows what is still open and when it should have been closed.
+
+#### What changed
+
+1. **A new button on the main screen: Today.** It shows **Overdue — still open**, **Today**, **This week**, **Waiting for**, **No date**, and the written dates in what you kept this week that are not yet a commitment (each with **Track this…**). **Add a commitment…** is at the top.
+2. **Make one from three places:** a **person's page** (*Add a commitment…*, with them), a **kept item** in Recall (*Track this…*), or a **date in Coming up** (*Track this…*). One small form — what it is (started from the item, yours to change), **I owe it / I'm waiting for them** — then **a date or none**, then a card that says what will be kept. **Cancel is the default.**
+3. **Tap a commitment:** **Done · Move date… · Drop · Remind me… · Delete…** (and **Reopen** once closed). *Remind me* is the reminder flow, at its date, with its words as the note. *Delete* asks first, erases its words for good and stops its reminders.
+4. **A person's page shows *Open with them*** — their open commitments, with the same actions.
+5. **Orb never marks anything done.** *Overdue* says *still open, 2 days past (date)*. Erasing the item a commitment came from does **not** touch it.
+6. Everything is **sealed and secure**: words and who are in a sealed note; the journal holds only the direction, the date and the state changes; no screenshots of any of these windows.
+
+#### Checked before the device
+
+- 1280 phone-side checks (was 1189); Kotlin 378, TypeScript 600 unchanged; lint and type-check clean.
+- **Tests:** the note; the record's fields; opening (sealed first, cited, nothing in the clear, a failed write puts the note back); reading; the state and the wording across month, year and leap-day ends; Today's order and every boundary; *Open with them*; delete stops the reminder and destroys the note; erasing the source leaves it; source guards. Mutation-checked.
+- **Not testable off the phone:** the screens and dialogs.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P185** | The main screen has a **Today** button; with nothing tracked it says *Nothing is open. Track something…* and offers **Add a commitment…** | the button or the empty state is missing |
+| **P186** | **Add a commitment…** → type words → **I owe it** → **Next** → **Pick a date** (set tomorrow) → the card shows the words, *You owe it*, the date, **Cancel the default** → **Keep** → it appears under **This week** | the flow or the section differs |
+| **P187** | Make another **I'm waiting for them** with **No date**: it appears under **Waiting for** | a waiting-for commitment is mislaid |
+| **P188** | Tap a commitment → **Move date…** → pick yesterday → it moves to **Overdue — still open**, and says **still open, 1 day past (date)** | the state is wrong or says *not done* |
+| **P189** | Tap it → **Done**: it leaves Today; nothing else marks anything done at any time | something closes without you |
+| **P190** | In **Recall**, open a kept item → **Track this…**: the words start from the item's first words; keep it; then **erase that item** in Recall: **the commitment is still on Today** | erasing the item removed it |
+| **P191** | On a **person's page** → **Add a commitment…** → keep one: their page opens again with **Open with them (1)**; it is under Today too, showing *with (their name)* | the person is not attached |
+| **P192** | Tap a commitment → **Remind me…** (set it two minutes ahead): the **notification fires**; then **Delete** the commitment: **no further reminder** for it | deleting left a reminder behind |
+| **P193** | **Export and share journal**: `orb.commitment.opened` for each (with an attachment identity, a `direction` and a `dueDate`), `moved`/`done` events citing it; **no words and no name anywhere in the file** | the words were written in the clear |
+
+#### The operator's protocol
+
+1. Install `orb-app-v38-today.apk` over v37; open Orb once.
+2. **Today** → read it → **Add a commitment…**: *Send the invoice* · **I owe it** · **Next** · **Pick a date**, tomorrow · read the card · **Keep**. *(P185, P186)*
+3. **Add a commitment…**: *Confirmation from the hotel* · **I'm waiting for them** · **Next** · **No date** · **Keep**. *(P187)*
+4. Tap *Send the invoice* → **Move date…** → yesterday. It should be under **Overdue — still open**. *(P188)* Tap it → **Done**. *(P189)*
+5. **Recall** → open a kept item → **Track this…** → keep it. Then erase that item in Recall; open **Today**. *(P190)*
+6. **People** → a person → **Add a commitment…** → keep one; check *Open with them* and Today. *(P191)*
+7. Tap a commitment → **Remind me…** two minutes ahead; wait for the notification; then tap it → **Delete…**. *(P192)*
+8. **Export and share journal**. *(P193)*
+

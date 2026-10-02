@@ -1,0 +1,307 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.content.DialogInterface;
+import android.graphics.Typeface;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.DatePicker;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.Calendar;
+import java.util.List;
+import java.util.TimeZone;
+
+/**
+ * *Track this* and what you do with a commitment (`docs/COMMITMENTS_PHONE.md`, DR-30). It draws and asks; `Commitments` records and
+ * reads. **A commitment is something you confirm**: the words (started from the item, if there is one, and yours to change), whether
+ * *you owe it* or *you are waiting for them*, a date or none, then a card that says what will be kept — **Cancel the default**. Done, moved,
+ * dropped and reopened are your taps; **Orb never marks anything done**.
+ *
+ * Every window here shows your words or a person, so every one is secure. Takes the host activity, which forwards Android's permission
+ * answer to `onPermissionResult` (a reminder asked for from a commitment goes through the existing reminder flow).
+ */
+final class CommitmentFlow {
+    private final Activity host;
+    private RemindFlow remind;
+
+    CommitmentFlow(Activity host) {
+        this.host = host;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    void onPermissionResult(int code, int[] results) {
+        if (remind != null) remind.onPermissionResult(code, results);
+    }
+
+    private void say(String message) {
+        AlertDialog box = new AlertDialog.Builder(host).setMessage(message).setPositiveButton("OK", null).create();
+        box.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        box.show();
+    }
+
+    /** Today in the person's zone, `YYYY-MM-DD`. */
+    static String today() {
+        return ComingUp.dateOf(System.currentTimeMillis(), TimeZone.getDefault().getID());
+    }
+
+    private static String pretty(String date) {
+        if (date == null) return "no date";
+        String[] p = date.split("-");
+        Calendar c = Calendar.getInstance();
+        c.clear();
+        c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+        return new java.text.SimpleDateFormat("EEE d MMM yyyy", java.util.Locale.getDefault()).format(c.getTime());
+    }
+
+    private static String ymd(int year, int month, int day) {
+        return String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", year, month + 1, day);
+    }
+
+    // ---- making one
+
+    /**
+     * Step 1: the words and the direction. `presetWords` starts the field (the item's first words, or empty); `ymd` is a date to offer
+     * (a date the item names) or null; `person` is who it is with, or null. `onDone` runs after it is kept.
+     */
+    void start(final String itemEventId, String presetWords, final int[] ymd, final People.Person person, final Runnable onDone) {
+        final EditText field = new EditText(host);
+        field.setHint("What is it? (" + Commitments.MAX_WORDS + " characters)");
+        field.setFilters(new InputFilter[] {new InputFilter.LengthFilter(Commitments.MAX_WORDS)});
+        final String[] typed = {presetWords == null ? "" : presetWords.trim()};
+        field.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) { typed[0] = s.toString().trim(); }
+        });
+        if (presetWords != null) field.setText(presetWords);
+        final RadioGroup direction = new RadioGroup(host);
+        final RadioButton owe = new RadioButton(host);
+        owe.setText("I owe it");
+        owe.setId(View.generateViewId());
+        final RadioButton waiting = new RadioButton(host);
+        waiting.setText("I'm waiting for them");
+        waiting.setId(View.generateViewId());
+        direction.addView(owe);
+        direction.addView(waiting);
+        direction.check(owe.getId());
+        LinearLayout column = new LinearLayout(host);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(48, 16, 48, 0);
+        column.addView(field);
+        column.addView(direction);
+        final boolean[] waits = {false};
+        direction.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(RadioGroup group, int id) { waits[0] = id == waiting.getId(); }
+        });
+        AlertDialog ask = new AlertDialog.Builder(host)
+            .setTitle(person == null ? "Track this" : "Track this with " + person.names.get(0))
+            .setView(column)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Next", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    if (typed[0].isEmpty()) { say("Say what it is first."); return; }
+                    askDate(itemEventId, typed[0], waits[0] ? CommitmentFacts.WAITING : CommitmentFacts.OWE, ymd, person, onDone);
+                }
+            })
+            .create();
+        ask.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ask.show();
+    }
+
+    /** Step 2: a date, or none. */
+    private void askDate(final String itemEventId, final String words, final String direction, final int[] ymd, final People.Person person, final Runnable onDone) {
+        final Calendar start = Calendar.getInstance();
+        if (ymd == null) start.add(Calendar.DAY_OF_MONTH, 1);
+        else start.set(ymd[0], ymd[1] - 1, ymd[2]);
+        AlertDialog when = new AlertDialog.Builder(host)
+            .setTitle("When should it be closed?")
+            .setMessage(ymd == null ? "A date is optional." : "The item names " + pretty(ymd[0] + "-" + String.format(java.util.Locale.ROOT, "%02d-%02d", ymd[1], ymd[2])) + ".")
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("No date", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { review(itemEventId, words, direction, null, person, onDone); }
+            })
+            .setPositiveButton("Pick a date", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    new DatePickerDialog(host, new DatePickerDialog.OnDateSetListener() {
+                        @Override public void onDateSet(DatePicker picker, int year, int month, int day) {
+                            review(itemEventId, words, direction, ymd(year, month, day), person, onDone);
+                        }
+                    }, start.get(Calendar.YEAR), start.get(Calendar.MONTH), start.get(Calendar.DAY_OF_MONTH)).show();
+                }
+            })
+            .create();
+        when.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        when.show();
+    }
+
+    /** Step 3: the card — exactly what will be kept. Cancel is the default; nothing is written until *Keep*. */
+    private void review(final String itemEventId, final String words, final String direction, final String dueDate, final People.Person person, final Runnable onDone) {
+        AlertDialog card = new AlertDialog.Builder(host)
+            .setTitle("Keep this?")
+            .setMessage("“" + words + "”\n\n" + (CommitmentFacts.WAITING.equals(direction) ? "You are waiting for them" : "You owe it")
+                + (person == null ? "" : " · with " + person.names.get(0)) + "\n" + pretty(dueDate)
+                + "\n\nKept sealed on this phone. You can mark it done, move it or delete it any time. Orb will not mark it done for you.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Keep", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { keep(itemEventId, words, direction, dueDate, person, onDone); }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    private void keep(String itemEventId, String words, String direction, String dueDate, People.Person person, Runnable onDone) {
+        Journal journal = journal();
+        if (journal == null) return;
+        Commitments.Opened opened = Commitments.open(host, journal, itemEventId, words, direction, dueDate, person);
+        if (!Commitments.OPENED.equals(opened.outcome)) {
+            say("Orb could not record this, so it kept nothing.");
+            return;
+        }
+        if (onDone != null) onDone.run();
+        else say("Kept.");
+    }
+
+    // ---- what you do with one
+
+    /** A commitment as a row: its words, who it is with, and where it stands — a tap opens `actions`. */
+    View row(final Commitments.Commitment c, String today, final Runnable onChanged) {
+        LinearLayout row = new LinearLayout(host);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, 16, 0, 16);
+        TextView words = new TextView(host);
+        words.setTextSize(15);
+        words.setTypeface(Typeface.DEFAULT_BOLD);
+        words.setText(c.words);
+        row.addView(words);
+        StringBuilder line = new StringBuilder(CommitmentFacts.WAITING.equals(c.direction) ? "waiting for them" : "I owe it");
+        if (!c.who.names.isEmpty()) line.append(" · with ").append(c.who.names.get(0));
+        if (Commitments.DONE.equals(c.last)) line.append(" · done");
+        else if (Commitments.DROPPED.equals(c.last)) line.append(" · dropped");
+        else line.append(" · ").append(Commitments.say(c, today));
+        TextView where = new TextView(host);
+        where.setTextSize(12);
+        where.setText(line.toString());
+        row.addView(where);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { actions(c, onChanged); }
+        });
+        return row;
+    }
+
+    private static final String DONE = "Done";
+    private static final String MOVE = "Move date…";
+    private static final String DROP = "Drop";
+    private static final String REMIND = "Remind me…";
+    private static final String REOPEN = "Reopen";
+    private static final String DELETE = "Delete…";
+
+    /** The things you can do, for a commitment as it stands. */
+    void actions(final Commitments.Commitment c, final Runnable onChanged) {
+        final String[] choices = c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE};
+        AlertDialog list = new AlertDialog.Builder(host)
+            .setTitle(c.words)
+            .setItems(choices, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int index) {
+                    String what = choices[index];
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    if (DONE.equals(what)) changed(Commitments.done(journal, c), onChanged);
+                    else if (DROP.equals(what)) changed(Commitments.drop(journal, c), onChanged);
+                    else if (REOPEN.equals(what)) changed(Commitments.reopen(journal, c), onChanged);
+                    else if (MOVE.equals(what)) move(c, onChanged);
+                    else if (REMIND.equals(what)) remindAbout(c);
+                    else confirmDelete(c, onChanged);
+                }
+            })
+            .setNegativeButton("Close", null)
+            .create();
+        list.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        list.show();
+    }
+
+    private void changed(boolean ok, Runnable onChanged) {
+        if (!ok) say("Orb could not record this, so nothing changed.");
+        else if (onChanged != null) onChanged.run();
+    }
+
+    private void move(final Commitments.Commitment c, final Runnable onChanged) {
+        final Calendar start = Calendar.getInstance();
+        if (c.dueDate != null) {
+            String[] p = c.dueDate.split("-");
+            start.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+        } else {
+            start.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        AlertDialog when = new AlertDialog.Builder(host)
+            .setTitle("Move to when?")
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("No date", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Journal journal = journal();
+                    if (journal != null) changed(Commitments.move(journal, c, null), onChanged);
+                }
+            })
+            .setPositiveButton("Pick a date", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    new DatePickerDialog(host, new DatePickerDialog.OnDateSetListener() {
+                        @Override public void onDateSet(DatePicker picker, int year, int month, int day) {
+                            Journal journal = journal();
+                            if (journal != null) changed(Commitments.move(journal, c, ymd(year, month, day)), onChanged);
+                        }
+                    }, start.get(Calendar.YEAR), start.get(Calendar.MONTH), start.get(Calendar.DAY_OF_MONTH)).show();
+                }
+            })
+            .create();
+        when.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        when.show();
+    }
+
+    /** *Remind me…* is the existing reminder flow, at the commitment's date, with its words as the note; the reminder cites the commitment. */
+    private void remindAbout(Commitments.Commitment c) {
+        if (remind == null) remind = new RemindFlow(host);
+        int[] ymd = null;
+        if (c.dueDate != null && c.dueDate.compareTo(today()) >= 0) {
+            String[] p = c.dueDate.split("-");
+            ymd = new int[] {Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2])};
+        }
+        remind.start(c.eventId, ymd, c.words);
+    }
+
+    private void confirmDelete(final Commitments.Commitment c, final Runnable onChanged) {
+        AlertDialog card = new AlertDialog.Builder(host)
+            .setTitle("Delete this?")
+            .setMessage("“" + c.words + "”\n\nIts words are erased for good and any reminder about it stops. The item it came from is not touched. This cannot be undone.")
+            .setNegativeButton("Keep it", null)
+            .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    try {
+                        changed(Commitments.delete(host, journal, c, new ReminderAlarms(host)), onChanged);
+                    } catch (IOException unreadable) {
+                        say("Orb could not read its history, so it deleted nothing.");
+                    }
+                }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+}

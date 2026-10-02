@@ -1278,6 +1278,22 @@ sealed note** — the note holds the contact's names, numbers and email addresse
 **Not in this ruling:** merging or splitting persons; linking from the screen capture or the share sheet at the moment of keeping; guessing a chat's person from its app or title; group chats.
 
 
+## DR-30 — Commitments: the first life state, confirmed by you and never closed by Orb
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator (the *Personal Life OS* framing, then "Yes, go ahead with the design") on `COMMITMENTS_PHONE.md` · **Bears on:** `Fact.md`, `Belief.md`, `Project.md`, `Goal.md`, DR-20, DR-29
+
+**The ruling.** A **commitment** is something **the person confirms**: its words (sealed), whether **I owe it** or **I am waiting for them**, optionally who it is with (sealed with the words), optionally a date, optionally the kept item it came from. **Orb does not file commitments**; it never proposes one in this slice. The **state is computed**, never stored: `open`, `due today`, `overdue` from the date and today; `done` and `dropped` from the last thing the person did.
+**Orb never marks anything done** — it cannot see what you sent — and *overdue* is said as *still open, N days past (date)*, never as *not done*. That is Orb's whole reconciliation in this slice: **what was supposed to happen against what you have told it happened.** A **Today** screen answers *what matters now* (Overdue, Today, This week, Waiting for, No date, and the written dates in what you kept that are not yet a commitment), and
+a person's page lists **what is open with them**.
+
+**Records.** `orb.commitment.opened` cites the source item (if any) and carries the sealed note's identity, the direction and the date; `moved`, `done`, `dropped`, `reopened` cite the opening; **the state is the last of them**. **No words and no name in the journal.** A reminder asked for from a commitment **cites the commitment**, so **Delete** (the existing erasure of the opening) stops it. **Erasing the item a commitment was made from does not touch it** —
+it is the person's own. **No new capability and no new Android permission.**
+
+**This is where the *Personal Life OS* framing meets the evidence model:** World is what exists (entities, people, links — already built), **State** is the lifecycle of what is open (this slice), **Intent** is what you are working toward (projects and goals: not yet). Orb's own claims will be *believed*, with their evidence shown, and a tap makes them yours; a model proposing commitments from your messages is a later, separate decision about what leaves the phone.
+
+**Not in this ruling:** Orb proposing commitments; projects, goals and trips as groupings; money; reconciling against evidence Orb does not have (sent mail, bank notifications); a nagging notification; recurring commitments; the quiet dot counting commitments.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

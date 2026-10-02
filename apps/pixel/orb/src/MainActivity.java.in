@@ -66,6 +66,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(backupButton);
 
+        // COMMITMENTS_PHONE.md: what you owe and what you are waiting for, and where each stands.
+        Button today = new Button(this);
+        today.setText("Today");
+        today.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, TodayActivity.class)); }
+        });
+        root.addView(today);
+
         // COMING_UP_PHONE.md: dates ahead in what was kept. A quiet mark when something is near; no notification, ever.
         comingUp = new Button(this);
         comingUp.setText("Coming up");
