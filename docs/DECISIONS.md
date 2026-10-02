@@ -1080,6 +1080,27 @@ change (the projection is identity-based, and the new event is live). Full desig
 and remembered screens (`DEVICE_LOOP.md` §7b61). Pictures, files and the desk's keyring are not covered (`ARCHITECTURAL_DEBT.md` AD-16).
 
 
+## DR-18 — Three small decisions closed: the scan interval stays at 12 hours, pictures are not read for words yet, the card keeps its two-tap Allow
+
+- **Status:** Decided · **Decided:** 2026-10-02, operator ("Go with your recommendation") on the recommendations below ·
+  **Bears on:** `Watch.SCAN_INTERVAL_MS`, `ROADMAP.md` B2, `DEVICE_LOOP.md` §7b51/§7b53
+
+1. **The package-scan interval stays 12 hours.** It was a labelled guess (`Watch.java.in`). Measured on the operator's real journal (322 events):
+   a scan is **4.9 KB** (the declared set is 153 apps, not the 484 of the old broad scan), the 16 scans so far — several taken by hand — are 22 % of the journal, and
+   at the automatic two a day that is about 10 KB a day. It is cheap enough to leave, and **the interval is the whole detection latency** for an install or uninstall
+   (the broadcast route is refuted), so lengthening it would cost detection for little saving; shortening it would roughly double the one largest item in the journal. *Scan installed packages now* covers the impatient case.
+   **Revisit** if journal growth becomes a problem or a install-to-alert latency under 12 hours is wanted.
+2. **Reading words out of pictures (OCR) is not built now.** It would make shared pictures searchable, but an on-device recogniser is a dependency the no-Gradle build cannot vouch for
+   (the same constraint as AD-15's memory-hard function), a vendor library would be a lock-in, and it reads far more than a person expects a share to mean. Pictures stay viewable
+   in Recall (verified) and are **found by their facts** (app, time, kind), not their words. **Revisit** when a recogniser can be added that ships with the build, runs fully on the phone and is asked for explicitly.
+3. **The assistant card keeps its two-tap *Allow*** (tap, then confirm; a payments app needs the named-exception wording). The card appears over another app, so the first tap only asks again and **only
+   the second writes anything**; the full list screen (*Apps Orb may remember from*) remains the place to see and remove them. Both were verified on the device (§7b50, §7b54). Removing the card route would
+   make the first allowance a trip through settings for no gain in safety that the second tap does not already give.
+
+**What this does not close.** P92 (restore refused on an Orb that has history) and P105 (*Not now* leaves a refusal) are small taps awaiting the device (`DEVICE_LOOP.md` §7b62). The eight payments-floor names
+are covered by tests and stay unverified on a device — verifying them needs those apps installed, and a wrong answer there fails *toward* keeping nothing.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

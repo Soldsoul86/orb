@@ -6244,3 +6244,15 @@ The operator reported *"Working as intended"*. What the exports themselves show:
 | **P99–P102, P107** | Recall search, *Where from?*, erase of shared text and the backup check leave no clear trace in an export; the operator's "working as intended" covers them, and nothing in the exports contradicts them. |
 
 **A small cost this showed:** a text share's sealed document adds 28 bytes of header, so `attachmentBytes` is not the text's size (`textChars` is the count). Harmless; stated so it is not mistaken for a defect.
+
+
+### 7b62. Two small taps to close — 2026-10-02
+
+No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions that closed the same day.
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P92** | On an Orb that **already has history** (this one), *Back up and restore → Restore from a backup…* and choosing any backup is **refused with an explanation**; nothing changes | the fresh-install guard is not holding |
+| **P105** | Share some new text, erase it in Recall, share the same text again, tap **Not now**: the export has an `orb.shared` with `resolveOutcome: "erased"` and **no `rekept`**, and Recall does not list the text | a Not-now tap leaves no record, or keeps it |
+
+**Protocol.** (1) Restore from a backup on this phone and read what it says. (2) Do the share → erase → share → *Not now* sequence, then **Export and share journal**. Send the export.
