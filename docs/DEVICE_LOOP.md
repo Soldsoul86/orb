@@ -6380,7 +6380,7 @@ The operator reported *"All works as intended"*. What the export shows:
 
 ### 7b65. Coming up — Orb proposes, you decide — B4 slice 2 (DR-21) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v29-comingup.apk`. v28 is §7b64 (verified bar the card's Cancel and a reboot). Design: `docs/COMING_UP_PHONE.md`; decision `DECISIONS.md` DR-21; limits `ARCHITECTURAL_DEBT.md` AD-19.
+**Status: verified on the device — P126, P128, P130, P131 held; P127/P129 reported working; P125 (the dot) not tested — the date used was ten days out, outside the seven-day window (see results)** — `orb-app-v29-comingup.apk`. v28 is §7b64 (verified bar the card's Cancel and a reboot). Design: `docs/COMING_UP_PHONE.md`; decision `DECISIONS.md` DR-21; limits `ARCHITECTURAL_DEBT.md` AD-19.
 
 #### What changed
 
@@ -6418,3 +6418,18 @@ The operator reported *"All works as intended"*. What the export shows:
 4. Tap **Remind me on …** for the dentist; set a time; read the card; **Confirm**. *(P128)* Return to **Coming up**. *(P129)*
 5. Erase the dentist item in Recall; look again. *(P130)*
 6. **Export and share journal**. *(P131)*
+
+
+#### Results (one export, `orb-20261002-093827.txt` — 368 events, `verifyLane`-clean; v29 = versionCode 29848560; plus a screenshot of the main screen)
+
+The operator reported *"All working correctly, I couldn't find the dot"*.
+
+| | What the export and the screenshot show |
+| --- | --- |
+| **P125 — the dot** | **Not tested, and its absence was correct.** The operator kept *Dentist appointment on 12 Oct 2026* (34 characters, on 2 Oct): the date is **ten days ahead**, and the dot counts only an un-reminded date within **seven**. The protocol said *"a date 3 days from today, written like 12 Oct 2026"*, and the example was followed literally — **my protocol's example date was wrong for the test.** The screenshot (9:36, before any reminder was set) shows *Coming up* without the dot, which is what the rule says for a date ten days out. To see it: keep a text naming a date within the next seven days. |
+| **P126–P128** | **Held.** *Coming up* offered the date and **Remind me on 12 Oct** opened the flow: `orb.action.intent` citing the kept share, then `orb.action.confirmed` for **12 Oct 2026 09:00** (the date pre-filled, the time at nine). |
+| **P130** | **Held, and it exercised the gate again.** The operator erased the dentist item: `orb.erasure` ×2 and, in the same second, `orb.action.refused` (`itemErased`) citing the reminder that had just been set — an erased item's reminder is stopped. |
+| **P131** | **Held.** Since v29's first start the journal gained only the two shares and their Observations, the one intent and confirmation, the erasures and the refusal, a start, two readings and the export: **viewing Coming up, ignoring the old invoice and the dot added nothing**; none of `entist`, `12 Oct`, `05/01/2020`, `1.2.2026` or `Invoice` is in the file. |
+| P127, P129 | Reported working on the screen (the invoice and version number not listed; *A reminder is set* after confirming); not visible in an export. |
+
+**A product question this raised, not a defect:** is **seven days** the right window for the dot? A date ten days out is on the list but does not mark the button. A longer window would show the dot earlier and more often; a shorter one is quieter. It is a number in one place (`MainActivity.markComingUp`), and a choice for the operator.
