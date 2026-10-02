@@ -6831,7 +6831,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b75. Commitments and Today — the first life state (DR-30) — 2026-10-02
 
-**Status: verified on the device bar one defect — the operator: "All working apart from the overdue one … no list of actions appears, the touch over it doesn't do anything. The drop down is nice else." Fixed in v39 (below).** `orb-app-v38-today.apk`; v39 is `orb-app-v39-today-buttons.apk`. v37 is §7b74 (verified; the reminder set from a person **fired** — the operator, "Reminder fired"). Design: `docs/COMMITMENTS_PHONE.md`; decision `DECISIONS.md` DR-30; limits `ARCHITECTURAL_DEBT.md` AD-25.
+**Status: verified on the device — v38 bar one defect (below), and v39's fix confirmed: the operator, "Working as intended, all buttons visible" (P194, P195 on the operator's word; P196, a tap on the row text itself, was not separately reported).** v38: the operator: "All working apart from the overdue one … no list of actions appears, the touch over it doesn't do anything. The drop down is nice else." Fixed in v39 (below).** `orb-app-v38-today.apk`; v39 is `orb-app-v39-today-buttons.apk`. v37 is §7b74 (verified; the reminder set from a person **fired** — the operator, "Reminder fired"). Design: `docs/COMMITMENTS_PHONE.md`; decision `DECISIONS.md` DR-30; limits `ARCHITECTURAL_DEBT.md` AD-25.
 
 **Why:** after the *Personal Life OS* framing (World, State, Intent), the first state worth keeping is **what you owe and what you are waiting for** — and where each stands. Orb cannot see what you did, so **you** confirm a commitment and **you** close it; Orb only shows what is still open and when it should have been closed.
 
