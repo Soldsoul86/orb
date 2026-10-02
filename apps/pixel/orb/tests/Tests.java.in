@@ -19,6 +19,7 @@ public final class Tests {
         RekeepTest.run();
         MentionsTest.run();
         RemindersTest.run();
+        ComingUpTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

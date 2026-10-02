@@ -6376,3 +6376,45 @@ The operator reported *"All works as intended"*. What the export shows:
 | **P120** | **Not shown**: there is no `orb.action.cancelled` — four intents and four confirmations, so the *Cancel on the card* tap was not done (or is not recorded). The cancel path is tested off the phone; the device has not confirmed it. |
 | **P124** | **Not shown**: no restart in this export. |
 | P92, P105 | Still not shown. |
+
+
+### 7b65. Coming up — Orb proposes, you decide — B4 slice 2 (DR-21) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v29-comingup.apk`. v28 is §7b64 (verified bar the card's Cancel and a reboot). Design: `docs/COMING_UP_PHONE.md`; decision `DECISIONS.md` DR-21; limits `ARCHITECTURAL_DEBT.md` AD-19.
+
+#### What changed
+
+1. **Coming up** (main screen): the dates in what you kept that are **today or later**, soonest first — each with the app, when you kept it, a few words of it, and **Remind me on 12 Oct**. Dates named by two items share a heading. An item that already has a
+   reminder on that date says *A reminder is set* instead of offering another.
+2. **One tap, then the same card as Remind me…**: pick the time (it starts at nine), an optional note, and the review card with **Cancel as the default**. Nothing is set until you confirm.
+3. **Orb proposes; it does not act.** The list is worked out when the screen opens, from your words in memory, and **never stored**: no event, no file, no notification. Ignoring a date leaves no trace; erasing an item removes it from the list.
+4. **A quiet dot** on the *Coming up* button when an un-reminded date is within seven days. No sound, no notification, nothing counted.
+5. **Dates that name themselves only** (*12/10/2026*, *12 Oct 2026*); *"Friday"* is not read (AD-19).
+6. *Remind me…* was moved into one shared flow, so Recall and Coming up offer exactly the same one.
+
+#### Checked before the device
+
+- 854 phone-side checks (was 790): see `COMING_UP_PHONE.md` §9. Brain 262, TypeScript 492, lint clean.
+- **Mutation-checked, 13 ways:** the past-date filter, the zone, the per-item and per-date reminder mark, both bounds and the reminded exclusion of the dot, the date arithmetic, the soonest-first order, the card defaulting to Cancel, and the screen reaching anything but the shared flow (each fails a named check). **One survived and was a lesson, not a gap:** *a date an item names twice* — the finder already returns each date once, so the guard I had written was dead code; I removed it and kept the test. **Another survived until a test was written** for a list made earlier than "now" (the dot's lower bound).
+- **Not testable off the phone:** the screen, the dot on the main screen, the pickers and the card.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P125** | Keep (or share) a text naming a date **a few days ahead** (e.g. *dentist on* the date three days from now), then open the main screen: **Coming up ●** shows the dot | the dot does not appear |
+| **P126** | **Coming up** lists that date with the item's app, *kept* date and a few of its words, and **Remind me on …** | the item is missing or misread |
+| **P127** | A text naming a date **in the past**, and one with *version 1.2.2026*, are **not** listed | a past date or look-alike is proposed |
+| **P128** | Tap **Remind me on …**: the date is pre-filled, the time starts at nine; set a time a few minutes ahead (today's date) or any time; the **review card** shows it with Cancel as the default; **Confirm** sets it | the flow differs from Remind me… |
+| **P129** | After confirming, **Coming up** shows *A reminder is set* for that item and date, and the dot is gone if nothing else is near | a proposal is repeated |
+| **P130** | **Erase** the item: it is gone from Coming up | an erased item is proposed |
+| **P131** | **Export and share journal**: apart from the reminder you confirmed (intent, confirmation, and release if it fired), the **only new events are the export** — viewing Coming up, ignoring a date and the dot added **nothing**, and no date or word appears in the file | the view wrote something |
+
+#### The operator's protocol
+
+1. Install `orb-app-v29-comingup.apk` over v28; open Orb once.
+2. Share to Orb (invented): *Dentist appointment on* **[a date 3 days from today, written like 12 Oct 2026]**; and a second text: *Invoice 05/01/2020 and version 1.2.2026*. Return to the main screen. *(P125)*
+3. Open **Coming up**. *(P126, P127)*
+4. Tap **Remind me on …** for the dentist; set a time; read the card; **Confirm**. *(P128)* Return to **Coming up**. *(P129)*
+5. Erase the dentist item in Recall; look again. *(P130)*
+6. **Export and share journal**. *(P131)*

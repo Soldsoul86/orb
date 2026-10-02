@@ -611,3 +611,16 @@ a second source for the compiler's checksum exists (item 1).
 5. **Two confirmations of exactly the same reminder** (same item, time and note) are one decision: the second is refused `alreadyReleased`.
 6. **Only Orb's own gate decides.** There is no second device and no remote path; a desk that later acts on the phone's behalf will need its own declaration.
 
+---
+
+## AD-19 — Coming up proposes dates that name themselves, and nothing else
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-21, `COMING_UP_PHONE.md`). Debts, stated.
+
+1. **No relative days.** *"Friday"*, *"tomorrow"*, *"next week"* are not read — a commitment written in words is missed. A step after seeing this on real words; it needs rules for *last / every / next* and says *guess* on the screen.
+2. **No names.** *"Call Ravi"* has no date and no name the phone can resolve (AD-17).
+3. **The context line is the start of the item's words**, not the sentence around the date (`Handles` gives a normalised value, not where it was). Good enough to recognise the item; not a quote of the date's sentence.
+4. **A past date is never shown**, so something you meant to be reminded of that has passed is silent — by design (a stale proposal is noise), but a reminder you wanted for yesterday is yours to set by hand.
+5. **Linear cost, newest 500** (AD-13), computed again each time the screen or the main screen opens (the dot, on a background thread).
+6. **No memory of declining.** Ignoring a proposal leaves no trace, so it is offered again each time it is still ahead. A "don't suggest this" would be recorded behaviour about you — a separate decision.
+

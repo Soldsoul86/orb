@@ -103,6 +103,10 @@
             android:name=".MayDoActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ComingUpActivity"
+            android:exported="false" />
+
         <!-- An alarm Orb set for a reminder the person confirmed. Not exported: only Orb's own alarm reaches it. -->
         <receiver
             android:name=".ReminderReceiver"

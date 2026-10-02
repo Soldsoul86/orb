@@ -1,0 +1,129 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
+
+/**
+ * Coming up — dates in what you kept that are still ahead, each with one tap to be reminded (`docs/COMING_UP_PHONE.md`).
+ *
+ * Orb proposes; **you** decide. The tap opens the same review card as *Remind me…* (`RemindFlow`), where Cancel is the
+ * default and nothing is set until you confirm. This screen records nothing, notifies nothing, and a date you ignore leaves
+ * no trace. It shows your own words, so it is secure like Recall.
+ */
+public final class ComingUpActivity extends Activity {
+    private static final int MAX_DAYS = 60;
+
+    private LinearLayout list;
+    private RemindFlow flow;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        flow = new RemindFlow(this);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        flow.onPermissionResult(code, results);
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("Coming up", 17, true));
+        list.addView(text("Dates in what you kept that are still ahead. Orb only suggests; nothing is set until you confirm.", 12, false));
+        Orb app = Orb.get();
+        Journal journal = app == null ? null : app.journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        String zone = TimeZone.getDefault().getID();
+        long now = System.currentTimeMillis();
+        ComingUp.Result result;
+        try {
+            result = ComingUp.compute(this, journal, now, zone);
+        } catch (IOException error) {
+            list.addView(text("read failed: " + error, 13, false));
+            return;
+        }
+        StringBuilder said = new StringBuilder();
+        if (result.looked.unreadable > 0) said.append(result.looked.unreadable).append(" could not be read");
+        if (result.looked.skipped > 0) {
+            if (said.length() > 0) said.append(" · ");
+            said.append("looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
+        }
+        if (said.length() > 0) list.addView(text(said.toString(), 12, false));
+        if (result.days.isEmpty()) {
+            list.addView(text("Nothing ahead. When something you keep names a date that is still to come, it will be here.", 14, false));
+            return;
+        }
+        SimpleDateFormat nice = new SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault());
+        SimpleDateFormat kept = new SimpleDateFormat("d MMM", Locale.getDefault());
+        int shown = 0;
+        for (ComingUp.Day day : result.days) {
+            if (shown++ >= MAX_DAYS) {
+                list.addView(text((result.days.size() - MAX_DAYS) + " more dates further ahead", 12, false));
+                break;
+            }
+            final String[] ymd = day.date.split("-");
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.clear();
+            c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
+            list.addView(text(nice.format(c.getTime()), 15, true));
+            for (final ComingUp.Item item : day.items) {
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.VERTICAL);
+                row.setPadding(0, 8, 0, 16);
+                row.addView(text((item.entry.packageName == null ? "" : item.entry.packageName + " · ") + "kept " + kept.format(new Date(item.entry.wallClock)), 11, false));
+                row.addView(text(item.entry.snippet, 14, false));
+                if (item.reminded) {
+                    row.addView(text("A reminder is set.", 12, true));
+                } else {
+                    Button remind = new Button(this);
+                    remind.setText("Remind me on " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(c.getTime()));
+                    final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+                    remind.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View view) { flow.start(item.entry.id, picked); }
+                    });
+                    row.addView(remind);
+                }
+                list.addView(row);
+            }
+        }
+    }
+}

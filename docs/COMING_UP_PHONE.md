@@ -1,6 +1,6 @@
 # Coming up — Orb proposes, you decide (B4, second slice; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with Coming up") and built** (`DEVICE_LOOP.md` §7b65, `orb-app-v29-comingup.apk`; `DECISIONS.md` DR-21). As-built notes in §9.
 > Builds on `GATE_PHONE.md` (DR-20, verified) and `ENTITIES_PHONE.md` (DR-19, verified). Contracts: `Capability.md`, `Policy.md`, `Entity.md`. **No contract text changes.**
 
 ## 1. Why, in plain words
@@ -62,3 +62,15 @@ Mutation-checked, as before.
 1. **Approach:** Orb proposes as a **computed view** on a **Coming up** screen with a quiet dot — no notification, nothing recorded for declining.
 2. **Dates that name themselves only for now** (§4 A); relative days as a later step.
 3. **Reminder time:** nine in the morning of the date, editable on the card (as *Remind me…* already is).
+
+## 9. As built
+
+- **`ComingUp`** (the view: dates today or later, grouped soonest first, newest kept first within a date, a date named twice in one item once, reminders already set marked *for that date only*), **`ComingUpActivity`** (the screen, secure like Recall),
+  **`RemindFlow`** (the *Remind me…* flow, moved out of Recall's activity so both screens offer the same one: pickers → optional note → review card, Cancel the default and a decline recorded → confirmation → Android's permission if missing).
+- **The dot** is computed on a background thread when the main screen opens and writes only a button's text: `Coming up ●` when an un-reminded date is within seven days.
+- **Approval items taken as proposed:** a computed view with a quiet dot (no notification); dates that name themselves only; nine in the morning (the picker starts at nine; the person sets the time).
+- **Held by tests (854 phone-side checks, mutation-checked):** zone-correct "today" (20:00 UTC is still the 2nd in UTC and already the 3rd in Kolkata); only today-or-later (no past, no version-number or order-id look-alike); grouping and order; an erased item vanishes; the reminder mark is per item and per date;
+  the dot counts only what is near and un-reminded; the same answer for the same words and clock; **nothing written** (journal and every file byte-for-byte unchanged); bounded like Recall; and source guards — the model and the screen reach no notification, alarm,
+  record or sealed store, the screen's only way to act is the shared flow, whose card defaults to Cancel and records a decline.
+- **Not testable off the phone:** the screen's rows, the dot on the main screen, the pickers and card.
+

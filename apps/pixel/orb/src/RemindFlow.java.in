@@ -1,0 +1,197 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
+import android.text.format.DateFormat;
+import android.view.WindowManager;
+import android.widget.DatePicker;
+import android.widget.EditText;
+import android.widget.TimePicker;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
+
+/**
+ * *Remind me…* — the person asks, reviews exactly what will happen, and confirms (`docs/GATE_PHONE.md` §5). One flow,
+ * offered from two places: a kept item in Recall, and a date on *Coming up*. It draws and asks; `Remind` records and the
+ * gate (`Reminders`) decides. Nothing here shows a notification or sets an alarm except through `Remind` and `ReminderAlarms`
+ * after a confirmation, and **not confirming is recorded as confirming is**.
+ *
+ * Takes the host activity, and the host forwards Android's permission answer to `onPermissionResult`.
+ */
+final class RemindFlow {
+    private static final int REQUEST_NOTIFICATIONS = 71;
+
+    private final Activity host;
+    /** What was being confirmed when Android's permission question was asked. */
+    private Runnable afterPermission;
+    private Runnable permissionDenied;
+
+    RemindFlow(Activity host) {
+        this.host = host;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void say(String message) {
+        new AlertDialog.Builder(host).setMessage(message).setPositiveButton("OK", null).show();
+    }
+
+    private static String when(long dueAtMs) {
+        return new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(dueAtMs));
+    }
+
+    /**
+     * Step 1: when. `ymd` is a year, a month (1–12) and a day to start from — a date the words name — or null for tomorrow.
+     * The time starts at nine; the person sets it.
+     */
+    void start(final String itemEventId, int[] ymd) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        try {
+            if (!Reminders.enabled(journal.readLines())) {
+                say("Reminders are turned off. You can turn them on in What Orb may do.");
+                return;
+            }
+        } catch (IOException unreadable) {
+            say("Orb could not read its history, so it did not set anything.");
+            return;
+        }
+        Calendar start = Calendar.getInstance();
+        if (ymd == null) start.add(Calendar.DAY_OF_MONTH, 1);
+        else start.set(ymd[0], ymd[1] - 1, ymd[2]);
+        new DatePickerDialog(host, new DatePickerDialog.OnDateSetListener() {
+            @Override public void onDateSet(DatePicker picker, final int year, final int month, final int day) {
+                new TimePickerDialog(host, new TimePickerDialog.OnTimeSetListener() {
+                    @Override public void onTimeSet(TimePicker timePicker, int hour, int minute) {
+                        Calendar due = Calendar.getInstance();
+                        due.clear();
+                        due.set(year, month, day, hour, minute, 0);
+                        askNote(itemEventId, due.getTimeInMillis());
+                    }
+                }, 9, 0, DateFormat.is24HourFormat(host)).show();
+            }
+        }, start.get(Calendar.YEAR), start.get(Calendar.MONTH), start.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    /** Step 2: an optional note, in the person's own words. */
+    private void askNote(final String itemEventId, final long dueAtMs) {
+        if (dueAtMs < System.currentTimeMillis() + 60_000L) {
+            say("That time has passed. Pick a time in the future.");
+            return;
+        }
+        final EditText note = new EditText(host);
+        note.setHint("A note (optional)");
+        note.setFilters(new InputFilter[] {new InputFilter.LengthFilter(200)});
+        // Kept from the text watcher, as the search box is, so no screen needs a text accessor.
+        final String[] typed = {""};
+        note.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) { typed[0] = s.toString().trim(); }
+        });
+        new AlertDialog.Builder(host)
+            .setTitle("Remind you when?")
+            .setMessage(when(dueAtMs))
+            .setView(note)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Next", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { review(itemEventId, dueAtMs, typed[0]); }
+            })
+            .show();
+    }
+
+    /** Step 3: the review card — exactly what will happen — and the intent recorded. Not confirming is recorded too. */
+    private void review(final String itemEventId, final long dueAtMs, final String note) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        final String zone = TimeZone.getDefault().getID();
+        Orb orb = Orb.get();
+        final String intentId = Remind.intend(journal, itemEventId, dueAtMs, zone, orb == null ? Start.VERSION_UNREADABLE : orb.versionCode());
+        if (intentId == null) {
+            say("Orb could not record this, so it did not set anything.");
+            return;
+        }
+        final boolean[] answered = {false};
+        AlertDialog card = new AlertDialog.Builder(host)
+            .setTitle("Set this reminder?")
+            .setMessage("Orb will show a notification on this phone on\n" + when(dueAtMs)
+                + (note.isEmpty() ? "" : "\n\nYour note: " + note)
+                + "\n\nNothing is sent anywhere. If the phone is dozing it may come a few minutes late. "
+                + "You can cancel it any time in What Orb may do.")
+            .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; Remind.cancel(journal, intentId, ActionFacts.DECLINED); }
+            })
+            .setPositiveButton("Confirm", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; confirm(journal, intentId, itemEventId, dueAtMs, zone, note); }
+            })
+            .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override public void onCancel(DialogInterface d) { if (!answered[0]) { answered[0] = true; Remind.cancel(journal, intentId, ActionFacts.DECLINED); } }
+            })
+            .create();
+        // The note is the person's own words: no screenshots of the card.
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    /** Step 4: Android's own permission if it is missing, then the confirmation is recorded and the alarm set. */
+    private void confirm(final Journal journal, final String intentId, final String itemEventId, final long dueAtMs, final String zone, final String note) {
+        final Runnable record = new Runnable() {
+            @Override public void run() {
+                Remind.Confirmed done = Remind.confirm(host, journal, intentId, itemEventId, dueAtMs, zone, note);
+                if (done.reminder == null) {
+                    say("noteErased".equals(done.failure)
+                        ? "Orb will not keep that exact note again because you erased it. Change a word and try again."
+                        : "Orb could not record this, so it did not set anything.");
+                    return;
+                }
+                new ReminderAlarms(host).schedule(done.reminder.confirmedId, dueAtMs);
+                say("Reminder set for " + when(dueAtMs) + ".");
+            }
+        };
+        if (ReminderNotifier.permitted(host)) {
+            record.run();
+            return;
+        }
+        if (host.checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED) {
+            // Granted to Orb, but switched off in Android's settings for it.
+            Remind.cancel(journal, intentId, ActionFacts.PERMISSION_DENIED);
+            say("Notifications are switched off for Orb in Android's settings, so a reminder could not be shown. Nothing was set.");
+            return;
+        }
+        afterPermission = record;
+        permissionDenied = new Runnable() {
+            @Override public void run() {
+                Remind.cancel(journal, intentId, ActionFacts.PERMISSION_DENIED);
+                say("Without permission to show notifications Orb cannot remind you, so nothing was set.");
+            }
+        };
+        host.requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, REQUEST_NOTIFICATIONS);
+    }
+
+    /** The host forwards Android's answer here. */
+    void onPermissionResult(int code, int[] results) {
+        if (code != REQUEST_NOTIFICATIONS) return;
+        Runnable granted = afterPermission;
+        Runnable denied = permissionDenied;
+        afterPermission = null;
+        permissionDenied = null;
+        boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        if (ok && granted != null) granted.run();
+        else if (denied != null) denied.run();
+    }
+}

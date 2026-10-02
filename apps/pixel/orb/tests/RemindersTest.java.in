@@ -318,7 +318,7 @@ final class RemindersTest {
         Harness.equal("only ReminderAlarms touches the alarm clock", alarming.toString(), "[ReminderAlarms]");
         Harness.equal("the notifier is made only where a release is wired: start-up and the alarm's receiver", constructing.toString(), "[Orb, ReminderReceiver]");
         Harness.check("the decision touches no Android", !source.get("Reminders").contains("android.") && !source.get("ActionFacts").contains("android."));
-        for (String name : Arrays.asList("Remind", "Reminders", "ReminderNotifier", "ReminderAlarms", "ReminderReceiver", "MayDoActivity", "ReminderNote")) {
+        for (String name : Arrays.asList("Remind", "Reminders", "ReminderNotifier", "ReminderAlarms", "ReminderReceiver", "MayDoActivity", "ReminderNote", "RemindFlow", "ComingUp", "ComingUpActivity")) {
             String t = source.get(name);
             Harness.check(name + " builds no record of its own and logs nothing",
                 !t.contains("Json.obj(") && !t.contains(".put(\"") && !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace"));

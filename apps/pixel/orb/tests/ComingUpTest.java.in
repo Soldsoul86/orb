@@ -1,0 +1,183 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * What the kept words say is still ahead (`docs/COMING_UP_PHONE.md`, DR-21): dates that are today or later, grouped, with
+ * reminders already set marked — a view that writes nothing, shows nothing outside its screen, and cannot act.
+ */
+final class ComingUpTest {
+    private ComingUpTest() {}
+
+    /** 2026-10-02 20:00 UTC — still the 2nd in UTC, already 01:30 on the 3rd in Asia/Kolkata. */
+    private static final long NOW = 1790971200000L;
+    /** 2026-10-12 09:00 and 2026-10-13 09:00, Asia/Kolkata. */
+    private static final long OCT12_9AM_IST = 1791775800000L;
+    private static final long OCT13_9AM_IST = 1791862200000L;
+
+    private static Map<String, Object> keep(Context context, Journal journal, String text) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, null);
+        return SharedText.record(journal, context, payload, stored, null);
+    }
+
+    private static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static Map<String, Long> listing(File dir, String prefix) {
+        Map<String, Long> out = new TreeMap<>();
+        File[] children = dir.listFiles();
+        if (children == null) return out;
+        for (File child : children) {
+            if (child.isDirectory()) out.putAll(listing(child, prefix + child.getName() + "/"));
+            else out.put(prefix + child.getName(), child.length());
+        }
+        return out;
+    }
+
+    private static List<String> shape(ComingUp.Result r) {
+        List<String> out = new ArrayList<>();
+        for (ComingUp.Day d : r.days) out.add(d.date + "x" + d.items.size());
+        return out;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("dates, in the person's own zone");
+        Harness.equal("20:00 UTC is still the 2nd in UTC", ComingUp.dateOf(NOW, "UTC"), "2026-10-02");
+        Harness.equal("and already the 3rd in Kolkata", ComingUp.dateOf(NOW, "Asia/Kolkata"), "2026-10-03");
+        Harness.equal("a week on", ComingUp.plusDays("2026-10-02", 7), "2026-10-09");
+        Harness.equal("across a month end", ComingUp.plusDays("2026-10-30", 3), "2026-11-02");
+        Harness.equal("across a year end and a leap day", ComingUp.plusDays("2023-12-31", 60), "2024-02-29");
+
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-comingup").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Map<String, Object> a = keep(context, journal, "board meeting on 02/10/2026");
+        Map<String, Object> b = keep(context, journal, "dentist 12/10/2026 and again 12 Oct 2026");
+        Map<String, Object> c = keep(context, journal, "school form due 12 October 2026");
+        keep(context, journal, "old invoice 05/01/2020");
+        keep(context, journal, "version 1.2.2026 build 12345678901 and order 9988776655443");
+        keep(context, journal, "passport expires 01/01/2099");
+        Map<String, Object> gone = keep(context, journal, "lease ends 20/10/2026");
+        Harness.equal("erase one of them", Erase.execute(context, journal, hashOf(gone)).outcome, Erase.DESTROYED);
+
+        Harness.suite("only what is ahead, grouped, soonest first");
+        List<String> linesBefore = journal.readLines();
+        Map<String, Long> diskBefore = listing(dir, "");
+        ComingUp.Result utc = ComingUp.compute(context, journal, NOW, "UTC");
+        Harness.equal("today, the 12th (two items) and the far date — no past, no look-alike, no erased item",
+            shape(utc), Arrays.asList("2026-10-02x1", "2026-10-12x2", "2099-01-01x1"));
+        Harness.equal("newest kept first within a date", utc.days.get(1).items.get(0).entry.id, (String) c.get("id"));
+        Harness.equal("the same date twice in one item is one line", utc.days.get(1).items.get(1).entry.id, (String) b.get("id"));
+        Harness.equal("where it is already the 3rd, the 2nd is behind", shape(ComingUp.compute(context, journal, NOW, "Asia/Kolkata")),
+            Arrays.asList("2026-10-12x2", "2099-01-01x1"));
+
+        Harness.suite("a reminder already set is marked, for that date only");
+        String intentB = Remind.intend(journal, (String) b.get("id"), OCT12_9AM_IST, "Asia/Kolkata", 7L);
+        Remind.Confirmed setB = Remind.confirm(context, journal, intentB, (String) b.get("id"), OCT12_9AM_IST, "Asia/Kolkata", null);
+        String intentC = Remind.intend(journal, (String) c.get("id"), OCT13_9AM_IST, "Asia/Kolkata", 7L);
+        Remind.confirm(context, journal, intentC, (String) c.get("id"), OCT13_9AM_IST, "Asia/Kolkata", null);
+        ComingUp.Result marked = ComingUp.compute(context, journal, NOW, "Asia/Kolkata");
+        Harness.check("the item with a reminder on the 12th is marked", setB.reminder != null && marked.days.get(0).items.get(1).reminded);
+        Harness.check("the other item on the 12th is not — its reminder is for the 13th", !marked.days.get(0).items.get(0).reminded);
+
+        Harness.suite("the quiet dot counts what is near and not yet reminded");
+        ComingUp.Result fresh = ComingUp.compute(context, journal, NOW, "UTC");
+        Harness.equal("today only", ComingUp.soon(fresh, NOW, "UTC", 0), 1);
+        Harness.equal("within a week: the board meeting", ComingUp.soon(fresh, NOW, "UTC", 7), 1);
+        Harness.equal("within ten days: the school form too; the dentist has a reminder", ComingUp.soon(fresh, NOW, "UTC", 10), 2);
+        Harness.equal("the far date is not near", ComingUp.soon(fresh, NOW, "UTC", 365), 2);
+        long later = NOW + 11L * 24L * 60L * 60L * 1000L;   // the 13th: the 2nd and the 12th are now behind
+        Harness.equal("a date that has passed since the list was made is not near", ComingUp.soon(fresh, later, "UTC", 7), 0);
+
+        Harness.suite("an erased item is gone from the next answer");
+        Harness.equal("erase the school form", Erase.execute(context, journal, hashOf(c)).outcome, Erase.DESTROYED);
+        Harness.equal("the 12th now has one item", shape(ComingUp.compute(context, journal, NOW, "UTC")), Arrays.asList("2026-10-02x1", "2026-10-12x1", "2099-01-01x1"));
+
+        Harness.suite("a view: the same answer, and nothing written");
+        Journal j2 = Journal.open(context, Install.lane(context), Install.id(context));
+        List<String> before = j2.readLines();
+        Map<String, Long> disk = listing(dir, "");
+        Harness.equal("the same words and clock give the same answer", shape(ComingUp.compute(context, j2, NOW, "UTC")), shape(ComingUp.compute(context, j2, NOW, "UTC")));
+        Harness.equal("the journal is unchanged", j2.readLines(), before);
+        Harness.equal("and so is every file on disk", listing(dir, ""), disk);
+        Harness.check("no date is in the journal or on disk in the clear",
+            !contains(dir, "dentist".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "board meeting".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("(and the first computation, over the earlier journal, changed nothing either)", !linesBefore.isEmpty() && !diskBefore.isEmpty());
+
+        Harness.suite("bounded like Recall, and it says so");
+        Install.forget();
+        File dir3 = Files.createTempDirectory("orb-comingup-limit").toFile();
+        Context c3 = new Context(dir3);
+        Journal j3 = Journal.open(c3, Install.lane(c3), Install.id(c3));
+        for (int i = 0; i < Recall.SCAN_LIMIT + 2; i++) keep(c3, j3, "item " + i + " due 12/10/2026");
+        ComingUp.Result limited = ComingUp.compute(c3, j3, NOW, "UTC");
+        Harness.equal("the newest are read", limited.days.get(0).items.size(), Recall.SCAN_LIMIT);
+        Harness.equal("and the rest are counted as not looked at", limited.looked.skipped, 2);
+
+        guard();
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Orb proposes and cannot act: the proposing code reaches no notification, alarm, record or sealed store. */
+    private static void guard() throws Exception {
+        Harness.suite("the proposing code cannot act");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String model = code(new String(Files.readAllBytes(root.resolve("src/ComingUp.java.in")), StandardCharsets.UTF_8));
+        String screen = code(new String(Files.readAllBytes(root.resolve("src/ComingUpActivity.java.in")), StandardCharsets.UTF_8));
+        List<String> forbidden = Arrays.asList(
+            "journal.append(", "Journal.append(", "Remind.", "Notification", "AlarmManager", "Attachments.", "Erase.", "Json.obj(", ".put(\"",
+            "Log.", "System.out", "printStackTrace", "Toast", "FileOutputStream", "RandomAccessFile", "getSharedPreferences");
+        for (String bad : forbidden) {
+            Harness.check("the model has no " + bad, !model.contains(bad));
+            Harness.check("the screen has no " + bad, !screen.contains(bad));
+        }
+        Harness.check("the screen's only way to act is the same flow as Remind me…, which asks and defaults to Cancel",
+            screen.contains("flow.start(") && screen.contains("new RemindFlow(") && !screen.contains("ReminderAlarms"));
+        String flow = code(new String(Files.readAllBytes(root.resolve("src/RemindFlow.java.in")), StandardCharsets.UTF_8));
+        Harness.check("the flow's card defaults to Cancel and records a decline", flow.contains("BUTTON_NEGATIVE).requestFocus()") && flow.contains("ActionFacts.DECLINED"));
+        String main = code(new String(Files.readAllBytes(root.resolve("src/MainActivity.java.in")), StandardCharsets.UTF_8));
+        int from = main.indexOf("private void markComingUp");
+        int to = main.indexOf("private void togglePackageAccess");
+        Harness.check("the dot only sets a button's text", from > 0 && to > from && !main.substring(from, to).contains("Notification")
+            && !main.substring(from, to).contains("journal.append(") && !main.substring(from, to).contains("Toast") && !main.substring(from, to).contains("Vibrat"));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

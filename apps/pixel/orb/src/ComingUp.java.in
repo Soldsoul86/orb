@@ -1,0 +1,115 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
+
+/**
+ * What the kept words say is still ahead — **a view, not a record** (`docs/COMING_UP_PHONE.md`, DR-21).
+ *
+ * Orb may *propose*; only the person confirms, and confirming goes through the gate that already exists. So this reads the
+ * kept words in memory (as `Mentions` does), finds the dates they name that are today or later, groups the items under each
+ * date, and says which already have a reminder. **It writes nothing, shows nothing outside its own screen, and reaches no
+ * notification, alarm or journal-append** — `ComingUpTest` holds it to that by reading its source. A proposal that is not
+ * taken leaves no trace, because there is nothing to leave: declining is not recorded, and an erased item simply is not in the list.
+ *
+ * Dates that name themselves only (day-first, as `Handles` reads them). Relative days — *"Friday"* — are a later step.
+ */
+final class ComingUp {
+    private ComingUp() {}
+
+    /** One kept item that names a date. */
+    static final class Item {
+        final Recall.Entry entry;
+        /** A reminder about this item on this date is already waiting. */
+        final boolean reminded;
+
+        Item(Recall.Entry entry, boolean reminded) {
+            this.entry = entry;
+            this.reminded = reminded;
+        }
+    }
+
+    /** A date, and the kept items that name it — newest kept first. */
+    static final class Day {
+        /** `YYYY-MM-DD`. */
+        final String date;
+        final List<Item> items = new ArrayList<>();
+
+        Day(String date) {
+            this.date = date;
+        }
+    }
+
+    static final class Result {
+        /** Soonest first. */
+        final List<Day> days = new ArrayList<>();
+        final Recall.Results looked = new Recall.Results();
+    }
+
+    /** `YYYY-MM-DD` for a moment, in a time zone. */
+    static String dateOf(long atMs, String zoneId) {
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone(zoneId));
+        c.setTimeInMillis(atMs);
+        return String.format(Locale.ROOT, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /** The date `days` after a `YYYY-MM-DD` date. */
+    static String plusDays(String date, int days) {
+        String[] p = date.split("-");
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        c.clear();
+        c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+        c.add(Calendar.DAY_OF_MONTH, days);
+        return String.format(Locale.ROOT, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /**
+     * The dates ahead, from the kept items. **Today is ahead; yesterday is not** — in the person's zone, so a date that
+     * is still today for them is shown even where it is already tomorrow in UTC.
+     */
+    static Result compute(Context context, Journal journal, final long nowMs, final String zoneId) throws IOException {
+        final String today = dateOf(nowMs, zoneId);
+        final List<String> lines = journal.readLines();
+        final List<Reminders.Reminder> waiting = Reminders.pending(lines);
+        final Result result = new Result();
+        final java.util.Map<String, Day> byDate = new java.util.TreeMap<>();
+        Recall.walk(context, journal, null, result.looked, new Recall.Visitor() {
+            @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
+                Recall.Entry entry = null;
+                // `Handles` returns each (kind, value) once, so a date an item names twice is one proposal.
+                for (Mentions.Handle h : Mentions.in(doc)) {
+                    if (!h.kind.equals("date") || h.value.compareTo(today) < 0) continue;
+                    if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
+                    boolean reminded = false;
+                    for (Reminders.Reminder r : waiting) {
+                        if (entry.id != null && entry.id.equals(r.itemEventId) && dateOf(r.dueAtMs, zoneId).equals(h.value)) reminded = true;
+                    }
+                    Day day = byDate.get(h.value);
+                    if (day == null) { day = new Day(h.value); byDate.put(h.value, day); }
+                    day.items.add(new Item(entry, reminded));
+                }
+            }
+        });
+        result.days.addAll(byDate.values());   // a TreeMap: soonest first
+        return result;
+    }
+
+    /** How many proposals within the next `withinDays` days (today included) have no reminder yet — what the quiet dot counts. */
+    static int soon(Result result, long nowMs, String zoneId, int withinDays) {
+        String today = dateOf(nowMs, zoneId);
+        String last = plusDays(today, withinDays);
+        int n = 0;
+        for (Day day : result.days) {
+            if (day.date.compareTo(today) < 0 || day.date.compareTo(last) > 0) continue;
+            for (Item item : day.items) if (!item.reminded) n++;
+        }
+        return n;
+    }
+}

@@ -1139,6 +1139,22 @@ stopped **at the erase** (alarm cleared, refused `itemErased`, note destroyed) *
 **Not done:** Orb *proposing* a reminder (next slice, through this gate); the result (that you saw it — `Capability.md` inv. 7); the package scan and the assistant's reads as declared capabilities (AD-7, slice 3).
 
 
+## DR-21 — Orb proposes dates ahead as a computed view; only you confirm
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with Coming up") on `COMING_UP_PHONE.md` ·
+  **Bears on:** `ROADMAP.md` B4, DR-19 (computed, never recorded), DR-20 (the gate), `ARCHITECTURAL_DEBT.md` AD-19
+
+**The ruling.** *Proposing is not acting.* Orb may **propose** — a **Coming up** screen listing the dates your kept words name that are today or later, each with one tap to be reminded — and **only you confirm**;
+confirming is the same review card and the same gate as *Remind me…* (DR-20). A proposal is **a view computed when the screen opens from words held in memory, never stored** (the road of Mentions, DR-19): it writes nothing,
+shows nothing outside its own screen, and reaches no notification, alarm or journal-append (a source guard holds that). **Declining is not recorded** — there is nothing to record — and an erased item is not in the list.
+The only outward sign is a **quiet mark** (a dot) on the button when an un-reminded date is within a week: no sound, no notification, no count of times ignored.
+
+**Dates that name themselves only**, read in the person's own time zone (today is ahead; yesterday is not). Relative days — *"I'll send it Friday"* — are not read: they need a date to be relative to and a rule for *last / every / next*,
+and are a separate step after seeing how this reads on real words (the discipline that put OCR off, DR-18). Names (*"call Ravi"*) wait for the contacts gate or a model (AD-17).
+
+**Reminder time:** nine in the morning of the date to start from, editable on the card.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

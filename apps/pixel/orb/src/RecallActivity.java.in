@@ -351,12 +351,9 @@ public final class RecallActivity extends Activity {
         dialog.show();
     }
 
-    // ---- Remind me… (docs/GATE_PHONE.md): the person asks, reviews exactly what will happen, and confirms.
+    // ---- Remind me… lives in RemindFlow (shared with Coming up); this screen only offers it.
 
-    private static final int REQUEST_NOTIFICATIONS = 71;
-    /** What was being confirmed when Android's permission question was asked. */
-    private Runnable afterPermission;
-    private Runnable permissionDenied;
+    private RemindFlow flow;
 
     private void addRemind(LinearLayout column, final Recall.Entry entry, final Recall.Doc doc) {
         TextView row = new TextView(this);
@@ -365,158 +362,25 @@ public final class RecallActivity extends Activity {
         row.setTypeface(Typeface.DEFAULT_BOLD);
         row.setText("Remind me\u2026");
         row.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { startRemind(entry, doc); }
+            @Override public void onClick(View view) {
+                if (flow == null) flow = new RemindFlow(RecallActivity.this);
+                int[] ymd = null;
+                for (Mentions.Handle h : Mentions.in(doc)) {
+                    if (!h.kind.equals("date")) continue;
+                    String[] parts = h.value.split("-");
+                    ymd = new int[] {Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2])};
+                    break;
+                }
+                flow.start(entry.id, ymd);
+            }
         });
         column.addView(row);
-    }
-
-    private void say(String message) {
-        new AlertDialog.Builder(this).setMessage(message).setPositiveButton("OK", null).show();
-    }
-
-    /** Step 1: when. Starts from a date the words name, if they name one, else tomorrow at nine. */
-    private void startRemind(final Recall.Entry entry, Recall.Doc doc) {
-        final Journal journal = journal();
-        if (journal == null) return;
-        try {
-            if (!Reminders.enabled(journal.readLines())) {
-                say("Reminders are turned off. You can turn them on in What Orb may do.");
-                return;
-            }
-        } catch (IOException unreadable) {
-            say("Orb could not read its history, so it did not set anything.");
-            return;
-        }
-        java.util.Calendar start = java.util.Calendar.getInstance();
-        start.add(java.util.Calendar.DAY_OF_MONTH, 1);
-        for (Mentions.Handle h : Mentions.in(doc)) {
-            if (!h.kind.equals("date")) continue;
-            String[] ymd = h.value.split("-");
-            start.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
-            break;
-        }
-        new android.app.DatePickerDialog(this, new android.app.DatePickerDialog.OnDateSetListener() {
-            @Override public void onDateSet(android.widget.DatePicker picker, final int year, final int month, final int day) {
-                new android.app.TimePickerDialog(RecallActivity.this, new android.app.TimePickerDialog.OnTimeSetListener() {
-                    @Override public void onTimeSet(android.widget.TimePicker timePicker, int hour, int minute) {
-                        java.util.Calendar due = java.util.Calendar.getInstance();
-                        due.clear();
-                        due.set(year, month, day, hour, minute, 0);
-                        askNote(entry, due.getTimeInMillis());
-                    }
-                }, 9, 0, android.text.format.DateFormat.is24HourFormat(RecallActivity.this)).show();
-            }
-        }, start.get(java.util.Calendar.YEAR), start.get(java.util.Calendar.MONTH), start.get(java.util.Calendar.DAY_OF_MONTH)).show();
-    }
-
-    /** Step 2: an optional note, in the person's own words. */
-    private void askNote(final Recall.Entry entry, final long dueAtMs) {
-        if (dueAtMs < System.currentTimeMillis() + 60_000L) {
-            say("That time has passed. Pick a time in the future.");
-            return;
-        }
-        final EditText note = new EditText(this);
-        note.setHint("A note (optional)");
-        note.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(200)});
-        // Kept from the text watcher, as the search box is, so this file never needs a text accessor.
-        final String[] typed = {""};
-        note.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) { typed[0] = s.toString().trim(); }
-        });
-        new AlertDialog.Builder(this)
-            .setTitle("Remind you when?")
-            .setMessage(new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(dueAtMs)))
-            .setView(note)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Next", new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int which) { review(entry, dueAtMs, typed[0]); }
-            })
-            .show();
-    }
-
-    /** Step 3: the review card — exactly what will happen — and the intent recorded. Not confirming is recorded too. */
-    private void review(final Recall.Entry entry, final long dueAtMs, final String note) {
-        final Journal journal = journal();
-        if (journal == null) return;
-        final String zone = java.util.TimeZone.getDefault().getID();
-        Orb orb = Orb.get();
-        final String intentId = Remind.intend(journal, entry.id, dueAtMs, zone, orb == null ? Start.VERSION_UNREADABLE : orb.versionCode());
-        if (intentId == null) {
-            say("Orb could not record this, so it did not set anything.");
-            return;
-        }
-        final boolean[] answered = {false};
-        AlertDialog card = new AlertDialog.Builder(this)
-            .setTitle("Set this reminder?")
-            .setMessage("Orb will show a notification on this phone on\n"
-                + new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(dueAtMs))
-                + (note.isEmpty() ? "" : "\n\nYour note: " + note)
-                + "\n\nNothing is sent anywhere. If the phone is dozing it may come a few minutes late. "
-                + "You can cancel it any time in What Orb may do.")
-            .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; Remind.cancel(journal, intentId, ActionFacts.DECLINED); }
-            })
-            .setPositiveButton("Confirm", new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; confirmReminder(journal, intentId, entry, dueAtMs, zone, note); }
-            })
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override public void onCancel(DialogInterface d) { if (!answered[0]) { answered[0] = true; Remind.cancel(journal, intentId, ActionFacts.DECLINED); } }
-            })
-            .create();
-        // The note is the person's own words: no screenshots of the card.
-        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-        card.show();
-        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
-    }
-
-    /** Step 4: Android's own permission if it is missing, then the confirmation is recorded and the alarm set. */
-    private void confirmReminder(final Journal journal, final String intentId, final Recall.Entry entry, final long dueAtMs, final String zone, final String note) {
-        final Runnable record = new Runnable() {
-            @Override public void run() {
-                Remind.Confirmed done = Remind.confirm(RecallActivity.this, journal, intentId, entry.id, dueAtMs, zone, note);
-                if (done.reminder == null) {
-                    say("noteErased".equals(done.failure)
-                        ? "Orb will not keep that exact note again because you erased it. Change a word and try again."
-                        : "Orb could not record this, so it did not set anything.");
-                    return;
-                }
-                new ReminderAlarms(RecallActivity.this).schedule(done.reminder.confirmedId, dueAtMs);
-                say("Reminder set for " + new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault()).format(new Date(dueAtMs)) + ".");
-            }
-        };
-        if (ReminderNotifier.permitted(this)) {
-            record.run();
-            return;
-        }
-        if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            // Granted to Orb, but switched off in Android's settings for it.
-            Remind.cancel(journal, intentId, ActionFacts.PERMISSION_DENIED);
-            say("Notifications are switched off for Orb in Android's settings, so a reminder could not be shown. Nothing was set.");
-            return;
-        }
-        afterPermission = record;
-        permissionDenied = new Runnable() {
-            @Override public void run() {
-                Remind.cancel(journal, intentId, ActionFacts.PERMISSION_DENIED);
-                say("Without permission to show notifications Orb cannot remind you, so nothing was set.");
-            }
-        };
-        requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, REQUEST_NOTIFICATIONS);
     }
 
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
-        if (code != REQUEST_NOTIFICATIONS) return;
-        Runnable granted = afterPermission;
-        Runnable denied = permissionDenied;
-        afterPermission = null;
-        permissionDenied = null;
-        boolean ok = results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
-        if (ok && granted != null) granted.run();
-        else if (denied != null) denied.run();
+        if (flow != null) flow.onPermissionResult(code, results);
     }
 
     /**

@@ -30,6 +30,7 @@ import java.util.Map;
 public final class MainActivity extends Activity {
     private TextView status;
     private TextView backupLine;
+    private Button comingUp;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -64,6 +65,14 @@ public final class MainActivity extends Activity {
             @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, BackupActivity.class)); }
         });
         root.addView(backupButton);
+
+        // COMING_UP_PHONE.md: dates ahead in what was kept. A quiet mark when something is near; no notification, ever.
+        comingUp = new Button(this);
+        comingUp.setText("Coming up");
+        comingUp.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, ComingUpActivity.class)); }
+        });
+        root.addView(comingUp);
 
         // GATE_PHONE.md: everything Orb may do to the world, in one place, withdrawable.
         Button mayDo = new Button(this);
@@ -159,6 +168,7 @@ public final class MainActivity extends Activity {
             status.setText("\njournal unavailable");
             return;
         }
+        markComingUp(journal);
         try {
             List<String> lines = journal.readLines();
             StringBuilder out = new StringBuilder("\ninstall  ");
@@ -175,6 +185,33 @@ public final class MainActivity extends Activity {
     }
 
     /** Grants or revokes the one read in this app that needs authorizing. */
+    /**
+     * A quiet mark on *Coming up* when a date within the next week has no reminder yet — and nothing else: no sound, no
+     * notification, no count of how many times it has been ignored. Found on a background thread (it opens the kept
+     * words) and written only to this button's text.
+     */
+    private void markComingUp(final Journal journal) {
+        final Button button = comingUp;
+        if (button == null) return;
+        final android.content.Context context = this;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                int near = 0;
+                try {
+                    long now = System.currentTimeMillis();
+                    String zone = java.util.TimeZone.getDefault().getID();
+                    near = ComingUp.soon(ComingUp.compute(context, journal, now, zone), now, zone, 7);
+                } catch (Exception ignored) {
+                    near = 0;
+                }
+                final int count = near;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { button.setText(count > 0 ? "Coming up  \u25cf" : "Coming up"); }
+                });
+            }
+        }).start();
+    }
+
     private void togglePackageAccess() {
         Orb app = Orb.get();
         Journal journal = app == null ? null : app.journal();
