@@ -6433,3 +6433,18 @@ The operator reported *"All working correctly, I couldn't find the dot"*.
 | P127, P129 | Reported working on the screen (the invoice and version number not listed; *A reminder is set* after confirming); not visible in an export. |
 
 **A product question this raised, not a defect:** is **seven days** the right window for the dot? A date ten days out is on the list but does not mark the button. A longer window would show the dot earlier and more often; a shorter one is quieter. It is a number in one place (`MainActivity.markComingUp`), and a choice for the operator.
+
+
+### 7b66. Closing the open items — one pass on v29 — 2026-10-02
+
+No new build. Five small checks, in this order, then **one export** at the end. What each should leave:
+
+| | Do | Expect |
+| --- | --- | --- |
+| **P120** | Kept item → **Remind me…** → time → **Next** → on the card tap **Cancel** | export: `orb.action.intent` then `orb.action.cancelled` (`declined`) citing it; **no** `confirmed` for it; nothing fires |
+| **P105** | Share new text → **Erase** it in Recall → share the **same text** again → tap **Not now** | export: an `orb.shared` with `resolveOutcome: "erased"` and **no `rekept`**; Recall does not list the text |
+| **P92** | **Back up and restore → Restore from a backup…** and choose any backup | refused with an explanation (this Orb has history); nothing changes; the export shows no `orb.restored` after this |
+| **P125** | Share a text naming a date **within the next 7 days** (e.g. *Dentist on 5 Oct 2026*), return to the main screen | **Coming up ●** shows the dot |
+| **P124** | Kept item → **Remind me…** → a time **15 minutes ahead** → confirm; then **restart the phone** | after the restart the notification still appears (on time or late); export: `released` citing the confirmation, with `lateMs` |
+
+Then **Export and share journal** once and send it. (Do the reboot last: it is the slowest.)
