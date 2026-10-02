@@ -6315,7 +6315,7 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 
 ### 7b64. The phone's first action, through a gate — B5 + B4 slice 1 (DR-20) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v28-gate.apk`. v27 is §7b63 (verified). Design: `docs/GATE_PHONE.md`; decision `DECISIONS.md` DR-20; limits `ARCHITECTURAL_DEBT.md` AD-18.
+**Status: verified on the device — P118, P119, P121, P122, P123 held; P120 (Cancel on the card) and P124 (reboot) not shown in the export** — `orb-app-v28-gate.apk`. v27 is §7b63 (verified). Design: `docs/GATE_PHONE.md`; decision `DECISIONS.md` DR-20; limits `ARCHITECTURAL_DEBT.md` AD-18.
 
 #### What changed
 
@@ -6359,3 +6359,20 @@ No new build: both run on v26. `DECISIONS.md` DR-18 records the three decisions 
 6. **What Orb may do → Turn off**, try *Remind me…*, then **Turn on**. *(P123)*
 7. *(optional)* Confirm one 15 minutes ahead and restart the phone. *(P124)*
 8. **Export and share journal** and send it.
+
+
+#### Results (one export, `orb-20261002-091517.txt` — 352 events, `verifyLane`-clean; v28 = versionCode 29848529)
+
+The operator reported *"All works as intended"*. What the export shows:
+
+| | What the export shows |
+| --- | --- |
+| **P118** | **Held.** Four reminders: each an `orb.action.intent` **citing the kept item**, then an `orb.action.confirmed` **citing its intent**, carrying a derived `authorization`, the `urgency` argument and a sealed `attachment` — and none of the note's words anywhere in the file. |
+| **P119** | **Held.** Two reminders were released: `orb.action.released` citing the confirmation, **69.5 s late** and **31.2 s late** (`lateMs` 69467 and 31176) — the phone dozing, recorded as late and never dropped, as designed. Whether the lock screen showed only *A reminder you set* is not visible in an export; the operator reports it worked. |
+| **P121** | **Held.** A reminder confirmed for the next day was withdrawn nine seconds later: `orb.action.revoked` (`scope: one`) citing it; it never appeared. |
+| **P122** | **Held.** A reminder about a shared item, then the item erased: `orb.erasure` (the item) and, in the same second, **`orb.action.refused` with `reason: itemErased`** citing the reminder, then a second `orb.erasure` for the reminder itself. The note was *not* destroyed because the operator had typed the **same note** on an earlier reminder (that one cites it too) — the right answer: content another reader still cites stays. |
+| **P123** | **Held.** `orb.action.revoked` (`scope: all`) then `orb.action.allowed`. There was nothing pending to cancel at that moment, so no per-reminder withdrawals follow — consistent. |
+| **P117** | Not visible in an export; the operator reports the screen as intended. |
+| **P120** | **Not shown**: there is no `orb.action.cancelled` — four intents and four confirmations, so the *Cancel on the card* tap was not done (or is not recorded). The cancel path is tested off the phone; the device has not confirmed it. |
+| **P124** | **Not shown**: no restart in this export. |
+| P92, P105 | Still not shown. |
