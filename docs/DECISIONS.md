@@ -1253,6 +1253,7 @@ and *Might be* lists unchanged. The reason: a guess from words cannot be made re
 
 ## DR-28 — A person's context, and a hand-off to reach them: a new declared capability
 
+- **Amended 2026-10-02 by DR-31:** the hand-off is now **v2** — it may also open the other app with a **draft** the person has seen and may have changed; v1's words and records stand as history.
 - **Status:** Decided and built · **Decided:** 2026-10-02, operator ("orb building a context of them and to invoke a communication from there"; "Yes, go ahead with slice 1 and 2"; "Yes, go ahead with the design") on `PERSON_CONTEXT_PHONE.md` · **Bears on:** DR-20 (the gate), DR-26, DR-27
 
 **The ruling.** (1) A person's window shows **their context**, computed from their own kept items when it opens and never stored: when they were last and first mentioned, how many items, where from, what often appears with them, and the **dates ahead** in those items (written, and relative days as marked guesses — the Coming up reader restricted to the person's items), each with the existing *Remind me on…*. Orb says
@@ -1292,6 +1293,22 @@ it is the person's own. **No new capability and no new Android permission.**
 **This is where the *Personal Life OS* framing meets the evidence model:** World is what exists (entities, people, links — already built), **State** is the lifecycle of what is open (this slice), **Intent** is what you are working toward (projects and goals: not yet). Orb's own claims will be *believed*, with their evidence shown, and a tap makes them yours; a model proposing commitments from your messages is a later, separate decision about what leaves the phone.
 
 **Not in this ruling:** Orb proposing commitments; projects, goals and trips as groupings; money; reconciling against evidence Orb does not have (sent mail, bank notifications); a nagging notification; recurring commitments; the quiet dot counting commitments.
+
+
+## DR-31 — Nudge: a draft from a commitment, handed to another app; the hand-off becomes v2
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with the design" on the nudge proposal and then on `NUDGE_PHONE.md`) · **Amends:** DR-28 (the hand-off); **bears on:** DR-30 (commitments), DR-9
+
+**The ruling.** On an **open commitment with a person whose number Orb has**, **Nudge…** writes a **draft** from **four fixed templates** (waiting for them or you owe it, and whether the date has passed) — **no model**, English only — and hands it to **WhatsApp or Messages**: the person picks the app, **sees and may change the draft on a card** (*To: name · number*, Cancel the default), and the other app opens with **their
+number and the words filled in; the person presses send. Orb sends nothing.**
+
+**A new capability version.** DR-28's hand-off opened an app **with a number only**, and its words were pinned: *a change to what a capability may do is a new capability, not an edit.* Handing **the person's own words** — a commitment's, sealed until now — to another app **is** a change, so **`orb.handoff.communicate` is v2**, with new pinned words (*… and, when you ask for a draft, a message you have seen and may have changed
+… Only which kind of app was opened, and whether a draft was used, is kept — never the number or the words*). **Act (reversible), the same switch, every tap confirmed, no new Android permission, no web link** (WhatsApp by its own scheme; its words travel in that link, percent-encoded). v1's records stay as history; the operator's approval of this design is the decision, and each draft is shown on a card before anything opens.
+
+**Records.** The same chain, channel only, now with **`version: 2` and `drafted`** (true when a draft was used; never for a call). **Never the number, the name or the words** — neither the template nor the person's edit. The record **does not cite the commitment** and the commitment is **not changed** by a nudge. The words live only on the card, in the link or extra that starts the other app, and in that app's own message
+box — **where they are the app's by design, like the number**.
+
+**Not in this ruling:** a model writing or answering messages (its own decision about what leaves the phone, DR-9); other languages; a *last nudged* mark; scheduling a nudge; any automatic send.
 
 
 ## Provenance

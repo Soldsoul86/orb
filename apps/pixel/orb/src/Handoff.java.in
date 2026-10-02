@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  * the person presses send or call there. The part that decides and records; it touches no Android — the app is opened through the
  * `Launcher`, which the app wires to Android and a test wires to a recorder.
  *
- * **Declared once, then frozen:** `orb.handoff.communicate` v1, Act (reversible), switchable, **every tap confirmed** — no standing
+ * **Declared once, then frozen:** `orb.handoff.communicate` v2 (v1 opened an app with a number only; v2 adds a draft the person has seen and
+ * may have changed), Act (reversible), switchable, **every tap confirmed** — no standing
  * authorization, because nothing here needs to happen when the person is not looking.
  *
  * **Recorded first, then done** (as `Remind`): the release is written before the other app is opened, so Orb never acts without
@@ -24,17 +25,37 @@ final class Handoff {
     private Handoff() {}
 
     static final String CAPABILITY = "orb.handoff.communicate";
-    static final long VERSION = 1L;
+    static final long VERSION = 2L;
 
     /** The words that freeze the capability: a change to what it may do is a new capability, not an edit of this one. */
     static final String DECLARATION =
-        "Opens WhatsApp, your messaging app or your dialer with one person's number filled in, when you tap and confirm. "
-        + "Orb sends nothing, calls no one and reads nothing; you press send or call there. Only which kind of app was opened is "
-        + "kept, never the number.";
+        "Opens WhatsApp, your messaging app or your dialer with one person's number filled in \u2014 and, when you ask for a draft, a message you "
+        + "have seen and may have changed \u2014 when you tap and confirm. Orb sends nothing, calls no one and reads nothing; you press send or "
+        + "call there. Only which kind of app was opened, and whether a draft was used, is kept \u2014 never the number or the words.";
 
     /** Opens another app. The only way anything reaches one. Returns false if no app handles it. */
     interface Launcher {
-        boolean open(String channel, String uri);
+        /** `text` is the draft for a message, or null; a messaging app that takes it separately (SMS) is handed it here, WhatsApp has it in the link. */
+        boolean open(String channel, String uri, String text);
+    }
+
+    /** The most a draft may carry. */
+    static final int MAX_TEXT = Nudge.MAX_CHARS;
+
+    /** A draft as it is handed over: trimmed, cut at `MAX_TEXT`, and null if nothing is left. */
+    static String textOrNull(String text) {
+        if (text == null) return null;
+        String t = text.trim();
+        if (t.isEmpty()) return null;
+        return t.length() > MAX_TEXT ? t.substring(0, MAX_TEXT) : t;
+    }
+
+    private static String percentEncode(String text) {
+        try {
+            return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException never) {
+            throw new IllegalStateException(never);
+        }
     }
 
     /** A number in the form the contacts reader carries: `+` and 8–15 digits. Anything else is refused before an app is named. */
@@ -44,10 +65,21 @@ final class Handoff {
      * The link that opens the channel, or null if it cannot be built safely. `tel:`, `smsto:`, and WhatsApp's own scheme — **no `http`**.
      */
     static String uri(String channel, String number) {
+        return uri(channel, number, null);
+    }
+
+    /**
+     * The same, with a draft: WhatsApp takes it in its own link (`&text=`, percent-encoded); a call has no text; a message's text is handed to the
+     * messaging app separately, so its link is the number alone.
+     */
+    static String uri(String channel, String number, String text) {
         if (number == null || !NUMBER.matcher(number).matches()) return null;
         if (HandoffFacts.DIAL.equals(channel)) return "tel:" + number;
         if (HandoffFacts.SMS.equals(channel)) return "smsto:" + number;
-        if (HandoffFacts.WHATSAPP.equals(channel)) return "whatsapp://send?phone=" + number.substring(1);
+        if (HandoffFacts.WHATSAPP.equals(channel)) {
+            String t = textOrNull(text);
+            return "whatsapp://send?phone=" + number.substring(1) + (t == null ? "" : "&text=" + percentEncode(t));
+        }
         return null;
     }
 
@@ -75,8 +107,8 @@ final class Handoff {
     }
 
     /** The person tapped a channel and is about to be shown the review card. Returns the intent's event id, or null if it could not be written. */
-    static String intend(Journal journal, String channel, long versionCode) {
-        return idOf(journal.append(HandoffFacts.INTENT, HandoffFacts.intent(channel, versionCode)));
+    static String intend(Journal journal, String channel, long versionCode, boolean drafted) {
+        return idOf(journal.append(HandoffFacts.INTENT, HandoffFacts.intent(channel, versionCode, drafted)));
     }
 
     /** The person did not confirm. Recorded exactly as a confirmation is. */
@@ -110,16 +142,22 @@ final class Handoff {
      * follows it. Returns `released` or `refused:<why>`. **The number is used to build the link and is never recorded.**
      */
     static String release(Journal journal, String confirmedId, String channel, String number, Launcher launcher) throws IOException {
+        return release(journal, confirmedId, channel, number, null, launcher);
+    }
+
+    /** The same, with the draft the person confirmed (or null): **it is handed to the other app and never recorded**; only *that* one was used is. */
+    static String release(Journal journal, String confirmedId, String channel, String number, String text, Launcher launcher) throws IOException {
+        String draft = HandoffFacts.DIAL.equals(channel) ? null : textOrNull(text);
         List<String> lines = journal.readLines();
         if (!enabled(lines)) return refuse(journal, confirmedId, HandoffFacts.SWITCHED_OFF);
         if (releasedAlready(lines, confirmedId)) return refuse(journal, confirmedId, HandoffFacts.ALREADY_RELEASED);
-        String link = uri(channel, number);
+        String link = uri(channel, number, draft);
         if (link == null) return refuse(journal, confirmedId, HandoffFacts.BAD_NUMBER);
         // Recorded first: an action Orb took is never missing from history.
-        if (journal.append(HandoffFacts.RELEASED, HandoffFacts.released(channel), Collections.singletonList(confirmedId)) == null) {
+        if (journal.append(HandoffFacts.RELEASED, HandoffFacts.released(channel, draft != null), Collections.singletonList(confirmedId)) == null) {
             return "refused:journalFailed";
         }
-        if (!launcher.open(channel, link)) return refuse(journal, confirmedId, HandoffFacts.APP_MISSING);
+        if (!launcher.open(channel, link, draft)) return refuse(journal, confirmedId, HandoffFacts.APP_MISSING);
         return RELEASED;
     }
 }

@@ -23,11 +23,13 @@ final class HandoffTest {
     private static final class Recorder implements Handoff.Launcher {
         final List<String> opened = new ArrayList<>();
         final List<Boolean> releasedBefore = new ArrayList<>();
+        final List<String> texts = new ArrayList<>();
         boolean installed = true;
         Journal watching;
 
-        @Override public boolean open(String channel, String uri) {
+        @Override public boolean open(String channel, String uri, String text) {
             opened.add(channel + " " + uri);
+            texts.add(text);
             try {
                 boolean held = false;
                 for (String line : watching.readLines()) if (HandoffFacts.RELEASED.equals(Journal.typeOf(line))) held = true;
@@ -53,9 +55,10 @@ final class HandoffTest {
 
     static void run() throws Exception {
         Harness.suite("the capability is declared once and frozen");
-        Harness.equal("its identity and version", Handoff.CAPABILITY + " v" + Handoff.VERSION, "orb.handoff.communicate v1");
+        Harness.equal("its identity and version", Handoff.CAPABILITY + " v" + Handoff.VERSION, "orb.handoff.communicate v2");
         Harness.check("it says it sends nothing, calls no one, and keeps no number",
-            Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number"));
+            Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number or the words")
+            && Handoff.DECLARATION.contains("a message you have seen and may have changed"));
 
         Harness.suite("the link that opens each channel: its own scheme, never the web");
         Harness.equal("dial", Handoff.uri("dial", "+919876543210"), "tel:+919876543210");
@@ -72,6 +75,45 @@ final class HandoffTest {
             Harness.check(channel + " never builds a web link", !Handoff.uri(channel, "+919876543210").startsWith("http"));
         }
 
+        Harness.suite("a draft: in WhatsApp's link, in a message as its own text, never in a call — and never recorded");
+        Harness.equal("WhatsApp: the words, percent-encoded, after the number", Handoff.uri("whatsapp", "+919876543210", "Hi Arun, a b"), "whatsapp://send?phone=919876543210&text=Hi%20Arun%2C%20a%20b");
+        Harness.equal("and anything that could end the link is encoded", Handoff.uri("whatsapp", "+919876543210", "a&phone=1#x?y=z"), "whatsapp://send?phone=919876543210&text=a%26phone%3D1%23x%3Fy%3Dz");
+        Harness.equal("non-English words are encoded as UTF-8", Handoff.uri("whatsapp", "+919876543210", "\u0bb5\u0ba3\u0b95\u0bcd\u0b95\u0bae\u0bcd"), "whatsapp://send?phone=919876543210&text=%E0%AE%B5%E0%AE%A3%E0%AE%95%E0%AF%8D%E0%AE%95%E0%AE%AE%E0%AF%8D");
+        Harness.equal("no words, no text parameter", Handoff.uri("whatsapp", "+919876543210", "   "), "whatsapp://send?phone=919876543210");
+        Harness.equal("a message's link is the number alone: its words travel separately", Handoff.uri("sms", "+919876543210", "hello"), "smsto:+919876543210");
+        Harness.equal("a call has no words", Handoff.uri("dial", "+919876543210", "hello"), "tel:+919876543210");
+        Harness.check("a draft is trimmed, cut at " + Handoff.MAX_TEXT + ", and nothing is nothing", "hi".equals(Handoff.textOrNull("  hi  ")) && Handoff.textOrNull("   ") == null && Handoff.textOrNull(null) == null
+            && Handoff.textOrNull(new String(new char[Handoff.MAX_TEXT + 50]).replace('\0', 'x')).length() == Handoff.MAX_TEXT);
+        Install.forget();
+        File dirD = Files.createTempDirectory("orb-handoff-draft").toFile();
+        Context ctxD = new Context(dirD);
+        Journal jD = Journal.open(ctxD, Install.lane(ctxD), Install.id(ctxD));
+        Recorder shownDraft = new Recorder();
+        shownDraft.watching = jD;
+        String draftWords = "Hi Arun, a quick reminder about the invoice";
+        String confirmedD = Handoff.confirm(jD, Handoff.intend(jD, "whatsapp", 7L, true), "whatsapp");
+        Harness.equal("a draft is handed to the other app", Handoff.release(jD, confirmedD, "whatsapp", "+919876543210", draftWords, shownDraft), Handoff.RELEASED);
+        Harness.equal("with the number and the words in the link, and the words alone as the text", shownDraft.opened, Arrays.asList("whatsapp whatsapp://send?phone=919876543210&text=Hi%20Arun%2C%20a%20quick%20reminder%20about%20the%20invoice"));
+        Harness.equal("and the text as the app is handed it", shownDraft.texts, Arrays.asList(draftWords));
+        Harness.check("the record says a draft was used, and nothing else about it", lastOf(jD, HandoffFacts.RELEASED).contains("\"drafted\":true") && lastOf(jD, HandoffFacts.INTENT).contains("\"drafted\":true"));
+        Harness.check("the words are nowhere in the journal, and nor is the number", !String.join("\n", jD.readLines()).contains("Arun") && !String.join("\n", jD.readLines()).contains("invoice") && !String.join("\n", jD.readLines()).contains("9876543210"));
+        Harness.check("the version is 2 on every record", lastOf(jD, HandoffFacts.RELEASED).contains("\"version\":2") && lastOf(jD, HandoffFacts.CONFIRMED).contains("\"version\":2"));
+        Recorder calling = new Recorder();
+        calling.watching = jD;
+        String confirmedC = Handoff.confirm(jD, Handoff.intend(jD, "dial", 7L, true), "dial");
+        Harness.equal("a call is opened without words even if some were given", Handoff.release(jD, confirmedC, "dial", "+919876543210", "ignored", calling), Handoff.RELEASED);
+        Harness.check("it carries no text, and is recorded as not drafted", calling.texts.get(0) == null && lastOf(jD, HandoffFacts.RELEASED).contains("\"drafted\":false"));
+        Recorder plain = new Recorder();
+        plain.watching = jD;
+        String confirmedP = Handoff.confirm(jD, Handoff.intend(jD, "sms", 7L, false), "sms");
+        Handoff.release(jD, confirmedP, "sms", "+919876543210", null, plain);
+        Harness.check("with no draft the message opens empty, and is recorded as not drafted", plain.texts.get(0) == null && lastOf(jD, HandoffFacts.RELEASED).contains("\"drafted\":false"));
+        Recorder smsDraft = new Recorder();
+        smsDraft.watching = jD;
+        String confirmedS = Handoff.confirm(jD, Handoff.intend(jD, "sms", 7L, true), "sms");
+        Handoff.release(jD, confirmedS, "sms", "+919876543210", "see you", smsDraft);
+        Harness.check("a message draft goes to the messaging app as its own text", smsDraft.opened.equals(Arrays.asList("sms smsto:+919876543210")) && smsDraft.texts.equals(Arrays.asList("see you")));
+
         Harness.suite("the chain: intent, confirmation, release — in order, and before the other app opens");
         Install.forget();
         File dir = Files.createTempDirectory("orb-handoff").toFile();
@@ -79,7 +121,7 @@ final class HandoffTest {
         Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
         Recorder app = new Recorder();
         app.watching = journal;
-        String intent = Handoff.intend(journal, "whatsapp", 7L);
+        String intent = Handoff.intend(journal, "whatsapp", 7L, false);
         Harness.check("the intent is recorded", intent != null && lastOf(journal, HandoffFacts.INTENT).contains("\"channel\":\"whatsapp\""));
         String confirmed = Handoff.confirm(journal, intent, "whatsapp");
         Harness.check("the confirmation cites the intent", confirmed != null && lastOf(journal, HandoffFacts.CONFIRMED).contains("\"causes\":[\"" + intent + "\"]"));
@@ -93,7 +135,7 @@ final class HandoffTest {
 
         Harness.suite("not confirming is recorded as confirming is");
         int before = count(journal, HandoffFacts.CANCELLED);
-        String declined = Handoff.intend(journal, "sms", 7L);
+        String declined = Handoff.intend(journal, "sms", 7L, false);
         Handoff.cancel(journal, declined, HandoffFacts.DECLINED);
         Harness.equal("one more cancellation", count(journal, HandoffFacts.CANCELLED), before + 1);
         Harness.check("citing the intent, with its reason", lastOf(journal, HandoffFacts.CANCELLED).contains("\"causes\":[\"" + declined + "\"]") && lastOf(journal, HandoffFacts.CANCELLED).contains("\"reason\":\"declined\""));
@@ -103,7 +145,7 @@ final class HandoffTest {
         Recorder none = new Recorder();
         none.watching = journal;
         none.installed = false;
-        String intent2 = Handoff.intend(journal, "whatsapp", 7L);
+        String intent2 = Handoff.intend(journal, "whatsapp", 7L, false);
         String confirmed2 = Handoff.confirm(journal, intent2, "whatsapp");
         Harness.equal("refused: the app is missing", Handoff.release(journal, confirmed2, "whatsapp", "+919876543210", none), "refused:appMissing");
         Harness.check("it was released first (Orb tried), then refused, both citing the confirmation",
@@ -112,7 +154,7 @@ final class HandoffTest {
         Harness.suite("a bad number is refused before any app is named");
         Recorder bad = new Recorder();
         bad.watching = journal;
-        String confirmed3 = Handoff.confirm(journal, Handoff.intend(journal, "dial", 7L), "dial");
+        String confirmed3 = Handoff.confirm(journal, Handoff.intend(journal, "dial", 7L, false), "dial");
         int releasedBefore = count(journal, HandoffFacts.RELEASED);
         Harness.equal("refused", Handoff.release(journal, confirmed3, "dial", "98765", bad), "refused:badNumber");
         Harness.check("nothing opened and no release was written", bad.opened.isEmpty() && count(journal, HandoffFacts.RELEASED) == releasedBefore);
@@ -125,7 +167,7 @@ final class HandoffTest {
         Harness.check("and the reminders' own switch is unaffected", Reminders.enabled(journal.readLines()));
         Recorder off = new Recorder();
         off.watching = journal;
-        String confirmed4 = Handoff.confirm(journal, Handoff.intend(journal, "sms", 7L), "sms");
+        String confirmed4 = Handoff.confirm(journal, Handoff.intend(journal, "sms", 7L, false), "sms");
         Harness.equal("a confirmed hand-off is refused when switched off", Handoff.release(journal, confirmed4, "sms", "+919876543210", off), "refused:switchedOff");
         Harness.check("and nothing opened", off.opened.isEmpty());
         Handoff.turnOn(journal);
@@ -135,9 +177,9 @@ final class HandoffTest {
         Harness.suite("the record carries a channel and never a number");
         String all = String.join("\n", journal.readLines());
         Harness.check("no number anywhere in the journal", !all.contains("9876543210") && !all.contains("919876543210"));
-        Harness.equal("the fields of a release", new java.util.TreeSet<>(HandoffFacts.released("whatsapp").keySet()).toString(), "[capability, channel, version]");
-        Harness.equal("the fields of an intent", new java.util.TreeSet<>(HandoffFacts.intent("dial", 7L).keySet()).toString(), "[capability, channel, version, versionCode]");
-        Harness.equal("a channel the record does not know is `other`, never free text", HandoffFacts.released("+919876543210; rm").get("channel"), "other");
+        Harness.equal("the fields of a release", new java.util.TreeSet<>(HandoffFacts.released("whatsapp", false).keySet()).toString(), "[capability, channel, drafted, version]");
+        Harness.equal("the fields of an intent", new java.util.TreeSet<>(HandoffFacts.intent("dial", 7L, false).keySet()).toString(), "[capability, channel, drafted, version, versionCode]");
+        Harness.equal("a channel the record does not know is `other`, never free text", HandoffFacts.released("+919876543210; rm", false).get("channel"), "other");
         Harness.check("hand-off records are not reminders' records: the reminders see none", Reminders.pending(journal.readLines()).isEmpty());
 
         guard();
@@ -172,11 +214,18 @@ final class HandoffTest {
         }
         String flow = source.get("HandoffFlow");
         Harness.check("not confirming is recorded on both ways out of the card (Cancel, and backing out), and the intent is recorded before the card",
-            flow.split("Handoff\\.cancel\\(", -1).length == 3 && flow.indexOf("Handoff.intend(") < flow.indexOf("new AlertDialog.Builder(host)\n            .setTitle(\"Open \"")
+            flow.split("Handoff\\.cancel\\(", -1).length == 3 && flow.indexOf("Handoff.intend(") < flow.indexOf("AlertDialog card = builder")
             && flow.contains("requestFocus()"));
         Harness.check("the number is on two windows (the picker and the card), and both are secure", flow.split("FLAG_SECURE", -1).length - 1 >= 4);
         Harness.check("the confirmation is recorded, then the gate decides: confirm comes before release", flow.indexOf("Handoff.confirm(") > 0 && flow.indexOf("Handoff.confirm(") < flow.indexOf("Handoff.release("));
-        Harness.check("a switched-off capability is checked before anything is shown", flow.indexOf("Handoff.enabled(") > 0 && flow.indexOf("Handoff.enabled(") < flow.indexOf("review(channel, numbers.get(0))"));
+        Harness.check("a switched-off capability is checked before anything is shown", flow.indexOf("Handoff.enabled(") > 0 && flow.indexOf("Handoff.enabled(") < flow.indexOf("review(channel, numbers.get(0), person, draft)"));
+        Harness.check("the draft is never recorded: the records take a yes or no about it, not the words", !source.get("HandoffFacts").contains("String text") && !source.get("HandoffFacts").contains("draft)")
+            && source.get("HandoffFacts").contains("boolean drafted") && !source.get("Handoff").contains("HandoffFacts.released(channel, text") && source.get("Handoff").contains("HandoffFacts.released(channel, draft != null)"));
+        Harness.check("a draft is typed in a watcher and read by no accessor; a message's words go to the app as its own extra only for a message",
+            flow.contains("addTextChangedListener") && !flow.contains(".getText(") && flow.contains("if (draft != null && HandoffFacts.SMS.equals(kind)) intent.putExtra(\"sms_body\", draft);"));
+        Harness.check("the card shows who it goes to and says Orb sends nothing, whether or not there is a draft", flow.contains("\"To: \"") && flow.split("Orb sends nothing", -1).length - 1 >= 2
+            && flow.contains("(person.names.isEmpty() ? \"\" : person.names.get(0) + \" \\u00b7 \") + shown"));
+        Harness.check("the intent records whether a draft was used", flow.contains("orb.versionCode(), draft != null);"));
         Harness.check("only HandoffFacts builds the records", source.get("Handoff").indexOf("Json.obj(") < 0 && source.get("HandoffFlow").indexOf("Json.obj(") < 0);
         Harness.check("the records never take a number or a name", !source.get("HandoffFacts").contains("number") && !source.get("HandoffFacts").contains("phone") && !source.get("HandoffFacts").contains("name\""));
         Harness.check("the person's page reaches an app only through the flow", !source.get("PeopleActivity").contains("Intent.ACTION")

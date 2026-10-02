@@ -1,6 +1,6 @@
 # Nudge — a draft from a commitment, handed to WhatsApp or Messages (B4; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Direction chosen by the operator ("Yes, go ahead with the design" on the *nudge from a commitment, drafted from rules* proposal). The five details in §7 are what is left to approve. Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b76, `orb-app-v40-nudge.apk`; `DECISIONS.md` DR-31). As-built notes in §9.
 > Builds on `COMMITMENTS_PHONE.md` (DR-30: the commitment, its state, its person) and `PERSON_CONTEXT_PHONE.md` (DR-28: the hand-off, **which deliberately opened the other app empty**). **This changes that one decision**, so it is a new capability version (§4).
 
 ## 1. Why, in plain words
@@ -67,3 +67,11 @@ The hand-off (DR-28) was declared as *opening an app with a number filled in*, a
 ## 8. Not in this slice
 
 A model writing or answering messages (its own decision about what leaves the phone); other languages; a *last nudged* mark or a nudge counter; scheduling a nudge; nudging from a person's page without a commitment; any automatic send.
+
+## 9. As built
+
+- **As designed:** *Nudge…* in a commitment's action list (Today → *More…*, or *Open with them* on a person's page) when the commitment is **open and has a person with a number**; pick **WhatsApp** or **Message**; (pick the number if there are several); a **card** — *To: (name) · (number)*, the draft in an **editable field**, *Orb sends nothing — the app opens with these words and you press send*, **Cancel the default**; **Open** hands the number and the words to the other app; **the four fixed templates** in §3, with *due today* said as *today* for what you owe; the new capability version **`orb.handoff.communicate` v2** with the new pinned words; **no new permission, no web link** (WhatsApp by its own scheme); the records carry **`version: 2` and `drafted`**, never the words; **no draft for Call**.
+- **Details the design left open:** (a) WhatsApp takes the words **in its own link** (`&text=`, percent-encoded as UTF-8, so nothing in them can end or add to the link); a message takes them as the messaging app's **`sms_body` extra**, its link being the number alone; some messaging apps ignore the extra and open an empty message — the number still arrives; (b) a draft is **trimmed and cut at 500 characters** (the field is limited to the same); (c) **`drafted` is on the intent and the release** (and the old v1 records, which have no such field, remain valid history); (d) the person's page *Add a commitment…* and the others are unchanged; (e) a commitment's *who* is turned back into a person for the hand-off from its sealed note — the numbers it held when it was made.
+- **Held by tests:** every template and boundary (passed, today, ahead, none; either direction); first names including one in another script; every date label across weekday, month, year and leap-day ends; verbatim words and the cut; the links (encoding of `& # ? = ,` and UTF-8, no text for a call, the message's link unchanged); the draft handed to the app and **nowhere in the journal**; `drafted` true only when a draft was used, a call never; version 2 on every record; the declaration's new words pinned; source guards (Nudge offered only with a number and open; this file starts no app; the draft is typed in a watcher; the SMS extra only for a message; the card names who it goes to).
+- **Not built:** §8, unchanged.
+

@@ -1,0 +1,68 @@
+package @PKG@;
+
+import java.util.Calendar;
+import java.util.TimeZone;
+
+/**
+ * A draft message from a commitment — *nudge them* (`docs/NUDGE_PHONE.md`, DR-31). **Fixed templates, no model, English only**: the first name
+ * of the person, the commitment's words in quotes, and a date as *Fri 3 Oct*. A starting point **the person edits on a card** before anything
+ * opens; Orb never sends it. Pure and deterministic: the same commitment and day give the same words.
+ *
+ * Four cases, by direction and date:
+ * *waiting for them* — date passed, or otherwise; *you owe it* — date passed, or otherwise.
+ */
+final class Nudge {
+    private Nudge() {}
+
+    /** The most characters a draft has. */
+    static final int MAX_CHARS = 500;
+
+    private static final String[] DAYS = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    private static final String[] MONTHS = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    /** `Fri 3 Oct` for a `YYYY-MM-DD` date. */
+    static String dateLabel(String date) {
+        String[] p = date.split("-");
+        int year = Integer.parseInt(p[0]);
+        int month = Integer.parseInt(p[1]);
+        int day = Integer.parseInt(p[2]);
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        c.clear();
+        c.set(year, month - 1, day);
+        return DAYS[c.get(Calendar.DAY_OF_WEEK) - 1] + " " + day + " " + MONTHS[month - 1];
+    }
+
+    /** The first word of a contact's name, or `there` if it has none. */
+    static String firstName(String name) {
+        if (name == null) return "there";
+        String t = name.trim();
+        if (t.isEmpty()) return "there";
+        int space = t.indexOf(' ');
+        return space < 0 ? t : t.substring(0, space);
+    }
+
+    /**
+     * The draft. `direction` is `owe` or `waiting`; `dueDate` is `YYYY-MM-DD` or null; `today` is `YYYY-MM-DD`. The words are the
+     * commitment's, verbatim, in curly quotes.
+     */
+    static String draft(String direction, String words, String personName, String dueDate, String today) {
+        String hi = "Hi " + firstName(personName) + ", ";
+        String about = "“" + (words == null ? "" : words.trim()) + "”";
+        boolean passed = dueDate != null && dueDate.compareTo(today) < 0;
+        String text;
+        if (CommitmentFacts.WAITING.equals(direction)) {
+            text = passed
+                ? hi + "a quick reminder about " + about + " (it was due " + dateLabel(dueDate) + "). Could you let me know where it stands?"
+                : hi + "just checking in about " + about + ". Could you let me know where it stands?";
+        } else if (passed) {
+            text = hi + "sorry for the delay on " + about + " (it was due " + dateLabel(dueDate) + "). I'm on it and will send it as soon as I can.";
+        } else if (dueDate == null) {
+            text = hi + "about " + about + " — I'll be in touch about it.";
+        } else if (dueDate.equals(today)) {
+            text = hi + "about " + about + " — I'll have it to you today.";
+        } else {
+            text = hi + "about " + about + " — I'll have it to you by " + dateLabel(dueDate) + ".";
+        }
+        return text.length() > MAX_CHARS ? text.substring(0, MAX_CHARS) : text;
+    }
+}

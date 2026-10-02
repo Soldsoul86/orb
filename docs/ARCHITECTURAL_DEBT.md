@@ -680,6 +680,20 @@ a second source for the compiler's checksum exists (item 1).
 10. **A closed commitment is reopenable for 14 days from Today**, and after that only from a person's page if it was reopened there — it is not deleted, just no longer listed (a *Closed* list for everything is not built).
 11. **An unexplained tap defect** (an overdue row ignored touches on the device, v38) was worked around, not root-caused: rows now have explicit buttons. If a bare row tap is still unreliable somewhere, other screens that rely on one (People rows, Recall rows) share the risk.
 
+
+---
+
+## AD-26 — what a nudge does not do
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-31). Debts, stated.
+
+1. **Templates, not understanding.** Four fixed sentences in English. A commitment written in Hindi or Tamil is quoted unchanged inside an English sentence; the card is where it is fixed. A model writing the message would be better and is its own decision (DR-9).
+2. **No memory of nudging.** Orb does not record *which* commitment you nudged, so it cannot say *last nudged Tuesday* or stop you nudging the same person every hour. A mark would cite the commitment in the hand-off record (a link between a commitment and a person's contact being used) — a later decision.
+3. **The words leave Orb's control by design.** Once the other app opens with them they are that app's: its draft box, its keyboard suggestions, its backup. Orb sees none of it and records none of it.
+4. **Messaging apps differ.** Some ignore the pre-filled text (`sms_body`) and open an empty message; WhatsApp takes it in its link. Neither is detected.
+5. **Only the numbers the commitment held when it was made.** A contact whose number changed since is not reached by *Nudge*; the person's page shows the current number, and a hand-off from there opens empty.
+6. **A nudge is a prompt to chase, not a measure of delay.** *It was due Thu 1 Oct* is the commitment's date, not evidence that they are late — Orb does not know whether they replied.
+
 ---
 
 ## AD-18 — the first action's limits, stated

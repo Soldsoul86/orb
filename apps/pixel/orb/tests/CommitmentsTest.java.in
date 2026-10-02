@@ -339,7 +339,11 @@ final class CommitmentsTest {
         Harness.check("the main screen opens Today", source.get("MainActivity").contains("TodayActivity.class"));
         Harness.check("the form refuses empty words, starts as I owe it, and the choices follow the state",
             flow.contains("if (typed[0].isEmpty()) { say(\"Say what it is first.\"); return; }") && flow.contains("direction.check(owe.getId());")
-            && flow.contains("c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE}"));
+            && flow.contains("c.closed() ? new String[] {REOPEN, DELETE}") && flow.contains("canNudge ? new String[] {DONE, MOVE, DROP, REMIND, NUDGE, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE}"));
+        Harness.check("Nudge is offered only on an open commitment with a number, and goes through the hand-off — this file starts no app",
+            flow.contains("final boolean canNudge = !c.closed() && !c.who.phones.isEmpty();") && flow.contains("new HandoffFlow(host).start(channels[index], person, Nudge.draft(c.direction, c.words, name, c.dueDate, today()))")
+            && !flow.contains("startActivity(") && !flow.contains("Intent") && flow.contains("else if (NUDGE.equals(what)) nudge(c);")
+            && flow.contains("final String[] channels = {HandoffFacts.WHATSAPP, HandoffFacts.SMS};") && flow.contains("new String[] {\"WhatsApp\", \"Message\"}"));
         Harness.check("each action does what it says: Done is done, Drop is dropped, Reopen reopens",
             flow.contains("if (DONE.equals(what)) changed(Commitments.done(journal, c), onChanged);") && flow.contains("else if (DROP.equals(what)) changed(Commitments.drop(journal, c), onChanged);")
             && flow.contains("else if (REOPEN.equals(what)) changed(Commitments.reopen(journal, c), onChanged);"));

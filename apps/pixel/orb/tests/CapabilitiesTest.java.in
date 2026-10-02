@@ -40,7 +40,7 @@ final class CapabilitiesTest {
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
-                !d.says.isEmpty() && !d.authorizedBy.isEmpty() && !d.recordsAs.isEmpty() && !d.withdrawnBy.isEmpty() && !d.title.isEmpty() && d.version == 1L);
+                !d.says.isEmpty() && !d.authorizedBy.isEmpty() && !d.recordsAs.isEmpty() && !d.withdrawnBy.isEmpty() && !d.title.isEmpty() && d.version >= 1L);
             Harness.check(d.id + " has one of the two tiers and is unique", (d.tier.equals(Capabilities.TIER_OBSERVE) || d.tier.equals(Capabilities.TIER_ACT_REVERSIBLE)) && seen.add(d.id));
         }
         Harness.check("the contacts read is Observe and switchable", Capabilities.byId(Capabilities.CONTACTS).tier.equals("Observe") && Capabilities.byId(Capabilities.CONTACTS).switchable);
@@ -53,10 +53,10 @@ final class CapabilitiesTest {
         Harness.equal("the screen read's words are pinned", pin(Capabilities.SCREEN_SAYS), "sha256:84f03c9fe03e2e86998ed1897d0694873086acc1dd541a499ff54fd7298f9e03");
         Harness.equal("the grants watch's words are pinned", pin(Capabilities.GRANTS_SAYS), "sha256:559ff8b71ce163ff7793114be79012cef725a64909e5cd48ac712d7e3fdeaab2");
         Harness.equal("the contacts read's words are pinned", pin(Capabilities.CONTACTS_SAYS), "sha256:6507721ef30337a1ac574c226ff8cf951e12f2e3f73b0dc7c55cf716aeb9f662");
-        Harness.equal("the hand-off's words are pinned", pin(Handoff.DECLARATION), "sha256:5a19d49a10a333e1560d36261ba05bb751d6fce82e2323f0666e4516038d59eb");
+        Harness.equal("the hand-off's words are pinned", pin(Handoff.DECLARATION), "sha256:71147d7bdb68426103d6e49d251b4e387902dcb46e2578ee2ccaaf49432e13a5");
         Harness.check("the hand-off is Act (reversible), switchable, and says it sends nothing and keeps no number",
             Capabilities.byId(Handoff.CAPABILITY).tier.equals("Act (reversible)") && Capabilities.byId(Handoff.CAPABILITY).switchable
-            && Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number"));
+            && Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number or the words") && Handoff.DECLARATION.contains("whether a draft was used"));
         Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
             && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",
@@ -119,7 +119,7 @@ final class CapabilitiesTest {
 
         Capabilities.Status handoffNever = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
         Harness.check("the hand-off is on, every tap confirmed, and none opened yet", handoffNever.state.startsWith("ON") && handoffNever.lastAtMs < 0 && handoffNever.lastDetail.equals("none opened yet"));
-        journal.append(HandoffFacts.RELEASED, HandoffFacts.released("whatsapp"));
+        journal.append(HandoffFacts.RELEASED, HandoffFacts.released("whatsapp", false));
         Capabilities.Status handoffUsed = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
         Harness.check("a use: when, how many, and that Orb sent nothing — no channel, no number", handoffUsed.lastAtMs > 0 && handoffUsed.lastDetail.equals("1 opened — Orb sent nothing"));
         Handoff.turnOff(journal);

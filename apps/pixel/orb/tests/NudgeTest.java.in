@@ -1,0 +1,65 @@
+package @PKG@;
+
+/**
+ * A draft from a commitment (`docs/NUDGE_PHONE.md`, DR-31): four fixed templates, the first name, the words verbatim in quotes, dates as
+ * *Fri 3 Oct*; deterministic, English, and cut at a limit.
+ */
+final class NudgeTest {
+    private NudgeTest() {}
+
+    static void run() throws Exception {
+        Harness.suite("a date, as it would be said");
+        Harness.equal("a Friday", Nudge.dateLabel("2026-10-02"), "Fri 2 Oct");
+        Harness.equal("a Saturday, the next day", Nudge.dateLabel("2026-10-03"), "Sat 3 Oct");
+        Harness.equal("a Sunday and the first of a month", Nudge.dateLabel("2026-11-01"), "Sun 1 Nov");
+        Harness.equal("a leap day", Nudge.dateLabel("2028-02-29"), "Tue 29 Feb");
+        Harness.equal("a new year", Nudge.dateLabel("2027-01-01"), "Fri 1 Jan");
+        Harness.equal("December", Nudge.dateLabel("2026-12-25"), "Fri 25 Dec");
+
+        Harness.suite("who it is for");
+        Harness.equal("the first word of the name", Nudge.firstName("Arun Kumar"), "Arun");
+        Harness.equal("one word is the name", Nudge.firstName("Arun"), "Arun");
+        Harness.equal("blanks around are ignored", Nudge.firstName("  Arun   Kumar "), "Arun");
+        Harness.equal("no name is *there*", Nudge.firstName(""), "there");
+        Harness.equal("and null", Nudge.firstName(null), "there");
+        Harness.equal("a name in another script is kept as it is", Nudge.firstName("வேலு குமார்"), "வேலு");
+
+        Harness.suite("the four drafts");
+        String today = "2026-10-02";
+        Harness.equal("waiting for them, the date has passed",
+            Nudge.draft("waiting", "Invoice", "Arun Kumar", "2026-10-01", today),
+            "Hi Arun, a quick reminder about “Invoice” (it was due Thu 1 Oct). Could you let me know where it stands?");
+        Harness.equal("waiting for them, a date ahead: the date is not mentioned",
+            Nudge.draft("waiting", "Invoice", "Arun Kumar", "2026-10-09", today),
+            "Hi Arun, just checking in about “Invoice”. Could you let me know where it stands?");
+        Harness.equal("waiting for them, due today: the date is not mentioned",
+            Nudge.draft("waiting", "Invoice", "Arun Kumar", today, today),
+            "Hi Arun, just checking in about “Invoice”. Could you let me know where it stands?");
+        Harness.equal("waiting for them, no date",
+            Nudge.draft("waiting", "Invoice", "Arun Kumar", null, today),
+            "Hi Arun, just checking in about “Invoice”. Could you let me know where it stands?");
+        Harness.equal("you owe it, the date has passed",
+            Nudge.draft("owe", "the GST certificate", "Ravi", "2026-09-30", today),
+            "Hi Ravi, sorry for the delay on “the GST certificate” (it was due Wed 30 Sep). I'm on it and will send it as soon as I can.");
+        Harness.equal("you owe it, a date ahead",
+            Nudge.draft("owe", "the GST certificate", "Ravi", "2026-10-05", today),
+            "Hi Ravi, about “the GST certificate” — I'll have it to you by Mon 5 Oct.");
+        Harness.equal("you owe it, due today",
+            Nudge.draft("owe", "the GST certificate", "Ravi", today, today),
+            "Hi Ravi, about “the GST certificate” — I'll have it to you today.");
+        Harness.equal("you owe it, no date",
+            Nudge.draft("owe", "the GST certificate", "Ravi", null, today),
+            "Hi Ravi, about “the GST certificate” — I'll be in touch about it.");
+        Harness.equal("any other direction is owe", Nudge.draft("x", "w", "Ravi", null, today), Nudge.draft("owe", "w", "Ravi", null, today));
+
+        Harness.suite("verbatim, bounded, and the same every time");
+        Harness.check("the words are the commitment's, trimmed, not changed", Nudge.draft("waiting", "  Confirmation from the hotel  ", "Sam", null, today).contains("“Confirmation from the hotel”"));
+        Harness.check("words in another script sit inside the English sentence unchanged", Nudge.draft("waiting", "வேலை", "Sam", null, today).contains("“வேலை”"));
+        Harness.check("a draft with no words still reads", Nudge.draft("owe", null, "Sam", null, today).contains("“”"));
+        StringBuilder many = new StringBuilder();
+        for (int i = 0; i < 600; i++) many.append('x');
+        Harness.equal("cut at the limit", Nudge.draft("owe", many.toString(), "Sam", null, today).length(), Nudge.MAX_CHARS);
+        Harness.equal("deterministic", Nudge.draft("waiting", "Invoice", "Arun", "2026-10-01", today), Nudge.draft("waiting", "Invoice", "Arun", "2026-10-01", today));
+        Harness.check("a date that is not yet passed is not 'passed' on the day itself", !Nudge.draft("waiting", "w", "A", today, today).contains("due"));
+    }
+}

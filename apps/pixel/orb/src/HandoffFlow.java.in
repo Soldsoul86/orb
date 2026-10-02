@@ -6,7 +6,13 @@ import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
 import android.view.WindowManager;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import java.io.IOException;
 import java.util.List;
 
@@ -38,8 +44,16 @@ final class HandoffFlow {
         return "the dialer";
     }
 
-    /** Step 1: which number, if there are several. */
+    /** Step 1: which number, if there are several. No draft: the other app opens empty. */
     void start(final String channel, final People.Person person) {
+        start(channel, person, null);
+    }
+
+    /**
+     * The same, with a **draft** (`Nudge`): shown on the card, editable, and handed to the other app as the message once the person confirms.
+     * The draft is the person's own words and is never recorded — only *that* a draft was used (`docs/NUDGE_PHONE.md`).
+     */
+    void start(final String channel, final People.Person person, final String draft) {
         final Journal journal = journal();
         if (journal == null) return;
         try {
@@ -57,7 +71,7 @@ final class HandoffFlow {
             return;
         }
         if (numbers.size() == 1) {
-            review(channel, numbers.get(0));
+            review(channel, numbers.get(0), person, draft);
             return;
         }
         String[] labels = new String[numbers.size()];
@@ -65,7 +79,7 @@ final class HandoffFlow {
         AlertDialog which = new AlertDialog.Builder(host)
             .setTitle("Which number?")
             .setItems(labels, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int index) { review(channel, numbers.get(index)); }
+                @Override public void onClick(DialogInterface d, int index) { review(channel, numbers.get(index), person, draft); }
             })
             .setNegativeButton("Cancel", null)
             .create();
@@ -74,25 +88,49 @@ final class HandoffFlow {
     }
 
     /** Step 2: the review card — exactly what will open, with which number — and the intent recorded. Not confirming is recorded too. */
-    private void review(final String channel, final String number) {
+    private void review(final String channel, final String number, People.Person person, String draft) {
         final Journal journal = journal();
         if (journal == null) return;
         Orb orb = Orb.get();
-        final String intentId = Handoff.intend(journal, channel, orb == null ? Start.VERSION_UNREADABLE : orb.versionCode());
+        final String intentId = Handoff.intend(journal, channel, orb == null ? Start.VERSION_UNREADABLE : orb.versionCode(), draft != null);
         if (intentId == null) {
             say("Orb could not record this, so it did not open anything.");
             return;
         }
         final boolean[] answered = {false};
-        AlertDialog card = new AlertDialog.Builder(host)
-            .setTitle("Open " + named(channel) + "?")
-            .setMessage("Orb will open " + named(channel) + " with " + Mentions.show(new Mentions.Handle("phone", number))
-                + ".\n\nOrb sends nothing and calls no one \u2014 you press send or call there.")
+        final String[] typed = {draft == null ? null : draft};
+        AlertDialog.Builder builder = new AlertDialog.Builder(host);
+        String shown = Mentions.show(new Mentions.Handle("phone", number));
+        if (draft == null) {
+            builder.setTitle("Open " + named(channel) + "?")
+                .setMessage("Orb will open " + named(channel) + " with " + shown + ".\n\nOrb sends nothing and calls no one \u2014 you press send or call there.");
+        } else {
+            LinearLayout column = new LinearLayout(host);
+            column.setOrientation(LinearLayout.VERTICAL);
+            column.setPadding(48, 16, 48, 0);
+            TextView to = new TextView(host);
+            to.setTextSize(13);
+            to.setText("To: " + (person.names.isEmpty() ? "" : person.names.get(0) + " \u00b7 ") + shown
+                + "\n\nThis is a draft \u2014 change it as you like. Orb sends nothing: " + named(channel) + " opens with these words and you press send.");
+            column.addView(to);
+            EditText field = new EditText(host);
+            field.setFilters(new InputFilter[] {new InputFilter.LengthFilter(Handoff.MAX_TEXT)});
+            field.setMinLines(3);
+            field.setText(draft);
+            field.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+                @Override public void afterTextChanged(Editable s) { typed[0] = s.toString(); }
+            });
+            column.addView(field);
+            builder.setTitle("Open " + named(channel) + " with this message?").setView(column);
+        }
+        AlertDialog card = builder
             .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int which) { answered[0] = true; Handoff.cancel(journal, intentId, HandoffFacts.DECLINED); }
             })
             .setPositiveButton("Open", new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; open(journal, intentId, channel, number); }
+                @Override public void onClick(DialogInterface d, int which) { answered[0] = true; open(journal, intentId, channel, number, typed[0]); }
             })
             .setOnCancelListener(new DialogInterface.OnCancelListener() {
                 @Override public void onCancel(DialogInterface d) { if (!answered[0]) { answered[0] = true; Handoff.cancel(journal, intentId, HandoffFacts.DECLINED); } }
@@ -105,7 +143,7 @@ final class HandoffFlow {
     }
 
     /** Step 3: the confirmation is recorded, then the gate decides, then the other app opens. */
-    private void open(Journal journal, String intentId, final String channel, String number) {
+    private void open(Journal journal, String intentId, final String channel, String number, String text) {
         String confirmedId = Handoff.confirm(journal, intentId, channel);
         if (confirmedId == null) {
             say("Orb could not record this, so it did not open anything.");
@@ -113,11 +151,14 @@ final class HandoffFlow {
         }
         String answer;
         try {
-            answer = Handoff.release(journal, confirmedId, channel, number, new Handoff.Launcher() {
-                @Override public boolean open(String kind, String uri) {
+            answer = Handoff.release(journal, confirmedId, channel, number, text, new Handoff.Launcher() {
+                @Override public boolean open(String kind, String uri, String draft) {
                     String action = HandoffFacts.DIAL.equals(kind) ? Intent.ACTION_DIAL : HandoffFacts.SMS.equals(kind) ? Intent.ACTION_SENDTO : Intent.ACTION_VIEW;
                     try {
-                        host.startActivity(new Intent(action, Uri.parse(uri)));
+                        Intent intent = new Intent(action, Uri.parse(uri));
+                        // A message's words go to the messaging app as its own extra; WhatsApp has them in its link; a call has none.
+                        if (draft != null && HandoffFacts.SMS.equals(kind)) intent.putExtra("sms_body", draft);
+                        host.startActivity(intent);
                         return true;
                     } catch (ActivityNotFoundException | SecurityException noApp) {
                         return false;

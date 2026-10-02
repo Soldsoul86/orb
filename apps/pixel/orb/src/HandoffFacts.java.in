@@ -8,8 +8,8 @@ import java.util.Map;
  * Every record of a hand-off — built here and nowhere else (`docs/PERSON_CONTEXT_PHONE.md` §3, DR-28). It is **its own family of
  * events**, not `orb.action.*`, so the code that lists or turns off reminders can never mistake one for the other.
  *
- * **Channel only.** A record says *which kind* of app was opened — `whatsapp`, `sms` or `dial` — and the build. **Never the number,
- * the name or any text.** `released` says Orb *issued* the hand-off, not that anything was sent: Orb sends nothing.
+ * **Channel only.** A record says *which kind* of app was opened — `whatsapp`, `sms` or `dial` — the capability's version, and whether a
+ * **draft** was used (`drafted`). **Never the number, the name or any words** — not the draft, not what the person made of it. `released` says Orb *issued* the hand-off, not that anything was sent: Orb sends nothing.
  */
 final class HandoffFacts {
     private HandoffFacts() {}
@@ -47,9 +47,10 @@ final class HandoffFacts {
     }
 
     /** The person tapped a channel on a person's window: which kind, and the build. */
-    static Map<String, Object> intent(String channel, long versionCode) {
+    static Map<String, Object> intent(String channel, long versionCode, boolean drafted) {
         Map<String, Object> p = base();
         p.put("channel", channelOrOther(channel));
+        p.put("drafted", drafted);
         p.put("versionCode", versionCode);
         return p;
     }
@@ -68,9 +69,10 @@ final class HandoffFacts {
     }
 
     /** Orb issued the hand-off. Not that the other app opened, and never that anything was sent. */
-    static Map<String, Object> released(String channel) {
+    static Map<String, Object> released(String channel, boolean drafted) {
         Map<String, Object> p = base();
         p.put("channel", channelOrOther(channel));
+        p.put("drafted", drafted);
         return p;
     }
 

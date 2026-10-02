@@ -53,6 +53,8 @@ Three buttons in the person's window: **WhatsApp**, **Message** (SMS) and **Call
 3. **The new capability** `orb.handoff.communicate` v1 (Act, reversible; switchable; every tap confirmed), **no new Android permission**.
 4. **WhatsApp by its own scheme only** — if it is not installed, nothing happens and the refusal is recorded.
 
+> **Amended 2026-10-02 (`NUDGE_PHONE.md`, DR-31):** the *no pre-filled text* rule below was lifted for one case — a draft from a commitment, shown on a card and changed by the person — and the capability is now **v2**.
+
 ## 7. What comes next, and what it will need (not in this document)
 
 **Drafts from rules** (a message started from the context, you edit it) need nothing new beyond this. **A model that writes or answers** needs its own decision: a remote model is an outbound disclosure of your history (DR-9) — a declared, revocable capability that shows you exactly what leaves the phone before it does, with the provider never hard-coded — or a model on the phone, which this hardware and build do not have.

@@ -234,11 +234,14 @@ final class CommitmentFlow {
     private static final String DROP = "Drop";
     private static final String REMIND = "Remind me…";
     private static final String REOPEN = "Reopen";
+    private static final String NUDGE = "Nudge…";
     private static final String DELETE = "Delete…";
 
     /** The things you can do, for a commitment as it stands. */
     void actions(final Commitments.Commitment c, final Runnable onChanged) {
-        final String[] choices = c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE};
+        final boolean canNudge = !c.closed() && !c.who.phones.isEmpty();
+        final String[] choices = c.closed() ? new String[] {REOPEN, DELETE}
+            : canNudge ? new String[] {DONE, MOVE, DROP, REMIND, NUDGE, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE};
         AlertDialog list = new AlertDialog.Builder(host)
             .setTitle(c.words)
             .setItems(choices, new DialogInterface.OnClickListener() {
@@ -251,6 +254,7 @@ final class CommitmentFlow {
                     else if (REOPEN.equals(what)) changed(Commitments.reopen(journal, c), onChanged);
                     else if (MOVE.equals(what)) move(c, onChanged);
                     else if (REMIND.equals(what)) remindAbout(c);
+                    else if (NUDGE.equals(what)) nudge(c);
                     else confirmDelete(c, onChanged);
                 }
             })
@@ -295,6 +299,30 @@ final class CommitmentFlow {
             .create();
         when.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         when.show();
+    }
+
+    /**
+     * *Nudge…* — a draft message from the commitment (`Nudge`), handed to WhatsApp or Messages through the hand-off (`HandoffFlow`): the person
+     * picks the app, sees and may change the draft on a card, and presses send there. This file starts no app; it only offers the draft.
+     */
+    private void nudge(final Commitments.Commitment c) {
+        final String[] channels = {HandoffFacts.WHATSAPP, HandoffFacts.SMS};
+        AlertDialog which = new AlertDialog.Builder(host)
+            .setTitle("Nudge through…")
+            .setItems(new String[] {"WhatsApp", "Message"}, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int index) {
+                    People.Person person = new People.Person();
+                    person.names.addAll(c.who.names);
+                    person.phones.addAll(c.who.phones);
+                    person.emails.addAll(c.who.emails);
+                    String name = c.who.names.isEmpty() ? null : c.who.names.get(0);
+                    new HandoffFlow(host).start(channels[index], person, Nudge.draft(c.direction, c.words, name, c.dueDate, today()));
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        which.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        which.show();
     }
 
     /** *Remind me…* is the existing reminder flow, at the commitment's date, with its words as the note; the reminder cites the commitment. */

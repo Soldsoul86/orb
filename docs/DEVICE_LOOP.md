@@ -6891,3 +6891,47 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 **New predictions.** **P194** — every row on Today, including **Overdue**, shows **Done** and **More…** buttons: *More…* opens the list; *Done* closes it at once. **P195** — a closed commitment appears under **Closed in the last 14 days** with **Reopen**, and reopening puts it back where its date says. **P196** — tapping the row text itself opens the list (and if it still does nothing on an overdue row, the buttons are the way — and the operator should say so).
 
+
+### 7b76. Nudge — a draft from a commitment, handed to WhatsApp or Messages (DR-31) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v40-nudge.apk`. v39 is §7b75 (verified: "Working as intended, all buttons visible"). Design: `docs/NUDGE_PHONE.md`; decision `DECISIONS.md` DR-31; limits `ARCHITECTURAL_DEBT.md` AD-26.
+
+**Why:** you are waiting for the invoice from Arun and it is two days late. Orb knows the commitment, who it is with and when it was due; the smallest useful step is for it to **write the first draft** — from fixed templates, no model — so chasing is a tap, an edit, and *send*.
+
+#### What changed
+
+1. **A new action, *Nudge…*,** in a commitment's action list (**Today → More…**, or **Open with them** on a person's page) — shown only on an **open commitment whose person has a number**.
+2. **Pick WhatsApp or Message** (and the number, if there are several). A **card** shows **To: (name) · (number)** and the **draft in an editable field**: *Orb sends nothing — the app opens with these words and you press send.* **Cancel is the default.**
+3. **Open** → the other app opens with **their number and your words filled in**; **you press send**.
+4. **The drafts are four fixed sentences** (waiting for them or you owe it; date passed or not), using the contact's first name, your commitment's words in quotes, and dates like *Fri 3 Oct*.
+5. **The hand-off is now v2**: new pinned words on **What Orb may do**, the same switch, no new permission. The record says a draft was used (`drafted`) and **never the words**.
+
+#### Checked before the device
+
+- 1334 phone-side checks (was 1285); Kotlin 378, TypeScript 600 unchanged; lint and type-check clean.
+- **Tests:** every template and boundary; first names; every date label across weekday, month, year and leap-day ends; verbatim words and the cut; the links (encoding, UTF-8, no words for a call, the message link unchanged); the draft reaches the app and is **nowhere in the journal**; `drafted` and version 2 on the records; the new words pinned; source guards. Mutation-checked.
+- **Not testable off the phone:** whether WhatsApp shows the text and whether your messaging app uses the pre-filled text.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P197** | An **open commitment with a person and a number** has **Nudge…** in its list; one with **no person**, or a **closed** one, does not | the action is mis-offered |
+| **P198** | **Nudge… → WhatsApp**: a card shows **To: (name) · (number)**, an **editable draft** that names them by first name and quotes your commitment, and **Cancel is the default** | the card or the draft differs |
+| **P199** | Edit a word, tap **Open**: **WhatsApp opens on that chat with your edited words already in the box**; nothing is sent until you press send | the words are missing or sent |
+| **P200** | **Nudge… → Message**: the messaging app opens with the number; **the words are in the message box** (some apps open it empty — say if yours does) | text is lost or sent |
+| **P201** | The wording follows the case: **waiting for them** and **overdue** says *a quick reminder about “…” (it was due …)*; **you owe it** and **overdue** says *sorry for the delay …*; **no date** says *just checking in* / *I'll be in touch* | the wrong template |
+| **P202** | **What Orb may do** shows the hand-off with its **new words** (*… and, when you ask for a draft, a message you have seen and may have changed …*) and **ON** | the capability is not v2 |
+| **P203** | **Export and share journal**: each nudge is an `orb.handoff.intent` and `released` with **`channel`, `drafted: true`, `version: 2`** — **no words, no name, no number anywhere in the file** | the draft was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v40-nudge.apk` over v39; open Orb once.
+2. **Today → Add a commitment…**, but **from a person's page** (People → a contact with a number → **Add a commitment…**): *Invoice from (them)* · **I'm waiting for them** · a date **yesterday or earlier** → **Keep**. *(a commitment with a person)*
+3. Open it (**Today → More…**, or *Open with them*): **Nudge…** is in the list. *(P197)* Tap it → **WhatsApp**; read the card. *(P198)*
+4. Change a word; tap **Open**; look at WhatsApp — **send nothing**, go back. *(P199)*
+5. Nudge again through **Message**; look at the box; **send nothing**. *(P200)*
+6. Make a second commitment **I owe it** with no date, and nudge it; compare the wording. *(P201)*
+7. **What Orb may do**: read the hand-off line. *(P202)*
+8. **Export and share journal**. *(P203)*
+
