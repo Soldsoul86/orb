@@ -677,6 +677,8 @@ a second source for the compiler's checksum exists (item 1).
 7. **Dates in what you kept are offered only for the next seven days** and only if not already tracked on that item and date; further ahead is in Coming up.
 8. **The newest 500 kept items and the first 500 commitments** are read each time Today opens (AD-13).
 9. **A restore on a phone with other contacts** may show a commitment's person under a different contact, matched by number, address or name as for a link (AD-24).
+10. **A closed commitment is reopenable for 14 days from Today**, and after that only from a person's page if it was reopened there — it is not deleted, just no longer listed (a *Closed* list for everything is not built).
+11. **An unexplained tap defect** (an overdue row ignored touches on the device, v38) was worked around, not root-caused: rows now have explicit buttons. If a bare row tap is still unreliable somewhere, other screens that rely on one (People rows, Recall rows) share the risk.
 
 ---
 

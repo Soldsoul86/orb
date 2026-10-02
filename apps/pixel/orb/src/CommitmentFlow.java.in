@@ -10,6 +10,7 @@ import android.text.InputFilter;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -198,6 +199,30 @@ final class CommitmentFlow {
         where.setTextSize(12);
         where.setText(line.toString());
         row.addView(where);
+        // Visible buttons, not only a tap on the row: *Done* (or *Reopen*) at once, and *More…* for the rest. A button is never a
+        // hidden target — the device found that a tap on a bare row did nothing for a commitment that was overdue.
+        LinearLayout buttons = new LinearLayout(host);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        Button quick = new Button(host);
+        quick.setText(c.closed() ? "Reopen" : "Done");
+        quick.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                Journal journal = journal();
+                if (journal == null) return;
+                changed(c.closed() ? Commitments.reopen(journal, c) : Commitments.done(journal, c), onChanged);
+            }
+        });
+        buttons.addView(quick);
+        Button more = new Button(host);
+        more.setText("More\u2026");
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { actions(c, onChanged); }
+        });
+        buttons.addView(more);
+        row.addView(buttons);
+        // The row itself still answers a tap, and shows that it will.
+        row.setBackgroundResource(android.R.drawable.list_selector_background);
+        row.setClickable(true);
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) { actions(c, onChanged); }
         });

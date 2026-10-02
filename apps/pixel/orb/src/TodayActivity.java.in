@@ -121,8 +121,8 @@ public final class TodayActivity extends Activity {
             @Override public void onClick(View view) { commitments.start(null, "", null, null, refresh); }
         });
         list.addView(add);
-        Commitments.Today t = Commitments.today(all, ahead, today);
-        boolean any = !(t.overdue.isEmpty() && t.today.isEmpty() && t.week.isEmpty() && t.waiting.isEmpty() && t.undated.isEmpty() && t.dates.isEmpty() && t.later == 0);
+        Commitments.Today t = Commitments.today(all, ahead, today, System.currentTimeMillis());
+        boolean any = !(t.overdue.isEmpty() && t.today.isEmpty() && t.week.isEmpty() && t.waiting.isEmpty() && t.undated.isEmpty() && t.dates.isEmpty() && t.closed.isEmpty() && t.later == 0);
         if (!any) {
             list.addView(text("Nothing is open. Track something from a person's page, a kept item, or a date in Coming up — or add one here.", 14, false));
             return;
@@ -133,6 +133,7 @@ public final class TodayActivity extends Activity {
         addDates(t, refresh);
         section("Waiting for", t.waiting, today, refresh);
         section("No date", t.undated, today, refresh);
+        section("Closed in the last " + Commitments.CLOSED_DAYS + " days \u2014 you can reopen", t.closed, today, refresh);
         if (t.later > 0) list.addView(text(t.later + " more, dated further ahead", 12, false));
         list.addView(text("Orb never marks anything done — only you. “Still open” means the date passed and you have not closed it.", 11, false));
     }

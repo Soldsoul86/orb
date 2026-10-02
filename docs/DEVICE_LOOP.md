@@ -6831,7 +6831,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b75. Commitments and Today — the first life state (DR-30) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v38-today.apk`. v37 is §7b74 (verified; the reminder set from a person **fired** — the operator, "Reminder fired"). Design: `docs/COMMITMENTS_PHONE.md`; decision `DECISIONS.md` DR-30; limits `ARCHITECTURAL_DEBT.md` AD-25.
+**Status: verified on the device bar one defect — the operator: "All working apart from the overdue one … no list of actions appears, the touch over it doesn't do anything. The drop down is nice else." Fixed in v39 (below).** `orb-app-v38-today.apk`; v39 is `orb-app-v39-today-buttons.apk`. v37 is §7b74 (verified; the reminder set from a person **fired** — the operator, "Reminder fired"). Design: `docs/COMMITMENTS_PHONE.md`; decision `DECISIONS.md` DR-30; limits `ARCHITECTURAL_DEBT.md` AD-25.
 
 **Why:** after the *Personal Life OS* framing (World, State, Intent), the first state worth keeping is **what you owe and what you are waiting for** — and where each stands. Orb cannot see what you did, so **you** confirm a commitment and **you** close it; Orb only shows what is still open and when it should have been closed.
 
@@ -6874,4 +6874,20 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 6. **People** → a person → **Add a commitment…** → keep one; check *Open with them* and Today. *(P191)*
 7. Tap a commitment → **Remind me…** two minutes ahead; wait for the notification; then tap it → **Delete…**. *(P192)*
 8. **Export and share journal**. *(P193)*
+
+#### Results (one export, `6de1c397` — 528 events; v38 = versionCode 29849085) and the fix
+
+| | What the export and the operator's report show |
+| --- | --- |
+| **P185–P187** | **Held.** Two commitments opened: *owe*, due 3 Oct, and *waiting*, due 4 Oct; each `orb.commitment.opened` carries a sealed note (81 and 92 bytes), the direction and the date, and **no words**. |
+| **P188** | **Held.** A `moved` event sent the first to **1 Oct** (yesterday), citing the opening: it became *overdue — still open*. |
+| **P189** | **Failed on the overdue row.** After that move there is **no `done` or `dropped` event** for it: the operator reports that **tapping the overdue row did nothing at all — no list of actions appeared**. The code that builds an overdue row is the same as for every other row (same tap handler, same action list), so the cause was not found by reading it; **v39 stops depending on a bare tap target** (below). |
+| **P190** | **Held.** A commitment citing a kept item was opened from Recall; the item was then erased (an `orb.erasure`) and the commitment stayed. |
+| **P191** | Reported working (a commitment from a person's page; the person is in the sealed note, so the file cannot show it). |
+| **P192** | **Held.** A commitment was opened, a reminder asked for from it (`orb.action.intent` **citing the commitment**), confirmed, **released** (it fired), and the commitment then deleted (an `orb.erasure`). |
+| **P193** | **Held.** No words and no name in the file; only the direction, the date and the state changes. |
+
+**The fix, v39 (`orb-app-v39-today-buttons.apk`).** (1) **Every commitment row now has visible buttons — *Done* (or *Reopen* once closed) and *More…* (the list of actions the operator liked)** — as well as answering a tap, and the row shows a touch highlight. A button is never a hidden target. (2) **A *Closed in the last 14 days* section on Today**, newest first, each with *Reopen*: a one-tap *Done* needs a way back from a mis-tap, and until now a closed commitment simply vanished from Today. Both held by tests and mutation-checked.
+
+**New predictions.** **P194** — every row on Today, including **Overdue**, shows **Done** and **More…** buttons: *More…* opens the list; *Done* closes it at once. **P195** — a closed commitment appears under **Closed in the last 14 days** with **Reopen**, and reopening puts it back where its date says. **P196** — tapping the row text itself opens the list (and if it still does nothing on an overdue row, the buttons are the way — and the operator should say so).
 

@@ -213,25 +213,32 @@ final class CommitmentsTest {
         String waitNone = opened(c2, j2, null, "waiting, no date", "waiting", null, null);
         String finished = opened(c2, j2, null, "already done", "owe", "2026-10-01", null);
         Commitments.done(j2, find(Commitments.all(c2, j2), finished));
+        String droppedLater = opened(c2, j2, null, "dropped after that", "owe", null, null);
+        Thread.sleep(5);
+        Commitments.drop(j2, find(Commitments.all(c2, j2), droppedLater));
         String tracked = opened(c2, j2, idOf(meeting), "meeting already tracked", "owe", "2026-10-05", null);
         List<Commitments.Commitment> everything = Commitments.all(c2, j2);
         Calendar noon = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         noon.clear();
         noon.set(2026, 9, 2, 12, 0, 0);
         ComingUp.Result dates = ComingUp.compute(c2, j2, noon.getTimeInMillis(), "UTC");
-        Commitments.Today today = Commitments.today(everything, dates, "2026-10-02");
+        long nowMs = System.currentTimeMillis();
+        Commitments.Today today = Commitments.today(everything, dates, "2026-10-02", nowMs);
         Harness.equal("overdue: the most overdue first", words(today.overdue), Arrays.asList("old overdue", "new overdue"));
         Harness.equal("today", words(today.today), Arrays.asList("due today"));
         Harness.equal("this week: soonest first, and the seventh day is in", words(today.week), Arrays.asList("sooner in the week", "later in the week", "meeting already tracked", "the last day of the week"));
         Harness.equal("further out is only counted", today.later, 1);
         Harness.equal("waiting for: by date, overdue ones first, undated last", words(today.waiting), Arrays.asList("waiting, overdue", "waiting, dated", "waiting, no date"));
         Harness.equal("no date: the oldest first", words(today.undated), Arrays.asList("undated, older", "undated, newer"));
-        Harness.check("a finished commitment is nowhere", !words(today.overdue).contains("already done"));
+        Harness.check("a finished commitment is in none of the open sections", !words(today.overdue).contains("already done") && !words(today.week).contains("already done") && !words(today.undated).contains("already done"));
+        Harness.equal("it is under *closed*, newest first, so a mis-tap can be reopened", words(today.closed), Arrays.asList("dropped after that", "already done"));
+        Harness.equal("and it leaves that list after " + Commitments.CLOSED_DAYS + " days", Commitments.today(everything, dates, "2026-10-02", nowMs + (Commitments.CLOSED_DAYS + 1) * 86_400_000L).closed.size(), 0);
+        Harness.equal("a day short of that it is still there", Commitments.today(everything, dates, "2026-10-02", nowMs + (Commitments.CLOSED_DAYS - 1) * 86_400_000L).closed.size(), 2);
         Harness.equal("a written date in what you kept, in the week and not yet a commitment: none, because it is tracked", today.dates.size(), 0);
-        Commitments.Today untracked = Commitments.today(Commitments.all(c2, j2).subList(0, 0), dates, "2026-10-02");
+        Commitments.Today untracked = Commitments.today(Commitments.all(c2, j2).subList(0, 0), dates, "2026-10-02", nowMs);
         Harness.check("untracked, the date in the week is offered; the one beyond the week is not", untracked.dates.size() == 1 && untracked.dates.get(0).date.equals("2026-10-05"));
-        Commitments.Today none = Commitments.today(new ArrayList<Commitments.Commitment>(), null, "2026-10-02");
-        Harness.check("nothing at all is an empty Today", none.overdue.isEmpty() && none.today.isEmpty() && none.week.isEmpty() && none.waiting.isEmpty() && none.undated.isEmpty() && none.later == 0 && none.dates.isEmpty());
+        Commitments.Today none = Commitments.today(new ArrayList<Commitments.Commitment>(), null, "2026-10-02", nowMs);
+        Harness.check("nothing at all is an empty Today", none.overdue.isEmpty() && none.today.isEmpty() && none.week.isEmpty() && none.waiting.isEmpty() && none.undated.isEmpty() && none.later == 0 && none.dates.isEmpty() && none.closed.isEmpty());
 
         Harness.suite("a person's page: what is open with them");
         List<Commitments.Commitment> mine = Commitments.forPerson(Commitments.all(context, journal), ravi());
@@ -340,10 +347,16 @@ final class CommitmentsTest {
         Harness.check("Today lists every section, in order: overdue, today, this week, the dates, waiting for, no date",
             todayScreen.indexOf("section(\"Overdue") > 0 && todayScreen.indexOf("section(\"Overdue") < todayScreen.indexOf("section(\"Today\"") && todayScreen.indexOf("section(\"Today\"") < todayScreen.indexOf("section(\"This week\"")
             && todayScreen.indexOf("section(\"This week\"") < todayScreen.indexOf("addDates(t, refresh)") && todayScreen.indexOf("addDates(t, refresh)") < todayScreen.indexOf("section(\"Waiting for\"")
-            && todayScreen.indexOf("section(\"Waiting for\"") < todayScreen.indexOf("section(\"No date\""));
+            && todayScreen.indexOf("section(\"Waiting for\"") < todayScreen.indexOf("section(\"No date\"") && todayScreen.indexOf("section(\"No date\"") < todayScreen.indexOf("section(\"Closed in the last"));
         Harness.check("a person's page forwards Android's answer to the commitment flow and shows their open ones through the same rows",
             source.get("PeopleActivity").contains("if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);")
             && source.get("PeopleActivity").contains("column.addView(commitmentFlow.row(c, today, reopenAfter(person)))"));
+        Harness.check("every row has visible buttons — Done (or Reopen) and More… — as well as answering a tap, so no commitment depends on a bare tap target",
+            flow.contains("quick.setText(c.closed() ? \"Reopen\" : \"Done\");") && flow.contains("changed(c.closed() ? Commitments.reopen(journal, c) : Commitments.done(journal, c), onChanged);")
+            && flow.contains("more.setText(\"More\\u2026\");") && flow.contains("more.setOnClickListener") && flow.contains("row.setClickable(true);")
+            && flow.indexOf("quick.setText(") < flow.indexOf("row.setOnClickListener(")
+            && flow.contains("buttons.addView(quick);") && flow.contains("buttons.addView(more);") && flow.contains("row.addView(buttons);"));
+        Harness.check("Today is not called empty while only closed commitments are listed", source.get("TodayActivity").contains("&& t.closed.isEmpty() && t.later == 0);"));
         Harness.check("Orb never marks one done by itself: the only place a done is built is the person's action",
             source.get("Commitments").split("CommitmentFacts\\.done\\(\\)", -1).length == 2);
     }

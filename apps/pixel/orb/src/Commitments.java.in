@@ -324,13 +324,22 @@ final class Commitments {
         int later;
         /** The written dates ahead in what you kept, within the week, that are not yet a commitment. */
         final List<ComingUp.Day> dates = new ArrayList<>();
+        /** What you closed (done or dropped) in the last `CLOSED_DAYS`, newest first — so a mis-tap can be reopened. */
+        final List<Commitment> closed = new ArrayList<>();
     }
 
-    static Today today(List<Commitment> all, ComingUp.Result ahead, String todayDate) {
+    /** How long a closed commitment stays on Today, to be reopened. */
+    static final int CLOSED_DAYS = 14;
+
+    static Today today(List<Commitment> all, ComingUp.Result ahead, String todayDate, long nowMs) {
         Today t = new Today();
         String last = ComingUp.plusDays(todayDate, WEEK_DAYS);
+        long since = nowMs - CLOSED_DAYS * 86_400_000L;
         for (Commitment c : all) {
-            if (c.closed()) continue;
+            if (c.closed()) {
+                if (c.changedAtMs >= since) t.closed.add(c);
+                continue;
+            }
             if (CommitmentFacts.WAITING.equals(c.direction)) { t.waiting.add(c); continue; }
             if (c.dueDate == null) t.undated.add(c);
             else if (c.dueDate.compareTo(todayDate) < 0) t.overdue.add(c);
@@ -342,6 +351,9 @@ final class Commitments {
         final Comparator<Commitment> byDate = new Comparator<Commitment>() {
             @Override public int compare(Commitment a, Commitment b) { return a.dueDate.compareTo(b.dueDate); }
         };
+        Collections.sort(t.closed, new Comparator<Commitment>() {
+            @Override public int compare(Commitment a, Commitment b) { return Long.compare(b.changedAtMs, a.changedAtMs); }
+        });
         Collections.sort(t.overdue, byDate);
         Collections.sort(t.week, byDate);
         Collections.sort(t.waiting, datedFirst());
