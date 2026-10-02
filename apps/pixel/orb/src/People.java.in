@@ -48,6 +48,8 @@ final class People {
     static final String BY_NUMBER = "number";
     static final String BY_EMAIL = "email";
     static final String BY_NAME = "name";
+    /** The person said so: they linked this item to this person (`PersonLink`). The strongest kind. */
+    static final String BY_LINK = "link";
 
     static final class Evidence {
         final Recall.Entry entry;
@@ -55,10 +57,18 @@ final class People {
         /** For `name`: the word the text wrote. Null otherwise. */
         final String word;
 
+        /** For `link`: the link's event hash, so the person can unlink it. Null otherwise. */
+        final String linkHash;
+
         Evidence(Recall.Entry entry, String by, String word) {
+            this(entry, by, word, null);
+        }
+
+        Evidence(Recall.Entry entry, String by, String word, String linkHash) {
             this.entry = entry;
             this.by = by;
             this.word = word;
+            this.linkHash = linkHash;
         }
     }
 
@@ -166,6 +176,17 @@ final class People {
             own.add(mine);
         }
 
+        // Items the person linked to someone: item id -> the people (by group) it is linked to, with the link to undo.
+        final Map<String, Map<Integer, String>> linked = new HashMap<>();
+        for (PersonLink.Link l : PersonLink.all(context, journal)) {
+            for (int g = 0; g < people.size(); g++) {
+                if (!PersonLink.matches(l.who, people.get(g))) continue;
+                Map<Integer, String> forItem = linked.get(l.itemId);
+                if (forItem == null) { forItem = new HashMap<>(); linked.put(l.itemId, forItem); }
+                if (!forItem.containsKey(g)) forItem.put(g, l.eventHash);
+            }
+        }
+
         Recall.walk(context, journal, null, result.looked, new Recall.Visitor() {
             @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
                 List<Mentions.Handle> handles = Mentions.in(doc);
@@ -178,15 +199,18 @@ final class People {
                     if (g != null && !byName.containsKey(g)) byName.put(g, m);
                 }
                 Recall.Entry entry = null;
+                Map<Integer, String> linkedHere = linked.get(item.id);
                 for (int g = 0; g < people.size(); g++) {
                     String by = null;
                     String word = null;
-                    for (String ph : people.get(g).phones) if (inItem.contains("phone:" + ph)) { by = BY_NUMBER; break; }
+                    String linkHash = null;
+                    if (linkedHere != null && linkedHere.containsKey(g)) { by = BY_LINK; linkHash = linkedHere.get(g); }
+                    if (by == null) for (String ph : people.get(g).phones) if (inItem.contains("phone:" + ph)) { by = BY_NUMBER; break; }
                     if (by == null) for (String em : people.get(g).emails) if (inItem.contains("email:" + em)) { by = BY_EMAIL; break; }
                     if (by == null && byName.containsKey(g)) { by = BY_NAME; word = byName.get(g).word; }
                     if (by == null) continue;
                     if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
-                    people.get(g).items.add(new Evidence(entry, by, word));
+                    people.get(g).items.add(new Evidence(entry, by, word, linkHash));
                     for (Mentions.Handle h : handles) {
                         if (own.get(g).contains(h.kind + ":" + h.value)) continue;
                         Integer n = beside.get(g).get(h);
@@ -299,13 +323,15 @@ final class People {
 
     /** A one-line account of how a person's items were found, for the list: *3 by number, 1 by name*. */
     static String evidenceLine(Person p) {
-        int number = 0, email = 0, name = 0;
+        int number = 0, email = 0, name = 0, you = 0;
         for (Evidence e : p.items) {
-            if (BY_NUMBER.equals(e.by)) number++;
+            if (BY_LINK.equals(e.by)) you++;
+            else if (BY_NUMBER.equals(e.by)) number++;
             else if (BY_EMAIL.equals(e.by)) email++;
             else name++;
         }
         List<String> parts = new ArrayList<>();
+        if (you > 0) parts.add(you + " by you");
         if (number > 0) parts.add(number + " by number");
         if (email > 0) parts.add(email + " by email");
         if (name > 0) parts.add(name + " by name");

@@ -57,6 +57,10 @@ This direction is deliberate (see Dependencies).
    it** — recording it would write the content in the clear. Such Entities are a
    projection, computed when asked and never stored; a resolution **a person
    decides** (a merge, a name) is the part that is recorded.
+   *Exercised 2026-10-02 (`../docs/DECISIONS.md` DR-29):* on the phone, a person's
+   decision that **a kept item is about a person** is recorded as an event that
+   cites the item and carries the identity of a **sealed note** holding who — never
+   the name in the clear. Merge and split are not yet exercised.
 3. **Existence.** It is referenced by Facts, Beliefs, Relationships, Projects, and
    the Digital Twin as the subject they concern.
 4. **Revision (merge / split).** As evidence accumulates, two Entities may merge

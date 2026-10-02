@@ -32,8 +32,18 @@ import java.util.Locale;
  */
 public final class PeopleActivity extends Activity {
     private static final int REQUEST_CONTACTS = 72;
+    /** The intent extra Recall passes to open this screen in *choose* mode: the kept item to link (`PERSON_LINK_PHONE.md`). */
+    static final String LINK_ITEM = "linkItem";
     /** At most this many dates ahead are shown in a person's window. */
     private static final int MAX_DAYS = 8;
+
+    /**
+     * Opens this screen to choose who a kept item is about. Only the item's event id travels, to this app's own screen — Recall never
+     * starts an activity itself, and nothing is handed to another app.
+     */
+    static void chooseFor(Activity from, String itemEventId) {
+        from.startActivity(new android.content.Intent(from, PeopleActivity.class).putExtra(LINK_ITEM, itemEventId));
+    }
 
     private LinearLayout list;
     /** The read is recorded once per opening, not per redraw. */
@@ -44,10 +54,16 @@ public final class PeopleActivity extends Activity {
     private HandoffFlow handoff;
     /** The dates ahead in all kept items, computed once with the people; a person's are the ones in their own items. */
     private ComingUp.Result ahead;
+    /** Choose mode: the item whose person is being chosen; null when this screen is just People. */
+    private String linkItem;
+    /** The person's window that is open, and the person to open again after a link or an unlink changes the screen. */
+    private AlertDialog shown;
+    private String reopenName;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        linkItem = getIntent() == null ? null : getIntent().getStringExtra(LINK_ITEM);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         ScrollView scroll = new ScrollView(this);
         list = new LinearLayout(this);
@@ -179,7 +195,7 @@ public final class PeopleActivity extends Activity {
             journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size(), result.possible.size()));
         }
         // You choose the person: type a few letters of a contact's name. Nothing is listed until you do.
-        list.addView(text("Find a person in your contacts, then set a reminder about them.", 13, false));
+        list.addView(text(linkItem != null ? "Choose who this is about. Orb will list it on their page." : "Find a person in your contacts, then set a reminder about them.", 13, false));
         final EditText search = new EditText(this);
         search.setHint("A name, two letters or more");
         search.setSingleLine(true);
@@ -199,6 +215,7 @@ public final class PeopleActivity extends Activity {
                 if (hits.isEmpty() && typed.trim().length() >= People.FIND_MIN) found.addView(text("No contact has that in its name.", 13, false));
             }
         });
+        if (linkItem != null) return;   // Choose mode: the search is all there is.
         // What the words mention is a guess, so it sits behind a button, not in front of you.
         final LinearLayout mentions = new LinearLayout(this);
         mentions.setOrientation(LinearLayout.VERTICAL);
@@ -242,6 +259,12 @@ public final class PeopleActivity extends Activity {
         note = text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
             + "Matching by number or email is much surer. A name at the start of a sentence is not read: a capital there says nothing.", 12, false);
         mentions.addView(note);
+        // After a link or an unlink the screen was recomputed: open the same person again.
+        if (reopenName != null) {
+            String name = reopenName;
+            reopenName = null;
+            for (People.Person p : result.all) if (p.names.contains(name)) { showPerson(p); break; }
+        }
     }
 
     private View row(final People.Person person) {
@@ -251,9 +274,146 @@ public final class PeopleActivity extends Activity {
         row.addView(text(person.display(), 15, true));
         row.addView(text(person.items.isEmpty() ? "nothing you kept mentions them" : person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
         row.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) { showPerson(person); }
+            @Override public void onClick(View view) {
+                if (linkItem != null) confirmLink(person, linkItem, null);
+                else showPerson(person);
+            }
         });
         return row;
+    }
+
+    private void say(String message, DialogInterface.OnDismissListener then) {
+        AlertDialog box = new AlertDialog.Builder(this).setMessage(message).setPositiveButton("OK", null).create();
+        if (then != null) box.setOnDismissListener(then);
+        box.show();
+    }
+
+    /** The card before a link: who, and what — Cancel is the default. Nothing is written until *Link*. */
+    private void confirmLink(final People.Person person, final String itemId, String preview) {
+        AlertDialog card = new AlertDialog.Builder(this)
+            .setTitle("Link this to " + person.display() + "?")
+            .setMessage((preview == null ? "The item you chose in Recall" : preview)
+                + "\n\nOrb will list it on their page and say you linked it. Nothing leaves the phone. You can unlink it any time.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Link", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { link(person, itemId); }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    private void link(People.Person person, String itemId) {
+        Journal journal = journal();
+        if (journal == null) return;
+        String outcome;
+        try {
+            outcome = PersonLink.link(this, journal, itemId, person);
+        } catch (IOException unreadable) {
+            say("Orb could not read its history, so it did not link anything.", null);
+            return;
+        }
+        if (PersonLink.ALREADY.equals(outcome)) {
+            say("Already linked.", null);
+        } else if (!PersonLink.LINKED.equals(outcome)) {
+            say("Orb could not record this, so it did not link anything.", null);
+        } else if (linkItem != null) {
+            say("Linked. It is on their page now.", new DialogInterface.OnDismissListener() {
+                @Override public void onDismiss(DialogInterface d) { finish(); }
+            });
+        } else {
+            reopenName = person.names.get(0);
+            if (shown != null) shown.dismiss();
+            render();
+        }
+    }
+
+    /** *Add something I kept…* — the newest kept items, to pick one to link to this person. */
+    private void chooseItem(final People.Person person) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        final android.content.Context context = this;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                Recall.Results found = null;
+                try {
+                    found = Recall.search(context, journal, "", null);
+                } catch (IOException unreadable) {
+                    found = null;
+                }
+                final Recall.Results results = found;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { pickItem(person, results); }
+                });
+            }
+        }).start();
+    }
+
+    private static final int PICK_ITEMS = 30;
+
+    private void pickItem(final People.Person person, Recall.Results found) {
+        if (found == null) {
+            say("Orb could not read what you kept.", null);
+            return;
+        }
+        java.util.Set<String> already = new java.util.HashSet<>();
+        for (People.Evidence e : person.items) if (People.BY_LINK.equals(e.by) && e.entry.id != null) already.add(e.entry.id);
+        final List<Recall.Entry> choices = new java.util.ArrayList<>();
+        for (Recall.Entry e : found.entries) {
+            if (e.id != null && !already.contains(e.id) && choices.size() < PICK_ITEMS) choices.add(e);
+        }
+        if (choices.isEmpty()) {
+            say("Nothing else you kept to add.", null);
+            return;
+        }
+        SimpleDateFormat day = new SimpleDateFormat("d MMM", Locale.getDefault());
+        String[] labels = new String[choices.size()];
+        for (int i = 0; i < labels.length; i++) {
+            Recall.Entry e = choices.get(i);
+            String flat = e.snippet.replace('\n', ' ');
+            labels[i] = day.format(new Date(e.wallClock)) + " \u00b7 " + (e.packageName == null ? "" : e.packageName + " \u00b7 ") + (flat.length() > 80 ? flat.substring(0, 80) + "\u2026" : flat);
+        }
+        AlertDialog which = new AlertDialog.Builder(this)
+            .setTitle("Add which to " + person.display() + "?")
+            .setItems(labels, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int index) {
+                    Recall.Entry e = choices.get(index);
+                    confirmLink(person, e.id, "\u201c" + e.snippet + "\u201d");
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .create();
+        which.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        which.show();
+    }
+
+    /** Unlinking removes only the link: the item stays kept. */
+    private void confirmUnlink(final People.Person person, final People.Evidence item) {
+        AlertDialog sure = new AlertDialog.Builder(this)
+            .setTitle("Unlink this?")
+            .setMessage("It stays kept. Only the link to " + person.display() + " is removed, for good.")
+            .setNegativeButton("Keep the link", null)
+            .setPositiveButton("Unlink", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    try {
+                        PersonLink.unlink(PeopleActivity.this, journal, item.linkHash);
+                    } catch (IOException unreadable) {
+                        say("Orb could not read its history, so it did not unlink anything.", null);
+                        return;
+                    }
+                    reopenName = person.names.get(0);
+                    if (shown != null) shown.dismiss();
+                    render();
+                }
+            })
+            .create();
+        // The card names a person: no screenshots of it.
+        sure.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        sure.show();
+        sure.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
     }
 
     /** The dates ahead in this person's own items — the Coming up reader, restricted; a guess is marked as one. */
@@ -298,7 +458,7 @@ public final class PeopleActivity extends Activity {
         column.addView(text("Orb knows only what you shared or let it remember. A guess is read from when you kept the item.", 11, false));
     }
 
-    private void showPerson(People.Person person) {
+    private void showPerson(final People.Person person) {
         ScrollView scroll = new ScrollView(this);
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
@@ -324,6 +484,15 @@ public final class PeopleActivity extends Activity {
             reach.addView(open);
         }
         column.addView(reach);
+        Button add = new Button(this);
+        add.setText("Add something I kept\u2026");
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                if (shown != null) shown.dismiss();
+                chooseItem(person);
+            }
+        });
+        column.addView(add);
         People.Glance context = People.context(person);
         if (context.count > 0) {
             SimpleDateFormat day = new SimpleDateFormat("d MMM yyyy", Locale.getDefault());
@@ -344,15 +513,24 @@ public final class PeopleActivity extends Activity {
         addDatesAhead(column, person);
         SimpleDateFormat when = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.getDefault());
         if (person.items.isEmpty()) column.addView(text("Nothing you kept mentions them yet.", 13, false));
-        for (People.Evidence item : person.items) {
+        for (final People.Evidence item : person.items) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(0, 16, 0, 16);
-            String how = People.BY_NAME.equals(item.by) ? "mentions the word “" + item.word + "”"
+            String how = People.BY_LINK.equals(item.by) ? "you linked it"
+                : People.BY_NAME.equals(item.by) ? "mentions the word “" + item.word + "”"
                 : People.BY_EMAIL.equals(item.by) ? "has their email" : "has their number";
             row.addView(text(when.format(new Date(item.entry.wallClock)) + "  ·  " + (item.entry.packageName == null ? "" : item.entry.packageName)
                 + (Provenance.SHARED_TEXT.equals(item.entry.type) ? "  ·  shared" : "") + "  ·  " + how, 11, true));
             row.addView(text(item.entry.snippet, 14, false));
+            if (People.BY_LINK.equals(item.by) && item.linkHash != null) {
+                Button unlink = new Button(this);
+                unlink.setText("Unlink");
+                unlink.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) { confirmUnlink(person, item); }
+                });
+                row.addView(unlink);
+            }
             column.addView(row);
         }
         scroll.addView(column);
@@ -371,6 +549,7 @@ public final class PeopleActivity extends Activity {
             .create();
         // A person's contact details and what you wrote about them are as private as the words.
         dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        shown = dialog;
         dialog.show();
     }
 }

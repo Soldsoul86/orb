@@ -1,0 +1,231 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * *Tell Orb who an item is about* — a link the person makes (`docs/PERSON_LINK_PHONE.md`, DR-29). A chat saved from someone rarely
+ * contains their name, so matching words cannot tie it to them; **the person says so, once**.
+ *
+ * **What is recorded:** one `orb.person.linked` event that **cites the item** and carries the identity of a **sealed note**. **Who** — the
+ * contact's names, numbers and email addresses as they were that moment — is inside the note, sealed with its own key like a reminder's
+ * note, never in the clear journal, never listed in Recall. People finds the person it means by a shared number or email, else by the
+ * same name; if the contact has gone, the link is **dormant** — nothing shown, nothing wrongly attributed.
+ *
+ * **Undone by erasure.** *Unlink* declares the link erased, which destroys the note's key; erasing the item destroys the links to it, and at
+ * start-up `reconcile` finishes any a crash left. Each note carries a random nonce so two links never share bytes: a note erased once is not
+ * quietly kept again by linking the same pair a second time.
+ */
+final class PersonLink {
+    private PersonLink() {}
+
+    static final String HEADER = "orb.person.link.v1";
+
+    /** Who a link names, as the sealed note holds it. */
+    static final class Who {
+        final List<String> names = new ArrayList<>();
+        final List<String> phones = new ArrayList<>();
+        final List<String> emails = new ArrayList<>();
+    }
+
+    /** A live link: its event, the item it cites, and who it names (opened from the sealed note). */
+    static final class Link {
+        final String eventId;
+        final String eventHash;
+        final String itemId;
+        final Who who;
+
+        Link(String eventId, String eventHash, String itemId, Who who) {
+            this.eventId = eventId;
+            this.eventHash = eventHash;
+            this.itemId = itemId;
+            this.who = who;
+        }
+    }
+
+    private static String oneLine(String value) {
+        return value.replace('\n', ' ').replace('\r', ' ').trim();
+    }
+
+    /** The sealed document: a header, a nonce, and one line per name, number and address. */
+    static byte[] document(People.Person person, String nonce) {
+        StringBuilder out = new StringBuilder(HEADER).append("\n---\n").append("nonce:").append(nonce).append('\n');
+        for (String n : person.names) out.append("name:").append(oneLine(n)).append('\n');
+        for (String p : person.phones) out.append("phone:").append(oneLine(p)).append('\n');
+        for (String e : person.emails) out.append("email:").append(oneLine(e)).append('\n');
+        return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Who the document names, or null if these bytes are not a link note. */
+    static Who parse(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = HEADER + "\n---\n";
+        if (!s.startsWith(prefix)) return null;
+        Who who = new Who();
+        for (String line : s.substring(prefix.length()).split("\n")) {
+            if (line.startsWith("name:")) who.names.add(line.substring(5));
+            else if (line.startsWith("phone:")) who.phones.add(line.substring(6));
+            else if (line.startsWith("email:")) who.emails.add(line.substring(6));
+        }
+        return who;
+    }
+
+    /** Does this link name that person: a number or an address in common, else a name in common (case aside)? */
+    static boolean matches(Who who, People.Person person) {
+        for (String p : who.phones) if (person.phones.contains(p)) return true;
+        for (String e : who.emails) if (person.emails.contains(e)) return true;
+        for (String n : who.names) for (String m : person.names) if (n.equalsIgnoreCase(m)) return true;
+        return false;
+    }
+
+    /** What `link` answers. */
+    static final String LINKED = "linked";
+    static final String ALREADY = "alreadyLinked";
+    static final String NOTE_FAILED = "noteFailed";
+    static final String JOURNAL_FAILED = "journalFailed";
+
+    /** A live link as the journal alone shows it: no note is opened. */
+    private static final class Raw {
+        final String eventId;
+        final String eventHash;
+        final String identity;
+        final String itemId;
+
+        Raw(String eventId, String eventHash, String identity, String itemId) {
+            this.eventId = eventId;
+            this.eventHash = eventHash;
+            this.identity = identity;
+            this.itemId = itemId;
+        }
+    }
+
+    private static List<Raw> raw(List<String> lines) {
+        Set<String> erased = Erasure.erasedHashes(lines);
+        Map<String, Erasure.Item> byHash = new LinkedHashMap<>();
+        for (Erasure.Item item : Erasure.items(lines)) if (PersonLinkFacts.LINKED.equals(item.type)) byHash.put(item.hash, item);
+        List<Raw> out = new ArrayList<>();
+        for (String line : lines) {
+            if (!PersonLinkFacts.LINKED.equals(Journal.typeOf(line))) continue;
+            String hash = Erasure.envelopeHash(line);
+            Erasure.Item item = hash == null ? null : byHash.get(hash);
+            List<String> causes = Reminders.causesOf(line);
+            if (item == null || causes.isEmpty() || erased.contains(hash)) continue;
+            out.add(new Raw(Erasure.eventId(line), hash, item.identity, causes.get(0)));
+        }
+        return out;
+    }
+
+    /** Every live link, with who it names. A note that cannot be opened is skipped, never guessed at. */
+    static List<Link> all(Context context, Journal journal) throws IOException {
+        List<Link> out = new ArrayList<>();
+        for (Raw r : raw(journal.readLines())) {
+            Who who = null;
+            try {
+                byte[] bytes = Attachments.open(context, r.identity);
+                who = bytes == null ? null : parse(bytes);
+            } catch (Exception unreadable) {
+                who = null;
+            }
+            if (who != null) out.add(new Link(r.eventId, r.eventHash, r.itemId, who));
+        }
+        return out;
+    }
+
+    private static String nonce() {
+        byte[] b = new byte[12];
+        new SecureRandom().nextBytes(b);
+        StringBuilder out = new StringBuilder();
+        for (byte x : b) out.append(String.format(Locale.ROOT, "%02x", x));
+        return out.toString();
+    }
+
+    /**
+     * Links the item to the person: seals who, then records the event citing the item. The same item and person twice is
+     * `alreadyLinked`, and writes nothing. If the event cannot be written the note goes back.
+     */
+    static String link(final Context context, final Journal journal, final String itemEventId, People.Person person) throws IOException {
+        return link(context, journal, itemEventId, person, new Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload, List<String> causes) {
+                return journal.append(PersonLinkFacts.LINKED, payload, causes);
+            }
+        });
+    }
+
+    /** Writes the event. The journal in the app; a test makes it fail, to see the sealed note go back. */
+    interface Recorder {
+        Map<String, Object> record(Map<String, Object> payload, List<String> causes);
+    }
+
+    static String link(Context context, Journal journal, String itemEventId, People.Person person, Recorder recorder) throws IOException {
+        if (itemEventId == null) return NOTE_FAILED;
+        for (Link l : all(context, journal)) if (itemEventId.equals(l.itemId) && matches(l.who, person)) return ALREADY;
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(document(person, nonce())));
+        if (stored.identity == null) return NOTE_FAILED;
+        boolean sealedNow = "stored".equals(stored.outcome);
+        Map<String, Object> event = recorder.record(PersonLinkFacts.linked(stored.identity, stored.bytes), Arrays.asList(itemEventId));
+        if (event == null) {
+            if (sealedNow) {
+                try {
+                    Attachments.discard(context, stored.identity);
+                } catch (Exception leftBehind) {
+                    // Nothing cites it; the next erase pass cannot see it.
+                }
+            }
+            return JOURNAL_FAILED;
+        }
+        return LINKED;
+    }
+
+    /** Unlinks: the link is declared erased, which destroys its note. Returns whether it was erased. */
+    static boolean unlink(Context context, Journal journal, String linkEventHash) throws IOException {
+        Erase.Result done = Erase.execute(context, journal, linkEventHash);
+        return Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome);
+    }
+
+    /** The links to a kept item that was just erased: erased with it. Returns how many. */
+    static int itemErased(Context context, Journal journal, String itemEventId) throws IOException {
+        int n = 0;
+        for (Raw r : raw(journal.readLines())) {
+            if (itemEventId != null && itemEventId.equals(r.itemId) && unlink(context, journal, r.eventHash)) n++;
+        }
+        return n;
+    }
+
+    private static boolean erasedItem(List<String> lines, Set<String> erased, String itemId) {
+        for (String line : lines) {
+            if (itemId.equals(Erasure.eventId(line))) {
+                String hash = Erasure.envelopeHash(line);
+                return hash != null && erased.contains(hash);
+            }
+        }
+        return false;
+    }
+
+    /** At start-up: links whose item was erased by any path are erased too. Returns how many. Never fatal. */
+    static int reconcile(Context context, Journal journal) {
+        int n = 0;
+        try {
+            List<String> lines = journal.readLines();
+            Set<String> erased = Erasure.erasedHashes(lines);
+            Set<String> done = new HashSet<>();
+            for (Raw r : raw(lines)) {
+                if (!done.add(r.eventHash) || !erasedItem(lines, erased, r.itemId)) continue;
+                if (unlink(context, journal, r.eventHash)) n++;
+            }
+        } catch (IOException unreadable) {
+            // No journal read, no reconciliation. Nothing is guessed.
+        }
+        return n;
+    }
+}

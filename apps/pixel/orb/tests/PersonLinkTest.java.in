@@ -1,0 +1,273 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * *Tell Orb who an item is about* (`docs/PERSON_LINK_PHONE.md`, DR-29): a link the person makes, sealed, cited to the item, found again by
+ * number, address or name, outranking a guess, undone by erasure, and never in the clear.
+ */
+final class PersonLinkTest {
+    private PersonLinkTest() {}
+
+    private static People.Contact contact(String id, String name, String[] phones, String... emails) {
+        People.Contact c = new People.Contact(id, name);
+        c.phones.addAll(Arrays.asList(phones));
+        c.emails.addAll(Arrays.asList(emails));
+        return c;
+    }
+
+    private static Map<String, Object> keep(Context context, Journal journal, String text) {
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.chat", text.length());
+        Attachments.Stored stored = SharedText.seal(context, text, null);
+        return SharedText.record(journal, context, payload, stored, null);
+    }
+
+    private static String idOf(Map<String, Object> event) { return (String) event.get("id"); }
+
+    private static String hashOf(Map<String, Object> event) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> integrity = (Map<String, Object>) event.get("integrity");
+        return (String) integrity.get("hash");
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static String lastOf(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) found = l;
+        return found;
+    }
+
+    private static People.Person find(People.Result r, String name) {
+        for (People.Person p : r.all) if (p.names.contains(name)) return p;
+        return null;
+    }
+
+    private static Map<String, Long> listing(File dir, String prefix) {
+        Map<String, Long> out = new TreeMap<>();
+        File[] children = dir.listFiles();
+        if (children == null) return out;
+        for (File child : children) {
+            if (child.isDirectory()) out.putAll(listing(child, prefix + child.getName() + "/"));
+            else out.put(prefix + child.getName(), child.length());
+        }
+        return out;
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the sealed note says who, and is not mistaken for anything else");
+        People.Person sasiP = new People.Person();
+        sasiP.names.add("Sasi Rao");
+        sasiP.phones.add("+919000000021");
+        sasiP.emails.add("sasi@x.example");
+        byte[] doc = PersonLink.document(sasiP, "ab12");
+        PersonLink.Who who = PersonLink.parse(doc);
+        Harness.check("it reads back: names, numbers and addresses", who != null && who.names.equals(Arrays.asList("Sasi Rao")) && who.phones.equals(Arrays.asList("+919000000021")) && who.emails.equals(Arrays.asList("sasi@x.example")));
+        Harness.check("other bytes are not a link note", PersonLink.parse("hello".getBytes(StandardCharsets.UTF_8)) == null && PersonLink.parse(ReminderNote.document("Call Sasi")) == null);
+        Harness.check("and a link note is not a screen's or a share's words: it is never listed in Recall", Recall.parse(doc) == null);
+        Harness.check("each note has its own nonce, so no two share bytes", !Arrays.equals(PersonLink.document(sasiP, "ab12"), PersonLink.document(sasiP, "cd34")));
+        People.Person odd = new People.Person();
+        odd.names.add("Line\nBreak");
+        Harness.equal("a line break in a name cannot forge a line", PersonLink.parse(PersonLink.document(odd, "n")).names, Arrays.asList("Line Break"));
+        Harness.check("a number in common names the person", PersonLink.matches(who, find2("Other Name", "+919000000021")));
+        Harness.check("an address in common", PersonLink.matches(who, find2("Other Name", null, "sasi@x.example")));
+        Harness.check("else a name in common, whatever its case", PersonLink.matches(who, find2("sasi rao")));
+        Harness.check("otherwise no one", !PersonLink.matches(who, find2("Ravi Kumar", "+919000000022", "ravi@x.example")));
+
+        Harness.suite("linking an item the words never name to a person");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-link").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        List<People.Contact> book = new ArrayList<>();
+        book.add(contact("1", "Sasi Rao", new String[] {"+919000000021"}, "sasi@x.example"));
+        book.add(contact("2", "Ravi Kumar", new String[] {"+919000000022"}));
+        Map<String, Object> chat = keep(context, journal, "ok see you at the stall, bring the invoice");
+        People.Result before = People.compute(context, journal, book);
+        Harness.check("the words name no one, so no one has it", find(before, "Sasi Rao").items.isEmpty() && find(before, "Ravi Kumar").items.isEmpty());
+        Harness.equal("linked", PersonLink.link(context, journal, idOf(chat), find(before, "Sasi Rao")), PersonLink.LINKED);
+        String event = lastOf(journal, PersonLinkFacts.LINKED);
+        Harness.check("one event, citing the item", count(journal, PersonLinkFacts.LINKED) == 1 && event.contains("\"causes\":[\"" + idOf(chat) + "\"]"));
+        Harness.equal("its fields: the sealed note's identity and size, and the shape", new java.util.TreeSet<>(PersonLinkFacts.linked("sha256:x", 5L).keySet()).toString(), "[attachment, attachmentBytes, version]");
+        String all = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no name, number or address", !all.contains("Sasi") && !all.contains("9000000021") && !all.contains("sasi@x"));
+        Harness.check("nor does anything on disk, in the clear", !contains(dir, "Sasi".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "9000000021".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "sasi@x".getBytes(StandardCharsets.UTF_8)));
+        People.Result after = People.compute(context, journal, book);
+        People.Person sasi = find(after, "Sasi Rao");
+        Harness.check("her page now has the chat, tied by you", sasi.items.size() == 1 && People.BY_LINK.equals(sasi.items.get(0).by) && sasi.items.get(0).linkHash != null);
+        Harness.equal("said as *by you*", People.evidenceLine(sasi), "1 by you");
+        Harness.check("it counts as sure, not as a guess", sasi.sure() && after.people.contains(sasi) && !after.possible.contains(sasi));
+        Harness.check("and it is the chat's own words that are shown", sasi.items.get(0).entry.snippet.contains("bring the invoice"));
+        Harness.check("no one else has it", find(after, "Ravi Kumar").items.isEmpty());
+        Harness.equal("the same item and person again is already linked, and writes nothing", PersonLink.link(context, journal, idOf(chat), sasi), PersonLink.ALREADY);
+        Harness.equal("so there is still one link", count(journal, PersonLinkFacts.LINKED), 1);
+        Harness.equal("the same item to someone else is another link", PersonLink.link(context, journal, idOf(chat), find(after, "Ravi Kumar")), PersonLink.LINKED);
+        Harness.check("and both pages have it", find(People.compute(context, journal, book), "Ravi Kumar").items.size() == 1 && find(People.compute(context, journal, book), "Sasi Rao").items.size() == 1);
+        Harness.check("a null item is refused, nothing written", PersonLink.link(context, journal, null, sasi).equals(PersonLink.NOTE_FAILED) && count(journal, PersonLinkFacts.LINKED) == 2);
+
+        Harness.suite("if the event cannot be written, the sealed note goes back");
+        Map<String, Long> disk = listing(dir, "");
+        Map<String, Object> chat0 = keep(context, journal, "a chat whose link will not be recorded");
+        Map<String, Long> diskKept = listing(dir, "");
+        PersonLink.Recorder failing = new PersonLink.Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload, List<String> causes) { return null; }
+        };
+        Harness.equal("refused: not recorded", PersonLink.link(context, journal, idOf(chat0), sasi, failing), PersonLink.JOURNAL_FAILED);
+        Harness.equal("and nothing is left on disk: the note is discarded", listing(dir, ""), diskKept);
+        Harness.equal("no link was made", count(journal, PersonLinkFacts.LINKED), 2);
+
+        Harness.suite("the link outranks a guess, and is found again by number, address or name");
+        Map<String, Object> numbered = keep(context, journal, "loan number 90000 00021 pay 500");
+        Harness.check("by number first: the item names her number", find(People.compute(context, journal, book), "Sasi Rao").items.get(0).by.equals(People.BY_NUMBER));
+        Harness.equal("linked as well", PersonLink.link(context, journal, idOf(numbered), find(People.compute(context, journal, book), "Sasi Rao")), PersonLink.LINKED);
+        People.Person sasi3 = find(People.compute(context, journal, book), "Sasi Rao");
+        int forNumbered = 0;
+        for (People.Evidence e : sasi3.items) if (idOf(numbered).equals(e.entry.id)) { forNumbered++; Harness.equal("listed once, as yours", e.by, People.BY_LINK); }
+        Harness.equal("exactly once", forNumbered, 1);
+        List<People.Contact> moved = new ArrayList<>();
+        moved.add(contact("1", "Sasi Rao", new String[] {"+919111111111"}));
+        moved.add(contact("2", "Ravi Kumar", new String[] {"+919000000022"}));
+        Harness.check("her number changed, her name did not: still found, by name", find(People.compute(context, journal, moved), "Sasi Rao").items.size() >= 1
+            && People.BY_LINK.equals(find(People.compute(context, journal, moved), "Sasi Rao").items.get(0).by));
+        List<People.Contact> renamed = new ArrayList<>();
+        renamed.add(contact("1", "Sasikala", new String[] {"+919000000021"}));
+        Harness.check("her name changed, her number did not: still found, by number", find(People.compute(context, journal, renamed), "Sasikala").items.size() >= 1);
+        List<People.Contact> gone = new ArrayList<>();
+        gone.add(contact("2", "Ravi Kumar", new String[] {"+919000000022"}));
+        People.Result dormant = People.compute(context, journal, gone);
+        Harness.check("her contact gone: the link is dormant — shown to no one, and not wrongly to Ravi",
+            find(dormant, "Ravi Kumar").items.size() == 1 && PersonLink.all(context, journal).size() == 3);
+
+        Harness.suite("unlinking destroys the link and nothing else");
+        String linkHash = find(People.compute(context, journal, book), "Sasi Rao").items.get(0).linkHash;
+        List<String> identities = new ArrayList<>();
+        for (Erasure.Item it : Erasure.items(journal.readLines())) if (PersonLinkFacts.LINKED.equals(it.type) && !it.erased) identities.add(it.identity);
+        Harness.check("three live link notes are held", identities.size() == 3 && Attachments.state(context, identities.get(0)).equals(Attachments.HELD_STATE));
+        int words = 0;
+        for (Erasure.Item it : Erasure.items(journal.readLines())) if (!PersonLinkFacts.LINKED.equals(it.type) && !it.erased) words++;
+        Harness.check("one of Sasi's links is undone", PersonLink.unlink(context, journal, linkHash));
+        Harness.check("its note's key is destroyed", Attachments.state(context, identities.get(0)).equals(Attachments.DESTROYED_STATE) || Attachments.state(context, identities.get(1)).equals(Attachments.DESTROYED_STATE) || Attachments.state(context, identities.get(2)).equals(Attachments.DESTROYED_STATE));
+        Harness.equal("two links remain", PersonLink.all(context, journal).size(), 2);
+        int wordsAfter = 0;
+        for (Erasure.Item it : Erasure.items(journal.readLines())) if (!PersonLinkFacts.LINKED.equals(it.type) && !it.erased) wordsAfter++;
+        Harness.equal("the kept items are untouched", wordsAfter, words);
+        Harness.equal("linking the same pair again is allowed: a fresh note, not the erased one", PersonLink.link(context, journal, idOf(numbered), find(People.compute(context, journal, book), "Sasi Rao")), PersonLink.LINKED);
+
+        Harness.suite("erasing the item erases the links to it — by the cascade, and by the start-up pass");
+        Map<String, Object> chat2 = keep(context, journal, "a second chat about the stall rent");
+        PersonLink.link(context, journal, idOf(chat2), find(People.compute(context, journal, book), "Sasi Rao"));
+        Harness.equal("erase the item", Erase.execute(context, journal, hashOf(chat2)).outcome, Erase.DESTROYED);
+        Harness.equal("its link goes with it", PersonLink.itemErased(context, journal, idOf(chat2)), 1);
+        boolean stillLinked = false;
+        for (PersonLink.Link l : PersonLink.all(context, journal)) if (idOf(chat2).equals(l.itemId)) stillLinked = true;
+        Harness.check("no live link cites it", !stillLinked);
+        Harness.equal("asking again finds nothing to do", PersonLink.itemErased(context, journal, idOf(chat2)), 0);
+        Map<String, Object> chat3 = keep(context, journal, "a third chat, erased by another path");
+        PersonLink.link(context, journal, idOf(chat3), find(People.compute(context, journal, book), "Sasi Rao"));
+        Erase.execute(context, journal, hashOf(chat3));
+        Harness.equal("a link left owed by another erase path is finished at start-up", PersonLink.reconcile(context, journal), 1);
+        Harness.equal("and a second pass finds nothing", PersonLink.reconcile(context, journal), 0);
+
+        Harness.suite("a backup carries the note, so a restored phone keeps its links");
+        String keyOfLink = null;
+        for (Erasure.Item it : Erasure.items(journal.readLines())) if (PersonLinkFacts.LINKED.equals(it.type) && !it.erased) keyOfLink = "key/" + Attachments.address(context, it.identity);
+        Backup.Plan plan = Backup.plan(context, journal.readLines(), false);
+        boolean carried = false;
+        for (Backup.Entry e : plan.entries) if (e.name.equals(keyOfLink)) carried = true;
+        Harness.check("a live link's key is in the plan, with pictures off", keyOfLink != null && carried);
+
+        guard();
+    }
+
+    /** A person as People builds one, for matching: names, and optionally a number and an address. */
+    private static People.Person find2(String name, String... more) {
+        People.Person p = new People.Person();
+        p.names.add(name);
+        if (more.length > 0 && more[0] != null) p.phones.add(more[0]);
+        if (more.length > 1 && more[1] != null) p.emails.add(more[1]);
+        return p;
+    }
+
+    /** One file builds the record and one file does the linking; nothing names a person in the clear or logs. */
+    private static void guard() throws Exception {
+        Harness.suite("the record is built in one place, and nothing here keeps a name");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> builders = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains("\"orb.person.linked\"")) builders.add(e.getKey());
+        Harness.equal("only PersonLinkFacts names the event", builders.toString(), "[PersonLinkFacts]");
+        Harness.check("the record takes no name, number or address", !source.get("PersonLinkFacts").contains("name") && !source.get("PersonLinkFacts").contains("phone") && !source.get("PersonLinkFacts").contains("email"));
+        for (String name : Arrays.asList("PersonLink", "PersonLinkFacts")) {
+            String t = source.get(name);
+            Harness.check(name + " logs nothing and keeps nothing but through the sealed note",
+                !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace") && !t.contains("FileOutputStream") && !t.contains("RandomAccessFile")
+                && !t.contains("getSharedPreferences") && !t.contains("Toast"));
+        }
+        Harness.check("PersonLink builds no record of its own", !source.get("PersonLink").contains("Json.obj("));
+        Harness.check("who is sealed before the event is written, and the note goes back if the event cannot be",
+            source.get("PersonLink").indexOf("Attachments.store(") < source.get("PersonLink").indexOf("recorder.record(PersonLinkFacts.linked(") && source.get("PersonLink").contains("Attachments.discard("));
+        Harness.check("unlinking is the existing erasure", source.get("PersonLink").contains("Erase.execute(context, journal, linkEventHash)"));
+        Harness.check("the contacts are read by one file still: Recall never touches them",
+            !source.get("RecallActivity").contains("ContactsReader") && !source.get("RecallActivity").contains("ContactsContract") && source.get("RecallActivity").contains("PeopleActivity.chooseFor(RecallActivity.this, entry.id)"));
+        Harness.check("erasing an item in Recall erases its links, and start-up finishes any others",
+            source.get("RecallActivity").contains("PersonLink.itemErased(this, journal, entry.id)") && source.get("Orb").contains("PersonLink.reconcile(this, journal)"));
+        Harness.check("a backup carries the note, and the items list names it", source.get("Backup").contains("PersonLinkFacts.LINKED.equals(item.type)") && source.get("ItemsActivity").contains("\"person link\""));
+        String activity = source.get("PeopleActivity");
+        Harness.check("the person's page can add an item and unlink one; both go through PersonLink, behind a card with Cancel the default",
+            activity.contains("PersonLink.link(this, journal, itemId, person)") && activity.contains("PersonLink.unlink(PeopleActivity.this, journal, item.linkHash)")
+            && activity.contains("Add something I kept") && activity.contains("confirmLink(") && activity.contains("BUTTON_NEGATIVE).requestFocus()"));
+        Harness.check("choose mode sends a tapped contact to the link card, not to their page; a linked item can be unlinked; the picker leaves out what is linked",
+            activity.contains("if (linkItem != null) confirmLink(person, linkItem, null);") && activity.contains("if (People.BY_LINK.equals(item.by) && item.linkHash != null) {")
+            && activity.contains("People.BY_LINK.equals(e.by) && e.entry.id != null") && activity.contains("say(\"Already linked.\", null);"));
+        Harness.check("every card that decides something puts Cancel first: link and unlink", activity.split("BUTTON_NEGATIVE\\)\\.requestFocus\\(\\)", -1).length - 1 >= 2);
+        Harness.check("a link can only be offered from an item that has an event id", source.get("RecallActivity").contains("if (entry.id == null) return;"));
+        Harness.check("choose mode is only the search: it returns before the lists the words build", activity.indexOf("if (linkItem != null) return;") > 0
+            && activity.indexOf("if (linkItem != null) return;") < activity.indexOf("final LinearLayout mentions"));
+        Harness.check("the windows that show words or a person are secure: the picker, the link card, the unlink card, the person's page", activity.split("FLAG_SECURE", -1).length - 1 >= 10);
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

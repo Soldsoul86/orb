@@ -1265,6 +1265,19 @@ permission, no `<queries>`.** WhatsApp is reached by **its own scheme, never a w
 **Not in this ruling:** pre-filled text or drafts, any model, reading chats, reminders listed by person (a reminder cites no item and never records the person, DR-26), search by number, pinned people.
 
 
+## DR-29 — A link the person makes: who an item is about, sealed
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator (after finding that a chat saved from Sasi does not mention Sasi: "Yes, go ahead with the design") on `PERSON_LINK_PHONE.md` · **Bears on:** DR-19, DR-24, DR-28, `Entity.md` §2
+
+**The ruling.** Matching words cannot tie a chat to the person it is with, because the chat rarely names them. **The person says so, once.** On a kept item, *This is about a person…* (People opens in choose mode); on a person's page, *Add something I kept…*. A card names who and what, **Cancel the default**; *Link* records **one `orb.person.linked` event that cites the item and carries the identity of a
+sealed note** — the note holds the contact's names, numbers and email addresses as of that moment, sealed with its own key like a reminder's note. **Nothing about who is in the journal or on disk in the clear.** The person's page then lists the item as **you linked it**, as **sure** (a decision of yours beats a guess), in their context and dates ahead, with **Unlink**.
+
+**This is the part of `Entity.md` §2 that is recorded: a resolution a person decides** (DR-19). Everything Orb *computes* about people stays computed and unstored; **this decision is the person's, so it is kept** — in the one place the journal can hold it without writing it in the clear, a sealed note. It is found again by **a number or an address in common, else the same name**; if the contact is gone it is
+**dormant** (nothing shown, nothing wrongly attributed). **Undone by erasure**: *Unlink* is the existing erasure; erasing the item erases its links; start-up finishes any left owed. **No new capability and no new permission**: the contacts are still read only by People, only while it is open.
+
+**Not in this ruling:** merging or splitting persons; linking from the screen capture or the share sheet at the moment of keeping; guessing a chat's person from its app or title; group chats.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

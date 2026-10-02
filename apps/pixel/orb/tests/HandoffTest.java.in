@@ -179,7 +179,8 @@ final class HandoffTest {
         Harness.check("a switched-off capability is checked before anything is shown", flow.indexOf("Handoff.enabled(") > 0 && flow.indexOf("Handoff.enabled(") < flow.indexOf("review(channel, numbers.get(0))"));
         Harness.check("only HandoffFacts builds the records", source.get("Handoff").indexOf("Json.obj(") < 0 && source.get("HandoffFlow").indexOf("Json.obj(") < 0);
         Harness.check("the records never take a number or a name", !source.get("HandoffFacts").contains("number") && !source.get("HandoffFacts").contains("phone") && !source.get("HandoffFacts").contains("name\""));
-        Harness.check("the person's page reaches an app only through the flow", !source.get("PeopleActivity").contains("Intent.ACTION") && !source.get("PeopleActivity").contains("startActivity(") 
+        Harness.check("the person's page reaches an app only through the flow", !source.get("PeopleActivity").contains("Intent.ACTION")
+            && source.get("PeopleActivity").split("startActivity\\(", -1).length == 2 && source.get("PeopleActivity").contains("from.startActivity(new android.content.Intent(from, PeopleActivity.class)")
             && source.get("PeopleActivity").contains("handoff.start(channel[0], person)"));
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
         Harness.check("no new permission and no <queries> package for it", !manifest.contains("CALL_PHONE") && !manifest.contains("SEND_SMS") && !manifest.contains("<package "));

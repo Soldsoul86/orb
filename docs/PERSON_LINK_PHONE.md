@@ -1,6 +1,6 @@
 # Tell Orb who an item is about — a link you make (B3, People slice 5; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Direction chosen by the operator ("Yes, go ahead with the design" after the problem was found: *a chat saved from Sasi does not mention Sasi, so it is not in her context*). The four details in §6 are what is left to approve. Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b74, `orb-app-v37-link.apk`; `DECISIONS.md` DR-29). As-built notes in §8. The problem, found on the device: *a chat saved from Sasi does not mention Sasi, so it is not in her context*.
 > Builds on `PEOPLE_PHONE.md` (DR-24), `PERSON_CONTEXT_PHONE.md` (DR-28), `GATE_PHONE.md` (the sealed-note pattern) and `Entity.md` §2 (*a recorded resolution when a **person** decides*).
 
 ## 1. Why, in plain words
@@ -50,3 +50,11 @@ tuning of the matching can fix that. **You know whose chat it is. Tell Orb once.
 ## 7. Not in this slice
 
 Merging or splitting persons; linking from the screen capture or the share sheet at the moment of keeping; guessing a chat's person from its app or title; any group chat; unlinking in bulk.
+
+## 8. As built
+
+- **As designed:** *This is about a person…* on a kept item's window (Recall) opens People in **choose mode** (the search only; tap a contact → a card, Cancel the default → *Link*); *Add something I kept…* on a person's page lists the newest 30 kept items not already linked to them; a linked item is labelled **you linked it**, counts as **sure**, and has **Unlink**; **one `orb.person.linked` event cites the item and carries the identity of a sealed note** holding names, numbers and emails; no name is in the journal or on disk in the clear; the contacts are read only by People.
+- **Details the design left open:** (a) the sealed note carries a **random nonce**, so no two links share bytes — a link erased once can be made again (a reminder note erased once cannot, by design; a link is not a thing to be kept out); (b) a person is found again by **a number or an address in common, else the same name** (case aside), so a contact whose number or name changed is still found; (c) Recall starts People through `PeopleActivity.chooseFor`, so **Recall still never starts an activity** (its guard is unchanged) and only the item's event id travels, to Orb's own screen; (d) after a link or an unlink the screen is recomputed and **the same person's page opens again**; (e) the cards that name a person are **secure**, the unlink card too; (f) the items list (*Everything Orb keeps*) names a link note **person link**.
+- **Undone by erasure:** *Unlink* = the existing erasure of the link event (its note's key is destroyed); erasing an item in Recall erases its links; at start-up `PersonLink.reconcile` erases links whose item was erased by any other path (the *Everything Orb keeps* screen).
+- **Held by tests:** the note's reading and what it is not (never listed in Recall); the link and its record (fields, causes, no name in the journal or on disk); duplicates; the same item to two people; by-number outranking nothing but yours; found again after a number or name change; dormant when the contact is gone and not wrongly shown to anyone else; unlink destroys the note and touches nothing else; relinking after an unlink; the cascade and the start-up pass; a backup carries the note; source guards (one builder of the record, Recall never reads contacts, the flows are behind cards with Cancel the default, secure windows).
+- **Not built:** §7, unchanged.

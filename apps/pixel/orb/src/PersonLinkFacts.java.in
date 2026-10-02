@@ -1,0 +1,23 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * The record of a link the person made — *this kept item is about that person* — built here and nowhere else
+ * (`docs/PERSON_LINK_PHONE.md`, DR-29). **The journal holds only that an item was linked**: the event cites the item in its `causes` and carries the
+ * identity of a sealed note; **never a name, a number or an email address**. Who it names is inside the sealed note (`PersonLink`).
+ */
+final class PersonLinkFacts {
+    private PersonLinkFacts() {}
+
+    static final String LINKED = "orb.person.linked";
+
+    /** The sealed note's identity and size, and the shape of this record. */
+    static Map<String, Object> linked(String identity, long bytes) {
+        Map<String, Object> p = Json.obj();
+        p.put("attachment", identity);
+        p.put("attachmentBytes", bytes);
+        p.put("version", 1L);
+        return p;
+    }
+}

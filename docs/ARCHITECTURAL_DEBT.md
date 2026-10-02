@@ -591,8 +591,7 @@ a second source for the compiler's checksum exists (item 1).
 
 1. **Handles, not people — partly closed (DR-24, 2026-10-02).** A phone number, site, UPI id, email, amount or date names itself; "Ravi" does not. **The People screen now resolves names through the contacts, opt-in** (see AD-21); **places and organisations still need a model** and are not read.
    Mentions itself is still handles only.
-2. **No merge or split — partly closed (DR-24).** Contacts sharing a number or an address are one person **on the People screen, computed, with nothing recorded**. Mentions still treats two numbers as two entities, and a person's own *"these two are the same"* decision
-   (the contract's recorded resolution, `Entity.md` §2) is not built.
+2. **No merge or split — partly closed (DR-24, DR-29).** Contacts sharing a number or an address are one person **on the People screen, computed, with nothing recorded**. **An item↔person decision is now recorded** (DR-29: a sealed link you make). Mentions still treats two numbers as two entities, and a person's own *"these two are the same"* (a merge) or *"these are not"* (a split) is not built.
 3. **Linear cost, bounded to the newest 500 kept items** (AD-13), and every lookup reopens every item in memory. An index would have to be sealed and kept in step with every erase; revisit if the lookup
    becomes slow (thousands of items).
 4. **Format limits are the rules' limits**: no landlines, no two-digit years, no relative dates, a ten-digit order id starting 6–9 reads as a mobile, other countries' numbers only as `+country…`.
@@ -645,6 +644,22 @@ a second source for the compiler's checksum exists (item 1).
 6. **No text, no drafts.** The other app opens empty. Writing a message from the context is a separate step (and, if a model writes it, a separate decision about what leaves the phone).
 7. **Dates ahead cost a second pass** over the newest 500 kept items each time People opens (AD-13).
 8. **Whether `whatsapp://` opens from an app with no `<queries>` entry** is expected, not yet seen on a device.
+
+
+---
+
+## AD-24 — what a link you make does and does not do
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-29). Debts, stated.
+
+1. **One item at a time.** Linking is a tap per item; Orb does not learn that *the next chat from the same screen is Sasi's too*. Offering the link at the moment of keeping (from the screen capture or the share) is a later step.
+2. **A chat kept again is a new item.** The same conversation shared on two days is two items; each is linked once.
+3. **The link names the contact as it was.** If the contact is deleted, or its number, address *and* name all change, the link is dormant — safe, but you would link again. A restore on a phone with different contacts behaves the same way.
+4. **Two people with the same name and no shared number** can be confused by the name fallback; the note carries the numbers and addresses, which match first.
+5. **The nonce means an erased link can be made again.** That is intended (it is a decision, not content to be kept out), but it also means *Unlink* cannot stop you from linking the same pair a minute later.
+6. **The cascade has two paths.** Erasing in Recall erases the links at once; erasing from *Everything Orb keeps* is finished at the next start (`reconcile`) — until then a link to a gone item exists but shows nothing.
+7. **A link is not a merge.** Two contacts for one person, or one contact for two, are still as the contacts book has them.
+8. **Cost:** each opening of People opens every live link's note (one decrypt each) with the newest 500 kept items (AD-13).
 
 ---
 

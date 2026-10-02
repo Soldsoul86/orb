@@ -331,6 +331,7 @@ public final class RecallActivity extends Activity {
         column.addView(text);
         addMentions(column, doc);
         addRemind(column, entry, doc);
+        addLink(column, entry);
         scroll.addView(column);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -349,6 +350,19 @@ public final class RecallActivity extends Activity {
         // The words on screen are the person's own: no screenshots, no recording, no assistant.
         dialog.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         dialog.show();
+    }
+
+    /** *This is about a person…* — opens People in its choose mode; the contacts are read there, never here (`PERSON_LINK_PHONE.md`). */
+    private void addLink(LinearLayout column, final Recall.Entry entry) {
+        if (entry.id == null) return;
+        Button row = new Button(this);
+        row.setText("This is about a person\u2026");
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                PeopleActivity.chooseFor(RecallActivity.this, entry.id);
+            }
+        });
+        column.addView(row);
     }
 
     // ---- Remind me… lives in RemindFlow (shared with Coming up); this screen only offers it.
@@ -526,6 +540,8 @@ public final class RecallActivity extends Activity {
             // Reminders about this item are stopped with it, and say why (`GATE_PHONE.md` §6).
             if (done.outcome.equals(Erase.DESTROYED) || done.outcome.equals(Erase.KEPT_BY_OTHERS)) {
                 Remind.itemErased(this, journal, entry.id, new ReminderAlarms(this));
+                // And the links a person made from it to someone: erased with it (`PERSON_LINK_PHONE.md` §3).
+                PersonLink.itemErased(this, journal, entry.id);
             }
         } catch (IOException error) {
             new AlertDialog.Builder(this).setMessage("Not erased: " + error).setPositiveButton("OK", null).show();

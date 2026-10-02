@@ -190,7 +190,7 @@ public final class ItemsActivity extends Activity {
 
     private static String kind(String type) {
         return type.equals(Orb.SHARED) ? "shared" : type.equals("orb.assist.captured") ? "remembered"
-            : type.equals(ActionFacts.CONFIRMED) ? "reminder note" : type;
+            : type.equals(ActionFacts.CONFIRMED) ? "reminder note" : type.equals(PersonLinkFacts.LINKED) ? "person link" : type;
     }
 
     private static String size(long bytes) {

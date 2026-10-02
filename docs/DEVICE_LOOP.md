@@ -6786,3 +6786,45 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 6. **What Orb may do** → read the new line; tap **Turn off**; go back to the person and tap **Call**; then **What Orb may do → Turn on**. *(P176)*
 7. **Export and share journal**. *(P177)*
 
+
+### 7b74. Tell Orb who an item is about — a link you make (DR-29) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v37-link.apk`. v36 is §7b73 (the hand-offs: **all worked as intended** on the operator's phone; the export showed `whatsapp` and `dial` released with channel only, the switch off and on, and no number). Design: `docs/PERSON_LINK_PHONE.md`; decision `DECISIONS.md` DR-29; limits `ARCHITECTURAL_DEBT.md` AD-24.
+
+**Why:** the operator saved a WhatsApp chat from Sasi, and *the chat doesn't mention Sasi*, so it was not in her context. A chat rarely names the person it is with; matching words cannot fix that.
+
+#### What changed
+
+1. **On a kept item (Recall): *This is about a person…*.** It opens People in a *choose* mode — just the search. Tap a contact: a card says **Link this to (name)?** (Cancel is the default) → **Link**.
+2. **On a person's page: *Add something I kept…*** lists your newest kept items (not already linked to them); tap one; the same card.
+3. **On their page the item appears as *you linked it***, counts as **sure**, adds to *Last mentioned*, *From* and the dates ahead, and has **Unlink** (a card first; the item stays kept).
+4. **Sealed:** the journal holds only that an item was linked (the event cites the item and carries a sealed note's identity); **who** is inside the sealed note. Erasing the item erases its links.
+
+#### Checked before the device
+
+- 1189 phone-side checks (was 1125); Kotlin 378, TypeScript 600 unchanged; lint and type-check clean.
+- **Tests:** the note and what it is not (never listed in Recall); the link and its record (fields, causes, no name in the journal or on disk); duplicates; one item to two people; found again after a number or name change; dormant when the contact is gone; unlink destroys the note and nothing else; relinking; the cascade on erase and the start-up pass; a backup carries the note; source guards. Mutation-checked.
+- **Not testable off the phone:** the screens, and linking a real chat.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P178** | Open **Recall**, open a kept item: a button **This is about a person…** | the button is missing |
+| **P179** | Tap it: **People opens with only the search** (*Choose who this is about…*), no *Who my words mention* button; type two letters, tap a contact: a card **Link this to (name)?** with **Cancel the default** | choose mode shows the lists, or links without a card |
+| **P180** | **Link** → *Linked. It is on their page now.* → back in Recall. Open **People** → that contact: the item is there, labelled **you linked it**, and the context line (*Last mentioned…*) counts it | the item is not on their page |
+| **P181** | On their page, **Add something I kept…** lists your newest kept items, **not** the one already linked; pick another → card → **Link** → their page opens again with both | the picker repeats a linked item, or the page does not refresh |
+| **P182** | **Unlink** on a linked item → a card (*It stays kept. Only the link … is removed*) → **Unlink** → the item leaves their page and **is still in Recall** | unlinking erases the item, or does nothing |
+| **P183** | Erase a linked item in Recall: it is gone from their page; **Everything Orb keeps** no longer lists its *person link* | a link outlives its item |
+| **P184** | **Export and share journal**: an `orb.person.linked` event for each link (with an attachment identity, citing the item), an erasure for each unlink; **no contact name, number or email anywhere in the file** | who was written in the clear |
+
+#### The operator's protocol
+
+1. Install `orb-app-v37-link.apk` over v36; open Orb once.
+2. **Recall** → open the WhatsApp chat you kept from Sasi → **This is about a person…** → search *Sasi* → tap her → read the card → **Link**. *(P178–P180)*
+3. **People** → Sasi: find the chat labelled **you linked it**; read the context line. *(P180)*
+4. On her page tap **Add something I kept…**; confirm the chat you linked is **not** offered; pick another kept item; **Link**. *(P181)*
+5. Tap **Unlink** on that second item; confirm; check it left her page but is still in **Recall**. *(P182)*
+6. In **Recall**, erase the first linked chat; look at her page and at **Everything Orb keeps**. *(P183)*
+7. **Export and share journal**. *(P184)*
+
