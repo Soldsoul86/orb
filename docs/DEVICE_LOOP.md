@@ -6380,7 +6380,7 @@ The operator reported *"All works as intended"*. What the export shows:
 
 ### 7b65. Coming up — Orb proposes, you decide — B4 slice 2 (DR-21) — 2026-10-02
 
-**Status: verified on the device — P126, P128, P130, P131 held; P127/P129 reported working; P125 (the dot) not tested — the date used was ten days out, outside the seven-day window (see results)** — `orb-app-v29-comingup.apk`. v28 is §7b64 (verified bar the card's Cancel and a reboot). Design: `docs/COMING_UP_PHONE.md`; decision `DECISIONS.md` DR-21; limits `ARCHITECTURAL_DEBT.md` AD-19.
+**Status: verified on the device — P125 (the dot, in §7b66), P126, P128, P130, P131 held; P127/P129 reported working** — `orb-app-v29-comingup.apk`. v28 is §7b64 (verified bar the card's Cancel and a reboot). Design: `docs/COMING_UP_PHONE.md`; decision `DECISIONS.md` DR-21; limits `ARCHITECTURAL_DEBT.md` AD-19.
 
 #### What changed
 
@@ -6448,3 +6448,16 @@ No new build. Five small checks, in this order, then **one export** at the end. 
 | **P124** | Kept item → **Remind me…** → a time **15 minutes ahead** → confirm; then **restart the phone** | after the restart the notification still appears (on time or late); export: `released` citing the confirmation, with `lateMs` |
 
 Then **Export and share journal** once and send it. (Do the reboot last: it is the slowest.)
+
+
+#### Results (one export, `orb-20261002-095605.txt` — 386 events, `verifyLane`-clean; plus a screenshot) — the five open checks
+
+The operator reported *"All 5 done"*.
+
+| | What the export and the screenshot show |
+| --- | --- |
+| **P125 — the dot** | **Held.** The screenshot (9:56) shows **Coming up ●**. The operator kept a 21-character text naming a date within the week, as asked this time. |
+| **P124 — a reboot** | **Held.** A reminder was confirmed at 09:49:46 for 09:55; a **new process started at 09:50:24 with the phone up for 19 s** (`elapsedRealtimeMs` 19095 — a restart), and at 09:55:46 `orb.action.released` citing the confirmation, **46.7 s late**. The alarm was set again from the journal after the reboot and the reminder was shown. |
+| **P105 — Not now** | **Held.** A text was kept (85 characters) and erased; the **same text shared again** was recorded as an `orb.shared` with `resolveOutcome: "erased"` and **no `rekept`** — and it is not kept. |
+| **P92 — restore refused** | **Consistent, not proved by an export:** no `orb.restored` and no change to the journal after the attempt. That the message was shown is on the operator's word. |
+| **P120 — Cancel on the card** | **Not shown.** There is **no `orb.action.cancelled`**, and the only `orb.action.intent` since 09:40 is the one that was confirmed. An intent is written when the **review card** appears, so Cancel on *that* card would have left an intent and a cancellation; Cancel on the earlier *"Remind you when?"* dialog (before the card) writes nothing by design — nothing has been asked of the gate yet. The operator did not say which was tapped; the card path is tested off the phone and **not yet confirmed on the device.** |
