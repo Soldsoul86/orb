@@ -1,0 +1,323 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** The Documents source (`docs/SOURCES_PHONE.md`): the rules, the look-and-keep path with a reader the test supplies, the records, and the source guards. */
+final class DocumentsRulesTest {
+    private DocumentsRulesTest() {}
+
+    private static DocumentsRules.Doc doc(String name, String mime, long size, long modified) {
+        return new DocumentsRules.Doc("content://tree/" + name, name, mime, size, modified);
+    }
+
+    private static DocumentsRules.Doc pdf(String name, long modified) { return doc(name, "application/pdf", 1000L, modified); }
+
+    private static List<String> names(List<DocumentsRules.Doc> docs) {
+        List<String> out = new ArrayList<>();
+        for (DocumentsRules.Doc d : docs) out.add(d.name);
+        return out;
+    }
+
+    /** A reader that returns what the test says per file name. */
+    private static final class Fake implements DocumentsRules.Reader {
+        final Map<String, DocumentsRules.Reading> by = new TreeMap<>();
+        final List<String> asked = new ArrayList<>();
+        boolean throwing;
+
+        @Override public DocumentsRules.Reading read(DocumentsRules.Doc doc) throws Exception {
+            asked.add(doc.name);
+            if (throwing) throw new java.io.IOException("boom");
+            DocumentsRules.Reading r = by.get(doc.name);
+            return r == null ? DocumentsRules.Reading.refused(DocumentsRules.CANNOT) : r;
+        }
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        rules();
+        flow();
+        records();
+        guards();
+    }
+
+    private static void rules() {
+        Harness.suite("which files are listed");
+        Harness.check("a PDF by its type", DocumentsRules.isPdf(doc("x", "application/pdf", 1L, 0L)));
+        Harness.check("a PDF by its name, whatever the case", DocumentsRules.isPdf(doc("Invoice.PDF", "application/octet-stream", 1L, 0L)));
+        Harness.check("not a picture, not a document of another kind", !DocumentsRules.isPdf(doc("a.jpg", "image/jpeg", 1L, 0L)) && !DocumentsRules.isPdf(doc("a.docx", "application/vnd.openxmlformats", 1L, 0L)));
+        Harness.check("not a name that only ends like one", !DocumentsRules.isPdf(doc("a.pdf.exe", "", 1L, 0L)) && !DocumentsRules.isPdf(doc("pdf", "", 1L, 0L)));
+        List<DocumentsRules.Doc> mixed = Arrays.asList(pdf("old", 100L), doc("photo.jpg", "image/jpeg", 5L, 900L), pdf("new", 300L), pdf("mid", 200L));
+        Harness.equal("PDFs only, newest first", names(DocumentsRules.listed(mixed)), Arrays.asList("new", "mid", "old"));
+        Harness.equal("the same date: by name, whatever the case", names(DocumentsRules.listed(Arrays.asList(pdf("b", 5L), pdf("A", 5L), pdf("c", 5L)))), Arrays.asList("A", "b", "c"));
+        Harness.equal("an unknown date sorts last", names(DocumentsRules.listed(Arrays.asList(pdf("undated", 0L), pdf("dated", 50L)))), Arrays.asList("dated", "undated"));
+        List<DocumentsRules.Doc> many = new ArrayList<>();
+        for (int i = 0; i < 45; i++) many.add(pdf("f" + (100 + i), 1000L + i));
+        List<DocumentsRules.Doc> cut = DocumentsRules.listed(many);
+        Harness.check("at most forty, the newest", cut.size() == 40 && cut.get(0).name.equals("f144") && cut.get(39).name.equals("f105"));
+        Harness.equal("and it says how many were left out", DocumentsRules.leftOut(many), 5);
+        Harness.equal("none left out at forty", DocumentsRules.leftOut(many.subList(0, 40)), 0);
+        Harness.equal("files that are not PDFs are not counted as left out", DocumentsRules.leftOut(Arrays.asList(doc("a.jpg", "image/jpeg", 1L, 1L))), 0);
+        Harness.check("the input is not changed", many.get(0).name.equals("f100"));
+
+        Harness.suite("what is refused before anything is read");
+        Harness.check("exactly ten megabytes is read", DocumentsRules.refusal(doc("a", "application/pdf", DocumentsRules.MAX_BYTES, 0L)) == null);
+        Harness.equal("one byte over is not", DocumentsRules.refusal(doc("a", "application/pdf", DocumentsRules.MAX_BYTES + 1, 0L)), DocumentsRules.TOO_BIG);
+        Harness.check("an unknown size is tried, not refused", DocumentsRules.refusal(doc("a", "application/pdf", -1L, 0L)) == null);
+        Harness.equal("limits are what the design says", DocumentsRules.MAX_BYTES + "/" + DocumentsRules.MAX_PAGES + "/" + DocumentsRules.MAX_LISTED + "/" + DocumentsRules.MAX_TEXT_CHARS,
+            (10L * 1024 * 1024) + "/60/40/200000");
+        for (String reason : Arrays.asList(DocumentsRules.TOO_BIG, DocumentsRules.TOO_MANY_PAGES, DocumentsRules.PASSWORD, DocumentsRules.NO_TEXT, DocumentsRules.CANNOT)) {
+            Harness.check("a reason in words: " + reason, DocumentsRules.reasonText(reason).length() > 20);
+        }
+        Harness.check("a scan says it cannot be kept", DocumentsRules.reasonText(DocumentsRules.NO_TEXT).contains("cannot keep"));
+        Harness.check("a password says so", DocumentsRules.reasonText(DocumentsRules.PASSWORD).contains("password"));
+        Harness.check("the page limit names the number", DocumentsRules.reasonText(DocumentsRules.TOO_MANY_PAGES).contains("60"));
+
+        Harness.suite("the words as they are kept");
+        Harness.equal("line endings are one kind", DocumentsRules.clean("a\r\nb\rc"), "a\nb\nc");
+        Harness.equal("control characters go, new lines and tabs stay", DocumentsRules.clean("a\u0000b\u0007c\td\ne"), "abc\td\ne");
+        Harness.equal("a private-use or ordinary letter stays", DocumentsRules.clean("café नमस्ते"), "café नमस्ते");
+        Harness.equal("blank lines are at most one", DocumentsRules.clean("a\n\n\n\n\nb"), "a\n\nb");
+        Harness.equal("spaces round a line go", DocumentsRules.clean("  a  \n   b   "), "a\nb");
+        Harness.equal("the whole is trimmed", DocumentsRules.clean("\n\n  hello  \n\n"), "hello");
+        Harness.equal("null is nothing", DocumentsRules.clean(null), "");
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < DocumentsRules.MAX_TEXT_CHARS + 500; i++) big.append('x');
+        Harness.equal("cut at the limit", DocumentsRules.clean(big.toString()).length(), DocumentsRules.MAX_TEXT_CHARS);
+        Harness.equal("and cleaning twice changes nothing", DocumentsRules.clean(DocumentsRules.clean("  a \r\n\n\n b\u0001 ")), DocumentsRules.clean("  a \r\n\n\n b\u0001 "));
+
+        Harness.suite("the preview");
+        Harness.equal("short text is shown whole, on one line", DocumentsRules.preview("Invoice 4471\nDue 3 Oct"), "Invoice 4471 Due 3 Oct");
+        StringBuilder words = new StringBuilder();
+        for (int i = 0; i < 80; i++) words.append("word").append(i).append(' ');
+        String long1 = DocumentsRules.preview(words.toString());
+        Harness.check("long text is cut at a word and marked", long1.endsWith("…") && long1.length() <= DocumentsRules.PREVIEW_CHARS + 1 && !long1.substring(0, long1.length() - 1).endsWith(" ") && long1.contains("word0 word1"));
+        Harness.check("exactly the limit is shown whole", DocumentsRules.preview(new String(new char[DocumentsRules.PREVIEW_CHARS]).replace('\0', 'a')).length() == DocumentsRules.PREVIEW_CHARS);
+        Harness.check("one more is cut", DocumentsRules.preview(new String(new char[DocumentsRules.PREVIEW_CHARS + 1]).replace('\0', 'a')).endsWith("…"));
+
+        Harness.suite("what a row says");
+        DocumentsRules.Doc d = pdf("bill.pdf", 1L);
+        DocumentsRules.Row fresh = DocumentsRules.readRow(d, "Total 900", "sha256:x", "never");
+        Harness.check("new content can be ticked, and shows its first words", fresh.keepable() && DocumentsRules.statusLine(fresh).equals("Total 900"));
+        DocumentsRules.Row held = DocumentsRules.readRow(d, "Total 900", "sha256:x", "held");
+        Harness.check("held content says it is already in Orb and cannot be ticked", !held.keepable() && DocumentsRules.statusLine(held).startsWith("Already in Orb."));
+        DocumentsRules.Row erased = DocumentsRules.readRow(d, "Total 900", "sha256:x", "destroyed");
+        Harness.check("erased content says so and cannot be ticked", !erased.keepable() && DocumentsRules.statusLine(erased).startsWith("You erased this before"));
+        DocumentsRules.Row no = DocumentsRules.unreadable(d, DocumentsRules.PASSWORD);
+        Harness.check("an unreadable file says why, and cannot be ticked", !no.keepable() && DocumentsRules.statusLine(no).contains("password") && no.identity == null);
+        Harness.equal("one file", DocumentsRules.summary(1, 0, 1), "1 PDF in the folder · 1 you can keep");
+        Harness.equal("several", DocumentsRules.summary(3, 0, 0), "3 PDFs in the folder · 0 you can keep");
+        Harness.equal("with a cut", DocumentsRules.summary(40, 5, 12), "40 PDFs in the folder (the newest 40 shown; 5 more not listed) · 12 you can keep");
+    }
+
+    private static Context box(Context[] c, Journal[] j, String name) throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory(name).toFile();
+        c[0] = new Context(dir);
+        j[0] = Journal.open(c[0], Install.lane(c[0]), Install.id(c[0]));
+        return c[0];
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String line : journal.readLines()) if (type.equals(Journal.typeOf(line))) n++;
+        return n;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int k = 0; k < needle.length; k++) if (hay[i + k] != needle[k]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void flow() throws Exception {
+        Context[] c = new Context[1];
+        Journal[] j = new Journal[1];
+        Context context = box(c, j, "orb-documents");
+        Journal journal = j[0];
+        Fake reader = new Fake();
+        String secret = "Invoice 4471 from Arun, amount 18250, pay by 3 Oct";
+        reader.by.put("invoice.pdf", DocumentsRules.Reading.text("  " + secret + "\r\n\r\n\r\n\u0000", 2));
+        reader.by.put("scan.pdf", DocumentsRules.Reading.text("  \n ", 1));
+        reader.by.put("locked.pdf", DocumentsRules.Reading.refused(DocumentsRules.PASSWORD));
+        reader.by.put("long.pdf", DocumentsRules.Reading.refused(DocumentsRules.TOO_MANY_PAGES));
+        DocumentsRules.Doc invoice = pdf("invoice.pdf", 10L);
+
+        Harness.suite("looking keeps nothing");
+        DocumentsRules.Row row = DocumentsFlow.inspect(context, invoice, reader);
+        Harness.check("a readable file can be ticked and shows its words", row.keepable() && row.preview.startsWith("Invoice 4471 from Arun"));
+        Harness.equal("its identity is that of the cleaned words, sealed as a share seals them", row.identity, Attachments.identity(SharedText.document(DocumentsRules.clean("  " + secret + "\r\n\r\n\r\n\u0000"))));
+        Harness.equal("nothing was sealed", Attachments.counts(context)[0], 0L);
+        Harness.equal("nothing was written", journal.readLines().size(), 0);
+        Harness.equal("a scan: no text found", DocumentsFlow.inspect(context, pdf("scan.pdf", 1L), reader).reason, DocumentsRules.NO_TEXT);
+        Harness.equal("a password-protected file says so", DocumentsFlow.inspect(context, pdf("locked.pdf", 1L), reader).reason, DocumentsRules.PASSWORD);
+        Harness.equal("a long one says so", DocumentsFlow.inspect(context, pdf("long.pdf", 1L), reader).reason, DocumentsRules.TOO_MANY_PAGES);
+        Harness.equal("a file the reader cannot do is unreadable, not a crash", DocumentsFlow.inspect(context, pdf("unknown.pdf", 1L), reader).reason, DocumentsRules.CANNOT);
+        Fake broken = new Fake();
+        broken.throwing = true;
+        Harness.equal("a reader that fails is unreadable, not a crash", DocumentsFlow.inspect(context, invoice, broken).reason, DocumentsRules.CANNOT);
+        reader.asked.clear();
+        Harness.equal("a file over the size limit is refused without being opened", DocumentsFlow.inspect(context, doc("big.pdf", "application/pdf", DocumentsRules.MAX_BYTES + 1, 1L), reader).reason, DocumentsRules.TOO_BIG);
+        Harness.check("and the reader was never asked", reader.asked.isEmpty());
+
+        Harness.suite("keeping what is ticked");
+        List<DocumentsRules.Doc> ticked = Arrays.asList(invoice, pdf("scan.pdf", 1L), pdf("locked.pdf", 1L));
+        int kept = DocumentsFlow.keep(context, journal, ticked, reader, 4242L);
+        Harness.equal("only the readable one is kept", kept, 1);
+        Harness.equal("one sealed item", Attachments.counts(context)[0], 1L);
+        Harness.equal("one share record", count(journal, Shares.TYPE), 1);
+        String share = null;
+        for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) share = line;
+        Harness.check("it says where it came from", share.contains("\"referrer\":\"orb-source://documents\"") && share.contains("\"action\":\"orb.source.documents\"") && share.contains("\"mimeType\":\"application/pdf\""));
+        Harness.check("it says how many characters, and that it is resolved and sealed", share.contains("\"textChars\":" + DocumentsRules.clean(secret).length()) && share.contains("\"resolved\":true"));
+        Harness.check("it holds no word of the document and no file name", !share.contains("Arun") && !share.contains("4471") && !share.contains("invoice"));
+        Harness.check("the journal as a whole holds none either", !String.join("\n", journal.readLines()).contains("18250") && !String.join("\n", journal.readLines()).contains("Arun"));
+        Harness.check("the words are not on the disk in the clear", !onDisk(context.getFilesDir(), "Arun".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("it became an observation like any share", count(journal, "orb.observation") >= 1);
+        Attachments.Stored again = Attachments.store(context, new java.io.ByteArrayInputStream(SharedText.document(DocumentsRules.clean(secret))));
+        Harness.equal("the sealed words are the cleaned text", again.outcome, "held");
+        Harness.equal("a look now says already in Orb", DocumentsFlow.inspect(context, invoice, reader).state, DocumentsRules.HELD);
+
+        Harness.suite("a second keep adds nothing");
+        Harness.equal("kept again: nothing new", DocumentsFlow.keep(context, journal, Arrays.asList(invoice), reader, 1L), 0);
+        Harness.equal("still one share record", count(journal, Shares.TYPE), 1);
+
+        Harness.suite("erased words are not kept again from here");
+        String hash = null;
+        for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) hash = Erasure.envelopeHash(line);
+        Harness.equal("erased", Erase.execute(context, journal, hash).outcome, Erase.DESTROYED);
+        Harness.equal("a look says it was erased", DocumentsFlow.inspect(context, invoice, reader).state, DocumentsRules.ERASED);
+        Harness.equal("keeping it does nothing", DocumentsFlow.keep(context, journal, Arrays.asList(invoice), reader, 1L), 0);
+        Harness.equal("and no key was made", Attachments.counts(context)[0], 0L);
+
+        Harness.suite("one bad file does not stop the others");
+        reader.by.put("second.pdf", DocumentsRules.Reading.text("Ticket for Thursday 9 Oct, seat 14", 1));
+        Fake mixed = new Fake();
+        mixed.by.putAll(reader.by);
+        int two = DocumentsFlow.keep(context, journal, Arrays.asList(pdf("locked.pdf", 1L), pdf("second.pdf", 1L)), mixed, 7L);
+        Harness.equal("the good one is kept", two, 1);
+        Harness.equal("a reader that fails keeps nothing and does not crash", DocumentsFlow.keep(context, journal, Arrays.asList(pdf("second.pdf", 1L)), broken, 7L), 0);
+        Harness.equal("nothing ticked keeps nothing and records no share", DocumentsFlow.keep(context, journal, new ArrayList<DocumentsRules.Doc>(), reader, 7L), 0);
+    }
+
+    private static void records() throws Exception {
+        Harness.suite("what the source records: counts, never a name or a word");
+        Map<String, Object> chosen = DocumentsFacts.chosen();
+        Harness.equal("chosen: the capability, its version and the source, nothing else", chosen.keySet().toString(), "[capability, source, version]");
+        Harness.equal("it names the capability", chosen.get("capability"), "orb.read.documents");
+        Map<String, Object> looked = DocumentsFacts.looked(12L, 3L);
+        Harness.check("looked: found and unreadable as numbers", looked.get("found").equals(12L) && looked.get("unreadable").equals(3L) && looked.size() == 5);
+        Map<String, Object> kept = DocumentsFacts.kept(4L);
+        Harness.check("kept: a number", kept.get("kept").equals(4L) && kept.size() == 4);
+        Map<String, Object> payload = DocumentsFacts.documentPayload(900L);
+        Harness.check("a kept document is a share record from a source", payload.get("referrer").equals("orb-source://documents") && payload.get("action").equals("orb.source.documents")
+            && payload.get("textChars").equals(900L) && payload.get("itemCount").equals(1L));
+        Harness.equal("provenance says where from, in words", DocumentsFacts.fromLabel("orb-source://documents"), "a PDF you chose");
+        Harness.check("and says nothing for any other referrer", DocumentsFacts.fromLabel("android-app://com.x") == null && DocumentsFacts.fromLabel(null) == null);
+        Harness.equal("Recall names it so", Recall.fromLabel("orb-source://documents"), "a PDF you chose");
+        Harness.equal("and still names an app as before", Recall.fromLabel("android-app://com.example.chat"), "com.example.chat");
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("one file reads the folder and the PDFs; nothing keeps what it reads; the screen only opens pickers");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String api : Arrays.asList("DocumentsContract", "PdfRenderer", "getTextContents")) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, String> e : source.entrySet()) if (!e.getKey().equals("Capabilities") && e.getValue().contains(api)) users.add(e.getKey());
+            Harness.equal("only DocumentsReader uses " + api, users.toString(), "[DocumentsReader]");
+        }
+        List<String> tree = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (!e.getKey().equals("Capabilities") && e.getValue().contains("OPEN_DOCUMENT_TREE")) tree.add(e.getKey());
+        Harness.equal("only the Sources screen asks for a folder", tree.toString(), "[SourcesActivity]");
+
+        String reader = source.get("DocumentsReader");
+        for (String write : Arrays.asList("openOutputStream", "deleteDocument", "createDocument", "renameDocument", "moveDocument", "\"w\"", "\"rw\"", "\"wt\"", "startActivity", "Intent(")) {
+            Harness.check("the reader never uses " + write, !reader.contains(write));
+        }
+        Harness.check("the reader opens a file only to read it", reader.contains("openFileDescriptor(Uri.parse(doc.uri), \"r\")"));
+        Harness.check("and gives up on a phone that cannot read PDF text, rather than guess", reader.contains("getExtensionVersion(android.os.Build.VERSION_CODES.S) < 13"));
+        Harness.check("no third-party PDF code and no all-files access anywhere",
+            !source.get("DocumentsReader").contains("pdfbox") && !source.get("DocumentsReader").contains("itext") && !source.get("DocumentsReader").contains("MANAGE_EXTERNAL_STORAGE"));
+        Harness.check("the rules import no Android class", !source.get("DocumentsRules").contains("import android."));
+        String facts = source.get("DocumentsFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the records take no name, folder, address or words", !facts.contains("name") && !facts.contains("folder") && !facts.contains("uri") && !facts.contains("text,") && !facts.contains("String text"));
+        for (String name : Arrays.asList("DocumentsReader", "DocumentsRules", "DocumentsFacts", "DocumentsFlow", "DocumentsAccess", "SourcesActivity")) {
+            String t = source.get(name);
+            Harness.check(name + " logs nothing and keeps no preference", !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace") && !t.contains("getSharedPreferences") && !t.contains("Toast"));
+        }
+
+        String screen = source.get("SourcesActivity");
+        Harness.check("the screen is secure", screen.contains("FLAG_SECURE"));
+        Harness.equal("it starts two pickers and nothing else", screen.split("startActivityForResult\\(", -1).length - 1, 2);
+        Harness.check("it opens no activity of its own and sends nothing", !screen.contains("startActivity(") && !screen.contains("ACTION_SEND") && !screen.contains("ACTION_VIEW"));
+        Harness.check("the folder picker asks for read access only", screen.contains("FLAG_GRANT_READ_URI_PERMISSION") && !screen.contains("FLAG_GRANT_WRITE_URI_PERMISSION"));
+        Harness.check("the file picker asks only for PDFs", screen.contains("pick.setType(\"application/pdf\")"));
+        int grantedAt = screen.indexOf("if (!DocumentsAccess.granted(this))");
+        int listAt = screen.indexOf("DocumentsReader.list(");
+        Harness.check("nothing is looked at unless the source is on: the grant is checked first and the offer returns before any control", grantedAt > 0 && screen.indexOf("return;", grantedAt) > 0
+            && screen.indexOf("return;", grantedAt) < screen.indexOf("Look now") && listAt > screen.indexOf("Look now"));
+        Harness.check("the files are read only when you tap: the look is started by a button or by files just picked",
+            screen.contains("lookInFolder(Uri.parse(folder))") && screen.contains("if (lookPicked && !picked.isEmpty())"));
+        Harness.check("the grant is recorded before the folder or the files can be chosen", screen.indexOf("DocumentsAccess.grant(") > 0 && screen.indexOf("DocumentsAccess.grant(") < screen.indexOf("ACTION_OPEN_DOCUMENT_TREE"));
+        int appends = 0;
+        for (int at = screen.indexOf("journal.append("); at >= 0; at = screen.indexOf("journal.append(", at + 1)) appends++;
+        Harness.check("its only journal writes are the look and the keep", appends == 2 && screen.contains("journal.append(DocumentsFacts.LOOKED, DocumentsFacts.looked(found, unreadable))")
+            && screen.contains("journal.append(DocumentsFacts.KEPT, DocumentsFacts.kept(kept))"));
+        Harness.check("only ticked, enabled rows are kept", screen.contains("v.box.isEnabled() && v.box.isChecked()") && screen.contains("DocumentsFlow.keep(SourcesActivity.this, journal, ticked, reader"));
+        Harness.check("the look is recorded once per look, not per row", screen.split("recordLook\\(", -1).length - 1 == 3);
+        Harness.check("the screen says it keeps words and not the file", screen.contains("Only the words are kept, sealed on this phone; the PDF is not copied."));
+
+        String access = source.get("DocumentsAccess");
+        int grantAt = access.indexOf("static void grant("), chooseAt = access.indexOf("static void choose("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");
+        String grant = access.substring(grantAt, chooseAt), revoke = access.substring(revokeAt, reconcileAt);
+        Harness.check("the grant is recorded before the flag", grant.indexOf("record(journal, PackageGrants.GRANTED") > 0 && grant.indexOf("record(journal, PackageGrants.GRANTED") < grant.indexOf("\"rws\""));
+        Harness.check("a revocation removes the flag, then lets the folder go, then says so",
+            revoke.indexOf("FLAG).delete()") > 0 && revoke.indexOf("FLAG).delete()") < revoke.indexOf("release(context, folder)") && revoke.indexOf("release(context, folder)") < revoke.indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("a folder is persisted for reading only", access.contains("takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)") && !access.contains("FLAG_GRANT_WRITE_URI_PERMISSION"));
+        Harness.check("after a restore, a grant the phone does not exercise is recorded as withdrawn", access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.DOCUMENTS)") && access.substring(reconcileAt).contains("granted(context)) return;"));
+        Harness.check("the grant record names no folder", !access.substring(access.indexOf("private static void record(")).contains("folder"));
+
+        Harness.check("Orb makes the history agree with the phone at start, for this source and the safety check",
+            source.get("Orb").contains("DocumentsAccess.reconcile(this, journal)") && source.get("Orb").contains("SafetyAccess.reconcile(this, journal)"));
+        Harness.check("the main screen has a Sources button", source.get("MainActivity").contains("sources.setText(\"Sources\")") && source.get("MainActivity").contains("SourcesActivity.class"));
+        Harness.check("What Orb may do can switch the source off", source.get("MayDoActivity").contains("DocumentsAccess.revoke(MayDoActivity.this, journal)") && source.get("MayDoActivity").contains("Switch off the Documents source"));
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        int at = manifest.indexOf(".SourcesActivity");
+        Harness.check("the Sources screen is in the manifest and not exported", at > 0 && manifest.substring(at, manifest.indexOf("/>", at)).contains("android:exported=\"false\""));
+        Harness.check("and the source added no permission and no query", !manifest.contains("READ_EXTERNAL_STORAGE") && !manifest.contains("MANAGE_EXTERNAL_STORAGE") && !manifest.contains("android.provider.action"));
+    }
+}

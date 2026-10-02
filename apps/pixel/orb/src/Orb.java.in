@@ -89,6 +89,8 @@ public final class Orb extends Application {
         // A restored journal may say the package scan is granted when the device has granted nothing.
         PackageAccess.reconcile(this, journal);
         ContactsAccess.reconcile(this, journal);
+        SafetyAccess.reconcile(this, journal);
+        DocumentsAccess.reconcile(this, journal);
         PersonLink.reconcile(this, journal);
 
         // Turn anything kept and not yet observed into an Observation (B2a). Idempotent;

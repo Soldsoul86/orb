@@ -27,6 +27,7 @@ public final class Tests {
         CommitmentsTest.run();
         NudgeTest.run();
         SafetyRulesTest.run();
+        DocumentsRulesTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

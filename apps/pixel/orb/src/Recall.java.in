@@ -116,6 +116,8 @@ final class Recall {
     /** Who handed it over, in words; Android's `android-app://` prefix is not the person's business. */
     static String fromLabel(String referrer) {
         if (referrer == null || referrer.isEmpty() || referrer.equals("unknown")) return "an app Android did not name";
+        String source = DocumentsFacts.fromLabel(referrer);
+        if (source != null) return source;
         return referrer.startsWith("android-app://") ? referrer.substring("android-app://".length()) : referrer;
     }
 

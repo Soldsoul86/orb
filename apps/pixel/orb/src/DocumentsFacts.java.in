@@ -1,0 +1,61 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * What the Documents source writes to the journal (`docs/SOURCES_PHONE.md` §3): that a folder was chosen, that a look happened and
+ * how many files it found, that some were kept. **Counts only — never a folder's name, a file's name, or a word of its text.**
+ * What a kept document *is* is written as the same `orb.shared` record a shared text is (`documentPayload`), so Recall, People,
+ * *Coming up* and commitments see it as they see any kept words; its provenance says *a PDF you chose*.
+ *
+ * The grant and its withdrawal are `PackageGrants` events written by `DocumentsAccess`, not here.
+ */
+final class DocumentsFacts {
+    private DocumentsFacts() {}
+
+    static final String CHOSEN = "orb.source.chosen";
+    static final String LOOKED = "orb.source.looked";
+    static final String KEPT = "orb.source.kept";
+
+    static final String SOURCE = "documents";
+
+    /** The share record's `action` and `referrer` for a kept document: where it came from, in the fields provenance already reads. */
+    static final String ACTION = "orb.source.documents";
+    static final String REFERRER = "orb-source://documents";
+    static final String MIME = "application/pdf";
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.DOCUMENTS);
+        p.put("version", Capabilities.DOCUMENTS_VERSION);
+        p.put("source", SOURCE);
+        return p;
+    }
+
+    static Map<String, Object> chosen() {
+        return base();
+    }
+
+    static Map<String, Object> looked(long found, long unreadable) {
+        Map<String, Object> p = base();
+        p.put("found", found);
+        p.put("unreadable", unreadable);
+        return p;
+    }
+
+    static Map<String, Object> kept(long kept) {
+        Map<String, Object> p = base();
+        p.put("kept", kept);
+        return p;
+    }
+
+    /** The share record for one kept document: the characters kept, and where they came from. No name, no words. */
+    static Map<String, Object> documentPayload(long textChars) {
+        return Shares.declaredText(ACTION, MIME, REFERRER, textChars);
+    }
+
+    /** The person-facing name of where kept words came from, or null when the referrer is not a source. */
+    static String fromLabel(String referrer) {
+        return REFERRER.equals(referrer) ? "a PDF you chose" : null;
+    }
+}

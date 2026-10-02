@@ -74,6 +74,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(safety);
 
+        // SOURCES_PHONE.md: PDF files Orb may read when you ask. Nothing is read until you turn it on and tap Look now.
+        Button sources = new Button(this);
+        sources.setText("Sources");
+        sources.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, SourcesActivity.class)); }
+        });
+        root.addView(sources);
+
         // COMMITMENTS_PHONE.md: what you owe and what you are waiting for, and where each stands.
         Button today = new Button(this);
         today.setText("Today");

@@ -1,0 +1,85 @@
+package @PKG@;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.database.Cursor;
+import android.graphics.pdf.PdfRenderer;
+import android.graphics.pdf.content.PdfPageTextContent;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.os.ext.SdkExtensions;
+import android.provider.DocumentsContract;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The one file that reads the chosen folder and a PDF's text (`docs/SOURCES_PHONE.md` §3, `orb.read.documents`). It lists one level of
+ * a folder Android holds open for Orb and returns each file's name, type, size and date; and for one file it returns the text of
+ * its pages through Android's own `PdfRenderer` — **no third-party PDF code**. It opens nothing for writing, deletes nothing, and
+ * keeps nothing: what it returns goes to `DocumentsFlow`, which keeps only what the person ticked.
+ *
+ * Only runs after `DocumentsAccess` says the source is on, and only for the folder the person chose. Reading a page's text needs a
+ * phone that offers it (Android 15+ with SDK extension 13); a phone that does not gets `CANNOT`, never a guess.
+ */
+final class DocumentsReader implements DocumentsRules.Reader {
+    private final Context context;
+
+    DocumentsReader(Context context) {
+        this.context = context;
+    }
+
+    /** One level of the folder: files only, with what the folder says about each. */
+    static List<DocumentsRules.Doc> list(Context context, Uri tree) {
+        List<DocumentsRules.Doc> out = new ArrayList<>();
+        ContentResolver resolver = context.getContentResolver();
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+        String[] columns = {
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED};
+        try (Cursor c = resolver.query(children, columns, null, null, null)) {
+            if (c == null) return out;
+            while (c.moveToNext()) {
+                String mime = c.getString(2);
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) continue;
+                out.add(new DocumentsRules.Doc(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)).toString(),
+                    c.getString(1), mime, c.isNull(3) ? -1L : c.getLong(3), c.isNull(4) ? 0L : c.getLong(4)));
+            }
+        } catch (RuntimeException unreadable) {
+            return out;
+        }
+        return out;
+    }
+
+    @Override
+    public DocumentsRules.Reading read(DocumentsRules.Doc doc) throws Exception {
+        if (SdkExtensions.getExtensionVersion(android.os.Build.VERSION_CODES.S) < 13) return DocumentsRules.Reading.refused(DocumentsRules.CANNOT);
+        ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(Uri.parse(doc.uri), "r");
+        if (descriptor == null) return DocumentsRules.Reading.refused(DocumentsRules.CANNOT);
+        try (PdfRenderer renderer = open(descriptor)) {
+            if (renderer == null) return DocumentsRules.Reading.refused(DocumentsRules.PASSWORD);
+            int pages = renderer.getPageCount();
+            if (pages > DocumentsRules.MAX_PAGES) return DocumentsRules.Reading.refused(DocumentsRules.TOO_MANY_PAGES);
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < pages; i++) {
+                try (PdfRenderer.Page page = renderer.openPage(i)) {
+                    for (PdfPageTextContent content : page.getTextContents()) text.append(content.getText()).append('\n');
+                }
+                text.append('\n');
+            }
+            return DocumentsRules.Reading.text(text.toString(), pages);
+        } catch (UnsupportedOperationException notOffered) {
+            return DocumentsRules.Reading.refused(DocumentsRules.CANNOT);
+        }
+    }
+
+    /** The renderer, or null when the file asks for a password. */
+    private static PdfRenderer open(ParcelFileDescriptor descriptor) throws IOException {
+        try {
+            return new PdfRenderer(descriptor);
+        } catch (SecurityException passwordProtected) {
+            try { descriptor.close(); } catch (IOException ignored) { }
+            return null;
+        }
+    }
+}

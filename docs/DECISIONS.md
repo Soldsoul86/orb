@@ -1323,6 +1323,20 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** a malware or reputation database (needs the network); scanning APK files; Wi‑Fi, Bluetooth, NFC and keys; remembering *"I know this app"*; background re-checks; a score.
 
+## DR-33 — Sources: the framework, and PDFs you point Orb at (slice 2a)
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with stage 2", then "Yes, go ahead with slice 2a" on `SOURCES_PHONE.md`) · **Bears on:** DR-32 (the same gate), DR-22 (the registry), DR-9 (nothing leaves the phone)
+
+**The ruling.** A **source** is something Orb *reaches for* rather than is *handed* — so each is a **declared capability** (`SENSOR_SHARE.md` §1: receiving a share is not a capability; reaching is). The pattern for every source: **a switch** (a recorded grant), **a read only when the person taps** (no background reading), **a preview, then ticks**, **only what is ticked is kept**, kept things go through **the pipeline shares already use** (sealed, erasable, searchable, mentioned, dated — no second store), and **the record is counts only**. Unticked things are forgotten when the screen closes.
+
+**Slice 2a: PDF files.** `orb.read.documents` v1 (Observe, switchable; words pinned). The person names **a folder** (Android's folder picker; persisted read access to that one folder; released on switch-off) **or the files themselves** (Android's file picker). Android's `PdfRenderer` gives each file's text where the phone offers it (Android 15+, SDK extension 13); **no third-party PDF code**. **Text only** is kept — the file is not copied. **No Android permission is added; the manifest guard is unchanged.** Limits: one folder level, 40 files per look, 10 MB, 60 pages, 200,000 characters kept; scans and password-protected files cannot be kept.
+
+**A deviation, found in the build.** The design said the person would pick Downloads. **Android refuses the Downloads folder itself in the folder picker**; the *Pick files* path (which does open Downloads) was added so the use the operator described works. Both are within the approved framework — no permission, the person names what Orb looks at, preview then tick.
+
+**Records.** `orb.source.chosen`, `orb.source.looked`, `orb.source.kept` — counts only, never a folder's or file's name or a word of text. A kept document is **the same `orb.shared` record a shared text is**, with `action: orb.source.documents` and `referrer: orb-source://documents` (the fields provenance already reads — **no importer change**).
+
+**Not in this ruling:** the call log and messages (slices 2b/2c: each adds a hard-restricted permission and changes the manifest guard — their own decisions); keeping the original file or a PDF viewer; text recognition; sub-folders; other file types; a model reading the text (DR-9).
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

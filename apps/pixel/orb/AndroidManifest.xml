@@ -133,6 +133,11 @@
             android:name=".SafetyActivity"
             android:exported="false" />
 
+        <!-- Sources: PDF files Orb may read when you ask (docs/SOURCES_PHONE.md). Not exported; secure like Recall. -->
+        <activity
+            android:name=".SourcesActivity"
+            android:exported="false" />
+
         <!-- Today: what matters now. Not exported; secure like Recall. -->
         <activity
             android:name=".TodayActivity"

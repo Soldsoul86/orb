@@ -1,0 +1,214 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * The Documents source's rules — which files are listed, which are refused and why, what a preview is, and what exactly
+ * is kept (`docs/SOURCES_PHONE.md` §3). **Pure: no Android class, no Context.** The one file that touches the folder
+ * picker's access and the PDF text API is `DocumentsReader`; it reaches this class only through the `Reader` interface,
+ * which is what lets every rule here (and the keep path in `DocumentsFlow`) be tested with a reader that returns what the
+ * test says.
+ *
+ * **Text only.** What is kept is the words, cleaned (`clean`) and then sealed like a shared text; the file is not copied.
+ * The same cleaned text is what *already in Orb* is matched on, so a file is recognised by its content, not its name.
+ */
+final class DocumentsRules {
+    private DocumentsRules() {}
+
+    /** A file over this is listed as not read (ten megabytes). */
+    static final long MAX_BYTES = 10L * 1024 * 1024;
+    /** A PDF over this many pages is listed as not read. */
+    static final int MAX_PAGES = 60;
+    /** At most this many PDFs are listed per look, newest first. */
+    static final int MAX_LISTED = 40;
+    /** What is kept of one document, in characters. */
+    static final int MAX_TEXT_CHARS = 200_000;
+    /** How much of the text a row shows. */
+    static final int PREVIEW_CHARS = 240;
+
+    // Why a file was not read — the words the row shows are in `reasonText`.
+    static final String TOO_BIG = "tooBig";
+    static final String TOO_MANY_PAGES = "tooManyPages";
+    static final String PASSWORD = "password";
+    static final String NO_TEXT = "noText";
+    static final String CANNOT = "cannot";
+
+    // What a row is, for what the person can do with it.
+    static final String READABLE = "readable";
+    static final String UNREADABLE = "unreadable";
+    /** Kept before, and still here. */
+    static final String HELD = "held";
+    /** Kept before and erased; not kept again from here (`SOURCES_PHONE.md` §3, AD-28). */
+    static final String ERASED = "erased";
+
+    static String reasonText(String reason) {
+        if (TOO_BIG.equals(reason)) return "Not read: the file is over 10 MB.";
+        if (TOO_MANY_PAGES.equals(reason)) return "Not read: it has more than " + MAX_PAGES + " pages.";
+        if (PASSWORD.equals(reason)) return "Not read: it is protected by a password.";
+        if (NO_TEXT.equals(reason)) return "No text found — probably a scan. Orb cannot keep this one.";
+        return "Not read: this phone could not read this file's text.";
+    }
+
+    /** What the PDF reader found. */
+    static final class Reading {
+        final String text;
+        final int pages;
+        /** One of the reasons above, or null when `text` was read. */
+        final String reason;
+
+        private Reading(String text, int pages, String reason) {
+            this.text = text;
+            this.pages = pages;
+            this.reason = reason;
+        }
+
+        static Reading text(String text, int pages) { return new Reading(text, pages, null); }
+
+        static Reading refused(String reason) { return new Reading(null, 0, reason); }
+    }
+
+    /** The one thing the rules ask of the outside world: the text of a file. May throw; a throw is `CANNOT`. */
+    interface Reader {
+        Reading read(Doc doc) throws Exception;
+    }
+
+    /** A file in the chosen folder, as the folder listing gave it. */
+    static final class Doc {
+        final String uri;
+        final String name;
+        final String mime;
+        /** Bytes, or -1 when the folder did not say. */
+        final long size;
+        /** Epoch ms, or 0 when unknown. */
+        final long modified;
+
+        Doc(String uri, String name, String mime, long size, long modified) {
+            this.uri = uri;
+            this.name = name == null ? "" : name;
+            this.mime = mime == null ? "" : mime;
+            this.size = size;
+            this.modified = modified;
+        }
+    }
+
+    static boolean isPdf(Doc d) {
+        return "application/pdf".equals(d.mime) || d.name.toLowerCase(Locale.ROOT).endsWith(".pdf");
+    }
+
+    /** Only PDFs, newest first (ties by name, then address), as many as `MAX_LISTED`. One folder level: the caller lists no sub-folder. */
+    static List<Doc> listed(List<Doc> all) {
+        List<Doc> pdfs = new ArrayList<>();
+        for (Doc d : all) if (isPdf(d)) pdfs.add(d);
+        Collections.sort(pdfs, new Comparator<Doc>() {
+            @Override public int compare(Doc a, Doc b) {
+                if (a.modified != b.modified) return a.modified > b.modified ? -1 : 1;
+                int byName = a.name.compareToIgnoreCase(b.name);
+                return byName != 0 ? byName : a.uri.compareTo(b.uri);
+            }
+        });
+        return pdfs.size() > MAX_LISTED ? new ArrayList<>(pdfs.subList(0, MAX_LISTED)) : pdfs;
+    }
+
+    /** How many PDFs the cut left out. */
+    static int leftOut(List<Doc> all) {
+        int pdfs = 0;
+        for (Doc d : all) if (isPdf(d)) pdfs++;
+        return Math.max(0, pdfs - MAX_LISTED);
+    }
+
+    /** Refused before any reading, from what the folder said alone; null when it is worth opening. */
+    static String refusal(Doc d) {
+        return d.size > MAX_BYTES ? TOO_BIG : null;
+    }
+
+    /**
+     * The words as they are kept: line endings made `\n`, control characters (but not new lines or tabs) dropped, three or more new
+     * lines made two, spaces around lines trimmed, the whole trimmed, and cut at `MAX_TEXT_CHARS`. The same text is what a row's
+     * *already in Orb* is matched on.
+     */
+    static String clean(String text) {
+        if (text == null) return "";
+        String t = text.replace("\r\n", "\n").replace('\r', '\n');
+        StringBuilder kept = new StringBuilder(t.length());
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '\n' || c == '\t' || (c >= ' ' && c != '\u007f' && !(c >= '\u0080' && c < ' '))) kept.append(c);
+        }
+        StringBuilder out = new StringBuilder(kept.length());
+        int blank = 0;
+        for (String line : kept.toString().split("\n", -1)) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                blank++;
+                if (blank > 1) continue;
+            } else {
+                blank = 0;
+            }
+            out.append(trimmed).append('\n');
+        }
+        String result = out.toString().trim();
+        if (result.length() > MAX_TEXT_CHARS) result = result.substring(0, MAX_TEXT_CHARS).trim();
+        return result;
+    }
+
+    /** The first words of the text on one line, cut at a word and marked. */
+    static String preview(String cleaned) {
+        String flat = cleaned.replaceAll("\\s+", " ").trim();
+        if (flat.length() <= PREVIEW_CHARS) return flat;
+        String cut = flat.substring(0, PREVIEW_CHARS);
+        int space = cut.lastIndexOf(' ');
+        if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);
+        return cut + "…";
+    }
+
+    /** One line of the list: what the person sees, and whether it can be ticked. Holds no text beyond the preview. */
+    static final class Row {
+        final Doc doc;
+        final String state;
+        /** For `UNREADABLE`, the reason; otherwise null. */
+        final String reason;
+        final String preview;
+        /** `sha256:…` of what would be sealed, or null when nothing was read. */
+        final String identity;
+
+        Row(Doc doc, String state, String reason, String preview, String identity) {
+            this.doc = doc;
+            this.state = state;
+            this.reason = reason;
+            this.preview = preview;
+            this.identity = identity;
+        }
+
+        boolean keepable() { return READABLE.equals(state); }
+    }
+
+    static Row unreadable(Doc doc, String reason) {
+        return new Row(doc, UNREADABLE, reason, "", null);
+    }
+
+    /** A row for text that was read: its state is what the store says about this identity (`held`, `destroyed`, anything else = new). */
+    static Row readRow(Doc doc, String cleaned, String identity, String storeState) {
+        String state = "held".equals(storeState) ? HELD : "destroyed".equals(storeState) ? ERASED : READABLE;
+        return new Row(doc, state, null, preview(cleaned), identity);
+    }
+
+    /** The line under a file's name. */
+    static String statusLine(Row row) {
+        if (UNREADABLE.equals(row.state)) return reasonText(row.reason);
+        if (HELD.equals(row.state)) return "Already in Orb. " + row.preview;
+        if (ERASED.equals(row.state)) return "You erased this before; it is not kept again from here. " + row.preview;
+        return row.preview;
+    }
+
+    /** *Found N PDFs · M can be kept* — the line above the list. */
+    static String summary(int shown, int leftOut, int keepable) {
+        StringBuilder out = new StringBuilder().append(shown).append(shown == 1 ? " PDF" : " PDFs").append(" in the folder");
+        if (leftOut > 0) out.append(" (the newest ").append(shown).append(" shown; ").append(leftOut).append(" more not listed)");
+        out.append(" · ").append(keepable).append(" you can keep");
+        return out.toString();
+    }
+}

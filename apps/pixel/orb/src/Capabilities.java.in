@@ -66,6 +66,8 @@ final class Capabilities {
     static final String CONTACTS = "orb.read.contacts";
     static final String APPSEC = "orb.read.appsecurity";
     static final long APPSEC_VERSION = 1L;
+    static final String DOCUMENTS = "orb.read.documents";
+    static final long DOCUMENTS_VERSION = 1L;
 
     static final String PACKAGES_SAYS =
         "Reads which launcher apps, UPI-payment apps and device-admin apps are installed — about a hundred and fifty names. "
@@ -88,6 +90,10 @@ final class Capabilities {
         + "notification access, a keyboard or device admin \u2014 their name, where they were installed from and which permissions they hold; and a few "
         + "settings of the phone itself (screen lock, USB debugging, security-update date). Only when you run the Safety check, only on the phone. "
         + "Only counts are kept; nothing leaves the phone.";
+
+    static final String DOCUMENTS_SAYS =
+        "Reads, in the one folder you chose, the names, dates and text of PDF files \u2014 only when you tap Look now, only on the phone. "
+        + "Nothing is kept unless you tick it; only counts are recorded.";
 
     /** The declarations, in the order the screen shows them. */
     static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -112,6 +118,10 @@ final class Capabilities {
             "your grant \u2014 a recorded decision \u2014 and your running the check", Arrays.asList(SafetyFacts.CHECKED),
             "Revoke the safety check", true,
             Arrays.asList("AppSecurityReader", "SafetyAccess", "SafetyActivity")),
+        new Declaration(DOCUMENTS, DOCUMENTS_VERSION, "PDFs in a folder you chose", DOCUMENTS_SAYS, TIER_OBSERVE,
+            "your grant \u2014 a recorded decision \u2014 the folder you chose, and your tapping Look now", Arrays.asList(DocumentsFacts.LOOKED),
+            "Switch off the Documents source", true,
+            Arrays.asList("DocumentsReader", "DocumentsAccess", "SourcesActivity")),
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
@@ -131,7 +141,8 @@ final class Capabilities {
         "getInstalledPackages", "getInstalledApplications", "queryIntentActivities", "queryBroadcastReceivers", "queryIntentServices",
         "getActiveAdmins", "Settings.Secure", "enabled_notification_listeners", "AssistStructure", "ViewNode",
         "onHandleScreenshot", "takeScreenshot", "ContactsContract", "READ_CONTACTS",
-        "getInstallSourceInfo", "requestedPermissions", "isDeviceSecure", "ADB_ENABLED", "ENABLED_INPUT_METHODS"));
+        "getInstallSourceInfo", "requestedPermissions", "isDeviceSecure", "ADB_ENABLED", "ENABLED_INPUT_METHODS",
+        "DocumentsContract", "PdfRenderer", "getTextContents", "OPEN_DOCUMENT_TREE"));
 
     /** Reads Orb does not have. They appear nowhere in the source until a capability declares them. */
     static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
@@ -239,6 +250,19 @@ final class Capabilities {
             long review = number(checked, "review");
             String detail = checked == null ? "never run" : apps + " apps looked at, " + now + " to look at now, " + review + " worth a look";
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(checked), detail);
+        }
+        if (DOCUMENTS.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, DOCUMENTS);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String looked = lastOfType(lines, DocumentsFacts.LOOKED);
+            long kept = 0L;
+            for (String line : lines) if (DocumentsFacts.KEPT.equals(Journal.typeOf(line))) kept += Math.max(0L, number(line, "kept"));
+            String detail = looked == null ? "never looked" : number(looked, "found") + " PDFs found at the last look, " + kept + " kept in all";
+            return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(looked), detail);
         }
         if (GRANTS.equals(id)) {
             String observed = lastOfType(lines, "grants.observed");

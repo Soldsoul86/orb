@@ -1,0 +1,347 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.provider.OpenableColumns;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Sources (`docs/SOURCES_PHONE.md`): the places Orb may reach for what you did not hand it — today, one: PDF files. **It reads only when the
+ * person taps *Look now* (or has just picked files), shows what it found with the first words of each, and keeps only what is ticked.**
+ * Unticked files are forgotten when the screen closes: nothing copied, nothing recorded about them. Kept words are sealed like a share
+ * (`DocumentsFlow`). Only counts are recorded (`DocumentsFacts`). Secure like Recall, because documents describe a life.
+ *
+ * Two ways to name files, neither needing an Android permission: **a folder** (Android's folder picker — it refuses the Downloads folder
+ * itself since Android 11, so a folder inside it, or Documents) and **the files themselves** (Android's file picker, which does open
+ * Downloads). The screen starts the pickers and nothing else.
+ */
+public final class SourcesActivity extends Activity {
+    private static final int PICK_FOLDER = 1;
+    private static final int PICK_FILES = 2;
+
+    private LinearLayout list;
+    /** The files of the current look, with the controls that show them; memory only. */
+    private final List<RowView> shown = new ArrayList<>();
+    /** The files the person picked by hand (no folder): addresses Android granted this screen. */
+    private final List<DocumentsRules.Doc> picked = new ArrayList<>();
+    private LinearLayout results;
+    private TextView summary;
+    private boolean looking;
+    /** Set by the file picker's answer and used once by the next drawing: files were just named, so look at them. */
+    private boolean lookPicked;
+
+    private static final class RowView {
+        final DocumentsRules.Doc doc;
+        final CheckBox box;
+        final TextView status;
+
+        RowView(DocumentsRules.Doc doc, CheckBox box, TextView status) {
+            this.doc = doc;
+            this.box = box;
+            this.status = status;
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!looking) render();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private Button button(String label, View.OnClickListener onClick) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(onClick);
+        return b;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void message(String s) {
+        new AlertDialog.Builder(this).setMessage(s).setPositiveButton("OK", null).show();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        shown.clear();
+        results = null;
+        summary = null;
+        list.addView(text("Sources", 17, true));
+        final Journal journal = journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        list.addView(text("PDF files", 15, true));
+        if (!DocumentsAccess.granted(this)) {
+            list.addView(text("Orb can read the PDFs you point it at — invoices, tickets, letters — so that what is in them can be found, "
+                + "mentioned with the right person and turned into dates and commitments. It reads only when you tap, shows you the first words of "
+                + "each file, and keeps only the ones you tick. It keeps the words, not the file. Nothing is kept about the ones you do not tick.", 13, false));
+            list.addView(text("This needs no Android permission: you name the folder or the files, and Android gives Orb only those.", 12, false));
+            list.addView(button("Turn on PDF files", new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    try {
+                        DocumentsAccess.grant(SourcesActivity.this, journal);
+                    } catch (IOException notRecorded) {
+                        message("Orb could not record this, so it turned nothing on.");
+                        return;
+                    }
+                    render();
+                }
+            }));
+            return;
+        }
+        final String folder = DocumentsAccess.folder(this);
+        list.addView(text(folder == null ? "On. Choose a folder, or pick files." : "On. A folder is chosen.", 13, false));
+        if (folder != null) {
+            list.addView(button("Look now", new View.OnClickListener() {
+                @Override public void onClick(View view) { lookInFolder(Uri.parse(folder)); }
+            }));
+        }
+        list.addView(button(folder == null ? "Choose a folder" : "Choose another folder", new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                startActivityForResult(pick, PICK_FOLDER);
+            }
+        }));
+        list.addView(text("Android does not let an app be given the Downloads folder itself. Pick a folder inside it, or use Pick files, which does open Downloads.", 11, false));
+        list.addView(button("Pick files", new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("application/pdf");
+                pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                startActivityForResult(pick, PICK_FILES);
+            }
+        }));
+        list.addView(button("Switch off PDF files", new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                DocumentsAccess.revoke(SourcesActivity.this, journal);
+                picked.clear();
+                render();
+            }
+        }));
+        results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        list.addView(results);
+        if (lookPicked && !picked.isEmpty()) {
+            lookPicked = false;
+            lookAt(new ArrayList<>(picked), 0);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null) return;
+        Journal journal = journal();
+        if (journal == null || !DocumentsAccess.granted(this)) return;
+        if (requestCode == PICK_FOLDER && data.getData() != null) {
+            try {
+                DocumentsAccess.choose(this, journal, data.getData());
+            } catch (IOException | RuntimeException notChosen) {
+                message("Orb could not keep that folder.");
+                return;
+            }
+            picked.clear();
+        } else if (requestCode == PICK_FILES) {
+            picked.clear();
+            List<Uri> uris = new ArrayList<>();
+            if (data.getClipData() != null) {
+                for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
+            } else if (data.getData() != null) {
+                uris.add(data.getData());
+            }
+            for (Uri uri : uris) picked.add(describe(uri));
+            lookPicked = true;
+        }
+    }
+
+    /** A picked file as the picker describes it: name, size, date. Android grants this screen those files and no others. */
+    private DocumentsRules.Doc describe(Uri uri) {
+        String name = "";
+        long size = -1L;
+        long modified = 0L;
+        try (Cursor c = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE, "last_modified"}, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                name = c.getString(0) == null ? "" : c.getString(0);
+                size = c.isNull(1) ? -1L : c.getLong(1);
+                modified = c.getColumnCount() > 2 && !c.isNull(2) ? c.getLong(2) : 0L;
+            }
+        } catch (RuntimeException unreadable) {
+            // The picker gave an address and nothing more; the file is still listed, by what it is.
+        }
+        return new DocumentsRules.Doc(uri.toString(), name, "application/pdf", size, modified);
+    }
+
+    private void lookInFolder(Uri folder) {
+        if (results == null) return;
+        results.removeAllViews();
+        results.addView(text("Looking in the folder…", 13, false));
+        final Uri tree = folder;
+        looking = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<DocumentsRules.Doc> all = DocumentsReader.list(SourcesActivity.this, tree);
+                final List<DocumentsRules.Doc> listed = DocumentsRules.listed(all);
+                final int leftOut = DocumentsRules.leftOut(all);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { lookAt(listed, leftOut); }
+                });
+            }
+        }).start();
+    }
+
+    /** Shows the files and, one by one as each is read, what is in them. Records the look once when every file has been looked at. */
+    private void lookAt(final List<DocumentsRules.Doc> docs, final int leftOut) {
+        looking = true;
+        results.removeAllViews();
+        shown.clear();
+        summary = text("Looking at " + docs.size() + (docs.size() == 1 ? " file…" : " files…"), 13, true);
+        results.addView(summary);
+        if (docs.isEmpty()) {
+            summary.setText("No PDF files found here.");
+            recordLook(0, 0);
+            looking = false;
+            return;
+        }
+        for (DocumentsRules.Doc doc : docs) {
+            CheckBox box = new CheckBox(this);
+            box.setText(label(doc));
+            box.setEnabled(false);
+            TextView status = text("Reading…", 12, false);
+            results.addView(box);
+            results.addView(status);
+            shown.add(new RowView(doc, box, status));
+        }
+        final DocumentsReader reader = new DocumentsReader(this);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                int keepable = 0;
+                int unreadable = 0;
+                for (int i = 0; i < docs.size(); i++) {
+                    final RowView view = shown.get(i);
+                    final DocumentsRules.Row row = DocumentsFlow.inspect(SourcesActivity.this, view.doc, reader);
+                    if (row.keepable()) keepable++;
+                    if (DocumentsRules.UNREADABLE.equals(row.state)) unreadable++;
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { show(view, row); }
+                    });
+                }
+                final int canKeep = keepable;
+                final int cannot = unreadable;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { finished(docs.size(), leftOut, canKeep, cannot); }
+                });
+            }
+        }).start();
+    }
+
+    private void show(RowView view, DocumentsRules.Row row) {
+        view.status.setText(DocumentsRules.statusLine(row));
+        view.box.setEnabled(row.keepable());
+    }
+
+    private void finished(int count, int leftOut, int keepable, int unreadable) {
+        looking = false;
+        if (summary == null || results == null) return;
+        summary.setText(DocumentsRules.summary(count, leftOut, keepable));
+        recordLook(count, unreadable);
+        if (keepable > 0) {
+            results.addView(button("Keep the ticked ones", new View.OnClickListener() {
+                @Override public void onClick(View view) { keepTicked(); }
+            }));
+        }
+        results.addView(text("Only the words are kept, sealed on this phone; the PDF is not copied. Nothing is kept about files you do not tick.", 11, false));
+    }
+
+    private void recordLook(int found, int unreadable) {
+        Journal journal = journal();
+        if (journal != null) journal.append(DocumentsFacts.LOOKED, DocumentsFacts.looked(found, unreadable));
+    }
+
+    private String label(DocumentsRules.Doc doc) {
+        String when = doc.modified > 0 ? new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(new Date(doc.modified)) : "date unknown";
+        return (doc.name.isEmpty() ? "(unnamed PDF)" : doc.name) + "\n" + when + " · " + Recall.sizeLabel(doc.size);
+    }
+
+    private void keepTicked() {
+        final List<DocumentsRules.Doc> ticked = new ArrayList<>();
+        final List<RowView> tickedViews = new ArrayList<>();
+        for (RowView v : shown) {
+            if (v.box.isEnabled() && v.box.isChecked()) {
+                ticked.add(v.doc);
+                tickedViews.add(v);
+            }
+        }
+        if (ticked.isEmpty()) {
+            message("Nothing is ticked, so nothing was kept.");
+            return;
+        }
+        final Journal journal = journal();
+        if (journal == null) return;
+        looking = true;
+        final DocumentsReader reader = new DocumentsReader(this);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final int kept = DocumentsFlow.keep(SourcesActivity.this, journal, ticked, reader, SystemClock.elapsedRealtime());
+                journal.append(DocumentsFacts.KEPT, DocumentsFacts.kept(kept));
+                final List<DocumentsRules.Row> after = new ArrayList<>();
+                for (DocumentsRules.Doc doc : ticked) after.add(DocumentsFlow.inspect(SourcesActivity.this, doc, reader));
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        looking = false;
+                        for (int i = 0; i < tickedViews.size(); i++) {
+                            tickedViews.get(i).box.setChecked(false);
+                            show(tickedViews.get(i), after.get(i));
+                        }
+                        if (summary != null) summary.setText("Kept " + kept + " of " + ticked.size() + ". Find the words in Recall.");
+                    }
+                });
+            }
+        }).start();
+    }
+}

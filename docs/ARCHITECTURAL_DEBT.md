@@ -737,6 +737,23 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-28 — what the Documents source does not know
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-33). Debts, stated.
+
+1. **PDF text is whatever Android's reader returns.** Columns can come out in the wrong order, odd fonts can come out as nothing, and a table can read as a stream of numbers. The preview shows what Orb read before anything is kept; if it is poor, the slice has not earned its keep. Not testable off the phone.
+2. **A phone without the reader cannot do this at all.** Reading text needs Android 15+ (SDK extension 13); elsewhere every file reads *this phone could not read this file's text*. Orb's minimum is Android 14.
+3. **Scans are not kept.** No text recognition, and no PDF viewer to keep the picture; both are their own decisions.
+4. **Only the words are kept, not the file.** A kept document cannot be shown as it looked, its layout is gone, and the original stays wherever it was.
+5. **A folder is a standing read grant** until switched off; every look is recorded, the grant is on **What Orb may do**, and what is kept is only what is ticked.
+6. **Sensitive documents are not recognised.** A bank statement or an identity document is a PDF like any other; the protection is *nothing without a tick*, a secure screen and per-item erase — not a guess.
+7. **Erased content is not kept again from here.** The Share path asks the question (`REKEEP.md`); this path does not yet.
+8. **One folder level, forty files, ten megabytes, sixty pages, two hundred thousand characters.** Chosen to be safe, not measured; a real phone may want them moved.
+9. **The picked-files path holds Android's temporary access** only while the screen is alive; leaving it and coming back means picking again.
+10. **The chosen folder's address is kept in a small file** beside the grant flag (not in the journal). It is not restored with a backup; after a restore the source reads as switched off and says so.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

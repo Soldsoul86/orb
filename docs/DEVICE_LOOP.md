@@ -6986,3 +6986,53 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 - **Scale:** 299 apps looked at; **1 now, 42 worth a look** — 14% of apps flagged is a lot of *worth a look*. The operator's note, **grouped by severity**, is the answer to that: the two levels are too coarse for 42 rows. Not built; a candidate (e.g. within *Worth a look*, groups by what the app can do — texts and calls, location, files, drawing over apps — with the strongest first).
 - **The order held:** *Not now* was recorded **before** the grant, then the check, as designed; revoking and re-checking each produced one record.
 - **Play Protect did not object** to the three added `<queries>` entries (AD-27 item 3 now answered for this phone).
+
+### 7b78. Sources — PDFs you point Orb at (DR-33, slice 2a of the operator's flow) — 2026-10-02
+
+**Status: built, awaiting the device.** `orb-app-v42-sources.apk`. v41 is §7b77 (verified). Design: `docs/SOURCES_PHONE.md`; decision `DECISIONS.md` DR-33; limits `ARCHITECTURAL_DEBT.md` AD-28.
+
+**Why:** your invoices, tickets and letters are PDFs. Until now Orb knew only what you shared one at a time. This lets you point Orb at PDFs, see what is in them, and keep the ones you tick — so what is in them can be found, tied to the right person and turned into dates and commitments. **Nothing is kept that you did not tick, and the file itself is not copied — only its words, sealed.**
+
+#### What changed
+
+1. **A *Sources* button** on the main screen. *PDF files* is off until you turn it on (**Turn on PDF files**, which records your decision). **It needs no Android permission.**
+2. **Two ways to name what Orb may look at:** **Choose a folder** (Android's folder picker; Android **will not** give an app the Downloads folder itself — choose a folder inside it, or Documents) and **Pick files** (Android's file picker, which does open Downloads; choose several PDFs).
+3. **The look:** a list of the PDFs with the first words of each as it is read — or why it could not be (a scan has no text, a password, too big, too many pages). *Already in Orb* is recognised by content.
+4. **Tick and keep:** only ticked rows are kept — **the words, sealed**, like a shared text; searchable in Recall, people mentioned, dates proposed. Recall says it came from *a PDF you chose*.
+5. **Switch it off** from Sources or **What Orb may do**: reading stops and Android's hold on the folder is released; what you kept stays, erasable one by one.
+6. **Fixed on the way:** the Safety check's grant is now reconciled after a restore (it was not).
+
+#### Checked before the device
+
+- The phone-side suite passes (1592 checks); brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the listing and sort, the size/page/character limits, cleaning, previews, the state of a row, the look/keep path, the records, the grant/revoke/reconcile ordering and the screen's guards: @@MUT@@
+- **Not testable off the phone — this round is the real test:** Android's folder and file pickers, the persisted folder access, and above all **how well Android's reader gets text out of *your* PDFs**.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P213** | **v42 installs over v41 without a Play Protect warning** (no new permission, no new query) and Orb opens; the Safety offer does **not** reappear | the install is flagged — **say what it said** |
+| **P214** | **Sources** shows *PDF files* with an explanation and **Turn on PDF files**; **nothing is listed and nothing is read** until you act | it reads before you turn it on |
+| **P215** | After turning on, **Pick files** opens Android's file picker **on Downloads**, PDFs only, several can be chosen; the chosen files appear as rows that fill in **with the first words of each** | the picker is wrong, or rows stay empty |
+| **P216** | A **scan or picture-only PDF** says *No text found — probably a scan. Orb cannot keep this one* and **cannot be ticked** | it offers to keep nothing, or crashes |
+| **P217** | **Tick two → Keep the ticked ones**: *Kept 2 of 2*, and those rows now say **Already in Orb** and cannot be ticked again | the keep fails or repeats |
+| **P218** | In **Recall**, a word from one of those PDFs finds it; its detail says it came from ***a PDF you chose***; **Erase** works on it | it is missing, mislabelled or cannot be erased |
+| **P219** | **Choose a folder** → try **Downloads itself**: Android **refuses** (that is Android's rule). Choose **another folder** (inside Downloads, or Documents): **Look now** lists its PDFs, newest first | Android accepts Downloads, or Look now lists nothing from a folder that has PDFs |
+| **P220** | **What Orb may do** shows ***PDFs in a folder you chose* — ON**, with a count line (*N PDFs found at the last look, M kept in all*); **Switch off the Documents source** turns it **OFF**, and Sources shows **Turn on PDF files** again | the capability is missing or ignores the switch |
+| **P221** | **Erase** one kept PDF in Recall, then **Pick files** and look at the same PDF again: its row says ***You erased this before; it is not kept again from here*** and cannot be ticked | it is kept again silently |
+| **P222** | **Export and share journal**: the grant, `orb.source.chosen` (if you chose a folder), `orb.source.looked` (found, unreadable), `orb.source.kept` (kept), and `orb.shared` records with **`referrer: orb-source://documents`**, **`textChars`** — **no file name, no folder, no word of any PDF anywhere in the file** | something about a document was recorded |
+| **P223** | **Quality:** *tell me* whether the first words of **your** PDFs read sensibly (an invoice, a ticket, a bank letter) — complete lines in order, or jumbled columns, or nothing | not a pass/fail: it decides whether this slice earns its keep (AD-28 item 1) |
+
+#### The operator's protocol
+
+1. Install `orb-app-v42-sources.apk` over v41; open Orb once. *(P213 — if Android or Play Protect warns, screenshot it and stop.)*
+2. **Sources**. Read it. **Turn on PDF files.** *(P214)*
+3. **Pick files** → open **Downloads**, choose **three or four PDFs** (include a scanned or picture-only one if you have it, and an invoice or ticket). Wait for the rows to fill in. *(P215, P216, P223)*
+4. **Tick two** readable ones → **Keep the ticked ones**. *(P217)*
+5. **Recall** → search a word that is in one of them; open it; look at where it came from; do **not** erase yet. *(P218)*
+6. **Sources → Choose a folder** → try **Downloads** itself and see what Android says; then pick **another folder** with PDFs and tap **Look now**. *(P219)*
+7. **What Orb may do** → read the new line; **Switch off the Documents source**; open **Sources** again. *(P220)*
+8. In **Recall**, **erase** one kept PDF. **Sources → Turn on PDF files → Pick files** → choose that same PDF. *(P221)*
+9. **Export and share journal**. *(P222)*
+10. Tell me: **how the PDFs read (P223)**, which ones were wrong or empty, and anything confusing.

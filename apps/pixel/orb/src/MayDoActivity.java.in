@@ -118,6 +118,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.DOCUMENTS)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.DOCUMENTS);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+            }
+            final boolean sourceOn = known;
+            b.setText(sourceOn ? "Switch off the Documents source" : "Turn on (opens Sources)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (sourceOn) {
+                        DocumentsAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, SourcesActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Reminders.CAPABILITY)) {
             final boolean on = Reminders.enabled(lines);
             b.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");

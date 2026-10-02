@@ -1,0 +1,61 @@
+package @PKG@;
+
+import android.content.Context;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Looking at a document and keeping it — the part of the Documents source that touches no Android API beyond a `Context` for the
+ * sealed store, so it runs off the phone with a reader the test supplies (`docs/SOURCES_PHONE.md` §3).
+ *
+ * **Looking keeps nothing**: `inspect` reads a file, works out what *would* be sealed (to say *already in Orb*) and what its first
+ * words are, and lets the text go. **Keeping seals the words exactly as a share does** (`SharedText`), records the share with
+ * where it came from, and observes it; a file whose words are already held is not written again, and one that was erased is not
+ * kept again from here.
+ */
+final class DocumentsFlow {
+    private DocumentsFlow() {}
+
+    /** One file, looked at: a row, never the text. A failure to read is a row that says so, not a crash. */
+    static DocumentsRules.Row inspect(Context context, DocumentsRules.Doc doc, DocumentsRules.Reader reader) {
+        String refused = DocumentsRules.refusal(doc);
+        if (refused != null) return DocumentsRules.unreadable(doc, refused);
+        try {
+            DocumentsRules.Reading reading = reader.read(doc);
+            if (reading.reason != null) return DocumentsRules.unreadable(doc, reading.reason);
+            String text = DocumentsRules.clean(reading.text);
+            if (text.isEmpty()) return DocumentsRules.unreadable(doc, DocumentsRules.NO_TEXT);
+            String identity = Attachments.identity(SharedText.document(text));
+            return DocumentsRules.readRow(doc, text, identity, Attachments.state(context, identity));
+        } catch (Exception unreadable) {
+            return DocumentsRules.unreadable(doc, DocumentsRules.CANNOT);
+        }
+    }
+
+    /**
+     * Keeps the ticked documents. Each is read again (nothing was held since the look), cleaned, sealed and recorded as a share.
+     *
+     * @return how many were kept — written now, not already held, not erased, and recorded
+     */
+    static int keep(Context context, Journal journal, List<DocumentsRules.Doc> ticked, DocumentsRules.Reader reader, long elapsedRealtimeMs) {
+        int kept = 0;
+        for (DocumentsRules.Doc doc : ticked) {
+            try {
+                if (DocumentsRules.refusal(doc) != null) continue;
+                DocumentsRules.Reading reading = reader.read(doc);
+                if (reading.reason != null) continue;
+                String text = DocumentsRules.clean(reading.text);
+                if (text.isEmpty()) continue;
+                Attachments.Stored stored = SharedText.seal(context, text, null);
+                if (!"stored".equals(stored.outcome)) continue;   // held already, erased before, or failed: nothing new to record
+                Map<String, Object> payload = DocumentsFacts.documentPayload(text.length());
+                payload.put("elapsedRealtimeMs", elapsedRealtimeMs);
+                if (SharedText.record(journal, context, payload, stored, null) != null) kept++;
+            } catch (Exception skipped) {
+                // One unreadable file does not stop the others, and nothing is claimed for it.
+            }
+        }
+        if (kept > 0) Observe.run(journal);
+        return kept;
+    }
+}
