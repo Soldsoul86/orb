@@ -6894,7 +6894,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b76. Nudge — a draft from a commitment, handed to WhatsApp or Messages (DR-31) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v40-nudge.apk`. v39 is §7b75 (verified: "Working as intended, all buttons visible"). Design: `docs/NUDGE_PHONE.md`; decision `DECISIONS.md` DR-31; limits `ARCHITECTURAL_DEBT.md` AD-26.
+**Status: verified on the device — the operator: "All working as intended"; the export (`44d39d2e`, 555 events) shows, for v40, three WhatsApp nudges released with `drafted: true` and `version: 2`, one **cancelled** (`declined`), one SMS nudge released (`drafted: true`), a commitment with a date and one with none, each hand-off a `intent → confirmed → released | cancelled` chain with channel only, and no words, names or numbers (P197–P203).** `orb-app-v40-nudge.apk`. v39 is §7b75 (verified: "Working as intended, all buttons visible"). Design: `docs/NUDGE_PHONE.md`; decision `DECISIONS.md` DR-31; limits `ARCHITECTURAL_DEBT.md` AD-26.
 
 **Why:** you are waiting for the invoice from Arun and it is two days late. Orb knows the commitment, who it is with and when it was due; the smallest useful step is for it to **write the first draft** — from fixed templates, no model — so chasing is a tap, an edit, and *send*.
 
