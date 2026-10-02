@@ -56,7 +56,13 @@ public final class MayDoActivity extends Activity {
     private void addControl(final Capabilities.Declaration d, List<String> lines, final Journal journal) {
         Button b = new Button(this);
         if (d.id.equals(Capabilities.PACKAGES)) {
-            final boolean granted = PackageGrants.lastIsGrant(lines);
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+            }
+            final boolean granted = known;
             b.setText(granted ? "Revoke package scanning" : "Grant package scanning");
             b.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) {
