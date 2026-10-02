@@ -6510,3 +6510,41 @@ The operator reported *"All 5 done"*.
 | **P134** | **Held.** 10:44:52 `grants.capability.revoked` (`installedPackages.read`, `by: operator`, tier *Observe*) — from the new screen's control — and 10:45:05 `grants.capability.granted` brings it back. |
 | **P135** | **Held.** The scan at 10:45:00, taken while revoked, is `grants.packages` with **`installedPackageReadable: false`, `installedPackageScope: "ungranted"`** — recorded as a refusal, not as an empty set; after the re-grant the scan at 10:45:36 reads: **153 apps, scope `declared`, `changed: false`.** |
 | **P132, P133, P136** | **Not visible in an export** (they are what the screen shows: the four sections, the state and last-use lines, and that no name or word appears). The operator then confirmed *"All three look correct"* — the four sections, the state and last-use lines, and no name or word on the screen. |
+
+
+### 7b68. Relative days — "I'll send it Friday" — B4 slice 3 (DR-23) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v31-relative.apk`. v30 is §7b67 (verified). Design: `docs/RELATIVE_DAYS_PHONE.md`; decision `DECISIONS.md` DR-23; limits `ARCHITECTURAL_DEBT.md` AD-19.
+
+#### What changed
+
+1. **Coming up reads relative days as guesses.** *Tomorrow*, *the day after tomorrow*, *in 3 days*, *in two weeks* and a spelled-out weekday (*Friday*, *on Friday*, *this Friday*) become proposals, **read from the day you kept the item**.
+2. **Each guess says so:** *A guess: "friday", read from when you kept it (Tue 6 Oct).* The tap opens the **same review card with the exact date** (Cancel the default), so a wrong guess is corrected in front of you.
+3. **Deliberately not read:** *next Friday*, *every / each / any Friday*, *last / previous / past / since Friday*, *Fridays*, *Fri / Sat / Sun / Wed*, *today*, *yesterday*, Hindi. A weekday written on that same weekday means **next week's**.
+4. **A guess never lights the dot.** A date you wrote down and a guess for the same date is one proposal (the written one).
+5. Still **a computed view, nothing stored, nothing notified**; confirming goes through the gate.
+
+#### Checked before the device
+
+- 952 phone-side checks (was 941), Kotlin 325 (was 262), TypeScript 551; the 54 hand-written cases are checked by **both** implementations; lint clean.
+- **Mutation-checked, 24 ways** (the same-weekday rule, each exclusion word, the line-break case, the day and week limits, the de-duplication, the word boundaries, the year bounds, the weekday arithmetic, the day-after-tomorrow precedence; and on the phone: the dot, the past filter, the written-vs-guessed rule, the anchor, the order, the reminder mark) — each fails a named check.
+- **Not testable off the phone:** the screen, the dot, the pickers and card.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P137** | Share *Send the file tomorrow*, open **Coming up**: tomorrow's date is listed with **A guess: "tomorrow", read from when you kept it (today's date)** and **Remind me on …** | a relative day is not read |
+| **P138** | Share *I'll send it Friday*: the **coming Friday** is listed as a guess (if today is Friday, next week's) | the weekday is missed or wrong |
+| **P139** | Share *next Friday*, *every Friday*, *Fridays* and *I sent it yesterday*: **none of them is listed** | a guess it should not make |
+| **P140** | The **dot** on the main screen is **not** lit by guesses alone (if nothing you *wrote* is within a week) | a guess tugs at you |
+| **P141** | Tap **Remind me on …** on a guess: the date is pre-filled, the card shows the exact date, Cancel is the default; **Confirm** sets it, and the guess then says **A reminder is set** | the flow or the mark differs |
+| **P142** | **Export and share journal**: apart from the reminder you confirmed (and the shares), **no new events**, and **no phrase or word** of what you kept is in the file | the view wrote something |
+
+#### The operator's protocol
+
+1. Install `orb-app-v31-relative.apk` over v30; open Orb once.
+2. Share to Orb (invented), as separate texts: *Send the file tomorrow* · *I'll send it Friday* · *Call next Friday, every Friday, on Fridays; I sent it yesterday*.
+3. Look at the main screen's **Coming up** button, then open **Coming up**. *(P137–P140)*
+4. Tap **Remind me on …** for the Friday guess; read the card; **Confirm**; return to Coming up. *(P141)*
+5. **Export and share journal**. *(P142)*

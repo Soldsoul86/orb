@@ -53,6 +53,15 @@ public final class ComingUpActivity extends Activity {
         flow.onPermissionResult(code, results);
     }
 
+    /** `Tue 6 Oct` for a `YYYY-MM-DD` day. */
+    private static String keptOn(String anchor) {
+        String[] p = anchor.split("-");
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.clear();
+        c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+        return new SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(c.getTime());
+    }
+
     private TextView text(String s, int size, boolean bold) {
         TextView t = new TextView(this);
         t.setTextSize(size);
@@ -65,7 +74,7 @@ public final class ComingUpActivity extends Activity {
     private void render() {
         list.removeAllViews();
         list.addView(text("Coming up", 17, true));
-        list.addView(text("Dates in what you kept that are still ahead. Orb only suggests; nothing is set until you confirm.", 12, false));
+        list.addView(text("Dates in what you kept that are still ahead. Orb only suggests; nothing is set until you confirm. A date it had to guess — like \u201cFriday\u201d — says so.", 12, false));
         Orb app = Orb.get();
         Journal journal = app == null ? null : app.journal();
         if (journal == null) {
@@ -111,6 +120,10 @@ public final class ComingUpActivity extends Activity {
                 row.setPadding(0, 8, 0, 16);
                 row.addView(text((item.entry.packageName == null ? "" : item.entry.packageName + " · ") + "kept " + kept.format(new Date(item.entry.wallClock)), 11, false));
                 row.addView(text(item.entry.snippet, 14, false));
+                if (item.guess) {
+                    // Said plainly: this was read, not written. The review card shows the exact date, and the person can move it.
+                    row.addView(text("A guess: \u201c" + item.phrase + "\u201d, read from when you kept it (" + keptOn(item.anchor) + ").", 12, true));
+                }
                 if (item.reminded) {
                     row.addView(text("A reminder is set.", 12, true));
                 } else {

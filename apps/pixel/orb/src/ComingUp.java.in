@@ -19,7 +19,8 @@ import java.util.TimeZone;
  * notification, alarm or journal-append** — `ComingUpTest` holds it to that by reading its source. A proposal that is not
  * taken leaves no trace, because there is nothing to leave: declining is not recorded, and an erased item simply is not in the list.
  *
- * Dates that name themselves only (day-first, as `Handles` reads them). Relative days — *"Friday"* — are a later step.
+ * Dates that name themselves (day-first, as `Handles` reads them) **and, marked as guesses, relative days** — *Friday*, *tomorrow*, *in two weeks* —
+ * read from the day the item was kept (`Mentions.relative`, `docs/RELATIVE_DAYS_PHONE.md`).
  */
 final class ComingUp {
     private ComingUp() {}
@@ -29,10 +30,18 @@ final class ComingUp {
         final Recall.Entry entry;
         /** A reminder about this item on this date is already waiting. */
         final boolean reminded;
+        /** The date was **guessed** from a relative phrase (*Friday*), not written down. */
+        final boolean guess;
+        /** For a guess: what was found (`friday`, `tomorrow`), and the day it was read from (`YYYY-MM-DD`, when the item was kept). */
+        final String phrase;
+        final String anchor;
 
-        Item(Recall.Entry entry, boolean reminded) {
+        Item(Recall.Entry entry, boolean reminded, boolean guess, String phrase, String anchor) {
             this.entry = entry;
             this.reminded = reminded;
+            this.guess = guess;
+            this.phrase = phrase;
+            this.anchor = anchor;
         }
     }
 
@@ -83,32 +92,62 @@ final class ComingUp {
         Recall.walk(context, journal, null, result.looked, new Recall.Visitor() {
             @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
                 Recall.Entry entry = null;
+                java.util.Set<String> written = new java.util.HashSet<>();
                 // `Handles` returns each (kind, value) once, so a date an item names twice is one proposal.
                 for (Mentions.Handle h : Mentions.in(doc)) {
-                    if (!h.kind.equals("date") || h.value.compareTo(today) < 0) continue;
+                    if (!h.kind.equals("date")) continue;
+                    written.add(h.value);
+                    if (h.value.compareTo(today) < 0) continue;
                     if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
-                    boolean reminded = false;
-                    for (Reminders.Reminder r : waiting) {
-                        if (entry.id != null && entry.id.equals(r.itemEventId) && dateOf(r.dueAtMs, zoneId).equals(h.value)) reminded = true;
-                    }
-                    Day day = byDate.get(h.value);
-                    if (day == null) { day = new Day(h.value); byDate.put(h.value, day); }
-                    day.items.add(new Item(entry, reminded));
+                    place(byDate, entry, h.value, new Item(entry, remindedOn(waiting, entry, h.value, zoneId), false, null, null));
+                }
+                // Relative days: a guess, read from the day the item was kept. A guess that lands on a date the item wrote down is
+                // that date, not a second proposal; a guess in the past is not shown.
+                String anchor = dateOf(item.wallClock, zoneId);
+                for (Mentions.Relative r : Mentions.relative(doc, anchor)) {
+                    if (r.date.compareTo(today) < 0 || written.contains(r.date)) continue;
+                    if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
+                    place(byDate, entry, r.date, new Item(entry, remindedOn(waiting, entry, r.date, zoneId), true, r.phrase, anchor));
                 }
             }
         });
+        // Within a date, what was written down comes before what was guessed (each in the order the items were kept, newest first).
+        for (Day day : byDate.values()) {
+            List<Item> written = new ArrayList<>();
+            List<Item> guessed = new ArrayList<>();
+            for (Item i : day.items) (i.guess ? guessed : written).add(i);
+            day.items.clear();
+            day.items.addAll(written);
+            day.items.addAll(guessed);
+        }
         result.days.addAll(byDate.values());   // a TreeMap: soonest first
         return result;
     }
 
-    /** How many proposals within the next `withinDays` days (today included) have no reminder yet — what the quiet dot counts. */
+    private static boolean remindedOn(List<Reminders.Reminder> waiting, Recall.Entry entry, String date, String zoneId) {
+        for (Reminders.Reminder r : waiting) {
+            if (entry.id != null && entry.id.equals(r.itemEventId) && dateOf(r.dueAtMs, zoneId).equals(date)) return true;
+        }
+        return false;
+    }
+
+    private static void place(java.util.Map<String, Day> byDate, Recall.Entry entry, String date, Item item) {
+        Day day = byDate.get(date);
+        if (day == null) { day = new Day(date); byDate.put(date, day); }
+        day.items.add(item);
+    }
+
+    /**
+     * How many proposals within the next `withinDays` days (today included) have no reminder yet — what the quiet dot counts.
+     * **A guess never counts**: the dot means *a date you wrote down is near*, and a suggestion should not tug at you.
+     */
     static int soon(Result result, long nowMs, String zoneId, int withinDays) {
         String today = dateOf(nowMs, zoneId);
         String last = plusDays(today, withinDays);
         int n = 0;
         for (Day day : result.days) {
             if (day.date.compareTo(today) < 0 || day.date.compareTo(last) > 0) continue;
-            for (Item item : day.items) if (!item.reminded) n++;
+            for (Item item : day.items) if (!item.reminded && !item.guess) n++;
         }
         return n;
     }

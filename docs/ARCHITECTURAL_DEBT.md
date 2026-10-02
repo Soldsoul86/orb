@@ -617,7 +617,7 @@ a second source for the compiler's checksum exists (item 1).
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-21, `COMING_UP_PHONE.md`). Debts, stated.
 
-1. **No relative days.** *"Friday"*, *"tomorrow"*, *"next week"* are not read — a commitment written in words is missed. A step after seeing this on real words; it needs rules for *last / every / next* and says *guess* on the screen.
+1. **Relative days: partly done (DR-23, 2026-10-02).** *Tomorrow*, *day after tomorrow*, *in N days/weeks* and a spelled-out weekday are read as marked guesses from when the item was kept. **Still not read:** *next Friday*, *every Friday*, *next week*, *this weekend*, *end of the month*, abbreviations, times of day, and Hindi/Hinglish (*kal*, *parso*).
 2. **No names.** *"Call Ravi"* has no date and no name the phone can resolve (AD-17).
 3. **The context line is the start of the item's words**, not the sentence around the date (`Handles` gives a normalised value, not where it was). Good enough to recognise the item; not a quote of the date's sentence.
 4. **A past date is never shown**, so something you meant to be reminded of that has passed is silent — by design (a stale proposal is noise), but a reminder you wanted for yesterday is yours to set by hand.

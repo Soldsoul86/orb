@@ -10,4 +10,6 @@
 
 - `Handles.extract(text): List<Handle(kind, value)>` — the phone numbers, sites, emails, UPI ids, amounts and dates a text names (`@JvmStatic`); rules, never stored, card numbers excluded. The twin of `@orb/entities`; `MAX_CHARS` 1,000,000, `MAX_HANDLES` 200.
 
+- `RelativeDays.extract(text, anchor): List<Day(date, phrase)>` — relative days read from `anchor` (`@JvmStatic`); the twin of `@orb/entities`' `relativeDays`.
+
 Called from Java as `dev.orb.brain.Observer.plan(...)` (`@JvmStatic`).

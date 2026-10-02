@@ -37,6 +37,11 @@ final class ComingUpTest {
         return (String) integrity.get("hash");
     }
 
+    private static String wallClockOf(String line) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"wallClock\":(\\d+)").matcher(line);
+        return m.find() ? m.group(1) : "0";
+    }
+
     private static Map<String, Long> listing(File dir, String prefix) {
         Map<String, Long> out = new TreeMap<>();
         File[] children = dir.listFiles();
@@ -118,6 +123,62 @@ final class ComingUpTest {
         Harness.check("no date is in the journal or on disk in the clear",
             !contains(dir, "dentist".getBytes(StandardCharsets.UTF_8)) && !contains(dir, "board meeting".getBytes(StandardCharsets.UTF_8)));
         Harness.check("(and the first computation, over the earlier journal, changed nothing either)", !linesBefore.isEmpty() && !diskBefore.isEmpty());
+
+        Harness.suite("relative days: a guess, marked, read from when the item was kept");
+        Install.forget();
+        File dir4 = Files.createTempDirectory("orb-comingup-relative").toFile();
+        Context c4 = new Context(dir4);
+        Journal j4 = Journal.open(c4, Install.lane(c4), Install.id(c4));
+        // The items are stamped with the real clock, so the answers are worked out from it with an independent calendar (java.time).
+        Map<String, Object> tomorrowItem = keep(c4, j4, "send the file tomorrow");
+        Map<String, Object> fridayItem = keep(c4, j4, "I'll send it Friday and call next Friday, every Friday");
+        Map<String, Object> pastItem = keep(c4, j4, "I sent it yesterday");
+        long kept = Long.parseLong(wallClockOf(j4.readLines().get(j4.readLines().size() - 1)));
+        String zone = "UTC";
+        java.time.LocalDate anchor = java.time.Instant.ofEpochMilli(kept).atZone(java.time.ZoneId.of(zone)).toLocalDate();
+        java.time.LocalDate nextFriday = anchor;
+        do { nextFriday = nextFriday.plusDays(1); } while (nextFriday.getDayOfWeek() != java.time.DayOfWeek.FRIDAY);
+        ComingUp.Result rel = ComingUp.compute(c4, j4, kept, zone);
+        List<String> expected = new ArrayList<>();
+        expected.add(anchor.plusDays(1).toString());
+        expected.add(nextFriday.toString());
+        java.util.Collections.sort(expected);
+        List<String> got = new ArrayList<>();
+        for (ComingUp.Day d : rel.days) got.add(d.date);
+        Harness.equal("tomorrow and the coming Friday — and nothing for next, every or yesterday", got, expected);
+        boolean allGuesses = true;
+        for (ComingUp.Day d : rel.days) for (ComingUp.Item i : d.items) allGuesses &= i.guess && i.phrase != null && i.anchor.equals(anchor.toString());
+        Harness.check("each is marked a guess, with what it was read from and the day it was read from", allGuesses);
+        Harness.equal("the phrases", rel.days.get(0).items.get(0).phrase.equals("tomorrow") || rel.days.get(0).items.get(0).phrase.equals("friday"), true);
+        Harness.equal("a guess never lights the dot", ComingUp.soon(rel, kept, zone, 30), 0);
+        Harness.equal("a week on, a guess for a day already past is not shown", ComingUp.compute(c4, j4, kept + 10L * 24L * 3600000L, zone).days.size(), 0);
+
+        // The same date written down and guessed in one item is the written one.
+        String tomorrowWritten = String.format(java.util.Locale.ROOT, "%02d/%02d/%04d", anchor.plusDays(1).getDayOfMonth(), anchor.plusDays(1).getMonthValue(), anchor.plusDays(1).getYear());
+        Map<String, Object> both = keep(c4, j4, "tomorrow, that is " + tomorrowWritten);
+        long keptBoth = Long.parseLong(wallClockOf(j4.readLines().get(j4.readLines().size() - 1)));
+        ComingUp.Result bothResult = ComingUp.compute(c4, j4, keptBoth, zone);
+        int writtenOnly = 0, guessedOfBoth = 0;
+        for (ComingUp.Day d : bothResult.days) for (ComingUp.Item i : d.items) if (i.entry.id.equals((String) both.get("id"))) { if (i.guess) guessedOfBoth++; else writtenOnly++; }
+        Harness.check("a date both written and guessed is one proposal, the written one", writtenOnly == 1 && guessedOfBoth == 0);
+        // Written before guessed within a date.
+        for (ComingUp.Day d : bothResult.days) {
+            boolean seenGuess = false, ordered = true;
+            for (ComingUp.Item i : d.items) { if (i.guess) seenGuess = true; else if (seenGuess) ordered = false; }
+            Harness.check("within " + d.date + ", what was written comes before what was guessed", ordered);
+        }
+        // A reminder already set on a guessed date marks it.
+        String intent = Remind.intend(j4, (String) tomorrowItem.get("id"), kept + 86_400_000L + 3_600_000L, zone, 7L);
+        Remind.confirm(c4, j4, intent, (String) tomorrowItem.get("id"), kept + 86_400_000L + 3_600_000L, zone, null);
+        boolean guessMarked = false;
+        for (ComingUp.Day d : ComingUp.compute(c4, j4, kept, zone).days) for (ComingUp.Item i : d.items) {
+            if (i.entry.id.equals((String) tomorrowItem.get("id")) && i.guess && i.reminded) guessMarked = true;
+        }
+        Harness.check("a reminder already set on a guessed date marks the guess", guessMarked);
+        Harness.equal("an erased item's guesses are gone", Erase.execute(c4, j4, hashOf(fridayItem)).outcome, Erase.DESTROYED);
+        boolean fridayGone = true;
+        for (ComingUp.Day d : ComingUp.compute(c4, j4, kept, zone).days) for (ComingUp.Item i : d.items) if (i.entry.id.equals((String) fridayItem.get("id"))) fridayGone = false;
+        Harness.check("(the Friday item no longer proposes anything)", fridayGone && pastItem != null);
 
         Harness.suite("bounded like Recall, and it says so");
         Install.forget();

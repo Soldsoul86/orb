@@ -51,6 +51,31 @@ final class Mentions {
         }
     }
 
+    /** A day read from a relative phrase — *Friday*, *tomorrow*, *in two weeks* — as a **guess** from the day the words were kept. */
+    static final class Relative {
+        /** `YYYY-MM-DD`. */
+        final String date;
+        /** What was found, normalised (`friday`, `tomorrow`, `in 2 weeks`). */
+        final String phrase;
+
+        Relative(String date, String phrase) {
+            this.date = date;
+            this.phrase = phrase;
+        }
+    }
+
+    /**
+     * The relative days an item's words name, read from `anchorDate` (a `YYYY-MM-DD`: when the item was kept). Guesses —
+     * conservative ones, with *next*, *every* and the past left unread (`docs/RELATIVE_DAYS_PHONE.md`).
+     */
+    static List<Relative> relative(Recall.Doc doc, String anchorDate) {
+        List<Relative> out = new ArrayList<>();
+        for (dev.orb.brain.RelativeDays.Day d : dev.orb.brain.RelativeDays.extract(doc.body, anchorDate)) {
+            out.add(new Relative(d.getDate(), d.getPhrase()));
+        }
+        return out;
+    }
+
     /** How many co-occurring handles a lookup offers beside its list. */
     static final int ALSO_WITH = 5;
 

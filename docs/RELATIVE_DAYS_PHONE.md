@@ -1,6 +1,6 @@
 # Relative days — "I'll send it Friday" (B4, third step; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with relative days") and built** (`DEVICE_LOOP.md` §7b68, `orb-app-v31-relative.apk`; `DECISIONS.md` DR-23). As-built notes in §8.
 > Extends `COMING_UP_PHONE.md` (DR-21, verified) and `ENTITIES_PHONE.md` (DR-19). Contracts unchanged. **Nothing new acts**: proposals stay a computed view and confirming goes through the gate that exists (DR-20).
 
 ## 1. Why, in plain words
@@ -56,3 +56,13 @@ Times of day (*"3 pm"*, *"morning"*); *next/last/every*; Hindi and Hinglish; rec
 1. **The expressions** in §2: *tomorrow*, *day after tomorrow*, *in N days/weeks*, and a spelled-out weekday — and **not** *next / every / abbreviations / Hindi*.
 2. **Guesses are marked, explained on the line, never light the dot.**
 3. **The anchor is when you kept the item**, in your time zone; a weekday written on that same weekday means the next week's.
+
+## 8. As built
+
+- **`relativeDays(text, anchor)`** in TypeScript (`runtime/entities/src/relative.ts`) and **`RelativeDays.extract`** in Kotlin (`runtime/brain`), both **pure and clock-free** (the anchor is an argument); calendar arithmetic by day numbers, so month ends, year ends and leap days are exact.
+  Held to **54 hand-written cases worked out on a calendar** (`relative-cases.ts` → `relative.json`): 25 that must find something, 29 that must not. `Mentions.relative` is the phone's only door to it (the third brain caller stays one file).
+- **`ComingUp`** asks for each kept item with **the day it was kept, in the person's zone,** as anchor; keeps guesses that are today or later and not already written down in the same item; marks them `guess` with their phrase and anchor; puts what was written before what was guessed within a date; and **`soon()` ignores guesses**, so the dot is unchanged.
+- **The screen** adds one bold line under a guess — *A guess: "friday", read from when you kept it (Tue 6 Oct).* — and the same one-tap flow.
+- **Held by tests (952 phone-side checks, 325 Kotlin, 551 TypeScript; mutation-checked):** the case files above; and on the phone, with an independent calendar (`java.time`) as the oracle — *tomorrow* and the coming Friday found, *next / every / yesterday* not;
+  each marked a guess with its anchor; a guess never lights the dot; a guess for a day since passed is not shown; a date both written and guessed is one proposal (the written one); written before guessed; a reminder already set marks a guess; an erased item's guesses are gone.
+

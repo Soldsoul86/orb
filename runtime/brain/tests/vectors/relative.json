@@ -1,0 +1,462 @@
+{
+ "note": "Hand-written in runtime/entities/tests/relative-cases.ts; written by scripts/write-brain-vectors.mjs. Do not edit.",
+ "cases": [
+  {
+   "name": "empty",
+   "anchor": "2026-10-06",
+   "text": "",
+   "expect": []
+  },
+  {
+   "name": "plain words",
+   "anchor": "2026-10-06",
+   "text": "meet at the red door",
+   "expect": []
+  },
+  {
+   "name": "an anchor that is not a date reads nothing",
+   "anchor": "",
+   "text": "tomorrow",
+   "expect": []
+  },
+  {
+   "name": "an anchor that is not a real day",
+   "anchor": "2026-02-30",
+   "text": "tomorrow",
+   "expect": []
+  },
+  {
+   "name": "an anchor outside the years it knows",
+   "anchor": "1850-01-01",
+   "text": "tomorrow",
+   "expect": []
+  },
+  {
+   "name": "an anchor in the wrong shape",
+   "anchor": "6/10/2026",
+   "text": "tomorrow",
+   "expect": []
+  },
+  {
+   "name": "tomorrow",
+   "anchor": "2026-10-06",
+   "text": "call him tomorrow",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "in any case",
+   "anchor": "2026-10-06",
+   "text": "TOMORROW",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "the day after tomorrow",
+   "anchor": "2026-10-06",
+   "text": "flight is the day after tomorrow's",
+   "expect": [
+    {
+     "date": "2026-10-08",
+     "phrase": "day after tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "tomorrow is a word, not a part of one",
+   "anchor": "2026-10-06",
+   "text": "Tomorrowland",
+   "expect": []
+  },
+  {
+   "name": "yesterday is the past",
+   "anchor": "2026-10-06",
+   "text": "I sent it yesterday",
+   "expect": []
+  },
+  {
+   "name": "today is not read",
+   "anchor": "2026-10-06",
+   "text": "see you today, tonight",
+   "expect": []
+  },
+  {
+   "name": "in three days",
+   "anchor": "2026-10-06",
+   "text": "in 3 days",
+   "expect": [
+    {
+     "date": "2026-10-09",
+     "phrase": "in 3 days"
+    }
+   ]
+  },
+  {
+   "name": "in two weeks, spelled",
+   "anchor": "2026-10-06",
+   "text": "back in two weeks",
+   "expect": [
+    {
+     "date": "2026-10-20",
+     "phrase": "in 2 weeks"
+    }
+   ]
+  },
+  {
+   "name": "in one week",
+   "anchor": "2026-10-06",
+   "text": "In 1 week",
+   "expect": [
+    {
+     "date": "2026-10-13",
+     "phrase": "in 1 week"
+    }
+   ]
+  },
+  {
+   "name": "in one day",
+   "anchor": "2026-10-06",
+   "text": "in one day",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "in 1 day"
+    }
+   ]
+  },
+  {
+   "name": "in a year of days",
+   "anchor": "2026-10-06",
+   "text": "in 365 days",
+   "expect": [
+    {
+     "date": "2027-10-06",
+     "phrase": "in 365 days"
+    }
+   ]
+  },
+  {
+   "name": "none is not a number of days",
+   "anchor": "2026-10-06",
+   "text": "in 0 days",
+   "expect": []
+  },
+  {
+   "name": "a few is not a number",
+   "anchor": "2026-10-06",
+   "text": "in a few days, in a week, soon",
+   "expect": []
+  },
+  {
+   "name": "too many days",
+   "anchor": "2026-10-06",
+   "text": "in 400 days",
+   "expect": []
+  },
+  {
+   "name": "too many weeks",
+   "anchor": "2026-10-06",
+   "text": "in 53 weeks",
+   "expect": []
+  },
+  {
+   "name": "in is a word, not a part of login",
+   "anchor": "2026-10-06",
+   "text": "login 3 days",
+   "expect": []
+  },
+  {
+   "name": "Friday",
+   "anchor": "2026-10-06",
+   "text": "I'll send it Friday",
+   "expect": [
+    {
+     "date": "2026-10-09",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "on, by, this and coming Friday are all the coming one",
+   "anchor": "2026-10-06",
+   "text": "on Friday, by friday, this Friday, coming Friday",
+   "expect": [
+    {
+     "date": "2026-10-09",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "the weekday that is today means next week's",
+   "anchor": "2026-10-06",
+   "text": "Tuesday",
+   "expect": [
+    {
+     "date": "2026-10-13",
+     "phrase": "tuesday"
+    }
+   ]
+  },
+  {
+   "name": "Monday",
+   "anchor": "2026-10-06",
+   "text": "Monday",
+   "expect": [
+    {
+     "date": "2026-10-12",
+     "phrase": "monday"
+    }
+   ]
+  },
+  {
+   "name": "Sunday",
+   "anchor": "2026-10-06",
+   "text": "Sunday",
+   "expect": [
+    {
+     "date": "2026-10-11",
+     "phrase": "sunday"
+    }
+   ]
+  },
+  {
+   "name": "Wednesday",
+   "anchor": "2026-10-06",
+   "text": "Wednesday",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "wednesday"
+    }
+   ]
+  },
+  {
+   "name": "Saturday",
+   "anchor": "2026-10-06",
+   "text": "Saturday",
+   "expect": [
+    {
+     "date": "2026-10-10",
+     "phrase": "saturday"
+    }
+   ]
+  },
+  {
+   "name": "a possessive is still the day",
+   "anchor": "2026-10-06",
+   "text": "Friday's meeting",
+   "expect": [
+    {
+     "date": "2026-10-09",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "a weekday on its own line after another word",
+   "anchor": "2026-10-06",
+   "text": "call me\nFriday",
+   "expect": [
+    {
+     "date": "2026-10-09",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "next Friday",
+   "anchor": "2026-10-06",
+   "text": "next Friday",
+   "expect": []
+  },
+  {
+   "name": "last Friday",
+   "anchor": "2026-10-06",
+   "text": "last Friday",
+   "expect": []
+  },
+  {
+   "name": "previous Friday",
+   "anchor": "2026-10-06",
+   "text": "previous Friday",
+   "expect": []
+  },
+  {
+   "name": "past Friday",
+   "anchor": "2026-10-06",
+   "text": "past Friday",
+   "expect": []
+  },
+  {
+   "name": "every Friday",
+   "anchor": "2026-10-06",
+   "text": "every Friday",
+   "expect": []
+  },
+  {
+   "name": "each Friday",
+   "anchor": "2026-10-06",
+   "text": "each Friday",
+   "expect": []
+  },
+  {
+   "name": "every other Friday",
+   "anchor": "2026-10-06",
+   "text": "every other Friday",
+   "expect": []
+  },
+  {
+   "name": "any Friday",
+   "anchor": "2026-10-06",
+   "text": "any Friday",
+   "expect": []
+  },
+  {
+   "name": "since Friday",
+   "anchor": "2026-10-06",
+   "text": "since Friday",
+   "expect": []
+  },
+  {
+   "name": "following Friday",
+   "anchor": "2026-10-06",
+   "text": "the following Friday",
+   "expect": []
+  },
+  {
+   "name": "next across a line break",
+   "anchor": "2026-10-06",
+   "text": "next\nFriday",
+   "expect": []
+  },
+  {
+   "name": "Fridays recur",
+   "anchor": "2026-10-06",
+   "text": "Fridays",
+   "expect": []
+  },
+  {
+   "name": "abbreviations are not read",
+   "anchor": "2026-10-06",
+   "text": "Fri, Sat, Sun, Wed, Mon, Tue, Thu",
+   "expect": []
+  },
+  {
+   "name": "other languages are not read",
+   "anchor": "2026-10-06",
+   "text": "kal, parso, kal subah",
+   "expect": []
+  },
+  {
+   "name": "end of a month",
+   "anchor": "2026-10-31",
+   "text": "tomorrow",
+   "expect": [
+    {
+     "date": "2026-11-01",
+     "phrase": "tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "end of a year",
+   "anchor": "2026-12-31",
+   "text": "tomorrow",
+   "expect": [
+    {
+     "date": "2027-01-01",
+     "phrase": "tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "a leap day",
+   "anchor": "2024-02-28",
+   "text": "in 2 days",
+   "expect": [
+    {
+     "date": "2024-03-01",
+     "phrase": "in 2 days"
+    }
+   ]
+  },
+  {
+   "name": "not a leap year",
+   "anchor": "2023-02-28",
+   "text": "tomorrow",
+   "expect": [
+    {
+     "date": "2023-03-01",
+     "phrase": "tomorrow"
+    }
+   ]
+  },
+  {
+   "name": "past the years it knows",
+   "anchor": "2100-12-31",
+   "text": "tomorrow",
+   "expect": []
+  },
+  {
+   "name": "a weekday across a year end (2026-12-30 is a Wednesday)",
+   "anchor": "2026-12-30",
+   "text": "Friday",
+   "expect": [
+    {
+     "date": "2027-01-01",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "two in order",
+   "anchor": "2026-10-06",
+   "text": "tomorrow or Friday",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "tomorrow"
+    },
+    {
+     "date": "2026-10-09",
+     "phrase": "friday"
+    }
+   ]
+  },
+  {
+   "name": "the same day two ways is one",
+   "anchor": "2026-10-06",
+   "text": "Wednesday or tomorrow",
+   "expect": [
+    {
+     "date": "2026-10-07",
+     "phrase": "wednesday"
+    }
+   ]
+  },
+  {
+   "name": "the day after tomorrow is not also tomorrow",
+   "anchor": "2026-10-06",
+   "text": "day after tomorrow and tomorrow",
+   "expect": [
+    {
+     "date": "2026-10-08",
+     "phrase": "day after tomorrow"
+    },
+    {
+     "date": "2026-10-07",
+     "phrase": "tomorrow"
+    }
+   ]
+  }
+ ]
+}

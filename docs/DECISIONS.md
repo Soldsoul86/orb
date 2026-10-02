@@ -1173,6 +1173,21 @@ before it reads and records a refusal as *ungranted* (never an empty set); only 
 **Not built:** a Policy language (rules as data) — *you* are the policy, as `Policy.md` allows; a switch for the grants watch (a small addition if wanted); a model call as a declared capability (when one exists, DR-9 applies).
 
 
+## DR-23 — Relative days are read as guesses from when the item was kept
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with relative days") on `RELATIVE_DAYS_PHONE.md` ·
+  **Bears on:** DR-21 (Coming up), DR-19, `ARCHITECTURAL_DEBT.md` AD-19
+
+**The ruling.** Coming up reads, besides dates that name themselves, **relative days — as guesses, marked and explained**: *tomorrow*, *day after tomorrow*, *in N days / weeks* (N a number or one…ten), and a **spelled-out weekday** (the first such day after the day
+the item was kept; the same weekday means the following week's). **Not read:** *next / last / previous / past / every / each / other / any / since / following* before a weekday, plurals, abbreviations, *today*, the past, and any language but English — *not reading
+is better than reading wrong*. The anchor is **when the item was kept**, in the person's zone, and is **passed in** (no clock inside the reader), so the answer is deterministic.
+
+**On the screen:** each guess says *A guess: "friday", read from when you kept it (Tue 6 Oct)*; the tap opens the same review card with the exact date, Cancel the default. **A guess never lights the dot**, a date both written and guessed is the written one, and
+within a date what was written comes before what was guessed. Still a computed view, nothing stored, confirming through the gate (DR-20).
+
+**Built the same way as the date finder:** a TypeScript reference (`runtime/entities`) and the phone's Kotlin, both held to **54 hand-written cases worked out on a calendar** (not computed from either), shared as vectors, mutation-checked.
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
