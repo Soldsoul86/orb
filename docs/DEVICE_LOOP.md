@@ -6629,7 +6629,7 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 
 ### 7b70. People, revised — sure and possible, and a name inside a sentence (DR-25) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v33-people.apk`. v32 is §7b69 (first run). Decision `DECISIONS.md` DR-25; limits `ARCHITECTURAL_DEBT.md` AD-21.
+**Status: seen on the device — P152, P153 held (screenshots and the export); P154, P155 not exercised** — `orb-app-v33-people.apk`. v32 is §7b69 (first run). On the operator's 2537-contact phone the main list showed **1 person tied by number or email** (the operator, by email) and **22 only by a name** (was 32), collapsed behind *Show N that only a name matches*, headed *Might be…*; the remaining noise was contacts that are not people (WhatsApp group names, a shop, a *Coffee Machine*, a company) — which is why §7b72 moved the guess behind a search. Decision `DECISIONS.md` DR-25; limits `ARCHITECTURAL_DEBT.md` AD-21.
 
 #### What changed
 
@@ -6666,7 +6666,7 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 
 ### 7b71. Remind me about a person — B4, the first action on someone (DR-26) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v34-person.apk`. v33 is §7b70 (awaiting its own run). Design: `docs/PERSON_ACTION_PHONE.md`; decision `DECISIONS.md` DR-26; limits `ARCHITECTURAL_DEBT.md` AD-22.
+**Status: partly verified — P157 seen (screenshots: the button beside *Close*, also on *Might be* people); the export of v35 shows the flow from a person worked up to confirming (P158, P159: an `orb.action.intent` with no cause, a confirmation citing only the intent, a 38-byte sealed note, no name in the file); that the notification fired, the lock-screen wording (P160) and the erase-another-note case (P161) are not in an export** — `orb-app-v34-person.apk`. v33 is §7b70. Design: `docs/PERSON_ACTION_PHONE.md`; decision `DECISIONS.md` DR-26; limits `ARCHITECTURAL_DEBT.md` AD-22.
 
 #### What changed
 
@@ -6705,7 +6705,7 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 
 ### 7b72. People opens on a search — you choose the person (DR-27) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v35-search.apk`. v34 is §7b71 (awaiting its own run; v33 §7b70 likewise). Design: `docs/PEOPLE_SEARCH_PHONE.md`; decision `DECISIONS.md` DR-27; limits `ARCHITECTURAL_DEBT.md` AD-22.
+**Status: verified on the device — the operator: "The search is good" (P163–P165); P168 held from the export (two openings, counts only, nothing typed recorded); P166, P167 not separately reported** — `orb-app-v35-search.apk`. v34 is §7b71 (awaiting its own run; v33 §7b70 likewise). Design: `docs/PEOPLE_SEARCH_PHONE.md`; decision `DECISIONS.md` DR-27; limits `ARCHITECTURAL_DEBT.md` AD-22.
 
 **Why:** the first real run (§7b69, and the operator's screenshots after v33/v34) showed a 2537-contact book of which most "people" were WhatsApp groups, shops and things. The operator asked what the right way is to remove the noise and make actions easy.
 
@@ -6744,7 +6744,7 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 
 ### 7b73. A person's context, and reaching them from it — B3/B4 slices 3 and 4 (DR-28) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v36-reach.apk`. v35 is §7b72 (the search; its export showed the reminder from a person worked up to confirming). Design: `docs/PERSON_CONTEXT_PHONE.md`; decision `DECISIONS.md` DR-28; limits `ARCHITECTURAL_DEBT.md` AD-23.
+**Status: verified on the device — the operator: "Hand-off buttons all worked as intended" (P171–P175); the export (`97be9314`) shows `whatsapp` and `dial` each as intent → confirmed → released with channel only, and the switch revoked then allowed (P176, P177); no phone number in the file. P169, P170 (the context block, dates ahead) were not separately reported** — `orb-app-v36-reach.apk`. v35 is §7b72 (the search; its export showed the reminder from a person worked up to confirming). Design: `docs/PERSON_CONTEXT_PHONE.md`; decision `DECISIONS.md` DR-28; limits `ARCHITECTURAL_DEBT.md` AD-23.
 
 #### What changed
 
@@ -6789,7 +6789,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b74. Tell Orb who an item is about — a link you make (DR-29) — 2026-10-02
 
-**Status: built, awaiting the device** — `orb-app-v37-link.apk`. v36 is §7b73 (the hand-offs: **all worked as intended** on the operator's phone; the export showed `whatsapp` and `dial` released with channel only, the switch off and on, and no number). Design: `docs/PERSON_LINK_PHONE.md`; decision `DECISIONS.md` DR-29; limits `ARCHITECTURAL_DEBT.md` AD-24.
+**Status: verified on the device — the operator: "Working as intended" on v37; the export (`e1b22f86`) shows an `orb.person.linked` event (a 104-byte sealed note, citing one item) and the people count rising from 1 to 2 on the next opening — Sasi's chat became hers (P178–P181, P184). Unlink and the erase cascade (P182, P183) are not in this export** — `orb-app-v37-link.apk`. v36 is §7b73 (the hand-offs: **all worked as intended** on the operator's phone; the export showed `whatsapp` and `dial` released with channel only, the switch off and on, and no number). Design: `docs/PERSON_LINK_PHONE.md`; decision `DECISIONS.md` DR-29; limits `ARCHITECTURAL_DEBT.md` AD-24.
 
 **Why:** the operator saved a WhatsApp chat from Sasi, and *the chat doesn't mention Sasi*, so it was not in her context. A chat rarely names the person it is with; matching words cannot fix that.
 
