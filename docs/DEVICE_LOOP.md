@@ -6136,7 +6136,7 @@ Not done in v24 so as not to change the build mid-test; bundled with the next ch
 
 ### 7b60. Shared words are sealed and searchable — pending item 2 — 2026-10-01
 
-**Status: built, awaiting the device** — `orb-app-v25-sharedtext.apk`. v24 is §7b59 (verified).
+**Status: verified on the device through v26 — P98 and P103 shown in the exports; P99–P102 reported working by the operator (results in §7b61)** — `orb-app-v25-sharedtext.apk`. v24 is §7b59 (verified).
 The finding it closes: **words shared to Orb were written into the journal in the clear and could not be erased** (AD-12, first row). A text share now takes the
 same road as a remembered screen.
 
@@ -6185,7 +6185,7 @@ same road as a remembered screen.
 
 ### 7b61. Keeping erased words again — DR-17 — 2026-10-01
 
-**Status: built, awaiting the device** — `orb-app-v26-keepagain.apk`. **v26 includes everything in v25 (§7b60), whose predictions P98–P103 are still open** — install v26 over whatever is on the phone and the §7b60 protocol still applies.
+**Status: verified on the device — P104, P106, P108, P109 held; P105 (*Not now*) not shown in the exports (results at the end of this section)** — `orb-app-v26-keepagain.apk`. **v26 includes everything in v25 (§7b60), whose predictions P98–P103 are still open** — install v26 over whatever is on the phone and the §7b60 protocol still applies.
 The operator asked whether it is a problem that erased words can never be kept again. It is, when the person means it; the design is `docs/REKEEP.md`, the decision `DECISIONS.md` DR-17.
 
 #### What changed
@@ -6226,3 +6226,21 @@ The operator asked whether it is a problem that erased words can never be kept a
 4. Export; search the file for the word (it should not be there) and look at the last two shares. *(P105, P106)*
 5. Invoke Orb on a screen in an allowed app → **Remember** → in Recall **Erase** it → invoke Orb on the same screen → **Remember** → **Keep again**. *(P108)*
 6. Erase one kept-again item and share its text once more. *(P109)*
+
+
+#### Results (two exports, `orb-20261002-073856.txt` 308 events and `orb-20261002-074059.txt` 322 events — both `verifyLane`-clean; v26 = versionCode 29847852)
+
+The operator reported *"Working as intended"*. What the exports themselves show:
+
+| | What the exports show |
+| --- | --- |
+| **P98 (v25)** | Three text shares (129, 136, 14 characters) are `orb.shared` with `mimeType: text/plain`, **`references: ""`**, `textChars`, `resolveOutcome: stored`, one attachment of *textChars + 28* bytes (the sealed document's header) — **no words in any record**. |
+| **P103 (v25)** | No `grants.capability.*` event with `by` other than `operator` anywhere; v25's and v26's starts added nothing. |
+| **P104 / P106** | The 14-character share was erased (`orb.erasure`), and the same words then produced an `orb.shared` with **`rekept: true`, `resolveOutcome: stored`, same attachment identity, `causes` = [that erasure's id]**. The dialog itself leaves no trace; the re-keep can only follow a *Keep again* tap. |
+| **P108** | A Chrome capture (618 chars) was kept, then `held` (same text), both erased (two declarations); *Remember* on the same screen wrote `orb.assist.captureFailed` outcome `erased` (the first tap, as designed), then `orb.assist.captured` with **`rekept: true` and `causes` = both declarations**. |
+| **P109** | That item was erased again (a third declaration); *Remember* → refused → *Keep again* produced another `rekept` capture whose `causes` are **all three declarations**. An erasure is final until the person says otherwise, each time. |
+| **Observations** | The re-kept share and both re-kept captures were observed; the capture Observations carry `rekept: true`. |
+| **P105 (Not now)** | **Not shown.** Neither export has a share refused as `erased` after v26 — the Not-now tap was either not done or left no record. The code writes the refusal in all three Not-now paths (button, back, unanswered at exit) and the logic is tested off-phone, but the device has not confirmed it. |
+| **P99–P102, P107** | Recall search, *Where from?*, erase of shared text and the backup check leave no clear trace in an export; the operator's "working as intended" covers them, and nothing in the exports contradicts them. |
+
+**A small cost this showed:** a text share's sealed document adds 28 bytes of header, so `attachmentBytes` is not the text's size (`textChars` is the count). Harmless; stated so it is not mistaken for a defect.
