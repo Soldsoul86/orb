@@ -49,7 +49,7 @@ final class DocumentsRules {
         if (TOO_BIG.equals(reason)) return "Not read: the file is over 10 MB.";
         if (TOO_MANY_PAGES.equals(reason)) return "Not read: it has more than " + MAX_PAGES + " pages.";
         if (PASSWORD.equals(reason)) return "Not read: it is protected by a password.";
-        if (NO_TEXT.equals(reason)) return "No text found — probably a scan. Orb cannot keep this one.";
+        if (NO_TEXT.equals(reason)) return "No text found \u2014 probably a scan. Orb cannot keep this one.";
         return "Not read: this phone could not read this file's text.";
     }
 
@@ -136,7 +136,7 @@ final class DocumentsRules {
         StringBuilder kept = new StringBuilder(t.length());
         for (int i = 0; i < t.length(); i++) {
             char c = t.charAt(i);
-            if (c == '\n' || c == '\t' || (c >= ' ' && c != '\u007f' && !(c >= '\u0080' && c < ' '))) kept.append(c);
+            if (c == '\n' || c == '\t' || (c >= ' ' && c != '\u007f' && !(c >= '\u0080' && c < '\u00a0'))) kept.append(c);
         }
         StringBuilder out = new StringBuilder(kept.length());
         int blank = 0;
@@ -162,7 +162,7 @@ final class DocumentsRules {
         String cut = flat.substring(0, PREVIEW_CHARS);
         int space = cut.lastIndexOf(' ');
         if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);
-        return cut + "…";
+        return cut + "\u2026";
     }
 
     /** One line of the list: what the person sees, and whether it can be ticked. Holds no text beyond the preview. */
@@ -208,7 +208,7 @@ final class DocumentsRules {
     static String summary(int shown, int leftOut, int keepable) {
         StringBuilder out = new StringBuilder().append(shown).append(shown == 1 ? " PDF" : " PDFs").append(" in the folder");
         if (leftOut > 0) out.append(" (the newest ").append(shown).append(" shown; ").append(leftOut).append(" more not listed)");
-        out.append(" · ").append(keepable).append(" you can keep");
+        out.append(" \u00b7 ").append(keepable).append(" you can keep");
         return out.toString();
     }
 }

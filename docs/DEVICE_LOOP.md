@@ -7004,8 +7004,8 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 #### Checked before the device
 
-- The phone-side suite passes (1592 checks); brain, TypeScript, lint and type-check unchanged and clean.
-- **Mutation checks** on the listing and sort, the size/page/character limits, cleaning, previews, the state of a row, the look/keep path, the records, the grant/revoke/reconcile ordering and the screen's guards: @@MUT@@
+- The phone-side suite passes (1609 checks); brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the listing and sort, the size/page/character limits, cleaning, previews, the state of a row, the look/keep path, the records, the grant/revoke/reconcile ordering and the screen's guards: **72 deliberate breakages. 49 were caught at once; 21 survived or were not applicable the first time and became tests (the case-insensitive and address tie-breaks of the sort, the delete and old terminal control characters, a cut inside a word, the size limit applied again at keep, the phone's clock on the record, "counted as kept only if recorded", and the screen's and the access file's ordering and wording guards), then all were caught; 1 is equivalent and documented** (a reader that reports a reason has no text, so the cleaned text is empty and is skipped either way); one mutant did not compile and proves nothing. The phone-side suite is now 1609 checks.
 - **Not testable off the phone — this round is the real test:** Android's folder and file pickers, the persisted folder access, and above all **how well Android's reader gets text out of *your* PDFs**.
 
 #### Predictions

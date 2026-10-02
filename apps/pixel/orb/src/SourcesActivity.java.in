@@ -116,7 +116,7 @@ public final class SourcesActivity extends Activity {
         }
         list.addView(text("PDF files", 15, true));
         if (!DocumentsAccess.granted(this)) {
-            list.addView(text("Orb can read the PDFs you point it at — invoices, tickets, letters — so that what is in them can be found, "
+            list.addView(text("Orb can read the PDFs you point it at \u2014 invoices, tickets, letters \u2014 so that what is in them can be found, "
                 + "mentioned with the right person and turned into dates and commitments. It reads only when you tap, shows you the first words of "
                 + "each file, and keeps only the ones you tick. It keeps the words, not the file. Nothing is kept about the ones you do not tick.", 13, false));
             list.addView(text("This needs no Android permission: you name the folder or the files, and Android gives Orb only those.", 12, false));
@@ -220,7 +220,7 @@ public final class SourcesActivity extends Activity {
     private void lookInFolder(Uri folder) {
         if (results == null) return;
         results.removeAllViews();
-        results.addView(text("Looking in the folder…", 13, false));
+        results.addView(text("Looking in the folder\u2026", 13, false));
         final Uri tree = folder;
         looking = true;
         new Thread(new Runnable() {
@@ -240,7 +240,7 @@ public final class SourcesActivity extends Activity {
         looking = true;
         results.removeAllViews();
         shown.clear();
-        summary = text("Looking at " + docs.size() + (docs.size() == 1 ? " file…" : " files…"), 13, true);
+        summary = text("Looking at " + docs.size() + (docs.size() == 1 ? " file\u2026" : " files\u2026"), 13, true);
         results.addView(summary);
         if (docs.isEmpty()) {
             summary.setText("No PDF files found here.");
@@ -252,7 +252,7 @@ public final class SourcesActivity extends Activity {
             CheckBox box = new CheckBox(this);
             box.setText(label(doc));
             box.setEnabled(false);
-            TextView status = text("Reading…", 12, false);
+            TextView status = text("Reading\u2026", 12, false);
             results.addView(box);
             results.addView(status);
             shown.add(new RowView(doc, box, status));
@@ -305,7 +305,7 @@ public final class SourcesActivity extends Activity {
 
     private String label(DocumentsRules.Doc doc) {
         String when = doc.modified > 0 ? new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(new Date(doc.modified)) : "date unknown";
-        return (doc.name.isEmpty() ? "(unnamed PDF)" : doc.name) + "\n" + when + " · " + Recall.sizeLabel(doc.size);
+        return (doc.name.isEmpty() ? "(unnamed PDF)" : doc.name) + "\n" + when + " \u00b7 " + Recall.sizeLabel(doc.size);
     }
 
     private void keepTicked() {

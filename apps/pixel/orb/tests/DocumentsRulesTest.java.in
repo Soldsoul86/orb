@@ -68,6 +68,11 @@ final class DocumentsRulesTest {
         List<DocumentsRules.Doc> mixed = Arrays.asList(pdf("old", 100L), doc("photo.jpg", "image/jpeg", 5L, 900L), pdf("new", 300L), pdf("mid", 200L));
         Harness.equal("PDFs only, newest first", names(DocumentsRules.listed(mixed)), Arrays.asList("new", "mid", "old"));
         Harness.equal("the same date: by name, whatever the case", names(DocumentsRules.listed(Arrays.asList(pdf("b", 5L), pdf("A", 5L), pdf("c", 5L)))), Arrays.asList("A", "b", "c"));
+        Harness.equal("the same date: a before B, whatever the case", names(DocumentsRules.listed(Arrays.asList(pdf("B", 5L), pdf("a", 5L)))), Arrays.asList("a", "B"));
+        DocumentsRules.Doc twinOne = new DocumentsRules.Doc("content://one", "same.pdf", "application/pdf", 1L, 5L);
+        DocumentsRules.Doc twinTwo = new DocumentsRules.Doc("content://two", "same.pdf", "application/pdf", 1L, 5L);
+        Harness.check("the same name and date: by address, whatever the order given", DocumentsRules.listed(Arrays.asList(twinTwo, twinOne)).get(0) == twinOne
+            && DocumentsRules.listed(Arrays.asList(twinOne, twinTwo)).get(0) == twinOne);
         Harness.equal("an unknown date sorts last", names(DocumentsRules.listed(Arrays.asList(pdf("undated", 0L), pdf("dated", 50L)))), Arrays.asList("dated", "undated"));
         List<DocumentsRules.Doc> many = new ArrayList<>();
         for (int i = 0; i < 45; i++) many.add(pdf("f" + (100 + i), 1000L + i));
@@ -98,6 +103,8 @@ final class DocumentsRulesTest {
         Harness.equal("blank lines are at most one", DocumentsRules.clean("a\n\n\n\n\nb"), "a\n\nb");
         Harness.equal("spaces round a line go", DocumentsRules.clean("  a  \n   b   "), "a\nb");
         Harness.equal("the whole is trimmed", DocumentsRules.clean("\n\n  hello  \n\n"), "hello");
+        Harness.equal("the delete character goes", DocumentsRules.clean("a\u007fb"), "ab");
+        Harness.equal("so do the old terminal controls", DocumentsRules.clean("a\u0085b\u009fc\u00a0d"), "abc\u00a0d");
         Harness.equal("null is nothing", DocumentsRules.clean(null), "");
         StringBuilder big = new StringBuilder();
         for (int i = 0; i < DocumentsRules.MAX_TEXT_CHARS + 500; i++) big.append('x');
@@ -110,6 +117,10 @@ final class DocumentsRulesTest {
         for (int i = 0; i < 80; i++) words.append("word").append(i).append(' ');
         String long1 = DocumentsRules.preview(words.toString());
         Harness.check("long text is cut at a word and marked", long1.endsWith("…") && long1.length() <= DocumentsRules.PREVIEW_CHARS + 1 && !long1.substring(0, long1.length() - 1).endsWith(" ") && long1.contains("word0 word1"));
+        StringBuilder mid = new StringBuilder();
+        for (int i = 0; i < 230; i++) mid.append('a');
+        Harness.equal("a cut that would land inside a word falls back to the last space", DocumentsRules.preview(mid + " " + new String(new char[40]).replace('\0', 'b')), mid + "\u2026");
+        Harness.equal("one unbroken run is cut at the limit", DocumentsRules.preview(new String(new char[300]).replace('\0', 'a')), new String(new char[DocumentsRules.PREVIEW_CHARS]).replace('\0', 'a') + "\u2026");
         Harness.check("exactly the limit is shown whole", DocumentsRules.preview(new String(new char[DocumentsRules.PREVIEW_CHARS]).replace('\0', 'a')).length() == DocumentsRules.PREVIEW_CHARS);
         Harness.check("one more is cut", DocumentsRules.preview(new String(new char[DocumentsRules.PREVIEW_CHARS + 1]).replace('\0', 'a')).endsWith("…"));
 
@@ -197,6 +208,7 @@ final class DocumentsRulesTest {
         for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) share = line;
         Harness.check("it says where it came from", share.contains("\"referrer\":\"orb-source://documents\"") && share.contains("\"action\":\"orb.source.documents\"") && share.contains("\"mimeType\":\"application/pdf\""));
         Harness.check("it says how many characters, and that it is resolved and sealed", share.contains("\"textChars\":" + DocumentsRules.clean(secret).length()) && share.contains("\"resolved\":true"));
+        Harness.check("it carries the phone's clock like any share", share.contains("\"elapsedRealtimeMs\":4242"));
         Harness.check("it holds no word of the document and no file name", !share.contains("Arun") && !share.contains("4471") && !share.contains("invoice"));
         Harness.check("the journal as a whole holds none either", !String.join("\n", journal.readLines()).contains("18250") && !String.join("\n", journal.readLines()).contains("Arun"));
         Harness.check("the words are not on the disk in the clear", !onDisk(context.getFilesDir(), "Arun".getBytes(StandardCharsets.UTF_8)));
@@ -204,6 +216,12 @@ final class DocumentsRulesTest {
         Attachments.Stored again = Attachments.store(context, new java.io.ByteArrayInputStream(SharedText.document(DocumentsRules.clean(secret))));
         Harness.equal("the sealed words are the cleaned text", again.outcome, "held");
         Harness.equal("a look now says already in Orb", DocumentsFlow.inspect(context, invoice, reader).state, DocumentsRules.HELD);
+
+        reader.asked.clear();
+        reader.by.put("huge.pdf", DocumentsRules.Reading.text("this should never be kept", 1));
+        Harness.equal("a ticked file over the size limit is not read and not kept", DocumentsFlow.keep(context, journal, Arrays.asList(doc("huge.pdf", "application/pdf", DocumentsRules.MAX_BYTES + 1, 1L)), reader, 1L), 0);
+        Harness.check("the reader was never asked for it", reader.asked.isEmpty());
+        Harness.equal("the file was not sealed", Attachments.counts(context)[0], 1L);
 
         Harness.suite("a second keep adds nothing");
         Harness.equal("kept again: nothing new", DocumentsFlow.keep(context, journal, Arrays.asList(invoice), reader, 1L), 0);
@@ -297,6 +315,11 @@ final class DocumentsRulesTest {
         for (int at = screen.indexOf("journal.append("); at >= 0; at = screen.indexOf("journal.append(", at + 1)) appends++;
         Harness.check("its only journal writes are the look and the keep", appends == 2 && screen.contains("journal.append(DocumentsFacts.LOOKED, DocumentsFacts.looked(found, unreadable))")
             && screen.contains("journal.append(DocumentsFacts.KEPT, DocumentsFacts.kept(kept))"));
+        Harness.check("a document is counted as kept only when its record was written", source.get("DocumentsFlow").contains("stored, null) != null) kept++;"));
+        Harness.check("a look says which rows can be ticked, and counts the readable and the unreadable",
+            screen.contains("view.box.setEnabled(row.keepable());") && screen.contains("if (row.keepable()) keepable++;") && screen.contains("if (DocumentsRules.UNREADABLE.equals(row.state)) unreadable++;"));
+        Harness.check("no files found is said, and recorded as a look of none", screen.contains("if (docs.isEmpty()) {") && screen.contains("No PDF files found here.") && screen.contains("recordLook(0, 0);"));
+        Harness.check("files just picked are looked at once, by the next drawing", screen.contains("lookPicked = true;") && screen.contains("lookPicked = false;"));
         Harness.check("only ticked, enabled rows are kept", screen.contains("v.box.isEnabled() && v.box.isChecked()") && screen.contains("DocumentsFlow.keep(SourcesActivity.this, journal, ticked, reader"));
         Harness.check("the look is recorded once per look, not per row", screen.split("recordLook\\(", -1).length - 1 == 3);
         Harness.check("the screen says it keeps words and not the file", screen.contains("Only the words are kept, sealed on this phone; the PDF is not copied."));
@@ -307,6 +330,10 @@ final class DocumentsRulesTest {
         Harness.check("the grant is recorded before the flag", grant.indexOf("record(journal, PackageGrants.GRANTED") > 0 && grant.indexOf("record(journal, PackageGrants.GRANTED") < grant.indexOf("\"rws\""));
         Harness.check("a revocation removes the flag, then lets the folder go, then says so",
             revoke.indexOf("FLAG).delete()") > 0 && revoke.indexOf("FLAG).delete()") < revoke.indexOf("release(context, folder)") && revoke.indexOf("release(context, folder)") < revoke.indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("turning on twice records once", grant.contains("if (granted(context)) return;"));
+        Harness.check("choosing a folder says so, counts only, and lets the earlier folder go",
+            access.contains("journal.append(DocumentsFacts.CHOSEN, DocumentsFacts.chosen())") && access.contains("if (previous != null && !previous.equals(tree.toString())) release(context, previous);"));
+        Harness.check("an empty folder address is no folder", access.contains("return uri.isEmpty() ? null : uri;"));
         Harness.check("a folder is persisted for reading only", access.contains("takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)") && !access.contains("FLAG_GRANT_WRITE_URI_PERMISSION"));
         Harness.check("after a restore, a grant the phone does not exercise is recorded as withdrawn", access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.DOCUMENTS)") && access.substring(reconcileAt).contains("granted(context)) return;"));
         Harness.check("the grant record names no folder", !access.substring(access.indexOf("private static void record(")).contains("folder"));
