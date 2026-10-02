@@ -6461,3 +6461,8 @@ The operator reported *"All 5 done"*.
 | **P105 — Not now** | **Held.** A text was kept (85 characters) and erased; the **same text shared again** was recorded as an `orb.shared` with `resolveOutcome: "erased"` and **no `rekept`** — and it is not kept. |
 | **P92 — restore refused** | **Consistent, not proved by an export:** no `orb.restored` and no change to the journal after the attempt. That the message was shown is on the operator's word. |
 | **P120 — Cancel on the card** | **Not shown.** There is **no `orb.action.cancelled`**, and the only `orb.action.intent` since 09:40 is the one that was confirmed. An intent is written when the **review card** appears, so Cancel on *that* card would have left an intent and a cancellation; Cancel on the earlier *"Remind you when?"* dialog (before the card) writes nothing by design — nothing has been asked of the gate yet. The operator did not say which was tapped; the card path is tested off the phone and **not yet confirmed on the device.** |
+
+
+#### P120 — the card's Cancel (`orb-20261002-100143.txt`, 389 events, `verifyLane`-clean)
+
+**Held.** At 10:01:37 `orb.action.intent` citing the kept item (written when the review card appeared) and, two seconds later, `orb.action.cancelled` (`reason: declined`) citing that intent — and no `confirmed` for it. The earlier export had no such pair because the operator's first Cancel was on the *"Remind you when?"* dialog, which writes nothing by design. **All five close-out checks are now held on the device.**
