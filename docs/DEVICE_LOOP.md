@@ -6666,7 +6666,7 @@ On the operator's phone: **2537 contacts**. The operator shared five invented te
 
 ### 7b71. Remind me about a person — B4, the first action on someone (DR-26) — 2026-10-02
 
-**Status: partly verified — P157 seen (screenshots: the button beside *Close*, also on *Might be* people); the export of v35 shows the flow from a person worked up to confirming (P158, P159: an `orb.action.intent` with no cause, a confirmation citing only the intent, a 38-byte sealed note, no name in the file); that the notification fired, the lock-screen wording (P160) and the erase-another-note case (P161) are not in an export** — `orb-app-v34-person.apk`. v33 is §7b70. Design: `docs/PERSON_ACTION_PHONE.md`; decision `DECISIONS.md` DR-26; limits `ARCHITECTURAL_DEBT.md` AD-22.
+**Status: partly verified — P157 seen (screenshots: the button beside *Close*, also on *Might be* people); the export of v35 shows the flow from a person worked up to confirming (P158, P159: an `orb.action.intent` with no cause, a confirmation citing only the intent, a 38-byte sealed note, no name in the file); **the notification fired — the operator: "Reminder fired" (P160, on the operator's word; the lock-screen wording was not reported)**; the erase-another-note case (P161) is not in an export** — `orb-app-v34-person.apk`. v33 is §7b70. Design: `docs/PERSON_ACTION_PHONE.md`; decision `DECISIONS.md` DR-26; limits `ARCHITECTURAL_DEBT.md` AD-22.
 
 #### What changed
 
