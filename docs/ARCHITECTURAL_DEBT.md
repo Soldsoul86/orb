@@ -722,6 +722,20 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-27 — what the Safety check does not know
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-32). Debts, stated.
+
+1. **A blind spot, by design.** Without `QUERY_ALL_PACKAGES` Orb sees apps that have a launcher icon or a powerful service (accessibility, notification access, keyboard, device admin) — not every package. An app with none of these and a risky permission is not seen. The screen says so every time; it is the price of not being blocked by Play Protect.
+2. **Heuristics, not detection.** The rules say what an app **can do**, not what it **intends**. A genuine accessibility tool and a stalkerware app look the same to it. It will flag legitimate apps (a password manager, a screen reader) and will miss malware that asks for nothing unusual. No reputation database, because that needs the network.
+3. **The added `<queries>` entries may themselves meet Play Protect.** Three intent filters were added to the manifest; the device is the test (`DEVICE_LOOP.md` §7b77, P204).
+4. **"Outside a known app store" is a short list** (Play, Galaxy, Amazon, Xiaomi, F-Droid). A store not on it reads as sideloaded.
+5. **Settings can be unreadable.** If Android refuses a read (screen lock, USB debugging, patch date), Orb does not claim the setting is bad.
+6. **Findings are not remembered.** *I know this app* is not built, so a legitimate flagged app appears at every check.
+7. **One-time.** No background re-check; the grants watch is the only thing that notices a later change.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

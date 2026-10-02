@@ -99,6 +99,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.APPSEC)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.APPSEC);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+            }
+            final boolean checkOn = known;
+            b.setText(checkOn ? "Revoke the safety check" : "Allow the safety check (opens it)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (checkOn) {
+                        SafetyAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, SafetyActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Reminders.CAPABILITY)) {
             final boolean on = Reminders.enabled(lines);
             b.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");

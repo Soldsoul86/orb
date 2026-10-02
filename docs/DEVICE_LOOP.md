@@ -6935,3 +6935,48 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 7. **What Orb may do**: read the hand-off line. *(P202)*
 8. **Export and share journal**. *(P203)*
 
+
+### 7b77. The Safety check — what else on this phone can see too much (DR-32) — 2026-10-02
+
+**Status: built, awaiting the device.** `orb-app-v41-safety.apk`. v40 is §7b76 (verified). Design: `docs/SAFETY_CHECK_PHONE.md`; decision `DECISIONS.md` DR-32; limits `ARCHITECTURAL_DEBT.md` AD-27.
+
+**Why:** your flow starts here — before Orb holds your commitments, people and messages, it should look at what else on the phone can read your screen, your notifications or your messages, and tell you plainly. It cannot *certify* a phone (nothing on a phone can see everything), so it **says what matched, what it cannot see, and never says "safe"**.
+
+#### What changed
+
+1. **First open of Orb after install shows the Safety check once**: what it will look at, that it stays on the phone, that it keeps only counts, and two buttons — **Check my phone** and **Not now**. **Nothing is read before you tap.** *Not now* is remembered (it does not nag); the check is always one tap away on the main screen (**Safety check**).
+2. **The result**: a line *Checked (date) · N to look at now · M worth a look* (or *nothing here matches these rules*), then **Look at these now** and **Worth a look** — each row one plain sentence (*"(App): Reads your screen and can tap for you, and it came from outside a known app store."*) with **Open its settings**, which opens **that app's own settings page** so **you** revoke or uninstall. For the phone itself (no screen lock, USB debugging, a security update older than six months) it opens the phone's security settings.
+3. **A permanent line says what it cannot see**: apps without a launcher icon or a powerful service are not visible to it (Orb does not ask for the all-apps permission — Play Protect blocked that earlier).
+4. **What Orb may do** gains a new line, **What the apps on your phone may do** (observe, switchable): ON after you tap *Check my phone*, with a **Revoke the safety check** control.
+5. **Orb never uninstalls, revokes or changes anything**, and **keeps only counts** (apps looked at, how many flagged) — **never an app's name**.
+
+#### Checked before the device
+
+- The phone-side suite (Java) passes — rules, boundaries, records, first-run, and the source guards (one reader of other apps' permissions; no write APIs; rules are pure; secure window; one `startActivity`; the grant is recorded **before** anything is read; only two journal writes). Brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the rule table, the boundaries, the sideload test, the skip rules, the sort, the summary words, the records, first-run, grant-before-read, the secure flag and the registry status: **58 deliberate breakages, 56 caught by the tests at once; 8 survived the first round and became guards (the grant call, one count per run, the cannot-see line, the keyboard and granted-permission conditions, USB debugging), then were caught; 2 are equivalent and documented** (a missing installer reads as not-in-a-store either way; the marker file's name is arbitrary).
+- **Not testable off the phone:** what Android actually reports for *your* apps (installer, permissions, services), whether `<queries>` shows the apps you expect, and whether Play Protect lets the install through.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P204** | **Installing v41 over v40 is not blocked or flagged by Play Protect**, and Orb opens | the three new `<queries>` entries tripped it — **say what Play Protect said** |
+| **P205** | **Opening Orb the first time** shows the Safety check **offer** (what it will look at, stays on the phone, only counts kept, what it cannot see) with **Check my phone** and **Not now**; **nothing is listed yet** | the offer or the order is wrong |
+| **P206** | **Not now** closes it; **reopening Orb does not show it again**; **Safety check** on the main screen still opens it | it nags, or the button is missing |
+| **P207** | **Check my phone** shows a result line *Checked … · N to look at now · M worth a look*, then rows with **plain sentences and reasons**, never the words *safe* or *certified* | the wording or the result is wrong |
+| **P208** | **The rows are about apps you know**: apps with accessibility or notification access (e.g. a screen reader, a password manager, a launcher, a VPN) appear under **Look at these now**; an app that reads texts or calls appears under **Worth a look** — **tell me any row that is wrong or any app you expected that is missing** | a rule is mis-set, or the visibility is too narrow |
+| **P209** | **Open its settings** on a row opens **that app's own settings page** (and for *This phone* the phone's security settings); **nothing is changed by Orb** | the wrong page opens, or something changed |
+| **P210** | **The "what Orb cannot see" line** is on the result | the blind spot is hidden |
+| **P211** | **What Orb may do** shows **What the apps on your phone may do — ON**, with a count line; **Revoke the safety check** turns it **OFF**, and opening **Safety check** again shows the offer | the capability is missing or revoke is ignored |
+| **P212** | **Export and share journal**: **one `orb.safety.checked` per run** (`apps`, `now`, `review` as numbers) and `orb.safety.deferred` if you chose *Not now* — **no app name, package or permission anywhere in the file** | something about an app was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v41-safety.apk` over v40. *(P204 — if Android or Play Protect warns, take a screenshot and stop.)*
+2. Open Orb. The Safety check offer should appear by itself. Read it. *(P205)*
+3. Tap **Not now**. Open Orb again — it should not reappear — then tap **Safety check** on the main screen. *(P206)*
+4. Tap **Check my phone**. Read the result line and every row. *(P207, P208, P210)*
+5. On two rows tap **Open its settings**, look, go back, **change nothing**. *(P209)*
+6. **What Orb may do**: find the new line; **Revoke the safety check**; open **Safety check** again; **Check my phone** once more. *(P211)*
+7. **Export and share journal**. *(P212)*
+8. Tell me: **which rows were wrong, which apps you expected but did not see, and how many rows felt like noise.**

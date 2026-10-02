@@ -1,0 +1,188 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+/**
+ * The Safety check (`docs/SAFETY_CHECK_PHONE.md`, DR-32): what other apps on this phone may do, and a few settings of the phone — in plain
+ * sentences, with a button that opens an app's own settings page. **It opens once by itself, the first time Orb is opened, and reads nothing
+ * until the person taps *Check my phone*.** It never says *safe* or *certified*; it says what matched and what it cannot see. It uninstalls and
+ * revokes nothing itself. **Counts only are recorded** (`SafetyFacts`); the findings are computed, shown and let go. Secure like Recall,
+ * because what is installed on a phone describes a life.
+ */
+public final class SafetyActivity extends Activity {
+    private LinearLayout list;
+    /** The check is recorded once per run, not per redraw. */
+    private boolean recorded;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setTextSize(size);
+        t.setPadding(0, 8, 0, 8);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setText(s);
+        return t;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("Safety check", 17, true));
+        final Journal journal = journal();
+        if (journal == null) {
+            list.addView(text("journal unavailable", 13, false));
+            return;
+        }
+        if (!SafetyAccess.granted(this)) {
+            offer(journal);
+            return;
+        }
+        list.addView(text("Looking at what is on this phone…", 13, false));
+        final android.content.Context context = this;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final AppSecurityReader.Snapshot snapshot = AppSecurityReader.read(context);
+                final SafetyRules.Result result = SafetyRules.check(snapshot.apps, snapshot.phone, getPackageName());
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { show(journal, result); }
+                });
+            }
+        }).start();
+    }
+
+    /** Before any reading: what it will look at, that it stays on the phone, and two buttons. */
+    private void offer(final Journal journal) {
+        list.addView(text("Orb is about to hold your commitments, your people and what you share. If another app on this phone can read your screen, "
+            + "your notifications or your messages, none of that is private. So the first thing Orb can do is look at what else is on the phone.", 14, false));
+        list.addView(text("It looks at the apps it can see — their names, where they came from and what they are allowed to do — and a few settings of the phone "
+            + "(a screen lock, USB debugging, how old the security update is). It stays on this phone. Orb keeps only how many apps it looked at and how many it "
+            + "flagged, never their names. It will not uninstall or change anything: it shows you, and opens the app's own settings so you can.", 13, false));
+        list.addView(text(SafetyRules.CANNOT_SEE, 12, false));
+        Button check = new Button(this);
+        check.setText("Check my phone");
+        check.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                try {
+                    SafetyAccess.grant(SafetyActivity.this, journal);
+                } catch (IOException notRecorded) {
+                    new AlertDialog.Builder(SafetyActivity.this).setMessage("Orb could not record this, so it checked nothing.").setPositiveButton("OK", null).show();
+                    return;
+                }
+                render();
+            }
+        });
+        list.addView(check);
+        Button later = new Button(this);
+        later.setText("Not now");
+        later.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                journal.append(SafetyFacts.DEFERRED, SafetyFacts.deferred());
+                finish();
+            }
+        });
+        list.addView(later);
+    }
+
+    private void show(Journal journal, SafetyRules.Result result) {
+        list.removeAllViews();
+        list.addView(text("Safety check", 17, true));
+        if (!recorded) {
+            recorded = true;
+            // The check happened: said, with counts only — never an app, a package or a permission.
+            journal.append(SafetyFacts.CHECKED, SafetyFacts.checked(result.apps, result.now, result.review));
+        }
+        list.addView(text(SafetyRules.summary(result, new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(new Date())), 13, true));
+        list.addView(text(result.apps + " apps looked at.", 12, false));
+        addSection("Look at these now", SafetyRules.NOW, result);
+        addSection("Worth a look", SafetyRules.REVIEW, result);
+        if (result.now == 0 && result.review == 0) list.addView(text("Nothing here matches these rules.", 14, false));
+        list.addView(text(SafetyRules.CANNOT_SEE, 12, false));
+        Button again = new Button(this);
+        again.setText("Check again");
+        again.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                recorded = false;
+                render();
+            }
+        });
+        list.addView(again);
+    }
+
+    private void addSection(String title, String level, SafetyRules.Result result) {
+        boolean any = false;
+        for (SafetyRules.Finding f : result.findings) {
+            if (!f.level.equals(level)) continue;
+            if (!any) {
+                list.addView(text(title, 15, true));
+                any = true;
+            }
+            list.addView(row(f));
+        }
+    }
+
+    private View row(final SafetyRules.Finding f) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, 12, 0, 12);
+        row.addView(text(f.sentence(), 14, true));
+        for (SafetyRules.Reason reason : f.reasons) row.addView(text("• " + reason.text + ". " + reason.why, 12, false));
+        Button open = new Button(this);
+        open.setText(f.pkg == null ? "Open the phone's settings" : "Open its settings");
+        open.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { openSettings(f); }
+        });
+        row.addView(open);
+        return row;
+    }
+
+    /** Opens the app's own settings page (to revoke a permission or uninstall), or the phone's security settings — **the person does the rest**. */
+    private void openSettings(SafetyRules.Finding f) {
+        Intent intent = f.pkg == null
+            ? new Intent(Settings.ACTION_SECURITY_SETTINGS)
+            : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", f.pkg, null));
+        try {
+            startActivity(intent);
+        } catch (RuntimeException noSettings) {
+            new AlertDialog.Builder(this).setMessage("Orb could not open that settings page. Open Settings on the phone and look for the app there.")
+                .setPositiveButton("OK", null).show();
+        }
+    }
+}

@@ -64,6 +64,8 @@ final class Capabilities {
     static final String SCREEN = "orb.read.screen";
     static final String GRANTS = "orb.read.grants";
     static final String CONTACTS = "orb.read.contacts";
+    static final String APPSEC = "orb.read.appsecurity";
+    static final long APPSEC_VERSION = 1L;
 
     static final String PACKAGES_SAYS =
         "Reads which launcher apps, UPI-payment apps and device-admin apps are installed — about a hundred and fifty names. "
@@ -80,6 +82,12 @@ final class Capabilities {
     static final String CONTACTS_SAYS =
         "Reads the names, phone numbers and email addresses in your contacts — only while the People screen is open, only on the phone. "
         + "Nothing is kept, nothing leaves the phone, and nothing is written to your contacts. It needs your grant here and Android's own permission.";
+
+    static final String APPSEC_SAYS =
+        "Reads, for the apps Orb can see on your phone \u2014 those with a launcher icon and those with powerful services such as accessibility, "
+        + "notification access, a keyboard or device admin \u2014 their name, where they were installed from and which permissions they hold; and a few "
+        + "settings of the phone itself (screen lock, USB debugging, security-update date). Only when you run the Safety check, only on the phone. "
+        + "Only counts are kept; nothing leaves the phone.";
 
     /** The declarations, in the order the screen shows them. */
     static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -100,6 +108,10 @@ final class Capabilities {
             "your grant — a recorded decision — and Android's own permission",
             Arrays.asList(ContactsFacts.READ), "Revoke contacts access", true,
             Arrays.asList("ContactsReader", "ContactsAccess", "PeopleActivity")),
+        new Declaration(APPSEC, APPSEC_VERSION, "What the apps on your phone may do", APPSEC_SAYS, TIER_OBSERVE,
+            "your grant \u2014 a recorded decision \u2014 and your running the check", Arrays.asList(SafetyFacts.CHECKED),
+            "Revoke the safety check", true,
+            Arrays.asList("AppSecurityReader", "SafetyAccess", "SafetyActivity")),
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
@@ -118,7 +130,8 @@ final class Capabilities {
     static final List<String> READ_APIS = Collections.unmodifiableList(Arrays.asList(
         "getInstalledPackages", "getInstalledApplications", "queryIntentActivities", "queryBroadcastReceivers", "queryIntentServices",
         "getActiveAdmins", "Settings.Secure", "enabled_notification_listeners", "AssistStructure", "ViewNode",
-        "onHandleScreenshot", "takeScreenshot", "ContactsContract", "READ_CONTACTS"));
+        "onHandleScreenshot", "takeScreenshot", "ContactsContract", "READ_CONTACTS",
+        "getInstallSourceInfo", "requestedPermissions", "isDeviceSecure", "ADB_ENABLED", "ENABLED_INPUT_METHODS"));
 
     /** Reads Orb does not have. They appear nowhere in the source until a capability declares them. */
     static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
@@ -212,6 +225,20 @@ final class Capabilities {
             String released = lastOfType(lines, HandoffFacts.RELEASED);
             String state = Handoff.enabled(lines) ? "ON — every tap is confirmed" : "OFF — you turned it off";
             return new Status(state, wallClock(released), released == null ? "none opened yet" : opened + " opened — Orb sent nothing");
+        }
+        if (APPSEC.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, APPSEC);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String checked = lastOfType(lines, SafetyFacts.CHECKED);
+            long apps = number(checked, "apps");
+            long now = number(checked, "now");
+            long review = number(checked, "review");
+            String detail = checked == null ? "never run" : apps + " apps looked at, " + now + " to look at now, " + review + " worth a look";
+            return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(checked), detail);
         }
         if (GRANTS.equals(id)) {
             String observed = lastOfType(lines, "grants.observed");

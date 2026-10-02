@@ -70,6 +70,20 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
         <!--
+          The Safety check (docs/SAFETY_CHECK_PHONE.md): the apps that provide the powerful services it looks for. These
+          name *kinds of service*, never an app, and are not QUERY_ALL_PACKAGES (which Play Protect blocked on this phone,
+          DEVICE_LOOP.md section 7b38). With the launcher query above they are the whole set the check can see.
+        -->
+        <intent>
+            <action android:name="android.accessibilityservice.AccessibilityService" />
+        </intent>
+        <intent>
+            <action android:name="android.service.notification.NotificationListenerService" />
+        </intent>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+        <!--
           Which apps on this phone handle a UPI payment link. Not a list of installed apps: only
           those that answer upi://pay become visible, and Orb uses them for one thing, to refuse
           to remember from a payments app whatever it is called (DR-14 ruling 1). Every UPI app,
@@ -112,6 +126,11 @@
 
         <activity
             android:name=".PeopleActivity"
+            android:exported="false" />
+
+        <!-- The Safety check: what other apps on the phone may do. Not exported; secure like Recall. -->
+        <activity
+            android:name=".SafetyActivity"
             android:exported="false" />
 
         <!-- Today: what matters now. Not exported; secure like Recall. -->

@@ -34,9 +34,9 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("six capabilities, each declared once and frozen");
+        Harness.suite("seven capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.remind.local", "orb.handoff.communicate"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
@@ -57,6 +57,10 @@ final class CapabilitiesTest {
         Harness.check("the hand-off is Act (reversible), switchable, and says it sends nothing and keeps no number",
             Capabilities.byId(Handoff.CAPABILITY).tier.equals("Act (reversible)") && Capabilities.byId(Handoff.CAPABILITY).switchable
             && Handoff.DECLARATION.contains("Orb sends nothing, calls no one and reads nothing") && Handoff.DECLARATION.contains("never the number or the words") && Handoff.DECLARATION.contains("whether a draft was used"));
+        Harness.equal("the safety check's words are pinned", pin(Capabilities.APPSEC_SAYS), "sha256:474082bc372eaab851b44f88a19fe3347c9f1d778dfa3397e071a3a56c73515e");
+        Harness.check("the safety check is Observe and switchable, and says only counts are kept and nothing leaves the phone",
+            Capabilities.byId(Capabilities.APPSEC).tier.equals("Observe") && Capabilities.byId(Capabilities.APPSEC).switchable
+            && Capabilities.APPSEC_SAYS.contains("Only counts are kept; nothing leaves the phone"));
         Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
             && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",
@@ -117,6 +121,17 @@ final class CapabilitiesTest {
         journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.contacts"));
         Harness.check("revoked: off", Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF"));
 
+        Capabilities.Status appsecNever = Capabilities.status(Capabilities.APPSEC, journal.readLines());
+        Harness.check("the safety check never granted: off, never run", appsecNever.state.startsWith("OFF") && appsecNever.lastAtMs < 0 && appsecNever.lastDetail.equals("never run"));
+        journal.append(PackageGrants.GRANTED, pkg(PackageGrants.GRANTED, "orb.read.appsecurity"));
+        Harness.check("granted: on, and the other grants are not disturbed", Capabilities.status(Capabilities.APPSEC, journal.readLines()).state.startsWith("ON")
+            && Capabilities.status(Capabilities.CONTACTS, journal.readLines()).state.startsWith("OFF") && Capabilities.status(Capabilities.PACKAGES, journal.readLines()).state.startsWith("OFF"));
+        journal.append(SafetyFacts.CHECKED, SafetyFacts.checked(210L, 2L, 5L));
+        Capabilities.Status appsecUsed = Capabilities.status(Capabilities.APPSEC, journal.readLines());
+        Harness.check("a run: when, and counts only — no app", appsecUsed.lastAtMs > 0 && appsecUsed.lastDetail.equals("210 apps looked at, 2 to look at now, 5 worth a look"));
+        journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.appsecurity"));
+        Harness.check("revoked: off", Capabilities.status(Capabilities.APPSEC, journal.readLines()).state.startsWith("OFF"));
+
         Capabilities.Status handoffNever = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
         Harness.check("the hand-off is on, every tap confirmed, and none opened yet", handoffNever.state.startsWith("ON") && handoffNever.lastAtMs < 0 && handoffNever.lastDetail.equals("none opened yet"));
         journal.append(HandoffFacts.RELEASED, HandoffFacts.released("whatsapp", false));
@@ -163,6 +178,11 @@ final class CapabilitiesTest {
         for (String api : Capabilities.UNDECLARED_READS) {
             List<String> users = new ArrayList<>();
             for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains(api)) users.add(e.getKey());
+            // `SafetyRules` is a table that *names* permissions to judge (`READ_SMS`…) — it reads nothing: no Android class at all.
+            if (users.contains("SafetyRules")) {
+                Harness.check("SafetyRules only names " + api + " in its table: it imports no Android class", !source.get("SafetyRules").contains("import android."));
+                users.remove("SafetyRules");
+            }
             Harness.check(api + " is read nowhere — no capability declares it " + users, users.isEmpty());
         }
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");

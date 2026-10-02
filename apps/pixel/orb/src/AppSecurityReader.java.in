@@ -1,0 +1,130 @@
+package @PKG@;
+
+import android.app.KeyguardManager;
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.InstallSourceInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.provider.Settings;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The one file that reads **what other apps hold** — their names, where they were installed from and which permissions they have — and the
+ * few settings of the phone the Safety check judges (`docs/SAFETY_CHECK_PHONE.md`, DR-32; capability `orb.read.appsecurity`). Read-only and in
+ * memory: it keeps nothing, writes nothing and logs nothing, and it **names no app**.
+ *
+ * **It does not use `QUERY_ALL_PACKAGES`.** Play Protect blocked Orb for that permission (`DEVICE_LOOP.md` §7b38). It sees what an ordinary
+ * app may see through the `<queries>` the manifest declares: apps with a launcher icon, and apps that provide the powerful services the
+ * rules look for. **An app with no icon and none of those services is invisible** — the screen says so (`SafetyRules.CANNOT_SEE`).
+ */
+final class AppSecurityReader {
+    private AppSecurityReader() {}
+
+    /** What one read found. */
+    static final class Snapshot {
+        final List<SafetyRules.App> apps = new ArrayList<>();
+        SafetyRules.Phone phone;
+    }
+
+    /** The package part of `package/Component` strings: the packages that hold a service or an admin. */
+    private static Set<String> packagesOf(List<String> components) {
+        Set<String> out = new HashSet<>();
+        if (components == null) return out;
+        for (String c : components) {
+            int slash = c.indexOf('/');
+            if (slash > 0) out.add(c.substring(0, slash));
+        }
+        return out;
+    }
+
+    /** The enabled keyboards (`pkg/Class:pkg/Class`) as a set of packages. */
+    private static Set<String> keyboards(Context context) {
+        try {
+            return packagesOf(Grants.split(Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ENABLED_INPUT_METHODS)));
+        } catch (Throwable unreadable) {
+            return new HashSet<>();
+        }
+    }
+
+    /** Reads the visible apps and the phone's settings once. Never throws; a part that cannot be read is simply left out. */
+    static Snapshot read(Context context) {
+        Snapshot s = new Snapshot();
+        PackageManager pm = context.getPackageManager();
+        Map<String, List<String>> grants = GrantReader.read(context);
+        Set<String> accessibility = packagesOf(grants.get("accessibility"));
+        Set<String> listeners = packagesOf(grants.get("notificationListener"));
+        Set<String> admins = packagesOf(grants.get("deviceAdmin"));
+        Set<String> imes = keyboards(context);
+        List<PackageInfo> installed;
+        try {
+            installed = pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS));
+        } catch (Throwable unreadable) {
+            installed = new ArrayList<>();
+        }
+        for (PackageInfo info : installed) {
+            if (info.applicationInfo == null) continue;
+            boolean system = (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            String installer = null;
+            try {
+                InstallSourceInfo source = pm.getInstallSourceInfo(info.packageName);
+                installer = source.getInstallingPackageName();
+            } catch (Throwable unknown) {
+                installer = null;
+            }
+            CharSequence label = null;
+            try {
+                label = info.applicationInfo.loadLabel(pm);
+            } catch (Throwable noLabel) {
+                label = null;
+            }
+            SafetyRules.App app = new SafetyRules.App(info.packageName, label == null || label.length() == 0 ? info.packageName : label.toString(), system, installer);
+            if (info.requestedPermissions != null) {
+                for (int i = 0; i < info.requestedPermissions.length; i++) {
+                    app.requested.add(info.requestedPermissions[i]);
+                    int flags = info.requestedPermissionsFlags != null && i < info.requestedPermissionsFlags.length ? info.requestedPermissionsFlags[i] : 0;
+                    if ((flags & PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0) app.granted.add(info.requestedPermissions[i]);
+                }
+            }
+            app.accessibility = accessibility.contains(info.packageName);
+            app.notificationListener = listeners.contains(info.packageName);
+            app.deviceAdmin = admins.contains(info.packageName);
+            app.keyboard = !system && imes.contains(info.packageName);
+            s.apps.add(app);
+        }
+        s.phone = phone(context);
+        return s;
+    }
+
+    /** The phone's own settings: a screen lock, USB debugging, and how old the security update is. */
+    private static SafetyRules.Phone phone(Context context) {
+        boolean lock = true;
+        try {
+            KeyguardManager keyguard = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+            if (keyguard != null) lock = keyguard.isDeviceSecure();
+        } catch (Throwable unknown) {
+            lock = true;   // cannot tell: not claimed
+        }
+        boolean adb = false;
+        try {
+            ContentResolver resolver = context.getContentResolver();
+            adb = Settings.Global.getInt(resolver, Settings.Global.ADB_ENABLED, 0) == 1;
+        } catch (Throwable unknown) {
+            adb = false;
+        }
+        int age = -1;
+        try {
+            String patch = Build.VERSION.SECURITY_PATCH;
+            if (patch != null && patch.matches("\\d{4}-\\d{2}-\\d{2}")) age = Commitments.daysBetween(patch, CommitmentFlow.today());
+        } catch (Throwable unknown) {
+            age = -1;
+        }
+        return new SafetyRules.Phone(lock, adb, age);
+    }
+}

@@ -1,0 +1,63 @@
+package @PKG@;
+
+import android.content.Context;
+import android.os.SystemClock;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.Map;
+
+/**
+ * Whether Orb may run the Safety check — a **recorded decision of the person's**, the same shape as `ContactsAccess`
+ * (`docs/SAFETY_CHECK_PHONE.md`, DR-32). There is no Android permission to ask: the check sees what an ordinary app may. The
+ * grant is an event, the flag follows it, a revocation removes the flag and then says so, and the history is made to agree with
+ * the phone after a restore.
+ *
+ * **Nothing here reads an app.** `AppSecurityReader` does, only after this says yes; the grant is not a copy of anything.
+ */
+final class SafetyAccess {
+    private SafetyAccess() {}
+
+    private static final String FILE = "safety-access.granted";
+
+    static boolean granted(Context context) {
+        return new File(context.getFilesDir(), FILE).exists();
+    }
+
+    /** Event first, then the flag: a crash in between leaves a grant on record that the device does not yet exercise — the harmless direction. */
+    static void grant(Context context, Journal journal) throws IOException {
+        if (granted(context)) return;
+        record(journal, PackageGrants.GRANTED, "operator");
+        try (RandomAccessFile out = new RandomAccessFile(new File(context.getFilesDir(), FILE), "rws")) {
+            out.write(new byte[] {1});
+            out.getFD().sync();
+        }
+    }
+
+    /** Flag first, then the event: stop reading, then say so — a crash in between fails toward not reading. */
+    static void revoke(Context context, Journal journal) {
+        new File(context.getFilesDir(), FILE).delete();
+        record(journal, PackageGrants.REVOKED, "operator");
+    }
+
+    /** A restore brings the journal back and grants nothing: if it says *granted* and the flag is absent, record the revocation. */
+    static void reconcile(Context context, Journal journal) {
+        if (journal == null || granted(context)) return;
+        try {
+            if (PackageGrants.lastIsGrant(journal.readLines(), Capabilities.APPSEC)) record(journal, PackageGrants.REVOKED, "reconcile");
+        } catch (IOException unreadable) {
+            // Cannot read the history, so cannot say what it claims. Write nothing.
+        }
+    }
+
+    private static void record(Journal journal, String type, String by) {
+        if (journal == null) return;
+        Map<String, Object> payload = Json.obj();
+        payload.put("capability", Capabilities.APPSEC);
+        payload.put("tier", Capabilities.TIER_OBSERVE);
+        payload.put("scope", "the apps Orb can see, what they may do and where they came from, read only when the Safety check runs");
+        payload.put("by", by);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(type, payload);
+    }
+}

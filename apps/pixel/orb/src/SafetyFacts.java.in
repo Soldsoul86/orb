@@ -1,0 +1,44 @@
+package @PKG@;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * The records of the Safety check — built here and nowhere else (`docs/SAFETY_CHECK_PHONE.md`, DR-32). **Counts only**: how many apps were
+ * looked at, how many findings of each level. **Never an app's name, a package, a permission or anything an app holds** — the findings are
+ * computed and shown, never stored, because *what is installed on a phone* describes a life.
+ */
+final class SafetyFacts {
+    private SafetyFacts() {}
+
+    static final String CHECKED = "orb.safety.checked";
+    static final String DEFERRED = "orb.safety.deferred";
+
+    /** One check: how many apps were looked at, and how many findings need a look now / are worth a look. */
+    static Map<String, Object> checked(long apps, long now, long review) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.APPSEC);
+        p.put("version", Capabilities.APPSEC_VERSION);
+        p.put("apps", apps);
+        p.put("now", now);
+        p.put("review", review);
+        return p;
+    }
+
+    /** The person chose *Not now* at the first offer. */
+    static Map<String, Object> deferred() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.APPSEC);
+        p.put("version", Capabilities.APPSEC_VERSION);
+        return p;
+    }
+
+    /** Is this the first time Orb is opened — no check run and no *Not now* said? Then it offers the check once. */
+    static boolean firstRun(List<String> lines) {
+        for (String line : lines) {
+            String type = Journal.typeOf(line);
+            if (type != null && type.startsWith("orb.safety.")) return false;
+        }
+        return true;
+    }
+}

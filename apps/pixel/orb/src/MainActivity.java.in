@@ -66,6 +66,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(backupButton);
 
+        // SAFETY_CHECK_PHONE.md: what other apps on this phone may do. Opens by itself once, the first time; never reads before a tap.
+        Button safety = new Button(this);
+        safety.setText("Safety check");
+        safety.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, SafetyActivity.class)); }
+        });
+        root.addView(safety);
+
         // COMMITMENTS_PHONE.md: what you owe and what you are waiting for, and where each stands.
         Button today = new Button(this);
         today.setText("Today");
@@ -163,6 +171,17 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(root);
         setContentView(scroll);
+        // The first time Orb is opened after an install, the Safety check offers itself once (never before, and not again after
+        // *Not now* or a check). Nothing is read until the person taps (`docs/SAFETY_CHECK_PHONE.md`).
+        if (state == null) {
+            Orb orb = Orb.get();
+            Journal journal = orb == null ? null : orb.journal();
+            try {
+                if (journal != null && SafetyFacts.firstRun(journal.readLines())) startActivity(new Intent(this, SafetyActivity.class));
+            } catch (java.io.IOException unreadable) {
+                // The history cannot say whether this is the first time, so nothing is offered on a guess.
+            }
+        }
     }
 
     /**

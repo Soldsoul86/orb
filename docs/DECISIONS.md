@@ -1311,6 +1311,18 @@ box — **where they are the app's by design, like the number**.
 **Not in this ruling:** a model writing or answering messages (its own decision about what leaves the phone, DR-9); other languages; a *last nudged* mark; scheduling a nudge; any automatic send.
 
 
+## DR-32 — The Safety check: what else on this phone can see too much, said plainly, never certified
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with stage 1", then "Yes, go ahead with the design" on `SAFETY_CHECK_PHONE.md`) · **Bears on:** DR-22 (the registry), DR-9 (nothing leaves the phone)
+
+**The ruling.** Orb offers **one** check of the phone, **once, at first open** (*Check my phone* / *Not now*; nothing is read before the tap), and always from a *Safety check* button. A **deterministic table of rules** (no model, no reputation database, no network) turns each app Orb can see — name, installer, permissions held, powerful services switched on — and a few settings of the phone (screen lock, USB debugging, age of the security update) into **plain sentences at two levels**: *Look at these now* and *Worth a look*. Each finding offers **the app's own settings page**; **Orb never uninstalls, revokes or changes anything**. It **never says *safe* or *certified***: a clean result reads *nothing here matches these rules*, and the screen always says what it cannot see.
+
+**A new declared capability, `orb.read.appsecurity` v1** (Observe, switchable, words pinned in the registry). **No `QUERY_ALL_PACKAGES`**: Play Protect refused it on the device (`DEVICE_LOOP.md` §7b38), so apps are seen through intent `<queries>` (launcher icon, accessibility, notification-listener and keyboard services) and the grants watch's reads — **with the blind spot stated on the screen**. A source guard holds that **one file** (`AppSecurityReader`) reads another app's permissions and install source.
+
+**Records.** `orb.safety.checked` (apps looked at, how many *Now*, how many *Worth a look*) once per run, and `orb.safety.deferred` for *Not now*. **Counts only: never an app, a package, a label or a permission.** What the check found is **computed and shown, never stored** (DR-19): *what is installed on a phone* describes a life. The first-run offer happens once — *any* `orb.safety.*` record in the journal ends it.
+
+**Not in this ruling:** a malware or reputation database (needs the network); scanning APK files; Wi‑Fi, Bluetooth, NFC and keys; remembering *"I know this app"*; background re-checks; a score.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

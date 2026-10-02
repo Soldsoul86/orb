@@ -1,0 +1,252 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+/**
+ * The Safety check's rules (`docs/SAFETY_CHECK_PHONE.md`, DR-32) — **the whole of the logic, as a table, and nothing else**. Pure and
+ * deterministic: the apps and the phone's settings go in, findings come out. **No model, no database, no network.**
+ *
+ * Orb **cannot tell a harmful app from a legitimate one that holds a powerful permission** — so it never says *safe* or *certified*. A
+ * finding says what an app **can do**, in a plain sentence, and why that matters; a clean result says *nothing here matches these rules* and is
+ * always followed by what the check cannot see (`CANNOT_SEE`).
+ */
+final class SafetyRules {
+    private SafetyRules() {}
+
+    static final String NOW = "now";
+    static final String REVIEW = "review";
+
+    // ---- the permissions the rules read
+
+    static final String READ_SMS = "android.permission.READ_SMS";
+    static final String RECEIVE_SMS = "android.permission.RECEIVE_SMS";
+    static final String READ_CALL_LOG = "android.permission.READ_CALL_LOG";
+    static final String BACKGROUND_LOCATION = "android.permission.ACCESS_BACKGROUND_LOCATION";
+    static final String ALL_FILES = "android.permission.MANAGE_EXTERNAL_STORAGE";
+    static final String OVERLAY = "android.permission.SYSTEM_ALERT_WINDOW";
+    static final String INSTALL_APPS = "android.permission.REQUEST_INSTALL_PACKAGES";
+
+    /** The installers Orb calls a known app store. Anything else — a file manager, a browser, a computer, nothing — is *outside*. */
+    static final Set<String> STORES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+        "com.android.vending",            // Google Play
+        "com.sec.android.app.samsungapps", // Samsung Galaxy Store
+        "com.amazon.venezia",             // Amazon Appstore
+        "com.xiaomi.mipicks",             // Xiaomi GetApps
+        "org.fdroid.fdroid")));           // F-Droid
+
+    /** A reason an app is flagged: the sentence, and why it matters. */
+    static final class Reason {
+        final String id;
+        final String text;
+        final String why;
+        final String level;
+
+        Reason(String id, String level, String text, String why) {
+            this.id = id;
+            this.level = level;
+            this.text = text;
+            this.why = why;
+        }
+    }
+
+    static final Reason ACCESSIBILITY_OVERLAY = new Reason("accessibilityOverlay", NOW, "Reads your screen, can tap for you, and can draw over other apps",
+        "That is how fake login screens and screen-reading malware work: it sees what you see, taps for you, and can cover what you are really looking at.");
+    static final Reason SMS_NOTIFICATIONS = new Reason("smsNotifications", NOW, "Reads your text messages and all your notifications",
+        "One-time codes and bank alerts arrive in both. An app that reads both can see them before you do.");
+    static final Reason ACCESSIBILITY = new Reason("accessibility", NOW, "Reads your screen and can tap for you",
+        "An accessibility service sees everything on screen and can act on it. Real accessibility tools need it; little else should.");
+    static final Reason NOTIFICATIONS = new Reason("notifications", NOW, "Reads all your notifications, including one-time codes",
+        "Every message, every code, every alert passes through it.");
+    static final Reason ADMIN = new Reason("admin", NOW, "Can lock or wipe this phone",
+        "A device administrator can lock the phone, change its password or erase it, and is hard to remove.");
+    static final Reason SMS = new Reason("sms", REVIEW, "Reads your text messages",
+        "Texts carry one-time codes, bank messages and private conversations.");
+    static final Reason CALL_LOG = new Reason("callLog", REVIEW, "Reads your call history",
+        "Who you call, when, and for how long.");
+    static final Reason BACKGROUND_LOC = new Reason("backgroundLocation", REVIEW, "Can see where you are when it is closed",
+        "It can follow you through the day without being open.");
+    static final Reason FILES = new Reason("allFiles", REVIEW, "Asks to see every file on the phone",
+        "Documents, photos and downloads, beyond what an app normally needs.");
+    static final Reason OVERLAY_ONLY = new Reason("overlay", REVIEW, "Can draw over other apps",
+        "Used for chat bubbles and screen filters — and for covering a real screen with a fake one.");
+    static final Reason INSTALLER = new Reason("installer", REVIEW, "Can install other apps, and came from outside a known app store",
+        "An app that can install others, from an unknown source, can bring in anything.");
+    static final Reason KEYBOARD = new Reason("keyboard", REVIEW, "A keyboard that is not Android's own",
+        "A keyboard sees every word you type, including passwords.");
+
+    static final Reason NO_LOCK = new Reason("noLock", NOW, "This phone has no screen lock",
+        "Anyone who picks it up can open everything, including Orb.");
+    static final Reason USB_DEBUGGING = new Reason("usbDebugging", REVIEW, "USB debugging is on",
+        "A computer plugged into this phone can read and change it.");
+    static final Reason OLD_PATCH = new Reason("oldPatch", REVIEW, "The phone's security update is more than six months old",
+        "Known weaknesses stay open until the phone is updated.");
+
+    /** Days after which a security update is called old. */
+    static final int OLD_PATCH_DAYS = 183;
+
+    /** What the check cannot see — always shown, clean result or not. */
+    static final String CANNOT_SEE =
+        "What this check cannot see: apps with no launcher icon and none of the powerful services above; what an app actually does with what it holds; "
+        + "and anything that changed after the check. It cannot tell a harmful app from a legitimate one that holds a powerful permission, so "
+        + "“nothing here matches these rules” is not “safe”.";
+
+    // ---- what goes in
+
+    /** An app as the reader found it. `system` apps are Android's own and are not judged. */
+    static final class App {
+        final String pkg;
+        final String label;
+        final boolean system;
+        /** The installing package, or null if unknown. */
+        final String installer;
+        final Set<String> granted = new HashSet<>();
+        final Set<String> requested = new HashSet<>();
+        boolean accessibility;
+        boolean notificationListener;
+        boolean deviceAdmin;
+        boolean keyboard;
+
+        App(String pkg, String label, boolean system, String installer) {
+            this.pkg = pkg;
+            this.label = label;
+            this.system = system;
+            this.installer = installer;
+        }
+    }
+
+    /** The phone's own settings. `patchAgeDays` is -1 when unknown. */
+    static final class Phone {
+        final boolean screenLock;
+        final boolean usbDebugging;
+        final int patchAgeDays;
+
+        Phone(boolean screenLock, boolean usbDebugging, int patchAgeDays) {
+            this.screenLock = screenLock;
+            this.usbDebugging = usbDebugging;
+            this.patchAgeDays = patchAgeDays;
+        }
+    }
+
+    // ---- what comes out
+
+    /** One thing to look at: an app (or the phone), why, and how it was installed. */
+    static final class Finding {
+        final String level;
+        /** The package to open the settings of, or null for the phone itself. */
+        final String pkg;
+        final String label;
+        final List<Reason> reasons = new ArrayList<>();
+        /** The app came from outside a known app store (shown with a *Now* finding). */
+        final boolean outsideStore;
+
+        Finding(String level, String pkg, String label, boolean outsideStore) {
+            this.level = level;
+            this.pkg = pkg;
+            this.label = label;
+            this.outsideStore = outsideStore;
+        }
+
+        /** The one sentence. */
+        String sentence() {
+            if (pkg == null) return reasons.get(0).text + ".";
+            return label + ": " + reasons.get(0).text.substring(0, 1).toLowerCase(Locale.ROOT) + reasons.get(0).text.substring(1)
+                + (outsideStore && NOW.equals(level) ? ", and it came from outside a known app store" : "") + ".";
+        }
+    }
+
+    static final class Result {
+        final List<Finding> findings = new ArrayList<>();
+        /** How many apps were looked at (all that were seen, Android's own included). */
+        int apps;
+        int now;
+        int review;
+    }
+
+    static boolean outside(String installer) {
+        return installer == null || !STORES.contains(installer);
+    }
+
+    private static boolean has(Set<String> set, String... names) {
+        for (String n : names) if (set.contains(n)) return true;
+        return false;
+    }
+
+    /** The findings for one app, or null if it matches no rule. */
+    static Finding appFinding(App a) {
+        boolean sms = has(a.granted, READ_SMS, RECEIVE_SMS);
+        boolean overlay = a.requested.contains(OVERLAY);
+        List<Reason> reasons = new ArrayList<>();
+        // The strongest first; a combination replaces the parts it contains.
+        if (a.accessibility && overlay) reasons.add(ACCESSIBILITY_OVERLAY);
+        else if (a.accessibility) reasons.add(ACCESSIBILITY);
+        if (sms && a.notificationListener) reasons.add(SMS_NOTIFICATIONS);
+        else if (a.notificationListener) reasons.add(NOTIFICATIONS);
+        if (a.deviceAdmin) reasons.add(ADMIN);
+        boolean now = !reasons.isEmpty();
+        if (sms && !(a.notificationListener)) reasons.add(SMS);
+        if (a.granted.contains(READ_CALL_LOG)) reasons.add(CALL_LOG);
+        if (a.granted.contains(BACKGROUND_LOCATION)) reasons.add(BACKGROUND_LOC);
+        if (a.requested.contains(ALL_FILES)) reasons.add(FILES);
+        if (overlay && !a.accessibility) reasons.add(OVERLAY_ONLY);
+        boolean outside = outside(a.installer);
+        if (a.requested.contains(INSTALL_APPS) && outside) reasons.add(INSTALLER);
+        if (a.keyboard) reasons.add(KEYBOARD);
+        if (reasons.isEmpty()) return null;
+        Finding f = new Finding(now ? NOW : REVIEW, a.pkg, a.label, outside);
+        f.reasons.addAll(reasons);
+        return f;
+    }
+
+    /** The whole check. `ownPackage` is Orb itself, never flagged. */
+    static Result check(List<App> apps, Phone phone, String ownPackage) {
+        Result r = new Result();
+        r.apps = apps.size();
+        for (App a : apps) {
+            if (a.system || a.pkg.equals(ownPackage)) continue;
+            Finding f = appFinding(a);
+            if (f != null) r.findings.add(f);
+        }
+        if (phone != null) {
+            if (!phone.screenLock) {
+                Finding f = new Finding(NOW, null, "This phone", false);
+                f.reasons.add(NO_LOCK);
+                r.findings.add(f);
+            }
+            List<Reason> weaker = new ArrayList<>();
+            if (phone.usbDebugging) weaker.add(USB_DEBUGGING);
+            if (phone.patchAgeDays > OLD_PATCH_DAYS) weaker.add(OLD_PATCH);
+            if (!weaker.isEmpty()) {
+                Finding f = new Finding(REVIEW, null, "This phone", false);
+                f.reasons.addAll(weaker);
+                r.findings.add(f);
+            }
+        }
+        Collections.sort(r.findings, new Comparator<Finding>() {
+            @Override public int compare(Finding a, Finding b) {
+                int level = (NOW.equals(a.level) ? 0 : 1) - (NOW.equals(b.level) ? 0 : 1);
+                return level != 0 ? level : a.label.compareToIgnoreCase(b.label);
+            }
+        });
+        for (Finding f : r.findings) {
+            if (NOW.equals(f.level)) r.now++;
+            else r.review++;
+        }
+        return r;
+    }
+
+    /** *Checked 2 Oct 2026 · 2 to look at now · 5 worth a look* — never *safe*, never *certified*. */
+    static String summary(Result r, String when) {
+        if (r.now == 0 && r.review == 0) return "Checked " + when + " · nothing here matches these rules";
+        StringBuilder out = new StringBuilder("Checked ").append(when);
+        if (r.now > 0) out.append(" · ").append(r.now).append(" to look at now");
+        if (r.review > 0) out.append(" · ").append(r.review).append(" worth a look");
+        return out.toString();
+    }
+}

@@ -1,0 +1,245 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * The Safety check (`docs/SAFETY_CHECK_PHONE.md`, DR-32): every rule in the table and its boundaries, the combinations, the wording that
+ * never says *safe*, the records that carry counts only, the first-run offer, and the source guards that keep the reading in one file.
+ */
+final class SafetyRulesTest {
+    private SafetyRulesTest() {}
+
+    private static SafetyRules.App app(String label, String installer, String... flags) {
+        SafetyRules.App a = new SafetyRules.App("pkg." + label.toLowerCase().replace(' ', '.'), label, false, installer);
+        for (String f : flags) {
+            if (f.equals("acc")) a.accessibility = true;
+            else if (f.equals("nl")) a.notificationListener = true;
+            else if (f.equals("admin")) a.deviceAdmin = true;
+            else if (f.equals("kbd")) a.keyboard = true;
+            else if (f.startsWith("g:")) a.granted.add(f.substring(2));
+            else if (f.startsWith("r:")) a.requested.add(f.substring(2));
+        }
+        return a;
+    }
+
+    private static final String PLAY = "com.android.vending";
+
+    private static SafetyRules.Finding one(SafetyRules.App a) {
+        return SafetyRules.appFinding(a);
+    }
+
+    private static List<String> ids(SafetyRules.Finding f) {
+        List<String> out = new ArrayList<>();
+        for (SafetyRules.Reason r : f.reasons) out.add(r.id);
+        return out;
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the powerful abilities: each one, and the combinations that replace their parts");
+        Harness.equal("an accessibility service reads your screen", ids(one(app("Acme", PLAY, "acc"))), Arrays.asList("accessibility"));
+        Harness.equal("it is a *now* finding", one(app("Acme", PLAY, "acc")).level, SafetyRules.NOW);
+        Harness.equal("accessibility and overlay are one finding, not two", ids(one(app("Acme", PLAY, "acc", "r:" + SafetyRules.OVERLAY))), Arrays.asList("accessibilityOverlay"));
+        Harness.equal("a notification listener", ids(one(app("Acme", PLAY, "nl"))), Arrays.asList("notifications"));
+        Harness.equal("a notification listener and SMS read are one finding", ids(one(app("Acme", PLAY, "nl", "g:" + SafetyRules.READ_SMS))), Arrays.asList("smsNotifications"));
+        Harness.equal("receiving SMS counts as reading it", ids(one(app("Acme", PLAY, "nl", "g:" + SafetyRules.RECEIVE_SMS))), Arrays.asList("smsNotifications"));
+        Harness.equal("a device administrator", ids(one(app("Acme", PLAY, "admin"))), Arrays.asList("admin"));
+        Harness.equal("two abilities, two reasons, in order, in one finding", ids(one(app("Acme", PLAY, "acc", "nl", "admin"))), Arrays.asList("accessibility", "notifications", "admin"));
+        Harness.equal("an ability with a weaker permission: the weaker is added to the same finding", ids(one(app("Acme", PLAY, "acc", "g:" + SafetyRules.READ_CALL_LOG))), Arrays.asList("accessibility", "callLog"));
+
+        Harness.suite("the weaker ones: only what is held, and only if held");
+        Harness.equal("texts, granted", ids(one(app("Acme", PLAY, "g:" + SafetyRules.READ_SMS))), Arrays.asList("sms"));
+        Harness.check("texts, only requested: nothing", one(app("Acme", PLAY, "r:" + SafetyRules.READ_SMS)) == null);
+        Harness.equal("call history, granted", ids(one(app("Acme", PLAY, "g:" + SafetyRules.READ_CALL_LOG))), Arrays.asList("callLog"));
+        Harness.check("call history, not granted: nothing", one(app("Acme", PLAY, "r:" + SafetyRules.READ_CALL_LOG)) == null);
+        Harness.equal("background location, granted", ids(one(app("Acme", PLAY, "g:" + SafetyRules.BACKGROUND_LOCATION))), Arrays.asList("backgroundLocation"));
+        Harness.check("background location, not granted: nothing", one(app("Acme", PLAY, "r:" + SafetyRules.BACKGROUND_LOCATION)) == null);
+        Harness.equal("every file, asked for", ids(one(app("Acme", PLAY, "r:" + SafetyRules.ALL_FILES))), Arrays.asList("allFiles"));
+        Harness.equal("overlay alone", ids(one(app("Acme", PLAY, "r:" + SafetyRules.OVERLAY))), Arrays.asList("overlay"));
+        Harness.equal("a keyboard", ids(one(app("Acme", PLAY, "kbd"))), Arrays.asList("keyboard"));
+        Harness.equal("a weaker finding is *review*", one(app("Acme", PLAY, "kbd")).level, SafetyRules.REVIEW);
+        Harness.check("an app that holds nothing powerful: no finding", one(app("Acme", PLAY, "g:android.permission.CAMERA")) == null);
+        Harness.equal("several weaker ones are one finding", ids(one(app("Acme", PLAY, "g:" + SafetyRules.READ_SMS, "g:" + SafetyRules.READ_CALL_LOG, "r:" + SafetyRules.ALL_FILES))), Arrays.asList("sms", "callLog", "allFiles"));
+
+        Harness.suite("where it came from");
+        Harness.equal("install-other-apps from outside a store is flagged", ids(one(app("Acme", null, "r:" + SafetyRules.INSTALL_APPS))), Arrays.asList("installer"));
+        Harness.check("from Play it is not", one(app("Acme", PLAY, "r:" + SafetyRules.INSTALL_APPS)) == null);
+        for (String store : Arrays.asList("com.android.vending", "com.sec.android.app.samsungapps", "com.amazon.venezia", "com.xiaomi.mipicks", "org.fdroid.fdroid")) {
+            Harness.check(store + " is a known app store", !SafetyRules.outside(store));
+        }
+        Harness.check("a file manager, a browser, the package installer, and no installer at all are outside",
+            SafetyRules.outside("com.google.android.packageinstaller") && SafetyRules.outside("com.android.chrome") && SafetyRules.outside("com.example.files") && SafetyRules.outside(null));
+        SafetyRules.Finding sideloaded = one(app("Acme", null, "acc"));
+        Harness.check("a powerful app from outside a store says so in the sentence", sideloaded.outsideStore && sideloaded.sentence().equals("Acme: reads your screen and can tap for you, and it came from outside a known app store."));
+        Harness.equal("from a store the sentence does not", one(app("Acme", PLAY, "acc")).sentence(), "Acme: reads your screen and can tap for you.");
+        Harness.equal("outside a store alone is no finding: many good apps are sideloaded", one(app("Acme", null, "g:android.permission.CAMERA")), null);
+        Harness.equal("a weaker finding from outside a store does not claim it", one(app("Acme", null, "kbd")).sentence(), "Acme: a keyboard that is not Android's own.");
+
+        Harness.suite("whose apps are judged");
+        List<SafetyRules.App> apps = new ArrayList<>();
+        apps.add(new SafetyRules.App("android.system", "Android System", true, null));
+        apps.get(0).accessibility = true;
+        apps.add(app("Orb", PLAY, "acc", "nl"));
+        SafetyRules.App orb = apps.get(1);
+        apps.add(app("Zed", PLAY, "kbd"));
+        apps.add(app("Alpha", PLAY, "acc"));
+        apps.add(app("Beta", PLAY, "nl"));
+        apps.add(app("alpha two", PLAY, "kbd"));
+        apps.add(app("Quiet", PLAY));
+        SafetyRules.Result r = SafetyRules.check(apps, null, orb.pkg);
+        Harness.equal("Android's own and Orb itself are never flagged", r.findings.size(), 4);
+        Harness.equal("all seen apps are counted as looked at", r.apps, 7);
+        List<String> order = new ArrayList<>();
+        for (SafetyRules.Finding f : r.findings) order.add(f.level + ":" + f.label);
+        Harness.equal("now before review; by name within a level, whatever the case", order, Arrays.asList("now:Alpha", "now:Beta", "review:alpha two", "review:Zed"));
+        Harness.check("the counts", r.now == 2 && r.review == 2);
+
+        Harness.suite("the phone itself");
+        SafetyRules.Result bare = SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(false, false, 10), "orb");
+        Harness.check("no screen lock is a *now* finding about the phone, not an app", bare.findings.size() == 1 && bare.findings.get(0).pkg == null && bare.findings.get(0).level.equals(SafetyRules.NOW)
+            && bare.findings.get(0).sentence().equals("This phone has no screen lock."));
+        Harness.check("USB debugging is a *review* finding", SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, true, 10), "orb").findings.get(0).reasons.get(0).id.equals("usbDebugging"));
+        Harness.check("a security update 183 days old is not old; 184 is", SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, false, 183), "orb").findings.isEmpty()
+            && SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, false, 184), "orb").findings.get(0).reasons.get(0).id.equals("oldPatch"));
+        Harness.check("an unknown date (-1) is not claimed", SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, false, -1), "orb").findings.isEmpty());
+        SafetyRules.Result both = SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, true, 300), "orb");
+        Harness.check("USB debugging and an old update are one finding with two reasons", both.findings.size() == 1 && both.findings.get(0).reasons.size() == 2);
+        Harness.check("a phone with nothing to flag has no finding, and none at all if the settings could not be read", SafetyRules.check(new ArrayList<SafetyRules.App>(), new SafetyRules.Phone(true, false, 30), "orb").findings.isEmpty()
+            && SafetyRules.check(new ArrayList<SafetyRules.App>(), null, "orb").findings.isEmpty());
+
+        Harness.suite("what it says — never *safe*, never *certified*");
+        Harness.equal("nothing matched", SafetyRules.summary(SafetyRules.check(new ArrayList<SafetyRules.App>(), null, "orb"), "2 Oct 2026"), "Checked 2 Oct 2026 · nothing here matches these rules");
+        Harness.equal("both levels", SafetyRules.summary(r, "2 Oct 2026"), "Checked 2 Oct 2026 · 2 to look at now · 2 worth a look");
+        List<SafetyRules.App> onlyNow = new ArrayList<>();
+        onlyNow.add(app("A", PLAY, "acc"));
+        Harness.equal("only the urgent", SafetyRules.summary(SafetyRules.check(onlyNow, null, "orb"), "d"), "Checked d · 1 to look at now");
+        List<SafetyRules.App> onlyWeak = new ArrayList<>();
+        onlyWeak.add(app("A", PLAY, "kbd"));
+        Harness.equal("only the weaker", SafetyRules.summary(SafetyRules.check(onlyWeak, null, "orb"), "d"), "Checked d · 1 worth a look");
+        StringBuilder spoken = new StringBuilder();
+        for (SafetyRules.Reason reason : Arrays.asList(SafetyRules.ACCESSIBILITY_OVERLAY, SafetyRules.SMS_NOTIFICATIONS, SafetyRules.ACCESSIBILITY, SafetyRules.NOTIFICATIONS, SafetyRules.ADMIN, SafetyRules.SMS,
+            SafetyRules.CALL_LOG, SafetyRules.BACKGROUND_LOC, SafetyRules.FILES, SafetyRules.OVERLAY_ONLY, SafetyRules.INSTALLER, SafetyRules.KEYBOARD, SafetyRules.NO_LOCK, SafetyRules.USB_DEBUGGING, SafetyRules.OLD_PATCH)) {
+            spoken.append(reason.text).append(' ').append(reason.why).append(' ');
+        }
+        spoken.append(SafetyRules.summary(r, "d")).append(SafetyRules.summary(bare, "d"));
+        String lowered = spoken.toString().toLowerCase();
+        Harness.check("no finding, reason or summary says safe, secure, clean, certified, malicious or virus", !lowered.contains("safe") && !lowered.contains("secure") && !lowered.contains("clean")
+            && !lowered.contains("certif") && !lowered.contains("malicious") && !lowered.contains("virus"));
+        Harness.check("what the check cannot see is always said: hidden apps, what an app does, what changed, harmful versus legitimate — and that a clean result is not safe",
+            SafetyRules.CANNOT_SEE.contains("no launcher icon") && SafetyRules.CANNOT_SEE.contains("what an app actually does") && SafetyRules.CANNOT_SEE.contains("changed after the check")
+            && SafetyRules.CANNOT_SEE.contains("cannot tell a harmful app from a legitimate one") && SafetyRules.CANNOT_SEE.contains("is not “safe”"));
+        Harness.check("deterministic", SafetyRules.summary(SafetyRules.check(apps, null, orb.pkg), "d").equals(SafetyRules.summary(SafetyRules.check(apps, null, orb.pkg), "d")));
+
+        Harness.suite("the record: counts only, and when the offer comes");
+        Harness.equal("a check's fields", new java.util.TreeSet<>(SafetyFacts.checked(210L, 2L, 5L).keySet()).toString(), "[apps, capability, now, review, version]");
+        Harness.equal("a *not now*'s fields", new java.util.TreeSet<>(SafetyFacts.deferred().keySet()).toString(), "[capability, version]");
+        Harness.check("they carry the capability and its version", SafetyFacts.checked(1L, 0L, 0L).get("capability").equals("orb.read.appsecurity") && SafetyFacts.checked(1L, 0L, 0L).get("version").equals(1L));
+        Install.forget();
+        java.io.File dir = Files.createTempDirectory("orb-safety").toFile();
+        android.content.Context context = new android.content.Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.check("a fresh install is the first run", SafetyFacts.firstRun(journal.readLines()));
+        journal.append("orb.shared", new TreeMap<String, Object>());
+        Harness.check("other events do not end it", SafetyFacts.firstRun(journal.readLines()));
+        journal.append(SafetyFacts.DEFERRED, SafetyFacts.deferred());
+        Harness.check("*Not now* ends it: the offer does not come again", !SafetyFacts.firstRun(journal.readLines()));
+        Install.forget();
+        java.io.File dir2 = Files.createTempDirectory("orb-safety2").toFile();
+        android.content.Context context2 = new android.content.Context(dir2);
+        Journal other = Journal.open(context2, Install.lane(context2), Install.id(context2));
+        other.append(SafetyFacts.CHECKED, SafetyFacts.checked(10L, 0L, 0L));
+        Harness.check("so does a check", !SafetyFacts.firstRun(other.readLines()));
+        Harness.check("and no app, package or permission is in the journal", !String.join("\n", other.readLines()).contains("pkg.") && !String.join("\n", other.readLines()).contains("permission"));
+
+        guard();
+    }
+
+    /** The reading is in one file, it only reads, it names no app in a record, and the screen only opens settings. */
+    private static void guard() throws Exception {
+        Harness.suite("one file reads what other apps hold; nothing keeps it; the screen only opens settings");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String api : Arrays.asList("getInstallSourceInfo", "requestedPermissions", "isDeviceSecure", "ADB_ENABLED", "ENABLED_INPUT_METHODS")) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, String> e : source.entrySet()) {
+                // Capabilities only names the API in the READ_APIS list (the registry's own check holds it to the declared files);
+                // PackageAccess is the older, separately declared reader of requested permissions.
+                if (e.getKey().equals("Capabilities") || (api.equals("requestedPermissions") && e.getKey().equals("PackageAccess"))) continue;
+                if (e.getValue().contains(api)) users.add(e.getKey());
+            }
+            Harness.equal("only AppSecurityReader uses " + api, users.toString(), "[AppSecurityReader]");
+        }
+        String reader = source.get("AppSecurityReader");
+        for (String write : Arrays.asList("revokeRuntimePermission", "deletePackage", "setApplicationEnabledSetting", "setComponentEnabledSetting", "grantRuntimePermission", "startActivity", "Intent(")) {
+            Harness.check("the reader never uses " + write, !reader.contains(write));
+        }
+        Harness.check("the reader does not ask for the all-apps permission, in code or in a name", !reader.contains("QUERY_ALL_PACKAGES") && !source.get("SafetyActivity").contains("QUERY_ALL_PACKAGES"));
+        for (String name : Arrays.asList("AppSecurityReader", "SafetyRules", "SafetyFacts", "SafetyActivity", "SafetyAccess")) {
+            String t = source.get(name);
+            Harness.check(name + " keeps nothing and logs nothing", !t.contains("Log.") && !t.contains("System.out") && !t.contains("printStackTrace") && !t.contains("FileOutputStream")
+                && !t.contains("getSharedPreferences") && !t.contains("Toast") && (name.equals("SafetyAccess") || !t.contains("RandomAccessFile")));
+        }
+        Harness.check("the rules are pure: they import no Android class and read nothing", !source.get("SafetyRules").contains("import android.") && !source.get("SafetyRules").contains("PackageManager"));
+        String facts = source.get("SafetyFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the record takes no app, package, label or permission", !facts.contains("pkg") && !facts.contains("label")
+            && !facts.contains("package") && !facts.contains("permission"));
+        String screen = source.get("SafetyActivity");
+        Harness.check("the screen is secure", screen.contains("FLAG_SECURE"));
+        Harness.check("it opens an app's own settings page or the phone's security settings, and starts nothing else",
+            screen.split("startActivity\\(", -1).length == 2 && screen.contains("ACTION_APPLICATION_DETAILS_SETTINGS") && screen.contains("ACTION_SECURITY_SETTINGS")
+            && !screen.contains("ACTION_DELETE") && !screen.contains("ACTION_UNINSTALL") && !screen.contains("DELETE_PACKAGES") && !screen.contains("revoke"));
+        int appends = 0;
+        for (int at = screen.indexOf("journal.append("); at >= 0; at = screen.indexOf("journal.append(", at + 1)) appends++;
+        Harness.check("its only writes are the check's counts and *Not now*", appends == 2 && screen.contains("journal.append(SafetyFacts.CHECKED, SafetyFacts.checked(result.apps, result.now, result.review))")
+            && screen.contains("journal.append(SafetyFacts.DEFERRED, SafetyFacts.deferred())"));
+        Harness.check("nothing is read before the grant: the grant is checked first, and the offer is the only thing shown without it",
+            screen.indexOf("SafetyAccess.granted(this)") > 0 && screen.indexOf("SafetyAccess.granted(this)") < screen.indexOf("AppSecurityReader.read(context)")
+            && screen.contains("Check my phone") && screen.contains("Not now"));
+        Harness.check("the offer says what it looks at, that it stays on the phone, that it changes nothing — and what it cannot see",
+            screen.contains("It stays on this phone") && screen.contains("It will not uninstall or change anything") && screen.contains("SafetyRules.CANNOT_SEE"));
+        Harness.check("a result is always followed by what the check cannot see", screen.indexOf("list.addView(text(SafetyRules.CANNOT_SEE, 12, false));", screen.indexOf("private void show(")) > 0);
+        Harness.check("what the check cannot see is on the offer and on the result", screen.split("list.addView\\(text\\(SafetyRules.CANNOT_SEE, 12, false\\)\\);", -1).length == 3);
+        Harness.check("the grant is made (and recorded) when you tap, and a failure to record reads nothing",
+            screen.contains("try {\n                    SafetyAccess.grant(SafetyActivity.this, journal);\n                } catch (IOException notRecorded)"));
+        Harness.check("one count is recorded per run, not per redraw", screen.contains("if (!recorded) {\n            recorded = true;"));
+        String readerSource = source.get("AppSecurityReader");
+        Harness.check("only a granted permission counts as held", readerSource.contains("(flags & PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0"));
+        Harness.check("only a keyboard that is not part of Android counts", readerSource.contains("app.keyboard = !system && imes.contains(info.packageName);"));
+        Harness.check("USB debugging is on only when it reads 1, and unreadable is off, not on",
+            readerSource.contains("Settings.Global.getInt(resolver, Settings.Global.ADB_ENABLED, 0) == 1"));
+        String main = source.get("MainActivity");
+        Harness.check("the offer comes by itself only on a fresh start and only when it is the first run",
+            main.contains("if (state == null)") && main.contains("SafetyFacts.firstRun(journal.readLines())") && main.contains("new Intent(this, SafetyActivity.class)")
+            && main.contains("safety.setText(\"Safety check\")"));
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        String queries = manifest.substring(manifest.indexOf("<queries>"), manifest.indexOf("</queries>"));
+        Harness.check("the manifest names three kinds of service to see — accessibility, notification listener, keyboard — and no app",
+            queries.contains("android.accessibilityservice.AccessibilityService") && queries.contains("android.service.notification.NotificationListenerService")
+            && queries.contains("android.view.InputMethod") && !queries.contains("<package"));
+        Harness.check("and still not the all-apps permission", !manifest.contains("android.permission.QUERY_ALL_PACKAGES\""));
+        Harness.check("the screen is declared and not exported", manifest.replaceAll("\\s+", " ").contains("android:name=\".SafetyActivity\" android:exported=\"false\""));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

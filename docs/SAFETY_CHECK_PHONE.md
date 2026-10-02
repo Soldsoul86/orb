@@ -1,6 +1,6 @@
 # The Safety check — what is on this phone that can see too much (stage 1 of the operator's flow; proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Stage 1 of the flow the operator wrote (*"when I install Orb, it should first scan the mobile for apps with dangerous permissions and malicious intent, then certify it or guide me to delete the apps or revoke the permissions"*). The five details in §8 are what is left to approve. Nothing here is built.
+> Status: **built 2026-10-02 (DR-32, AD-27) — awaiting the device (`DEVICE_LOOP.md` §7b77, `orb-app-v41-safety.apk`).** The operator approved the design ("Yes, go ahead with stage 1", then "Yes, go ahead with the design"). Stage 1 of the flow the operator wrote (*"when I install Orb, it should first scan the mobile for apps with dangerous permissions and malicious intent, then certify it or guide me to delete the apps or revoke the permissions"*). **No `QUERY_ALL_PACKAGES`**; the blind spot is on the screen.
 > Builds on the grants watch (`SENSOR_GRANTS.md`: accessibility, notification-listener and device-admin powers), the package scan (`PackageAccess`, DR-22) and the capability registry (`Capabilities`). **It does not take `QUERY_ALL_PACKAGES`** — see §4 and `DEVICE_LOOP.md` §7b38.
 
 ## 1. Why, in plain words
@@ -74,3 +74,12 @@ Orb will **not** take `QUERY_ALL_PACKAGES` (the permission to list every app). *
 ## 9. Not in this slice
 
 A malware or reputation database (it would need the network); scanning APK files or the contents of apps; Wi-Fi, Bluetooth, NFC and keys (the next stages of the flow); remembering which findings you accepted (*"I know this app"*); background re-checks (the grants watch already covers the biggest change); a score.
+
+## 10. As built
+
+- **Files.** `SafetyRules` (pure: the table of §3 as code; imports no Android class), `SafetyFacts` (the two records, counts only; `firstRun`), `SafetyAccess` (the recorded grant, marker file), `AppSecurityReader` (**the one reader** of other apps' permissions and install source, plus the phone's settings), `SafetyActivity` (secure screen: offer, findings, *Open its settings*, *Check again*), a *Safety check* button on the main screen, and the capability `orb.read.appsecurity` v1 on **What Orb may do** (revoke / allow).
+- **Apps are seen through `<queries>`** for three service kinds (accessibility, notification listener, input method) plus the existing launcher/handler entries — no new Android permission.
+- **First run.** The screen opens by itself once, when the journal holds **no** `orb.safety.*` record. *Check my phone* records the grant, **then** reads; *Not now* records `orb.safety.deferred`. Nothing is read before the tap.
+- **Each run** records one `orb.safety.checked` (apps looked at, *Now*, *Worth a look*) — never a name, package, label or permission.
+- **Rules as built.** Combinations replace their parts (accessibility + overlay; SMS + notification access); SMS, call log and background location count only when **granted**, all-files and overlay when **requested**; installer power counts only when sideloaded; the phone: no screen lock (*Now*), USB debugging and a security update older than **183 days** (*Worth a look*). Android's own apps and Orb are skipped. Sorted *Now* first, then by name.
+- **Tests.** Every rule and boundary (182/183/184 days), the sideload list, the skip rules, the sort, the summary words (never *safe*/*certified*), the records, first-run, and source guards: one reader, no write APIs, pure rules, secure window, one `startActivity`, grant before read, two journal appends, manifest queries. Mutation checks are recorded in `DEVICE_LOOP.md` §7b77.
