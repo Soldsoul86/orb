@@ -1,6 +1,6 @@
 # Declaring what Orb reads — closing AD-7 (proposed)
 
-> Status: **proposed 2026-10-02, awaiting the operator's go-ahead.** Nothing here is built.
+> Status: **approved 2026-10-02 ("Yes, go ahead with the design") and built** (`DEVICE_LOOP.md` §7b67, `orb-app-v30-declared.apk`; `DECISIONS.md` DR-22). As-built notes in §10.
 > Closes `ARCHITECTURAL_DEBT.md` AD-7 on the phone. Builds on `GATE_PHONE.md` (DR-20, the registry and *What Orb may do*).
 > Contracts: `Capability.md` §1 (*"Reads are capabilities too"*), §8; `Policy.md`. **No contract text changes. No behaviour changes** — see §4.
 
@@ -67,3 +67,13 @@ recorded grant/revoke the package scan has.
 1. **The four declarations** in §2, with the existing ids, and *what they say*.
 2. **The grants watch stays always-on, shown but not switchable** (§5) — or say you want a switch.
 3. **The screen** shows state and last use (counts and times only) for each.
+
+## 10. As built
+
+- **`Capabilities`** — the registry (pure): four declarations with their plain words, tier, what allows each, `recordsAs`, how to withdraw, whether it is switchable, and the source files that perform its reads; and the projections `state` and `lastUse` over the journal (a count and a time, never content;
+  an unreadable history says *unknown*, not a guess). **`MayDoActivity`** renders all four from it, each with its existing control (package scanning's grant/revoke, a link to *Apps Orb may remember from*, the reminder switch; none for the always-on watch), and the reminders waiting.
+- **Declarations as approved**, ids kept (`installedPackages.read` is the id already in history). The grants watch is shown, not switchable.
+- **Held by tests (941 phone-side checks, mutation-checked):** the four declarations pinned by hash and complete; tiers; the watch the only one not switchable; state for each capability from built histories (never granted, granted, scanned with a count, refused, revoked; no app allowed, one, two; a capture's time and no content; the watch before and after it looks; reminders on and off; an unknown id);
+  **every platform read API in the source sits in a file a declaration names; the undeclared reads appear nowhere and the manifest asks for none of their permissions nor the network;** the scan checks the grant before the read, records a refusal as *ungranted*, and is the only caller of the package read.
+- **Not testable off the phone:** the screen's rows and buttons.
+

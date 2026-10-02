@@ -52,6 +52,48 @@ public final class MayDoActivity extends Activity {
         return t;
     }
 
+    /** The one control that withdraws a capability — each the control that already existed for it. */
+    private void addControl(final Capabilities.Declaration d, List<String> lines, final Journal journal) {
+        Button b = new Button(this);
+        if (d.id.equals(Capabilities.PACKAGES)) {
+            final boolean granted = PackageGrants.lastIsGrant(lines);
+            b.setText(granted ? "Revoke package scanning" : "Grant package scanning");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    try {
+                        if (granted) PackageAccess.revoke(MayDoActivity.this, journal);
+                        else PackageAccess.grant(MayDoActivity.this, journal);
+                    } catch (IOException ignored) {
+                        // Nothing changed if the grant could not be recorded.
+                    }
+                    render();
+                }
+            });
+        } else if (d.id.equals(Capabilities.SCREEN)) {
+            b.setText("Apps Orb may remember from");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { startActivity(new android.content.Intent(MayDoActivity.this, AllowActivity.class)); }
+            });
+        } else if (d.id.equals(Reminders.CAPABILITY)) {
+            final boolean on = Reminders.enabled(lines);
+            b.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    try {
+                        if (on) Remind.turnOff(journal, new ReminderAlarms(MayDoActivity.this));
+                        else Remind.turnOn(journal);
+                    } catch (IOException ignored) {
+                        // Nothing changed if the history cannot be read.
+                    }
+                    render();
+                }
+            });
+        } else {
+            return;   // The grants watch is always on: shown, with no control.
+        }
+        list.addView(b);
+    }
+
     private void render() {
         list.removeAllViews();
         list.addView(text("What Orb may do", 17, true));
@@ -69,35 +111,28 @@ public final class MayDoActivity extends Activity {
             return;
         }
 
-        list.addView(text("Remind me", 15, true));
-        list.addView(text(Reminders.DECLARATION, 13, false));
-        list.addView(text(Reminders.CAPABILITY + " · version " + Reminders.VERSION, 11, false));
-
-        final boolean on = Reminders.enabled(lines);
-        list.addView(text(on ? "Orb may remind me: ON" : "Orb may remind me: OFF", 14, true));
-        Button toggle = new Button(this);
-        toggle.setText(on ? "Turn off (cancels every pending reminder)" : "Turn on");
-        toggle.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View view) {
-                try {
-                    if (on) Remind.turnOff(journal, new ReminderAlarms(MayDoActivity.this));
-                    else Remind.turnOn(journal);
-                } catch (IOException ignored) {
-                    // Nothing changed if the history cannot be read.
-                }
-                render();
-            }
-        });
-        list.addView(toggle);
+        SimpleDateFormat when = new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault());
+        list.addView(text("Everything Orb may do or read, in one place. Each says what it does, whether it is on, when it was last used "
+            + "(times and counts only, never what was read), and how to withdraw it.", 12, false));
+        for (final Capabilities.Declaration d : Capabilities.ALL) {
+            Capabilities.Status st = Capabilities.status(d.id, lines);
+            list.addView(text(d.title, 15, true));
+            list.addView(text(d.says, 13, false));
+            list.addView(text(d.id + " \u00b7 version " + d.version + " \u00b7 tier " + d.tier, 11, false));
+            list.addView(text("Allowed by: " + d.authorizedBy, 12, false));
+            list.addView(text(st.state, 14, true));
+            list.addView(text("Last used: " + (st.lastAtMs < 0 ? "never" : when.format(new Date(st.lastAtMs))) + " \u00b7 " + st.lastDetail, 12, false));
+            addControl(d, lines, journal);
+        }
 
         List<Reminders.Reminder> pending = Reminders.pending(lines);
-        list.addView(text(pending.isEmpty() ? "No reminders waiting." : pending.size() + (pending.size() == 1 ? " reminder waiting" : " reminders waiting"), 14, true));
-        SimpleDateFormat when = new SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault());
+        list.addView(text("Reminders waiting", 14, true));
+        list.addView(text(pending.isEmpty() ? "No reminders waiting." : pending.size() + (pending.size() == 1 ? " reminder waiting" : " reminders waiting"), 13, false));
         for (final Reminders.Reminder r : pending) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(0, 16, 0, 16);
-            row.addView(text(when.format(new Date(r.dueAtMs)) + (r.noteIdentity == null ? "" : "  ·  with a note"), 14, false));
+            row.addView(text(when.format(new Date(r.dueAtMs)) + (r.noteIdentity == null ? "" : "  \u00b7  with a note"), 14, false));
             Button cancel = new Button(this);
             cancel.setText("Cancel this reminder");
             cancel.setOnClickListener(new View.OnClickListener() {

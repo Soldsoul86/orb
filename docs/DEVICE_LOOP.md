@@ -6466,3 +6466,38 @@ The operator reported *"All 5 done"*.
 #### P120 — the card's Cancel (`orb-20261002-100143.txt`, 389 events, `verifyLane`-clean)
 
 **Held.** At 10:01:37 `orb.action.intent` citing the kept item (written when the review card appeared) and, two seconds later, `orb.action.cancelled` (`reason: declined`) citing that intent — and no `confirmed` for it. The earlier export had no such pair because the operator's first Cancel was on the *"Remind you when?"* dialog, which writes nothing by design. **All five close-out checks are now held on the device.**
+
+
+### 7b67. Everything Orb reads, declared in one place — AD-7 closed (DR-22) — 2026-10-02
+
+**Status: built, awaiting the device** — `orb-app-v30-declared.apk`. v29 is §7b65/§7b66 (verified). Design: `docs/GATE_READS_PHONE.md`; decision `DECISIONS.md` DR-22; what remains: `ARCHITECTURAL_DEBT.md` AD-20.
+
+#### What changed
+
+1. **What Orb may do** now lists **four capabilities** — *Which apps are installed*, *The text of a screen, when you ask*, *Which apps hold powerful settings*, *A reminder you set* — each with **what it says, its id and tier, what allows it, whether it is on, when it was last used, and the control that withdraws it**.
+   Last use is **a time and a count, never content** (*Last scan: … · 153 apps*).
+2. The scan, the assistant and the watch behave **exactly as before**; their records are the events they already write. Package scanning's grant/revoke, the allowed-apps list and the reminder switch are on this screen too (the same controls). The grants watch is **always on and shown as such**.
+3. **A source guard fails the build** if any read exists that a declaration does not name, if Orb ever reads contacts, calendar, location, the microphone, the camera, the clipboard, SMS or usage stats before one is declared, or if the manifest asks for any of those permissions or the network.
+
+#### Checked before the device
+
+- 941 phone-side checks (was 854); brain 262; TypeScript 492; lint clean. See `GATE_READS_PHONE.md` §10.
+- **Mutation-checked, 16 ways:** the package state, the scan count, the refused-scan wording, the allowed-apps count and its plural, the always-on state, the reminder state, last-of-type, the time, the watch's switchability, a declaration's file list, a declaration's words (the pin), the grant check before the read, the *ungranted* record, **a read added to a file no declaration names** (the package list read in `Mentions`) and **a read Orb does not have** (contacts in `Recall`) — each fails a named check. The last two were first tried as code that does not compile in the test build and so proved nothing; they were redone as the names alone, which is what the guard reads.
+- **Not testable off the phone:** the screen's rows and buttons.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P132** | **What Orb may do** shows four sections in that order, each with words, an id and tier, *Allowed by*, a state line and *Last used* | the screen is missing a capability or a field |
+| **P133** | *Which apps are installed* says **ON — you granted it** and **Last used … · N apps** (a count, not names); *The text of a screen* says **ON — N apps allowed** and a last-used time if you have remembered something; *Which apps hold powerful settings* says **ALWAYS ON** with a time and **no button** | a state or last use is wrong |
+| **P134** | **Revoke package scanning** on this screen flips that section to **OFF — not granted** and the export shows `grants.capability.revoked`; **Grant package scanning** brings it back (`granted`) | the control does not hold |
+| **P135** | **Scan installed packages now** after the revoke is **refused and recorded** as *ungranted* (the export's `grants.packages` has `installedPackageReadable: false`, `installedPackageScope: "ungranted"`) — then grant again and scan: it reads | a revoked scan reads |
+| **P136** | Nothing the screen shows contains a package name or any word you kept | content leaks onto the screen |
+
+#### The operator's protocol
+
+1. Install `orb-app-v30-declared.apk` over v29; open Orb once; open **What Orb may do** and read all four sections. *(P132, P133, P136)*
+2. Tap **Revoke package scanning**; check the section; then on the main screen **Scan installed packages now**. *(P134, P135)*
+3. Tap **Grant package scanning** (on this screen), scan again. *(P134, P135)*
+4. **Export and share journal**.

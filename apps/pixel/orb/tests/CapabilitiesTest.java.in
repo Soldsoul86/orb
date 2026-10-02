@@ -1,0 +1,158 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Everything Orb may do or read is declared in one place, frozen, shown honestly, and held to by the source
+ * (`docs/GATE_READS_PHONE.md`, DR-22): the pinned words, the state read back from history, and a guard that no read exists that
+ * a declaration does not name.
+ */
+final class CapabilitiesTest {
+    private CapabilitiesTest() {}
+
+    private static Map<String, Object> pkg(String type, String capability) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", capability);
+        p.put("by", "operator");
+        return p;
+    }
+
+    private static String pin(String says) throws Exception {
+        return Attachments.identity(says.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void run() throws Exception {
+        Harness.suite("four capabilities, each declared once and frozen");
+        Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.remind.local"));
+        Set<String> seen = new HashSet<>();
+        for (Capabilities.Declaration d : Capabilities.ALL) {
+            Harness.check(d.id + " says, authorizes, records and names its withdrawal",
+                !d.says.isEmpty() && !d.authorizedBy.isEmpty() && !d.recordsAs.isEmpty() && !d.withdrawnBy.isEmpty() && !d.title.isEmpty() && d.version == 1L);
+            Harness.check(d.id + " has one of the two tiers and is unique", (d.tier.equals(Capabilities.TIER_OBSERVE) || d.tier.equals(Capabilities.TIER_ACT_REVERSIBLE)) && seen.add(d.id));
+        }
+        Harness.check("the reads are Observe and the reminder is Act (reversible)",
+            Capabilities.byId(Capabilities.PACKAGES).tier.equals("Observe") && Capabilities.byId(Capabilities.SCREEN).tier.equals("Observe")
+            && Capabilities.byId(Capabilities.GRANTS).tier.equals("Observe") && Capabilities.byId(Reminders.CAPABILITY).tier.equals("Act (reversible)"));
+        Harness.check("the grants watch is the one that is not switchable", !Capabilities.byId(Capabilities.GRANTS).switchable
+            && Capabilities.byId(Capabilities.PACKAGES).switchable && Capabilities.byId(Capabilities.SCREEN).switchable);
+        Harness.equal("the package read's words are pinned: a change is a new capability", pin(Capabilities.PACKAGES_SAYS), "sha256:81e866d255902abc14864b5d10905fbfee8c7f03266582fd08b24fd467bbeb0c");
+        Harness.equal("the screen read's words are pinned", pin(Capabilities.SCREEN_SAYS), "sha256:84f03c9fe03e2e86998ed1897d0694873086acc1dd541a499ff54fd7298f9e03");
+        Harness.equal("the grants watch's words are pinned", pin(Capabilities.GRANTS_SAYS), "sha256:559ff8b71ce163ff7793114be79012cef725a64909e5cd48ac712d7e3fdeaab2");
+        Harness.check("the screen read says it is only when you invoke it and never a login screen",
+            Capabilities.SCREEN_SAYS.contains("only when you invoke Orb") && Capabilities.SCREEN_SAYS.contains("never a login screen"));
+        Harness.check("the package read says nothing leaves the phone", Capabilities.PACKAGES_SAYS.contains("Nothing leaves the phone"));
+        Harness.check("the reminder's declaration is the one `Reminders` freezes", Capabilities.byId(Reminders.CAPABILITY).says.equals(Reminders.DECLARATION));
+
+        Harness.suite("state and last use are read from history, and show no content");
+        Install.forget();
+        Context context = new Context(Files.createTempDirectory("orb-capabilities").toFile());
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Capabilities.Status none = Capabilities.status(Capabilities.PACKAGES, journal.readLines());
+        Harness.check("a package scan never granted: off, never", none.state.startsWith("OFF") && none.lastAtMs < 0 && none.lastDetail.equals("never"));
+        journal.append(PackageGrants.GRANTED, pkg(PackageGrants.GRANTED, "installedPackages.read"));
+        Harness.check("granted: on", Capabilities.status(Capabilities.PACKAGES, journal.readLines()).state.startsWith("ON"));
+        Map<String, Object> scan = Json.obj();
+        scan.put("installedPackageHoldingCount", 153L);
+        scan.put("installedPackageReadable", true);
+        journal.append("grants.packages", scan);
+        Capabilities.Status scanned = Capabilities.status(Capabilities.PACKAGES, journal.readLines());
+        Harness.check("a scan: when, and how many — a count, never a name", scanned.lastAtMs > 0 && scanned.lastDetail.equals("153 apps"));
+        Map<String, Object> refused = Json.obj();
+        refused.put("installedPackageReadable", false);
+        journal.append("grants.packages", refused);
+        Harness.check("a refused scan says so", Capabilities.status(Capabilities.PACKAGES, journal.readLines()).lastDetail.startsWith("could not read"));
+        journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "installedPackages.read"));
+        Harness.check("revoked: off", Capabilities.status(Capabilities.PACKAGES, journal.readLines()).state.startsWith("OFF"));
+
+        Harness.check("the screen read with no app allowed: off", Capabilities.status(Capabilities.SCREEN, journal.readLines()).state.startsWith("OFF"));
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.chat"));
+        Harness.equal("one app allowed", Capabilities.status(Capabilities.SCREEN, journal.readLines()).state, "ON — 1 app allowed");
+        journal.append(AllowList.ALLOWED, AssistFacts.grant("com.example.notes"));
+        Harness.equal("two", Capabilities.status(Capabilities.SCREEN, journal.readLines()).state, "ON — 2 apps allowed");
+        Harness.check("nothing remembered yet", Capabilities.status(Capabilities.SCREEN, journal.readLines()).lastAtMs < 0);
+        ScreenText text = new ScreenText();
+        text.add("some words that must not appear in the answer");
+        Harness.equal("remember something", Capture.remember(context, journal, text, "com.example.chat", 7L, false).outcome, Capture.STORED);
+        Capabilities.Status after = Capabilities.status(Capabilities.SCREEN, journal.readLines());
+        Harness.check("last use is a time and no content", after.lastAtMs > 0 && !after.lastDetail.contains("words") && !after.state.contains("example"));
+
+        Capabilities.Status watch = Capabilities.status(Capabilities.GRANTS, journal.readLines());
+        Harness.check("the grants watch is always on, and has not yet looked", watch.state.equals("ALWAYS ON") && watch.lastAtMs < 0);
+        journal.append("grants.observed", Json.obj());
+        Harness.check("after it looks, there is a time", Capabilities.status(Capabilities.GRANTS, journal.readLines()).lastAtMs > 0);
+
+        Harness.check("reminders on, none waiting", Capabilities.status(Reminders.CAPABILITY, journal.readLines()).state.equals("ON — 0 reminders waiting"));
+        Remind.turnOff(journal, new RemindersTest.Alarms());
+        Harness.check("turned off", Capabilities.status(Reminders.CAPABILITY, journal.readLines()).state.startsWith("OFF"));
+        Harness.check("an unknown id says so, not a guess", Capabilities.status("orb.read.nothing", journal.readLines()).state.equals("unknown"));
+
+        guard();
+    }
+
+    /** Every read in the source is declared; the reads Orb does not have are not there at all. */
+    private static void guard() throws Exception {
+        Harness.suite("no read exists that a declaration does not name");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                // The registry itself names the APIs as data; it is not a use of them.
+                if (name.endsWith(".java.in") && !name.equals("Capabilities.java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        Set<String> declaredFiles = new HashSet<>();
+        for (Capabilities.Declaration d : Capabilities.ALL) declaredFiles.addAll(d.files);
+        for (String f : declaredFiles) Harness.check(f + " (named by a declaration) exists", source.containsKey(f));
+        for (String api : Capabilities.READ_APIS) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains(api)) users.add(e.getKey());
+            Harness.check("every file using " + api + " is one a declaration names " + users, declaredFiles.containsAll(users));
+        }
+        for (String api : Capabilities.UNDECLARED_READS) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains(api)) users.add(e.getKey());
+            Harness.check(api + " is read nowhere — no capability declares it " + users, users.isEmpty());
+        }
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        for (String permission : Arrays.asList("READ_CONTACTS", "READ_CALENDAR", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "RECORD_AUDIO", "CAMERA",
+                "READ_SMS", "READ_CALL_LOG", "PACKAGE_USAGE_STATS", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES", "INTERNET")) {
+            Harness.check("the manifest asks for no " + permission, !manifest.contains("android.permission." + permission));
+        }
+
+        Harness.suite("the package scan refuses unless granted, and nothing else reads the list");
+        String watch = source.get("Watch");
+        int method = watch.indexOf("Map<String, Object> scanPackages(String because)");
+        int granted = watch.indexOf("PackageAccess.granted(context)", method);
+        int read = watch.indexOf("GrantReader.readPackages(context)", method);
+        Harness.check("the grant is checked before the read", method > 0 && granted > method && read > granted);
+        List<String> readers = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains("GrantReader.readPackages(")) readers.add(e.getKey());
+        Harness.equal("only the scan calls the package read", readers.toString(), "[Watch]");
+        Harness.check("a refused scan is recorded as ungranted, not as an empty set",
+            watch.substring(method, read).contains("\"installedPackageReadable\", false") && watch.substring(method, read).contains("\"ungranted\""));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

@@ -121,7 +121,7 @@ durable reflection-state need materializes.
 
 ## AD-7 — `device-watch` reads a person's whole package list outside the Capability boundary
 
-- **Status:** Open — **the gate now exists (2026-10-02, DR-20, `GATE_PHONE.md`) for the first *action*; the package scan and the assistant's reads are still not declared in it (slice 3).** · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
+- **Status:** **Closed on the phone 2026-10-02 (DR-22, `GATE_READS_PHONE.md`)** — the package scan, the assistant's screen read and the grants watch are declared at tier *Observe* beside the reminder, shown and withdrawable in one place, and held by tests; what remains is a Policy language and the desk (below). *(Earlier: the gate for the first *action* landed with DR-20.)* · **Deferred 2026-09-29 (DR-13):** no special-case fix; waits for the general
   Capability → Policy → permission → Action/read → Journal mechanism in Phase 3c ·
   **Raised:** 2026-09-28, at the Execution contracts' acceptance
 - **Domain:** Execution / Reality · **Kind (if adopted):** bring an existing read
@@ -623,4 +623,16 @@ a second source for the compiler's checksum exists (item 1).
 4. **A past date is never shown**, so something you meant to be reminded of that has passed is silent — by design (a stale proposal is noise), but a reminder you wanted for yesterday is yours to set by hand.
 5. **Linear cost, newest 500** (AD-13), computed again each time the screen or the main screen opens (the dot, on a background thread).
 6. **No memory of declining.** Ignoring a proposal leaves no trace, so it is offered again each time it is still ahead. A "don't suggest this" would be recorded behaviour about you — a separate decision.
+
+---
+
+## AD-20 — what closing AD-7 did not build
+
+**Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.
+
+1. **No Policy language.** *You* are the policy — each read is allowed by a recorded decision of yours (a grant, an allow-list entry, a confirmation) or is always on — which `Policy.md` allows. Rules as data (scoped, expiring, evaluated deterministically) wait for a second person or device that needs them.
+2. **The grants watch cannot be switched off.** Declared and shown as exactly that. A switch (with a recorded grant and revoke, as the package scan has) is a small addition if wanted.
+3. **The registry does not stop a determined edit.** It is held by source tests that fail the build; a person who edits both a read and its guard has changed the architecture on purpose, which is what the pinned words and the review are for.
+4. **The assistant's read is gated by the existing allow-list and your invoking it**, as before — the registry declares and displays it; `AssistGuardTest` still holds the code path.
+5. **The desk's reads** (an importer reading an export, the connector) are not declared here; they are the laptop's side and have their own boundary.
 

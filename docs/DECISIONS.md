@@ -1155,6 +1155,24 @@ and are a separate step after seeing how this reads on real words (the disciplin
 **Reminder time:** nine in the morning of the date to start from, editable on the card.
 
 
+## DR-22 — Orb's reads are declared capabilities, in one place: AD-7 closed on the phone
+
+- **Status:** Decided and built · **Decided:** 2026-10-02, operator ("Yes, go ahead with the design") on `GATE_READS_PHONE.md` ·
+  **Bears on:** `contracts/Capability.md` §1/§8, `ARCHITECTURAL_DEBT.md` AD-7, DR-20
+
+**The ruling.** *Reads are capabilities too.* Four are declared in one registry (`Capabilities`), each **frozen with its words pinned by a test** (a wider read is a new capability, never an edit): **`installedPackages.read`** v1 (which apps are installed;
+authorized by your recorded grant), **`orb.read.screen`** v1 (a screen's text, only when you invoke Orb, in an app you allowed, never a login screen; keeps nothing unless you tap Remember), **`orb.read.grants`** v1 (which apps hold accessibility,
+notification-listener and device-admin powers; always on, because it protects you and needs no permission), and **`orb.remind.local`** v1 (DR-20). All three reads are tier *Observe*; the reminder is *Act (reversible)*.
+
+**Nothing about how they behave changed.** Their record of use is **the event each already wrote** (`grants.packages`, `orb.assist.captured`/`declined`, `grants.observed`, `orb.action.released`) — the registry names it and reads it back, so there is no second source of truth.
+*What Orb may do* now lists all four: what it says, tier, what allows it, its state (read from history), its last use (**counts and times only, never content**), and the one control that already withdraws it. The grants watch is **shown and not switchable** (operator: approved as proposed).
+
+**Held by the source.** Every platform read in the code sits in a file a declaration names; the reads Orb does not have — contacts, calendar, location, the microphone, the camera, the clipboard, SMS, usage stats — appear **nowhere**, and the manifest asks for none of their permissions (nor the network); the package scan checks the grant
+before it reads and records a refusal as *ungranted* (never an empty set); only the scan calls the package read. **A fifth read added without a declaration fails the build.**
+
+**Not built:** a Policy language (rules as data) — *you* are the policy, as `Policy.md` allows; a switch for the grants watch (a small addition if wanted); a model call as a declared capability (when one exists, DR-9 applies).
+
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

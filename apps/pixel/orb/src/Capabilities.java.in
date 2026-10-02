@@ -1,0 +1,200 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Everything Orb may do or read, declared in one place (`docs/GATE_READS_PHONE.md`, DR-22) — the registry `AD-7` asked for.
+ *
+ * `Capability.md` §1: *reads are capabilities too* — they cost privacy even when nothing leaves the device. Four are declared
+ * here, each frozen with its text pinned by a test (a wider read is a **new** capability, never an edit): the package scan, the
+ * assistant's screen read, the grants watch, and the reminder (declared in `Reminders`).
+ *
+ * **Nothing about how they behave is defined here.** The scan, the assistant and the watch run as they always have; their
+ * records are the events they already write, and this registry names them (`recordsAs`) and reads them back. A second record
+ * beside the first would be two sources of truth for one fact. `state` and `lastUse` are projections over the journal.
+ *
+ * **Held by tests:** the declarations are pinned; every platform read in the source sits in a file a declaration names; and the
+ * reads Orb does not have — contacts, calendar, location, the clipboard, the microphone, the camera — appear **nowhere** until a
+ * capability declares them (`CapabilitiesTest`). A fifth read added without a declaration fails the build.
+ */
+final class Capabilities {
+    private Capabilities() {}
+
+    static final String TIER_OBSERVE = "Observe";
+    static final String TIER_ACT_REVERSIBLE = "Act (reversible)";
+
+    /** One declared capability. */
+    static final class Declaration {
+        final String id;
+        final long version;
+        final String title;
+        /** What it does, in the words a person reads. Frozen with the version. */
+        final String says;
+        final String tier;
+        final String authorizedBy;
+        /** The event types that are the record of its use — already written, never duplicated. */
+        final List<String> recordsAs;
+        final String withdrawnBy;
+        /** Whether the person can switch it off. */
+        final boolean switchable;
+        /** The source files that perform its platform reads (what the guard holds each read to). */
+        final List<String> files;
+
+        Declaration(String id, long version, String title, String says, String tier, String authorizedBy,
+                    List<String> recordsAs, String withdrawnBy, boolean switchable, List<String> files) {
+            this.id = id;
+            this.version = version;
+            this.title = title;
+            this.says = says;
+            this.tier = tier;
+            this.authorizedBy = authorizedBy;
+            this.recordsAs = Collections.unmodifiableList(recordsAs);
+            this.withdrawnBy = withdrawnBy;
+            this.switchable = switchable;
+            this.files = Collections.unmodifiableList(files);
+        }
+    }
+
+    static final String PACKAGES = "installedPackages.read";
+    static final String SCREEN = "orb.read.screen";
+    static final String GRANTS = "orb.read.grants";
+
+    static final String PACKAGES_SAYS =
+        "Reads which launcher apps, UPI-payment apps and device-admin apps are installed — about a hundred and fifty names. "
+        + "Nothing leaves the phone. It runs at start-up and when you ask, at most twice a day, and only while you have granted it.";
+    static final String SCREEN_SAYS =
+        "Reads the text on the screen you are looking at — only when you invoke Orb as the assistant, only in an app you allowed, "
+        + "never a login screen and never a payments app unless you named one an exception. It shows you what it read first "
+        + "and keeps it only if you tap Remember.";
+    static final String GRANTS_SAYS =
+        "Reads which apps hold accessibility, notification-listener and device-admin powers — the ones that could watch you. "
+        + "It needs no permission and runs at every start; this is what lets Orb alert you when one changes. It is always on, "
+        + "because it protects you.";
+
+    /** The declarations, in the order the screen shows them. */
+    static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
+        new Declaration(PACKAGES, 1L, "Which apps are installed", PACKAGES_SAYS, TIER_OBSERVE,
+            "your grant — a recorded decision", Arrays.asList("grants.packages"),
+            "Package scanning: revoke", true,
+            Arrays.asList("GrantReader", "PackageQueries", "DeclaredPackages", "Watch", "PackageAccess")),
+        new Declaration(SCREEN, 1L, "The text of a screen, when you ask", SCREEN_SAYS, TIER_OBSERVE,
+            "your allow-list, one app at a time, and your invoking it every time",
+            Arrays.asList("orb.assist.captured", "orb.assist.declined"),
+            "Apps Orb may remember from: remove", true,
+            Arrays.asList("ScreenReader", "AssistSession", "UpiApps")),
+        new Declaration(GRANTS, 1L, "Which apps hold powerful settings", GRANTS_SAYS, TIER_OBSERVE,
+            "always on — it needs no permission and protects you", Arrays.asList("grants.observed"),
+            "not switchable", false,
+            Arrays.asList("GrantReader", "Grants", "Watch")),
+        new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
+            "your confirmation of each reminder", Arrays.asList("orb.action.released"),
+            "What Orb may do: turn off", true,
+            Collections.<String>emptyList())));
+
+    static Declaration byId(String id) {
+        for (Declaration d : ALL) if (d.id.equals(id)) return d;
+        return null;
+    }
+
+    /** What the platform APIs are, by name, that Orb's reads are made with — each allowed only in the files a declaration names. */
+    static final List<String> READ_APIS = Collections.unmodifiableList(Arrays.asList(
+        "getInstalledPackages", "getInstalledApplications", "queryIntentActivities", "queryBroadcastReceivers", "queryIntentServices",
+        "getActiveAdmins", "Settings.Secure", "enabled_notification_listeners", "AssistStructure", "ViewNode",
+        "onHandleScreenshot", "takeScreenshot"));
+
+    /** Reads Orb does not have. They appear nowhere in the source until a capability declares them. */
+    static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
+        "ContactsContract", "CalendarContract", "LocationManager", "FusedLocation", "UsageStatsManager", "AudioRecord", "MediaRecorder",
+        "CameraManager", "ClipboardManager", "getPrimaryClip", "TelephonyManager", "SmsManager", "READ_SMS", "READ_CALL_LOG",
+        "BODY_SENSORS", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"));
+
+    // ---- state and last use: projections over the journal, never stored
+
+    /** What the journal says about one capability right now. */
+    static final class Status {
+        /** `ON`, `OFF` or `ALWAYS ON`, with the count that matters, in words. */
+        final String state;
+        /** When it was last used, in epoch ms, or -1 if never. */
+        final long lastAtMs;
+        /** What the last use came to — counts only, never content. */
+        final String lastDetail;
+
+        Status(String state, long lastAtMs, String lastDetail) {
+            this.state = state;
+            this.lastAtMs = lastAtMs;
+            this.lastDetail = lastDetail;
+        }
+    }
+
+    private static final Pattern WALL_CLOCK = Pattern.compile("\"wallClock\":(\\d+)");
+
+    private static String lastOfType(List<String> lines, String type) {
+        String found = null;
+        for (String line : lines) if (type.equals(Journal.typeOf(line))) found = line;
+        return found;
+    }
+
+    private static long wallClock(String line) {
+        if (line == null) return -1L;
+        Matcher m = WALL_CLOCK.matcher(line);
+        return m.find() ? Long.parseLong(m.group(1)) : -1L;
+    }
+
+    private static long number(String line, String key) {
+        if (line == null) return -1L;
+        int payload = line.indexOf("\"payload\":");
+        Matcher m = Pattern.compile("\"" + Pattern.quote(key) + "\":(\\d+)").matcher(line);
+        return payload >= 0 && m.find(payload) ? Long.parseLong(m.group(1)) : -1L;
+    }
+
+    private static boolean flagFalse(String line, String key) {
+        return line != null && line.contains("\"" + key + "\":false");
+    }
+
+    static Status status(String id, List<String> lines) {
+        if (PACKAGES.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines);
+            } catch (java.io.IOException unreadable) {
+                // A line whose type cannot be read: the history cannot say, so neither does this.
+                return new Status("unknown — the history could not be read", -1L, "");
+            }
+            String scan = lastOfType(lines, "grants.packages");
+            long count = number(scan, "installedPackageHoldingCount");
+            String detail = scan == null ? "never"
+                : flagFalse(scan, "installedPackageReadable") ? "could not read (not granted)"
+                : count >= 0 ? count + " apps" : "read";
+            return new Status(granted ? "ON — you granted it" : "OFF — not granted", wallClock(scan), detail);
+        }
+        if (SCREEN.equals(id)) {
+            int apps = AllowList.allowed(lines).size();
+            String captured = lastOfType(lines, "orb.assist.captured");
+            return new Status(apps == 0 ? "OFF — no app is allowed" : "ON — " + apps + (apps == 1 ? " app allowed" : " apps allowed"),
+                wallClock(captured), captured == null ? "nothing remembered yet" : "something was remembered");
+        }
+        if (GRANTS.equals(id)) {
+            String observed = lastOfType(lines, "grants.observed");
+            return new Status("ALWAYS ON", wallClock(observed), observed == null ? "never" : "looked");
+        }
+        if (Reminders.CAPABILITY.equals(id)) {
+            int waiting = Reminders.pending(lines).size();
+            String released = lastOfType(lines, ActionFacts.RELEASED);
+            String state = Reminders.enabled(lines) ? "ON — " + waiting + (waiting == 1 ? " reminder waiting" : " reminders waiting") : "OFF — you turned it off";
+            return new Status(state, wallClock(released), released == null ? "none shown yet" : "shown");
+        }
+        return new Status("unknown", -1L, "");
+    }
+
+    /** The declared ids, for tests and the screen. */
+    static List<String> ids() {
+        List<String> out = new ArrayList<>();
+        for (Declaration d : ALL) out.add(d.id);
+        return out;
+    }
+}
