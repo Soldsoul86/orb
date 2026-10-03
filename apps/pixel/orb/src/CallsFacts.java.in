@@ -1,0 +1,24 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * What reading the call log writes to the journal (`docs/CALLS_PHONE.md` §4): that a person's page read it, and **two numbers** — how many calls
+ * were looked at and how many were with that person. **Never a number, a name, a time or a length.** The calls themselves are not kept anywhere.
+ *
+ * The grant and its withdrawal are `PackageGrants` events written by `CallsAccess`, not here.
+ */
+final class CallsFacts {
+    private CallsFacts() {}
+
+    static final String READ = "orb.calls.read";
+
+    static Map<String, Object> read(long examined, long matched) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.CALLS);
+        p.put("version", Capabilities.CALLS_VERSION);
+        p.put("examined", examined);
+        p.put("matched", matched);
+        return p;
+    }
+}

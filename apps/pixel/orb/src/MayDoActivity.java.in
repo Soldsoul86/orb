@@ -118,6 +118,30 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.CALLS)) {
+            if (!CallsAccess.available(this)) {
+                b.setText("Not in this build of Orb");
+                b.setEnabled(false);
+            } else {
+                boolean known;
+                try {
+                    known = PackageGrants.lastIsGrant(lines, Capabilities.CALLS);
+                } catch (IOException unreadable) {
+                    return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+                }
+                final boolean callsOn = known;
+                b.setText(callsOn ? "Switch off the call-history line" : "Turn on (opens People)");
+                b.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) {
+                        if (callsOn) {
+                            CallsAccess.revoke(MayDoActivity.this, journal);
+                            render();
+                        } else {
+                            startActivity(new android.content.Intent(MayDoActivity.this, PeopleActivity.class));
+                        }
+                    }
+                });
+            }
         } else if (d.id.equals(Capabilities.DOCUMENTS)) {
             boolean known;
             try {

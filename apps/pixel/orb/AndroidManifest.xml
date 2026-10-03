@@ -48,6 +48,9 @@
          granted it in Orb and again in Android's own question. Read-only: there is no write permission. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 @QUERY_ALL_PACKAGES@
+<!-- Calls (docs/CALLS_PHONE.md): the call-history permission is declared here only in the calls build (ORB_CALL_LOG=1), by build.sh,
+         the one place it is spelled out. The default build declares none. -->
+@CALL_LOG@
 
     <!--
       Without this, `queryBroadcastReceivers` for admin receivers sees some

@@ -1,0 +1,40 @@
+package @PKG@;
+
+import android.content.ContentResolver;
+import android.content.Context;
+import android.database.Cursor;
+import android.provider.CallLog;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The one file that reads the phone's call log (`orb.read.calls` v1, `docs/CALLS_PHONE.md`) — **read-only, in memory, and only for a person's page
+ * that is open**. It never writes, inserts, updates or deletes a call, keeps nothing between calls, logs nothing, and returns null (not an empty
+ * list) when Android's permission is missing or the log cannot be read: *cannot read* is not *no calls*.
+ *
+ * It asks for the last year, newest first, at most `CallsRules.MAX_CALLS`, and four columns: the number (and the log's normalised form), the
+ * kind, the time and the length. It reads **no name**, no message, no location, nothing about what was said.
+ */
+final class CallsReader {
+    private CallsReader() {}
+
+    /** The calls of the last year (newest first, at most the cap), or null if they cannot be read. */
+    static List<CallsRules.Call> read(Context context, long nowMs) {
+        if (!CallsAccess.permitted(context)) return null;
+        ContentResolver resolver = context.getContentResolver();
+        long since = nowMs - CallsRules.WINDOW_DAYS * 86_400_000L;
+        List<CallsRules.Call> out = new ArrayList<>();
+        try (Cursor c = resolver.query(CallLog.Calls.CONTENT_URI,
+                new String[] {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NORMALIZED_NUMBER, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION},
+                CallLog.Calls.DATE + " >= ?", new String[] {String.valueOf(since)},
+                CallLog.Calls.DATE + " DESC LIMIT " + CallsRules.MAX_CALLS)) {
+            if (c == null) return null;
+            while (c.moveToNext()) {
+                out.add(new CallsRules.Call(CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(3), c.getLong(4)));
+            }
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
+        return out;
+    }
+}

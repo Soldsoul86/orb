@@ -32,6 +32,7 @@ import java.util.Locale;
  */
 public final class PeopleActivity extends Activity {
     private static final int REQUEST_CONTACTS = 72;
+    private static final int REQUEST_CALLS = 73;
     /** The intent extra Recall passes to open this screen in *choose* mode: the kept item to link (`PERSON_LINK_PHONE.md`). */
     static final String LINK_ITEM = "linkItem";
     /** At most this many dates ahead are shown in a person's window. */
@@ -119,7 +120,7 @@ public final class PeopleActivity extends Activity {
             list.addView(again);
             return;
         }
-        list.addView(text("Looking through your contacts and what you kept…", 13, false));
+        list.addView(text("Looking through your contacts and what you kept\u2026", 13, false));
         final android.content.Context context = this;
         new Thread(new Runnable() {
             @Override public void run() {
@@ -150,7 +151,7 @@ public final class PeopleActivity extends Activity {
     private void askToGrant(final Journal journal) {
         list.addView(text(Capabilities.CONTACTS_SAYS, 13, false));
         list.addView(text("Orb reads your contacts only while this screen is open, to tell you which people your kept words mention and "
-            + "to put everything about one person together — their several numbers become one. You can revoke this any time on What Orb may do.", 13, false));
+            + "to put everything about one person together \u2014 their several numbers become one. You can revoke this any time on What Orb may do.", 13, false));
         Button grant = new Button(this);
         grant.setText("Allow Orb to read my contacts");
         grant.setOnClickListener(new View.OnClickListener() {
@@ -178,6 +179,12 @@ public final class PeopleActivity extends Activity {
         super.onRequestPermissionsResult(code, permissions, results);
         if (flow != null) flow.onPermissionResult(code, results);
         if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);
+        if (code == REQUEST_CALLS) {
+            boolean allowed = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+            if (allowed) finishCalls();
+            else say("Android did not allow it, so nothing changed and Orb read no calls.", null);
+            return;
+        }
         if (code != REQUEST_CONTACTS) return;
         boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         Journal journal = journal();
@@ -238,10 +245,10 @@ public final class PeopleActivity extends Activity {
         list.addView(toggle);
         list.addView(mentions);
         StringBuilder said = new StringBuilder();
-        said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" tied by number or email · ")
-            .append(result.possible.size()).append(" only by a name · ").append(result.contacts).append(" contacts looked at");
-        if (result.looked.unreadable > 0) said.append(" · ").append(result.looked.unreadable).append(" items could not be read");
-        if (result.looked.skipped > 0) said.append(" · looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
+        said.append(result.people.size()).append(result.people.size() == 1 ? " person" : " people").append(" tied by number or email \u00b7 ")
+            .append(result.possible.size()).append(" only by a name \u00b7 ").append(result.contacts).append(" contacts looked at");
+        if (result.looked.unreadable > 0) said.append(" \u00b7 ").append(result.looked.unreadable).append(" items could not be read");
+        if (result.looked.skipped > 0) said.append(" \u00b7 looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
         mentions.addView(text(said.toString(), 12, false));
         if (result.people.isEmpty()) {
             mentions.addView(text("None of your contacts' numbers or email addresses is in what you kept.", 14, false));
@@ -253,7 +260,7 @@ public final class PeopleActivity extends Activity {
             more.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) {
                     mentions.removeView(more);
-                    mentions.addView(text("Might be — only a word matches a contact's name. It can be a different person, or no person.", 13, true), mentions.indexOfChild(note));
+                    mentions.addView(text("Might be \u2014 only a word matches a contact's name. It can be a different person, or no person.", 13, true), mentions.indexOfChild(note));
                     int at = mentions.indexOfChild(note);
                     for (People.Person person : result.possible) mentions.addView(row(person), at++);
                 }
@@ -264,7 +271,7 @@ public final class PeopleActivity extends Activity {
             mentions.addView(text(result.sharedFirstNames + (result.sharedFirstNames == 1 ? " first name is" : " first names are")
                 + " shared by several contacts, so those are matched by full name or number only.", 12, false));
         }
-        note = text("Matching by name finds a word that happens to be a name — it can be a different person or no person. "
+        note = text("Matching by name finds a word that happens to be a name \u2014 it can be a different person or no person. "
             + "Matching by number or email is much surer. A name at the start of a sentence is not read: a capital there says nothing.", 12, false);
         mentions.addView(note);
         // After a link or an unlink the screen was recomputed: open the same person again.
@@ -307,12 +314,95 @@ public final class PeopleActivity extends Activity {
         list.addView(text("Or search for someone else:", 12, false));
     }
 
+    /** The person whose page asked to turn the call history on, to reopen after Android answers. */
+    private People.Person callsFor;
+
+    /**
+     * *Calls (phone calls only): last spoke…* — from the call log, computed now for this person's numbers and let go with this window
+     * (`docs/CALLS_PHONE.md`). Only in the calls build; only after the person has said yes here and Android has said yes; nothing about any call
+     * is kept, and the one record is two counts.
+     */
+    private void addCalls(LinearLayout column, final People.Person person) {
+        if (!CallsAccess.available(this)) {
+            column.addView(text("Calls: not in this build of Orb.", 11, false));
+            return;
+        }
+        if (person.phones.isEmpty()) return;   // nothing to match their calls to
+        if (!CallsAccess.granted(this)) {
+            column.addView(text("Calls: off.", 12, false));
+            Button on = new Button(this);
+            on.setText("Show when we last spoke");
+            on.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { confirmCalls(person); }
+            });
+            column.addView(on);
+            return;
+        }
+        final TextView line = text("Calls: looking\u2026", 12, false);
+        column.addView(line);
+        final android.content.Context context = this;
+        final List<String> numbers = new java.util.ArrayList<>(person.phones);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final long now = System.currentTimeMillis();
+                List<CallsRules.Call> calls = CallsReader.read(context, now);
+                final CallsRules.Summary summary = calls == null ? null : CallsRules.summarize(calls, numbers, now);
+                final List<String> said = summary == null
+                    ? java.util.Collections.singletonList("Calls: could not be read, so nothing is shown rather than a guess.")
+                    : CallsRules.lines(summary, now, java.util.TimeZone.getDefault(), Locale.getDefault());
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        Journal journal = journal();
+                        if (summary != null && journal != null) journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched));
+                        line.setText(android.text.TextUtils.join("\n", said));
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** The card before the call history is turned on: what is read, what is kept — Cancel is the default. Nothing is asked of Android until *Allow*. */
+    private void confirmCalls(final People.Person person) {
+        callsFor = person;
+        AlertDialog card = new AlertDialog.Builder(this)
+            .setTitle("Show when you last spoke?")
+            .setMessage("Orb will read your phone's call history while a person's page is open, to say when you last spoke with them: the last call, any missed since, "
+                + "and the last 90 days. Phone calls only \u2014 not WhatsApp. Nothing is kept; only how many calls were looked at is recorded. "
+                + "You can switch it off on What Orb may do.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Allow", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    if (CallsAccess.permitted(PeopleActivity.this)) finishCalls();
+                    else requestPermissions(new String[] {CallsAccess.PERMISSION}, REQUEST_CALLS);
+                }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    /** Android said yes: now the person's own decision is recorded, and only then does anything read. */
+    private void finishCalls() {
+        Journal journal = journal();
+        if (journal == null) return;
+        try {
+            CallsAccess.grant(this, journal);
+        } catch (IOException notRecorded) {
+            say("Orb could not record this, so it turned nothing on.", null);
+            return;
+        }
+        if (callsFor != null) reopenName = callsFor.names.get(0);
+        if (shown != null) shown.dismiss();
+        render();
+    }
+
     private View row(final People.Person person) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(0, 16, 0, 16);
         row.addView(text(person.display(), 15, true));
-        row.addView(text(person.items.isEmpty() ? "nothing you kept mentions them" : person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " · " + People.evidenceLine(person), 12, false));
+        row.addView(text(person.items.isEmpty() ? "nothing you kept mentions them" : person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " \u00b7 " + People.evidenceLine(person), 12, false));
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) {
                 if (linkItem != null) confirmLink(person, linkItem, null);
@@ -577,6 +667,7 @@ public final class PeopleActivity extends Activity {
             if (context.shared > 0) from.append(from.length() > 0 ? " \u00b7 " : "").append("shared \u00d7").append(context.shared);
             if (from.length() > 0) column.addView(text("From: " + from, 12, false));
         }
+        addCalls(column, person);
         if (!person.alsoWith.isEmpty()) {
             StringBuilder with = new StringBuilder("Often with:");
             for (Mentions.Handle h : person.alsoWith) with.append("\n  ").append(Mentions.line(h));
@@ -591,10 +682,10 @@ public final class PeopleActivity extends Activity {
             row.setOrientation(LinearLayout.VERTICAL);
             row.setPadding(0, 16, 0, 16);
             String how = People.BY_LINK.equals(item.by) ? "you linked it"
-                : People.BY_NAME.equals(item.by) ? "mentions the word “" + item.word + "”"
+                : People.BY_NAME.equals(item.by) ? "mentions the word \u201c" + item.word + "\u201d"
                 : People.BY_EMAIL.equals(item.by) ? "has their email" : "has their number";
-            row.addView(text(when.format(new Date(item.entry.wallClock)) + "  ·  " + (item.entry.packageName == null ? "" : item.entry.packageName)
-                + (Provenance.SHARED_TEXT.equals(item.entry.type) ? "  ·  shared" : "") + "  ·  " + how, 11, true));
+            row.addView(text(when.format(new Date(item.entry.wallClock)) + "  \u00b7  " + (item.entry.packageName == null ? "" : item.entry.packageName)
+                + (Provenance.SHARED_TEXT.equals(item.entry.type) ? "  \u00b7  shared" : "") + "  \u00b7  " + how, 11, true));
             row.addView(text(item.entry.snippet, 14, false));
             if (People.BY_LINK.equals(item.by) && item.linkHash != null) {
                 Button unlink = new Button(this);

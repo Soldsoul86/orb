@@ -783,6 +783,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-31 — what the call-history line does not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-36). Debts, stated.
+
+1. **Only the phone's own calls.** WhatsApp, Telegram, Meet and other apps' calls are not in the system log; *last spoke* will say Tuesday when you spoke on WhatsApp on Friday. The line says *phone calls only* so it never claims more.
+2. **The permission is in the whole calls build.** A user of the calls build holds `READ_CALL_LOG` in the app that also holds their vault. A companion app would separate them (least privilege) at the cost of two apps and a protocol; not built.
+3. **Play Protect's verdict on the whole of Orb with this permission is unmeasured.** The probe (a 13 KB app) installed silently; the full app is the first device round's question, and v45 is the rollback.
+4. **Numbers that cannot be matched** (a short code, a hidden number, a number saved in a form that cannot be normalised) never match a person.
+5. **Two people sharing a number** (a family landline) see the same calls.
+6. **A year, 5,000 calls.** A busier log is cut at the newest 5,000 and the line says so.
+7. **"Spoken" is a duration over zero.** A call answered by voicemail that lasted is counted; a very short real call is too. No attempt is made to read intent.
+8. **Time zone.** The day is the phone's current zone; a call made abroad in another zone is shown in today's.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

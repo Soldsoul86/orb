@@ -254,7 +254,7 @@ final class SafetyRulesTest {
             for (Map.Entry<String, String> e : source.entrySet()) {
                 // Capabilities only names the API in the READ_APIS list (the registry's own check holds it to the declared files);
                 // PackageAccess is the older, separately declared reader of requested permissions.
-                if (e.getKey().equals("Capabilities") || (api.equals("requestedPermissions") && e.getKey().equals("PackageAccess"))) continue;
+                if (e.getKey().equals("Capabilities") || (api.equals("requestedPermissions") && (e.getKey().equals("PackageAccess") || e.getKey().equals("CallsAccess")))) continue;
                 if (e.getValue().contains(api)) users.add(e.getKey());
             }
             Harness.equal("only AppSecurityReader uses " + api, users.toString(), "[AppSecurityReader]");

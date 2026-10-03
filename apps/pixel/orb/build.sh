@@ -23,6 +23,14 @@ if [ "$SCAN" = "0" ]; then
 else
   QUERY_ALL='    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />'
 fi
+# Whether this build declares READ_CALL_LOG (`docs/CALLS_PHONE.md` §12). Off unless asked: the default build keeps three permissions, and the
+# calls build is the one made with ORB_CALL_LOG=1. This script is the only place the declaration is spelled out; the manifest holds a placeholder.
+CALLS="${ORB_CALL_LOG:-0}"
+if [ "$CALLS" = "1" ]; then
+  CALL_LOG='    <uses-permission android:name="android.permission.READ_CALL_LOG" />'
+else
+  CALL_LOG='    <!-- ORB_CALL_LOG=1 not set: the call-history permission is not declared in this build. -->'
+fi
 LABEL="${ORB_PROBE_LABEL:-Orb}"
 # **There is no ORB_LANE here, and that is the point.** Pass 1 hardcoded its lane
 # and pass 2 made it a build flag; both put the lane's identity outside the
@@ -47,6 +55,7 @@ rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/src/$PKG_PATH"
 
 sed -e "s/@PKG@/$PKG/g" -e "s/@LABEL@/$LABEL/g" -e "s/@VERSION_CODE@/$VERSION_CODE/g" \
   -e "s|@QUERY_ALL_PACKAGES@|$QUERY_ALL|" \
+  -e "s|@CALL_LOG@|$CALL_LOG|" \
   AndroidManifest.xml > "$OUT/AndroidManifest.xml"
 
 # The journal itself comes from pass 1, taken at build time and never copied.
@@ -126,3 +135,4 @@ ls -lh "$OUT/${PKG##*.}.apk"
 echo "package: $PKG  lane: minted at first run  versionCode: $VERSION_CODE"
 echo "QUERY_ALL_PACKAGES: $([ "$SCAN" = "0" ] && echo omitted || echo declared)"
 echo "signing key: $KEYSTORE"
+echo "READ_CALL_LOG: $([ "$CALLS" = "1" ] && echo declared || echo omitted)"

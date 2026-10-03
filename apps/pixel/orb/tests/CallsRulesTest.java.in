@@ -1,0 +1,232 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/** When did we last speak? (`docs/CALLS_PHONE.md`, DR-36): the rules, the words, the record, and the guards on the one reader. */
+final class CallsRulesTest {
+    private CallsRulesTest() {}
+
+    /** 2026-10-03 12:00 UTC. */
+    private static final long NOW = 1791028800000L;
+    private static final long DAY = 86_400_000L;
+    private static final String RAVI = "+919876543210";
+    private static final String OTHER = "+919000000002";
+
+    private static CallsRules.Call call(String number, int type, long daysAgo, long seconds) {
+        return new CallsRules.Call(number, type, NOW - daysAgo * DAY, seconds);
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        numbersAndKinds();
+        summary();
+        words();
+        records();
+        guards();
+    }
+
+    private static void numbersAndKinds() {
+        Harness.suite("numbers as People writes them, and what a call is");
+        Harness.equal("the log's own normalised form is preferred", CallsRules.normal("098765 43210", "+919876543210"), RAVI);
+        Harness.equal("else the number as written", CallsRules.normal("098765 43210", null), RAVI);
+        Harness.equal("a garbled normalised form falls back to the written one", CallsRules.normal("98765 43210", "abc"), RAVI);
+        Harness.check("a short code or nothing cannot be matched", CallsRules.normal("12345", null) == null && CallsRules.normal(null, null) == null && CallsRules.normal("", "") == null);
+        Harness.check("incoming and outgoing calls that lasted were spoken", call(RAVI, CallsRules.INCOMING, 1, 5).spoken() && call(RAVI, CallsRules.OUTGOING, 1, 1).spoken());
+        Harness.check("a call that rang out with no talk is not", !call(RAVI, CallsRules.OUTGOING, 1, 0).spoken() && !call(RAVI, CallsRules.INCOMING, 1, 0).spoken());
+        Harness.check("a missed or turned-away call was not spoken, and is unanswered",
+            !call(RAVI, CallsRules.MISSED, 1, 0).spoken() && call(RAVI, CallsRules.MISSED, 1, 0).unanswered() && call(RAVI, CallsRules.REJECTED, 1, 0).unanswered());
+        Harness.check("voicemail, blocked and the rest are neither", !call(RAVI, 4, 1, 30).spoken() && !call(RAVI, 6, 1, 0).unanswered() && !call(RAVI, 4, 1, 30).unanswered());
+        Harness.check("a ring that was not answered is not unanswered when it was spoken", !call(RAVI, CallsRules.INCOMING, 1, 60).unanswered());
+    }
+
+    private static void summary() {
+        Harness.suite("the summary for one person");
+        List<CallsRules.Call> log = new ArrayList<>();
+        log.add(call(RAVI, CallsRules.INCOMING, 3, 280));       // the last spoken
+        log.add(call(RAVI, CallsRules.OUTGOING, 10, 40));
+        log.add(call(RAVI, CallsRules.MISSED, 1, 0));            // after: counts
+        log.add(call(RAVI, CallsRules.REJECTED, 2, 0));          // after: counts
+        log.add(call(RAVI, CallsRules.MISSED, 5, 0));            // before: does not
+        log.add(call(RAVI, CallsRules.OUTGOING, 1, 0));          // rang out: neither
+        log.add(call(OTHER, CallsRules.INCOMING, 1, 600));       // someone else
+        log.add(call(null, CallsRules.INCOMING, 1, 600));        // a number that cannot be matched
+        log.add(call(RAVI, CallsRules.INCOMING, 400, 900));      // outside the year
+        log.add(new CallsRules.Call(RAVI, CallsRules.INCOMING, NOW + 60_000L, 100));   // in the future: a clock error, not a call
+        CallsRules.Summary s = CallsRules.summarize(log, Arrays.asList(RAVI), NOW);
+        Harness.equal("calls looked at: those in the last year, not in the future", s.examined, 8);
+        Harness.equal("with their numbers", s.matched, 6);
+        Harness.check("the last spoken is the incoming of three days ago", s.lastSpoken != null && s.lastSpoken.durationSec == 280 && s.lastSpoken.type == CallsRules.INCOMING);
+        Harness.equal("two unanswered since then; the older one and the unspoken ring do not count", s.missedSince, 2);
+        Harness.equal("the last 90 days: two calls spoken", s.recentCalls, 2);
+        Harness.equal("and their total length", s.recentSeconds, 320L);
+        Harness.check("not cut", !s.truncated);
+
+        Harness.equal("any order gives the same answer", CallsRules.summarize(reversed(log), Arrays.asList(RAVI), NOW).lastSpoken.durationSec, 280L);
+        Harness.equal("two numbers of one person", CallsRules.summarize(log, Arrays.asList(RAVI, OTHER), NOW).matched, 7);
+        Harness.equal("a person with no numbers matches nothing", CallsRules.summarize(log, new ArrayList<String>(), NOW).matched, 0);
+        Harness.equal("a null number in the list is ignored", CallsRules.summarize(log, Arrays.asList((String) null), NOW).matched, 0);
+
+        Harness.suite("nothing spoken, only unanswered calls");
+        List<CallsRules.Call> onlyMissed = Arrays.asList(call(RAVI, CallsRules.MISSED, 40, 0), call(RAVI, CallsRules.MISSED, 2, 0));
+        CallsRules.Summary m = CallsRules.summarize(onlyMissed, Arrays.asList(RAVI), NOW);
+        Harness.check("none spoken, both unanswered in the year", m.lastSpoken == null && m.missedSince == 2 && m.matched == 2);
+
+        Harness.suite("the edges");
+        Harness.equal("exactly 90 days ago is in the last 90 days", CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.INCOMING, 90, 60)), Arrays.asList(RAVI), NOW).recentCalls, 1);
+        Harness.equal("a moment more is not", CallsRules.summarize(Arrays.asList(new CallsRules.Call(RAVI, CallsRules.INCOMING, NOW - 90 * DAY - 1, 60)), Arrays.asList(RAVI), NOW).recentCalls, 0);
+        Harness.equal("exactly a year ago is in the year", CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.INCOMING, 365, 60)), Arrays.asList(RAVI), NOW).matched, 1);
+        Harness.equal("a moment more is not", CallsRules.summarize(Arrays.asList(new CallsRules.Call(RAVI, CallsRules.INCOMING, NOW - 365 * DAY - 1, 60)), Arrays.asList(RAVI), NOW).matched, 0);
+        Harness.equal("a call right now is counted", CallsRules.summarize(Arrays.asList(new CallsRules.Call(RAVI, CallsRules.INCOMING, NOW, 60)), Arrays.asList(RAVI), NOW).matched, 1);
+        List<CallsRules.Call> full = new ArrayList<>();
+        for (int i = 0; i < CallsRules.MAX_CALLS; i++) full.add(call(OTHER, CallsRules.INCOMING, 1, 5));
+        Harness.check("the cap is 5,000 and a log that full is said to be cut", CallsRules.MAX_CALLS == 5000 && CallsRules.summarize(full, Arrays.asList(RAVI), NOW).truncated);
+        Harness.check("one fewer is not", !CallsRules.summarize(full.subList(0, CallsRules.MAX_CALLS - 1), Arrays.asList(RAVI), NOW).truncated);
+        Harness.check("the year and the recent stretch are 365 and 90 days", CallsRules.WINDOW_DAYS == 365 && CallsRules.RECENT_DAYS == 90);
+    }
+
+    private static List<CallsRules.Call> reversed(List<CallsRules.Call> in) {
+        List<CallsRules.Call> out = new ArrayList<>(in);
+        java.util.Collections.reverse(out);
+        return out;
+    }
+
+    private static void words() {
+        Harness.suite("in words");
+        Harness.equal("seconds", CallsRules.duration(40), "40 sec");
+        Harness.equal("nothing", CallsRules.duration(0), "0 sec");
+        Harness.equal("the last second before a minute", CallsRules.duration(59), "59 sec");
+        Harness.equal("a minute", CallsRules.duration(60), "1 min");
+        Harness.equal("rounded to the nearest minute", CallsRules.duration(89) + "|" + CallsRules.duration(90), "1 min|2 min");
+        Harness.equal("four minutes forty rounds to five", CallsRules.duration(280), "5 min");
+        Harness.equal("an hour", CallsRules.duration(3600), "1 h");
+        Harness.equal("an hour and five minutes", CallsRules.duration(3900), "1 h 5 min");
+        Harness.equal("just under an hour rounds to an hour", CallsRules.duration(3599), "1 h");
+        TimeZone utc = TimeZone.getTimeZone("UTC");
+        TimeZone kolkata = TimeZone.getTimeZone("Asia/Kolkata");
+        Harness.equal("today", CallsRules.day(NOW - 3600_000L, NOW, utc, Locale.ENGLISH), "today");
+        Harness.equal("yesterday", CallsRules.day(NOW - DAY, NOW, utc, Locale.ENGLISH), "yesterday");
+        Harness.equal("a day this year", CallsRules.day(NOW - 4 * DAY, NOW, utc, Locale.ENGLISH), "Tue 29 Sep");
+        Harness.equal("a day in another year carries it", CallsRules.day(NOW - 300 * DAY, NOW, utc, Locale.ENGLISH), "Sun 7 Dec 2025");
+        Harness.equal("the person's own time zone decides the day: 20:00 UTC on the 2nd is the 3rd in Kolkata", CallsRules.day(1790971200000L, NOW, kolkata, Locale.ENGLISH), "today");
+        Harness.equal("while in UTC it was yesterday", CallsRules.day(1790971200000L, NOW, utc, Locale.ENGLISH), "yesterday");
+
+        CallsRules.Summary s = CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.INCOMING, 3, 280), call(RAVI, CallsRules.OUTGOING, 10, 40), call(RAVI, CallsRules.MISSED, 1, 0), call(RAVI, CallsRules.MISSED, 2, 0)),
+            Arrays.asList(RAVI), NOW);
+        Harness.equal("the full account", CallsRules.lines(s, NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH), Arrays.asList(
+            "Calls (phone calls only): last spoke Wed 30 Sep \u2014 5 min, they called", "2 calls missed since then", "Last 90 days: 2 calls, 5 min"));
+        CallsRules.Summary one = CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.OUTGOING, 0, 40), call(RAVI, CallsRules.MISSED, 0, 0)), Arrays.asList(RAVI), NOW - 1);
+        Harness.equal("singular, today, you called", CallsRules.lines(CallsRules.summarize(Arrays.asList(new CallsRules.Call(RAVI, CallsRules.OUTGOING, NOW - 1000, 40), new CallsRules.Call(RAVI, CallsRules.MISSED, NOW - 500, 0)), Arrays.asList(RAVI), NOW),
+            NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH), Arrays.asList("Calls (phone calls only): last spoke today \u2014 40 sec, you called", "1 call missed since then", "Last 90 days: 1 call, 40 sec"));
+        Harness.check("(unused summary is still well formed)", one.matched >= 0);
+        Harness.equal("none in the year", CallsRules.lines(CallsRules.summarize(new ArrayList<CallsRules.Call>(), Arrays.asList(RAVI), NOW), NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH),
+            Arrays.asList("Calls (phone calls only): none with their numbers in the last year"));
+        CallsRules.Summary nothingSpoken = CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.MISSED, 2, 0), call(RAVI, CallsRules.OUTGOING, 3, 0)), Arrays.asList(RAVI), NOW);
+        Harness.equal("calls but none spoken", CallsRules.lines(nothingSpoken, NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH),
+            Arrays.asList("Calls (phone calls only): no call with them was answered or lasted in the last year \u00b7 1 unanswered"));
+        CallsRules.Summary cut = CallsRules.summarize(fullPlus(call(RAVI, CallsRules.INCOMING, 3, 60)), Arrays.asList(RAVI), NOW);
+        Harness.check("a cut log says so", CallsRules.lines(cut, NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH).get(0).endsWith("(from the newest 5000 calls)"));
+        Harness.check("every first line says phone calls only", CallsRules.lines(s, NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH).get(0).contains("phone calls only")
+            && CallsRules.lines(nothingSpoken, NOW, TimeZone.getTimeZone("UTC"), Locale.ENGLISH).get(0).contains("phone calls only"));
+    }
+
+    private static List<CallsRules.Call> fullPlus(CallsRules.Call mine) {
+        List<CallsRules.Call> full = new ArrayList<>();
+        full.add(mine);
+        for (int i = 1; i < CallsRules.MAX_CALLS; i++) full.add(call(OTHER, CallsRules.INCOMING, 1, 5));
+        return full;
+    }
+
+    private static void records() {
+        Harness.suite("the record: two counts");
+        Map<String, Object> read = CallsFacts.read(1510L, 7L);
+        Harness.equal("fields", read.keySet().toString(), "[capability, examined, matched, version]");
+        Harness.check("the capability, its version and the two numbers", read.get("capability").equals("orb.read.calls") && read.get("version").equals(1L) && read.get("examined").equals(1510L) && read.get("matched").equals(7L));
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("one reader of the call log, read-only; the permission is spelled in one place; the screen asks, then records");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> users = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (!e.getKey().equals("Capabilities") && e.getValue().contains("CallLog")) users.add(e.getKey());
+        Harness.equal("only CallsReader touches the call log", users.toString(), "[CallsReader]");
+        List<String> spelled = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains("android.permission.READ_CALL_LOG")) spelled.add(e.getKey());
+        Harness.equal("the permission's name is in the source only in the file that asks for it and the rules table that judges others by it", spelled.toString(), "[CallsAccess, SafetyRules]");
+        String reader = source.get("CallsReader");
+        for (String bad : Arrays.asList("insert(", "update(", "delete(", "applyBatch", "bulkInsert", "openOutputStream", "CACHED_NAME", "GEOCODED_LOCATION", "TRANSCRIPTION", "VOICEMAIL_URI", "PHONE_ACCOUNT", "COUNTRY_ISO",
+                "DATA_USAGE", "startActivity", "Log.d(", "Log.e(", "Log.i(", "Log.w(", "Log.v(", "System.out", "FileOutputStream", "getSharedPreferences")) {
+            Harness.check("the reader never uses " + bad, !reader.contains(bad));
+        }
+        Harness.check("it reads five columns: the number, the log's normalised form, the kind, the time and the length",
+            reader.contains("new String[] {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NORMALIZED_NUMBER, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION}"));
+        Harness.check("only the last year, newest first, at most the cap",
+            reader.contains("CallLog.Calls.DATE + \" >= ?\"") && reader.contains("CallLog.Calls.DATE + \" DESC LIMIT \" + CallsRules.MAX_CALLS") && reader.contains("nowMs - CallsRules.WINDOW_DAYS * 86_400_000L"));
+        Harness.check("nothing is read without Android's permission, and a failure is null, not an empty log",
+            reader.contains("if (!CallsAccess.permitted(context)) return null;") && reader.contains("if (c == null) return null;") && reader.contains("catch (RuntimeException unreadable) {\n            return null;"));
+        Harness.check("the rules import no Android class and keep nothing", !source.get("CallsRules").contains("import android.") && !source.get("CallsRules").contains("Journal") && !source.get("CallsRules").contains("Attachments."));
+        String facts = source.get("CallsFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the record takes no number, name, time or length", !facts.contains("number") && !facts.contains("name") && !facts.contains("duration") && !facts.contains("date"));
+
+        String access = source.get("CallsAccess");
+        int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");
+        String grant = access.substring(grantAt, revokeAt), revoke = access.substring(revokeAt, reconcileAt);
+        Harness.check("the grant is recorded before the flag", grant.indexOf("record(journal, PackageGrants.GRANTED") > 0 && grant.indexOf("record(journal, PackageGrants.GRANTED") < grant.indexOf("\"rws\""));
+        Harness.check("a revocation removes the flag, then says so", revoke.indexOf(".delete()") > 0 && revoke.indexOf(".delete()") < revoke.indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("a grant needs the flag and Android's permission together", access.contains("return new File(context.getFilesDir(), FILE).exists() && permitted(context);"));
+        Harness.check("a permission withdrawn in Settings, or a restore, is brought into the history",
+            access.substring(reconcileAt).contains("if (flag.exists() && !permitted(context)) flag.delete();") && access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.CALLS)"));
+        Harness.check("this build asks only its own package whether it declared the permission", access.contains("getPackageInfo(context.getPackageName(), PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS))"));
+        Harness.check("the grant record names no number, person or call", !access.substring(access.indexOf("private static void record(")).contains("number"));
+
+        String screen = source.get("PeopleActivity");
+        int addAt = screen.indexOf("private void addCalls(");
+        String add = screen.substring(addAt, screen.indexOf("private void confirmCalls("));
+        Harness.check("a build without the permission says so and reads nothing", add.indexOf("if (!CallsAccess.available(this)) {") > 0 && add.indexOf("if (!CallsAccess.available(this)) {") < add.indexOf("CallsReader.read("));
+        Harness.check("a person with no number is not looked up", add.contains("if (person.phones.isEmpty()) return;"));
+        Harness.check("nothing is read before the grant is checked", add.indexOf("if (!CallsAccess.granted(this)) {") > 0 && add.indexOf("if (!CallsAccess.granted(this)) {") < add.indexOf("CallsReader.read("));
+        Harness.check("the read is off the main thread and matched to this person's numbers only", add.contains("new Thread(new Runnable()") && add.contains("CallsRules.summarize(calls, numbers, now)") && add.contains("new java.util.ArrayList<>(person.phones)"));
+        Harness.check("only two counts are recorded, from the read that happened", add.contains("journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched))") && add.contains("summary != null && journal != null"));
+        String confirm = screen.substring(screen.indexOf("private void confirmCalls("), screen.indexOf("private void finishCalls("));
+        Harness.check("the card says what is read and kept, Cancel is the default, the window is secure",
+            confirm.contains("Phone calls only") && confirm.contains("Nothing is kept") && confirm.contains("BUTTON_NEGATIVE).requestFocus()") && confirm.contains("FLAG_SECURE"));
+        Harness.check("Android is asked only after Allow, and the decision is recorded only after Android says yes", confirm.contains("requestPermissions(new String[] {CallsAccess.PERMISSION}, REQUEST_CALLS)")
+            && screen.contains("if (allowed) finishCalls();") && screen.substring(screen.indexOf("private void finishCalls(")).contains("CallsAccess.grant(this, journal)"));
+
+        Harness.check("Orb makes the history agree with the phone at start", source.get("Orb").contains("CallsAccess.reconcile(this, journal)"));
+        Harness.check("What Orb may do says when it is not in this build, and can switch it off", source.get("MayDoActivity").contains("Not in this build of Orb") && source.get("MayDoActivity").contains("CallsAccess.revoke(MayDoActivity.this, journal)"));
+
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8);
+        String bare = manifest.replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("the manifest declares the call-history permission nowhere: it holds a placeholder for the build to fill", manifest.contains("@CALL_LOG@") && !bare.contains("READ_CALL_LOG"));
+        String build = new String(Files.readAllBytes(root.resolve("build.sh")), StandardCharsets.UTF_8);
+        Harness.check("build.sh declares it only when ORB_CALL_LOG=1, and says which it did",
+            build.contains("CALLS=\"${ORB_CALL_LOG:-0}\"") && build.contains("if [ \"$CALLS\" = \"1\" ]; then\n  CALL_LOG='    <uses-permission android:name=\"android.permission.READ_CALL_LOG\" />'")
+            && build.contains("-e \"s|@CALL_LOG@|$CALL_LOG|\"") && build.contains("echo \"READ_CALL_LOG: "));
+    }
+}

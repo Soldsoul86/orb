@@ -1361,6 +1361,18 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** automatic linking; the same list for short items; organisations that are not contacts; a model reading the document (DR-9).
 
+## DR-36 — Calls: when you last spoke, on a person's page — an opt-in build, nothing kept
+
+- **Status:** Decided and built · **Decided:** 2026-10-03, operator ("Yes, go ahead with the design for calls first", the probes, "Calls go ahead") · **Bears on:** DR-24 (People), DR-22 (the registry), the manifest permission guard
+
+**The ruling.** On a person's page, Orb says **when you last spoke with them** — the last completed call, any missed since, and the last 90 days — from **the phone's call log**, read **only while that page is open**, matched to that person's saved numbers in memory, **let go when the page closes. Nothing about any call is kept** (not in the journal, not sealed, not in a backup); the one record is **two counts** (calls examined, calls with that person). **Phone calls only** — WhatsApp and similar are not in the system log, and the words say so.
+
+**An opt-in build.** The permission `READ_CALL_LOG` is declared **only in a build made with `ORB_CALL_LOG=1`** (the calls build, `orb-app-vNN-calls.apk`); the default build keeps its three permissions. The code is in every build and is switched on by one declared fact; elsewhere the capability reads *not in this build*. **Why:** Play Protect weighs a declared permission at install for the whole app, however it is used; two probes measured it on the operator's phone — `READ_CALL_LOG` installs silently, is granted with a prompt, and reads (`DEVICE_LOOP.md` §7b82), while `READ_SMS` is **blocked with no override** (§7b83). The opt-in build lets the operator keep the default build untouched if Play Protect ever objects. A companion app (least privilege) is the hardening to revisit if a second sensitive permission arrives.
+
+**A new declared capability `orb.read.calls` v1** (Observe, switchable; words pinned). **Turning it on** is the person's card (Cancel first), Android's own prompt, then a recorded decision; nothing is read until both. `CallLog` joins the declared reads and `READ_CALL_LOG` leaves the list of reads Orb does not have; the manifest guard still says three permissions in the template, and the calls build is held to four by its build script.
+
+**Not in this ruling:** keeping or listing any call; calls in the commitment card, Today or the nudge; other apps' calls; SMS (closed by permission; see `MESSAGES_PHONE.md`).
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

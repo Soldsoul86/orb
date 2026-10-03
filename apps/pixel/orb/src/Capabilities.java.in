@@ -66,6 +66,8 @@ final class Capabilities {
     static final String CONTACTS = "orb.read.contacts";
     static final String APPSEC = "orb.read.appsecurity";
     static final long APPSEC_VERSION = 1L;
+    static final String CALLS = "orb.read.calls";
+    static final long CALLS_VERSION = 1L;
     static final String DOCUMENTS = "orb.read.documents";
     static final long DOCUMENTS_VERSION = 1L;
 
@@ -95,6 +97,10 @@ final class Capabilities {
         "Reads, in the one folder you chose, the names, dates and text of PDF files \u2014 only when you tap Look now, only on the phone. "
         + "Nothing is kept unless you tick it; only counts are recorded.";
 
+    static final String CALLS_SAYS =
+        "Reads your call history \u2014 the number, time, length and kind of each call in the last year \u2014 only while a person's page is open, only on the phone, "
+        + "to say when you last spoke. Nothing is kept; only how many calls were looked at is recorded.";
+
     /** The declarations, in the order the screen shows them. */
     static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
         new Declaration(PACKAGES, 1L, "Which apps are installed", PACKAGES_SAYS, TIER_OBSERVE,
@@ -122,6 +128,10 @@ final class Capabilities {
             "your grant \u2014 a recorded decision \u2014 the folder you chose, and your tapping Look now", Arrays.asList(DocumentsFacts.LOOKED),
             "Switch off the Documents source", true,
             Arrays.asList("DocumentsReader", "DocumentsAccess", "SourcesActivity")),
+        new Declaration(CALLS, CALLS_VERSION, "When you last spoke with someone", CALLS_SAYS, TIER_OBSERVE,
+            "your grant \u2014 a recorded decision \u2014 Android's own permission, and a person's page being open (only in the calls build)", Arrays.asList(CallsFacts.READ),
+            "Switch off the call-history line", true,
+            Arrays.asList("CallsReader", "CallsAccess", "PeopleActivity")),
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
@@ -142,12 +152,13 @@ final class Capabilities {
         "getActiveAdmins", "Settings.Secure", "enabled_notification_listeners", "AssistStructure", "ViewNode",
         "onHandleScreenshot", "takeScreenshot", "ContactsContract", "READ_CONTACTS",
         "getInstallSourceInfo", "requestedPermissions", "isDeviceSecure", "ADB_ENABLED", "ENABLED_INPUT_METHODS",
-        "DocumentsContract", "PdfRenderer", "getTextContents", "OPEN_DOCUMENT_TREE"));
+        "DocumentsContract", "PdfRenderer", "getTextContents", "OPEN_DOCUMENT_TREE",
+        "CallLog"));
 
     /** Reads Orb does not have. They appear nowhere in the source until a capability declares them. */
     static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
         "CalendarContract", "LocationManager", "FusedLocation", "UsageStatsManager", "AudioRecord", "MediaRecorder",
-        "CameraManager", "ClipboardManager", "getPrimaryClip", "TelephonyManager", "SmsManager", "READ_SMS", "READ_CALL_LOG",
+        "CameraManager", "ClipboardManager", "getPrimaryClip", "TelephonyManager", "SmsManager", "READ_SMS",
         "BODY_SENSORS", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"));
 
     // ---- state and last use: projections over the journal, never stored
@@ -250,6 +261,17 @@ final class Capabilities {
             long review = number(checked, "review");
             String detail = checked == null ? "never run" : apps + " apps looked at, " + now + " to look at now, " + review + " worth a look";
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(checked), detail);
+        }
+        if (CALLS.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, CALLS);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String read = lastOfType(lines, CallsFacts.READ);
+            String detail = read == null ? "never looked" : number(read, "examined") + " calls examined, " + number(read, "matched") + " with that person, at the last look";
+            return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(read), detail);
         }
         if (DOCUMENTS.equals(id)) {
             boolean granted;

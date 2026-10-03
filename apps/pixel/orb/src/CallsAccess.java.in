@@ -1,0 +1,87 @@
+package @PKG@;
+
+import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.os.SystemClock;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.Map;
+
+/**
+ * Whether Orb may read the call history — **only in the calls build**, and then a recorded decision of the person's, followed by Android's own
+ * question (`docs/CALLS_PHONE.md` §12). The permission is declared in the manifest only when the build was made with `ORB_CALL_LOG=1`; every other
+ * build contains this code and `available` says *no*. The grant is an event, the flag follows it, a revocation removes the flag and then says so,
+ * and after a restore — or after the person withdraws Android's permission — the history is made to agree with the phone.
+ *
+ * **Nothing here reads a call.** `CallsReader` does, only after `granted` says yes.
+ */
+final class CallsAccess {
+    private CallsAccess() {}
+
+    static final String PERMISSION = "android.permission.READ_CALL_LOG";
+    private static final String FILE = "calls-access.granted";
+
+    /** This build declared the permission (it is the calls build). */
+    static boolean available(Context context) {
+        try {
+            PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS));
+            if (info.requestedPermissions == null) return false;
+            for (String p : info.requestedPermissions) if (PERMISSION.equals(p)) return true;
+            return false;
+        } catch (PackageManager.NameNotFoundException | RuntimeException unknown) {
+            return false;
+        }
+    }
+
+    /** Android has given the permission. */
+    static boolean permitted(Context context) {
+        return context.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** The person's decision is on record and Android agrees. */
+    static boolean granted(Context context) {
+        return new File(context.getFilesDir(), FILE).exists() && permitted(context);
+    }
+
+    /** Event first, then the flag: a crash in between leaves a grant on record that the device does not yet exercise — the harmless direction. */
+    static void grant(Context context, Journal journal) throws IOException {
+        if (new File(context.getFilesDir(), FILE).exists()) return;
+        record(journal, PackageGrants.GRANTED, "operator");
+        try (RandomAccessFile out = new RandomAccessFile(new File(context.getFilesDir(), FILE), "rws")) {
+            out.write(new byte[] {1});
+            out.getFD().sync();
+        }
+    }
+
+    /** Flag first, then the event: stop reading, then say so — a crash in between fails toward not reading. */
+    static void revoke(Context context, Journal journal) {
+        new File(context.getFilesDir(), FILE).delete();
+        record(journal, PackageGrants.REVOKED, "operator");
+    }
+
+    /** A restore brings the journal back and grants nothing; Android's permission can also be withdrawn in Settings. If the history says *granted* and the phone does not, record the revocation. */
+    static void reconcile(Context context, Journal journal) {
+        if (journal == null) return;
+        File flag = new File(context.getFilesDir(), FILE);
+        if (flag.exists() && !permitted(context)) flag.delete();
+        if (flag.exists()) return;
+        try {
+            if (PackageGrants.lastIsGrant(journal.readLines(), Capabilities.CALLS)) record(journal, PackageGrants.REVOKED, "reconcile");
+        } catch (IOException unreadable) {
+            // Cannot read the history, so cannot say what it claims. Write nothing.
+        }
+    }
+
+    private static void record(Journal journal, String type, String by) {
+        if (journal == null) return;
+        Map<String, Object> payload = Json.obj();
+        payload.put("capability", Capabilities.CALLS);
+        payload.put("tier", Capabilities.TIER_OBSERVE);
+        payload.put("scope", "the phone's call history, read only while a person's page is open");
+        payload.put("by", by);
+        payload.put("elapsedRealtimeMs", SystemClock.elapsedRealtime());
+        journal.append(type, payload);
+    }
+}

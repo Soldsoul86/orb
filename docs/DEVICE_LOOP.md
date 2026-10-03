@@ -7247,3 +7247,49 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 3. *(Only if granted)* **2. Count my messages**. *(P255)*
 4. Paste the report here (**4. Share**, then copy it), or the screenshot of the block.
 5. Afterwards, uninstall the probe if it installed; it holds nothing.
+
+### 7b84. Calls — when you last spoke, on a person's page (DR-36) — the calls build, 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v46-calls.apk` — **the calls build** (made with `ORB_CALL_LOG=1`; it declares `READ_CALL_LOG`, so it has four permissions; the default build, which is v45's shape, has three). v45 is the safe build and the rollback. Design: `docs/CALLS_PHONE.md` (§12–13); decision `DECISIONS.md` DR-36; limits `ARCHITECTURAL_DEBT.md` AD-31.
+
+**Why:** before you message or chase someone, the simplest thing to know is when you last spoke. Your call log has it. Orb reads it **for one person at a time, only while their page is open**, says it in a line, and keeps nothing.
+
+#### What changed
+
+1. **A person's page (People → a person with a saved number) gains a line** under *Last mentioned…*: ***Calls (phone calls only): last spoke Tue 29 Sep — 4 min, you called***, then ***1 call missed since then*** (only if there is one) and ***Last 90 days: 7 calls, 21 min***. A person with no calls in the year: *none with their numbers in the last year*.
+2. **Turning it on:** the line starts as ***Calls: off.*** with **Show when we last spoke** → a card saying what is read and that nothing is kept (**Cancel is the default**) → **Allow** → **Android's own permission prompt** → the page reopens with the lines. Nothing is read before both.
+3. **Phone calls only** — not WhatsApp. The line says so.
+4. **What Orb may do** gains ***When you last spoke with someone***, ON/OFF with *N calls examined, M with that person, at the last look*, and **Switch off the call-history line**.
+5. **Nothing about any call is kept anywhere.** The only record is two counts per page opened (`orb.calls.read`), plus the grant and its withdrawal.
+6. **In a default build** the same line reads *Calls: not in this build of Orb.* (not tested on the device; this is the calls build).
+
+#### Checked before the device
+
+- Phone-side suite: @@COUNT@@ checks; brain, TypeScript, lint and type-check unchanged and clean. **Both builds were built:** the default declares three permissions, the calls build four.
+- **Mutation checks** on the kinds of call, the summary and its edges (a year, 90 days, the future, 5,000), the words, the record, the access (grant before flag, both conditions, revoke order, reconcile), the reader (the query, the columns, the null on failure) and the screen (the order of asking and recording, the card's default): @@MUT@@
+- **Not testable off the phone:** that Android's call-log provider returns what it returned to the probe for the whole of Orb, and that Play Protect lets the whole of Orb through with this permission.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P256** | **v46 installs over v45 with no Play Protect block** (the probe, with the same permission, installed silently) and Orb opens | blocked or warned — **record the exact words**; v45 stays the build to use and the feature waits |
+| **P257** | **People → a person who has a saved number**: the window shows ***Calls: off.*** and the button **Show when we last spoke**; a person with no number shows no calls line | the line or the button is missing |
+| **P258** | Tap it → the card; **Cancel** does nothing and records nothing; again → **Allow** → **Android's prompt** → **Allow** → the person's window reopens with ***Calls (phone calls only): last spoke …*** | the card, the prompt or the line differs |
+| **P259** | **The line matches your Phone app's history for that person**: the day of the last call (or *today* / *yesterday*), its length to the nearest minute, and whether you called or they did | a wrong day, length or direction |
+| **P260** | ***N calls missed since then*** matches your Phone app (missed calls after that call), and ***Last 90 days*** matches the count of completed calls | the counts differ |
+| **P261** | A person you have **never called** shows ***none with their numbers in the last year*** | a call is shown that is not theirs |
+| **P262** | **What Orb may do** shows ***When you last spoke with someone — ON***, with *N calls examined, M with that person, at the last look*; **Switch off the call-history line** turns it OFF and People shows ***Calls: off.*** again | the capability is missing or ignores the switch |
+| **P263** | **Export and share journal**: the grant, and an `orb.calls.read` for each person's page you opened — **two numbers each, no phone number, name, time or length anywhere in the file** | something about a call was recorded |
+| **P264** | **WhatsApp calls are not in the line** (as the line says) | — (this is the stated limit, not a failure) |
+
+#### The operator's protocol
+
+1. Install `orb-app-v46-calls.apk` over v45; open Orb once. **Screenshot anything Android or Play Protect says.** *(P256)*
+2. **People** → open a person you have called → read the calls line state; try one with no saved number. *(P257)*
+3. **Show when we last spoke** → read the card → **Cancel**; again → **Allow** → **Allow** on Android's prompt. *(P258)*
+4. Compare the lines with your **Phone app's recents** for that person. *(P259, P260)*
+5. Open a person you have never called. *(P261)*
+6. **What Orb may do** → read the line → **Switch off** → back in People. *(P262)*
+7. **Export and share journal**. *(P263)*
+8. Tell me: **was the last-spoke line right, and did anything look wrong or missing?**

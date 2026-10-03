@@ -34,9 +34,9 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("eight capabilities, each declared once and frozen");
+        Harness.suite("nine capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.remind.local", "orb.handoff.communicate"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.calls", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
@@ -65,6 +65,10 @@ final class CapabilitiesTest {
         Harness.check("the documents source is Observe and switchable, and says it keeps only what you tick and records only counts",
             Capabilities.byId(Capabilities.DOCUMENTS).tier.equals("Observe") && Capabilities.byId(Capabilities.DOCUMENTS).switchable
             && Capabilities.DOCUMENTS_SAYS.contains("only when you tap Look now") && Capabilities.DOCUMENTS_SAYS.contains("Nothing is kept unless you tick it; only counts are recorded"));
+        Harness.equal("the call history's words are pinned", pin(Capabilities.CALLS_SAYS), "sha256:aae241a0f41bc9aee8883b3e20f7df6f5bd51cf6c4cfd6a6b6e78b12b4d193cd");
+        Harness.check("the call history is Observe and switchable, says phone and a page being open, and that nothing is kept",
+            Capabilities.byId(Capabilities.CALLS).tier.equals("Observe") && Capabilities.byId(Capabilities.CALLS).switchable
+            && Capabilities.CALLS_SAYS.contains("only while a person's page is open") && Capabilities.CALLS_SAYS.contains("Nothing is kept; only how many calls were looked at is recorded"));
         Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
             && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",
@@ -148,6 +152,15 @@ final class CapabilitiesTest {
         Harness.check("a look and keeps: when, the count found, and the total kept", docsUsed.lastAtMs > 0 && docsUsed.lastDetail.equals("9 PDFs found at the last look, 4 kept in all"));
         journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.documents"));
         Harness.check("revoked: off", Capabilities.status(Capabilities.DOCUMENTS, journal.readLines()).state.startsWith("OFF"));
+
+        Capabilities.Status callsNever = Capabilities.status(Capabilities.CALLS, journal.readLines());
+        Harness.check("the call history never granted: off, never looked", callsNever.state.startsWith("OFF") && callsNever.lastAtMs < 0 && callsNever.lastDetail.equals("never looked"));
+        journal.append(PackageGrants.GRANTED, pkg(PackageGrants.GRANTED, "orb.read.calls"));
+        journal.append(CallsFacts.READ, CallsFacts.read(1510L, 7L));
+        Capabilities.Status callsUsed = Capabilities.status(Capabilities.CALLS, journal.readLines());
+        Harness.check("granted and used: on, when, and two counts", callsUsed.state.startsWith("ON") && callsUsed.lastAtMs > 0 && callsUsed.lastDetail.equals("1510 calls examined, 7 with that person, at the last look"));
+        journal.append(PackageGrants.REVOKED, pkg(PackageGrants.REVOKED, "orb.read.calls"));
+        Harness.check("revoked: off", Capabilities.status(Capabilities.CALLS, journal.readLines()).state.startsWith("OFF"));
 
         Capabilities.Status handoffNever = Capabilities.status(Handoff.CAPABILITY, journal.readLines());
         Harness.check("the hand-off is on, every tap confirmed, and none opened yet", handoffNever.state.startsWith("ON") && handoffNever.lastAtMs < 0 && handoffNever.lastDetail.equals("none opened yet"));

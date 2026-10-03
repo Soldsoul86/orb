@@ -30,6 +30,7 @@ public final class Tests {
         DocumentsRulesTest.run();
         DocumentDatesTest.run();
         DocumentPeopleTest.run();
+        CallsRulesTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

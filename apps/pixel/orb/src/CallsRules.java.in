@@ -1,0 +1,151 @@
+package @PKG@;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TimeZone;
+
+/**
+ * *When did we last speak?* — the rules, with no Android in them (`docs/CALLS_PHONE.md`, DR-36). `CallsReader` is the one file that touches
+ * the call log; it hands calls to this class, which matches them to one person's numbers, summarises them, and puts the summary into words.
+ *
+ * **A summary, never a list.** Nothing here keeps a call: the answer is a handful of numbers and a few sentences, computed when a person's
+ * page opens and let go when it closes. A call *spoken* is one that was answered or made and lasted; a ring that nobody answered is not
+ * *speaking*, and Orb does not call it that. Only the phone's own call log is seen, never WhatsApp or other apps' calls, and the words say so.
+ */
+final class CallsRules {
+    private CallsRules() {}
+
+    /** Calls are read for this many days back, and at most this many of the newest. */
+    static final int WINDOW_DAYS = 365;
+    static final int MAX_CALLS = 5000;
+    /** The recent stretch the totals cover. */
+    static final int RECENT_DAYS = 90;
+
+    // The call log's own kinds (`CallLog.Calls.TYPE`), spelled as numbers so this class needs no Android.
+    static final int INCOMING = 1;
+    static final int OUTGOING = 2;
+    static final int MISSED = 3;
+    static final int REJECTED = 5;
+
+    private static final long DAY_MS = 86_400_000L;
+
+    /** One call, as the log gave it. `number` is already in the form People writes numbers (`+91…`), or null if it cannot be. */
+    static final class Call {
+        final String number;
+        final int type;
+        final long dateMs;
+        final long durationSec;
+
+        Call(String number, int type, long dateMs, long durationSec) {
+            this.number = number;
+            this.type = type;
+            this.dateMs = dateMs;
+            this.durationSec = durationSec;
+        }
+
+        /** Answered or made, and it lasted. */
+        boolean spoken() {
+            return (type == INCOMING || type == OUTGOING) && durationSec > 0;
+        }
+
+        /** Rang and was not answered: missed, or turned away. */
+        boolean unanswered() {
+            return type == MISSED || type == REJECTED;
+        }
+    }
+
+    /** The number as People writes it: the log's own normalised form if it has one, else the number as written; null if neither can be matched. */
+    static String normal(String raw, String cachedNormalized) {
+        String n = People.normalPhone(cachedNormalized);
+        return n != null ? n : People.normalPhone(raw);
+    }
+
+    static final class Summary {
+        /** Calls looked at, and how many of them were with this person's numbers. */
+        int examined;
+        int matched;
+        /** The latest call that was spoken, or null. */
+        Call lastSpoken;
+        /** Calls that rang unanswered since then (or, if nothing was ever spoken, in the whole window). */
+        int missedSince;
+        /** Spoken calls in the last `RECENT_DAYS`, and their total length. */
+        int recentCalls;
+        long recentSeconds;
+        /** The newest `MAX_CALLS` were read and the log had at least that many: older ones may exist. */
+        boolean truncated;
+    }
+
+    /** The calls with these numbers, summarised as of `nowMs`. `calls` may be in any order. */
+    static Summary summarize(List<Call> calls, Collection<String> numbers, long nowMs) {
+        Summary s = new Summary();
+        Set<String> mine = new HashSet<>();
+        for (String n : numbers) if (n != null) mine.add(n);
+        long since = nowMs - WINDOW_DAYS * DAY_MS;
+        long recentSince = nowMs - RECENT_DAYS * DAY_MS;
+        List<Call> theirs = new ArrayList<>();
+        for (Call c : calls) {
+            if (c.dateMs < since || c.dateMs > nowMs) continue;
+            s.examined++;
+            if (c.number == null || !mine.contains(c.number)) continue;
+            s.matched++;
+            theirs.add(c);
+            if (c.spoken() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.lastSpoken = c;
+        }
+        for (Call c : theirs) {
+            if (c.unanswered() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.missedSince++;
+            if (c.spoken() && c.dateMs >= recentSince) {
+                s.recentCalls++;
+                s.recentSeconds += c.durationSec;
+            }
+        }
+        s.truncated = calls.size() >= MAX_CALLS;
+        return s;
+    }
+
+    /** *40 sec*, *4 min*, *1 h 5 min*. */
+    static String duration(long seconds) {
+        if (seconds < 60) return seconds + " sec";
+        long minutes = (seconds + 30) / 60;
+        if (minutes < 60) return minutes + " min";
+        return (minutes / 60) + " h" + (minutes % 60 == 0 ? "" : " " + (minutes % 60) + " min");
+    }
+
+    /** *today*, *yesterday*, *Tue 29 Sep*, or *Tue 29 Sep 2025* when it was not this year — in the person's own time zone. */
+    static String day(long whenMs, long nowMs, TimeZone zone, Locale locale) {
+        SimpleDateFormat key = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
+        key.setTimeZone(zone);
+        String then = key.format(new Date(whenMs));
+        if (then.equals(key.format(new Date(nowMs)))) return "today";
+        if (then.equals(key.format(new Date(nowMs - DAY_MS)))) return "yesterday";
+        boolean thisYear = then.substring(0, 4).equals(key.format(new Date(nowMs)).substring(0, 4));
+        SimpleDateFormat nice = new SimpleDateFormat(thisYear ? "EEE d MMM" : "EEE d MMM yyyy", locale);
+        nice.setTimeZone(zone);
+        return nice.format(new Date(whenMs));
+    }
+
+    /** The lines for a person's page, in words. Always says *phone calls only*. */
+    static List<String> lines(Summary s, long nowMs, TimeZone zone, Locale locale) {
+        List<String> out = new ArrayList<>();
+        String cut = s.truncated ? " (from the newest " + MAX_CALLS + " calls)" : "";
+        if (s.matched == 0) {
+            out.add("Calls (phone calls only): none with their numbers in the last year" + cut);
+            return out;
+        }
+        if (s.lastSpoken == null) {
+            out.add("Calls (phone calls only): no call with them was answered or lasted in the last year" + cut
+                + (s.missedSince > 0 ? " \u00b7 " + s.missedSince + " unanswered" : ""));
+            return out;
+        }
+        out.add("Calls (phone calls only): last spoke " + day(s.lastSpoken.dateMs, nowMs, zone, locale) + " \u2014 " + duration(s.lastSpoken.durationSec)
+            + ", " + (s.lastSpoken.type == OUTGOING ? "you called" : "they called") + cut);
+        if (s.missedSince > 0) out.add(s.missedSince + (s.missedSince == 1 ? " call missed since then" : " calls missed since then"));
+        if (s.recentCalls > 0) out.add("Last " + RECENT_DAYS + " days: " + s.recentCalls + (s.recentCalls == 1 ? " call, " : " calls, ") + duration(s.recentSeconds));
+        return out;
+    }
+}
