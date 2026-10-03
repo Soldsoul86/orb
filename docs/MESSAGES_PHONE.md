@@ -99,3 +99,17 @@ The app on the operator's phone is **"SMS Backup & Restore" 2.3.7 with a purple 
 Two cautions given to the operator: that app asks for ***All files access*** (read, modify and delete every file) — leave it off first, try the *Storage Backup Location* pencil to pick a normal folder, and switch it off again in Settings afterwards if it must be granted; and **never tap *Delete All SMS* or *Delete All local Backups*** while testing. Orb endorses no backup app.
 
 **The file turned out to be `Sat, Oct 3, 2026, 11.00.48.sms`** (6.22 MB, beside a 151 MB WhatsApp file that Orb must not be pointed at). The `.sms` extension says nothing certain about the inside. So v48 adds one small thing: when a file **cannot be read at all**, Orb says **what kind of file it looks like from its first bytes only** (`MessagesRules.kindOf`: empty / zip archive / SQLite database / XML or HTML text / JSON text / plain text / binary data possibly encrypted) and that it reads message backups written as XML. It is a fixed phrase, never a word of the content, so the operator can describe an unrecognised file by what Orb shows without pasting a message. If the kind is XML or JSON, the next build adapts `MessagesXml` to the real shape; if it is binary or encrypted, the honest answer is that Orb cannot read that app's format and the backup app must be set to write XML (or another route chosen).
+
+## 14. The operator's file is JSON (2026-10-03) — proposed, not built
+
+The operator reports that `Sat, Oct 3, 2026, 11.00.48.sms` is **JSON**. Orb's reader is XML only. **Nothing is built until the shape is known**; guessing field names would pass its own tests and still misread real dates and message kinds.
+
+**What stays the same.** Everything after the parser: the `Message` sink, the survey, the harvest, the sealed words, the records, the keys, the screens. A JSON reader would be a second front end onto the same five facts (number, name, time, kind, words). It is not an architecture change; it is a second reader behind `MessagesXml.Sink`'s sibling, chosen by the file's first bytes (`MessagesRules.kindOf`).
+
+**Two ways to learn the shape, the operator's choice.**
+- **A. No build.** Back up one harmless conversation (*Backup Conversations*), open the file with any text viewer, and send the **first ~10 lines** with the real words replaced by anything. That shows the keys, how dates are written (milliseconds, seconds or text) and how sent/received is written.
+- **B. A describer in the app (v49).** For a JSON file Orb shows **key names and value kinds only** (e.g. *a list of 1,204 objects with keys: …; "date": 13 digits; "type": one of 2 short words*), never a value, except the few distinct short words of a field that has at most 6 distinct values and is not the body or the number. The operator reads that to me. A streaming JSON tokenizer of our own (Android's `JsonReader` does not exist in the off-device tests), the same 200 MB and 200,000-message caps, external-reference-free by construction.
+
+**Risks.** The date may be seconds, milliseconds or text; the kind may be a word (*inbox/sent*) or a number; the conversation may be nested rather than flat. Each needs a stated rule and a test before it is read. A field with few distinct values could in principle be a name; B lets the operator see it before sharing and the words are capped at 12 characters.
+
+**Third route.** If the backup app can write **XML** instead, v48 already reads it.
