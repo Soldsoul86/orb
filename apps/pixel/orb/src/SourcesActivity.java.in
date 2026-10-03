@@ -434,7 +434,8 @@ public final class SourcesActivity extends Activity {
                     try {
                         result = MessagesFlow.look(new MessagesReader(SourcesActivity.this, file), System.currentTimeMillis(), java.util.TimeZone.getDefault());
                     } catch (Exception unreadable) {
-                        failure = "Orb could not read that file (" + unreadable.getClass().getSimpleName() + ").";
+                        failure = "Orb could not read that file (" + unreadable.getClass().getSimpleName() + "). It looks like "
+                            + new MessagesReader(SourcesActivity.this, file).kind() + "; Orb reads message backups written as XML.";
                     }
                 }
                 final MessagesFlow.Look found = result;

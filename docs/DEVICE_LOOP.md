@@ -7315,8 +7315,8 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 #### Checked before the device
 
-- Phone-side suite: 2047 checks; brain, TypeScript, lint and type-check unchanged and clean.
-- **Mutation checks** on the parser, the rules (the code words, the months and their edges, the survey, the caps, the sealed words), the flow (held / earlier / erased / sixty), the records and key, the status, and the screen's order of asking and reading: @@MUT@@
+- Phone-side suite: 2084 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the parser, the rules (the code words, the months and their edges, the survey, the caps, the sealed words), the flow (held / earlier / erased / sixty), the records and key, the status, and the screen's order of asking and reading: **112 mutants; 87 caught by the first suite, 25 survived** (the preview-length edges, ties in order and in "latest", a name written as *null* or *unknown*, the singular wording, a month's length cap, what *left out* adds up, the grant and revoke steps, the source filter on the status). Each became a test, and **all but one are now caught**; the one that remains is **equivalent** (`live.add(key)` inside a single keep: every month has its own key, so nothing later in the same keep can see the difference).
 - A **made-up sample file** (`orb-sample-messages.xml`) is sent with the APK so the flow can be tried without exposing a real export.
 - **Not testable off the phone:** your real backup file's shape, the picker's grant for a large file, and how the screens feel with hundreds of message items.
 
@@ -7330,7 +7330,7 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 | **P268** | Tick the first, **Keep the ticked ones** → ***Kept 2 months***; **Recall → search "pay by"** finds it, *from a message backup you chose* | nothing is kept, or it is not found |
 | **P269** | **Coming up** shows the **12 Dec 2026** date with the message ***Reminder: please pay by 12/12/2026…*** (a deadline) and **20 Dec 2026** ("meet on 20/12/2026") — the second under *Other dates in your documents* | a date is missing or has no message |
 | **P270** | Tap **Keep** again on the same file (pick it again, tick it) → ***Already in Orb: 2*** | duplicates appear |
-| **P271** | **Your own backup file:** Orb either **recognises** it (a conversation list) or says **Not recognised. Found <…> → <…> with attributes: …** *(names only)*; bank senders and codes are counted as left out | a crash, a wrong format, or message text on the screen |
+| **P271** | **Your own backup file** (yours is named like *Sat, Oct 3, 2026, 11.00.48.**sms***, 6.22 MB, in `AllBackupRestore`): Orb either **recognises** it (a conversation list), or says **Not recognised. Found <…> → <…> with attributes: …** *(names only)*, or says **Orb could not read that file … It looks like \<XML / JSON / a zip archive / binary data (possibly encrypted) / plain text\>** *(a kind, never a word of it)*; bank senders and codes are counted as left out | a crash, a wrong format, or message text on the screen |
 | **P272** | **Export and share journal**: `orb.source.looked` and `orb.source.kept` with `source: messages` and counts; `orb.shared` records with `referrer: orb-source://messages/<key>/<month>` — **no number, name or message word anywhere in the file** | something about a message was recorded in the clear |
 | **P273** | **What Orb may do** shows ***Text messages from a backup file you choose — ON*** with *N conversations in the last file, M months kept in all*; **Switch off the Messages source** turns it OFF | missing or ignores the switch |
 

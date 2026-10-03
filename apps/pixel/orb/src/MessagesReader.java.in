@@ -30,6 +30,20 @@ final class MessagesReader implements MessagesFlow.Source {
         return -1L;
     }
 
+    /** What kind of file this is, from its first 16 bytes (see `MessagesRules.kindOf`); "unknown" if it cannot be opened. */
+    String kind() {
+        try (InputStream in = context.getContentResolver().openInputStream(file)) {
+            if (in == null) return "unknown";
+            byte[] head = new byte[16];
+            int n = 0;
+            int got;
+            while (n < head.length && (got = in.read(head, n, head.length - n)) > 0) n += got;
+            return MessagesRules.kindOf(head, n);
+        } catch (Exception unreadable) {
+            return "unknown";
+        }
+    }
+
     @Override
     public MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception {
         try (InputStream in = context.getContentResolver().openInputStream(file)) {

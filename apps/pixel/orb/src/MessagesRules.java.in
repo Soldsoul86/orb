@@ -95,6 +95,26 @@ final class MessagesRules {
         return cut + "\u2026";
     }
 
+    /**
+     * What a file *is*, from its first bytes alone — a kind, never a word of its content. Used only when a file cannot be read, so that "it is JSON" or "it is
+     * encrypted" can be said and nobody has to paste a message to describe it.
+     */
+    static String kindOf(byte[] head, int length) {
+        if (length <= 0) return "an empty file";
+        if (length >= 4 && head[0] == 'P' && head[1] == 'K' && head[2] == 3 && head[3] == 4) return "a zip archive";
+        if (length >= 15 && new String(head, 0, 15, java.nio.charset.StandardCharsets.ISO_8859_1).equals("SQLite format 3")) return "a SQLite database";
+        int i = 0;
+        if (length >= 3 && (head[0] & 0xff) == 0xEF && (head[1] & 0xff) == 0xBB && (head[2] & 0xff) == 0xBF) i = 3;
+        while (i < length && (head[i] == ' ' || head[i] == '\n' || head[i] == '\r' || head[i] == '\t')) i++;
+        if (i < length && head[i] == '<') return "XML or HTML text";
+        if (i < length && (head[i] == '{' || head[i] == '[')) return "JSON text";
+        for (int k = 0; k < length; k++) {
+            int b = head[k] & 0xff;
+            if (b < 0x20 && b != '\n' && b != '\r' && b != '\t') return "binary data (possibly encrypted)";
+        }
+        return "plain text";
+    }
+
     // ---- months
 
     /** `YYYY-MM` for a moment, in a zone. */

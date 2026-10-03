@@ -94,6 +94,15 @@ final class MessagesTest {
         MessagesXml.Recognition other = MessagesXml.parse(new ByteArrayInputStream("<backup><entry secret=\"hunter2\" other=\"x\"/></backup>".getBytes(StandardCharsets.UTF_8)), new Collect(), 10);
         Harness.check("an unknown file is not recognised", !other.recognised());
         Harness.check("and is described by names only", other.describe().contains("<backup>") && other.describe().contains("<entry>") && other.describe().contains("secret, other") && !other.describe().contains("hunter2"));
+        MessagesXml.Recognition two = MessagesXml.parse(new ByteArrayInputStream("<backup><a x=\"1\"/><b y=\"2\"/></backup>".getBytes(StandardCharsets.UTF_8)), new Collect(), 10);
+        Harness.check("only the first child's names are described", two.describe().contains("<a>") && two.describe().contains("x") && !two.describe().contains("<b>") && !two.describe().contains("y,") && !two.describe().contains(", y"));
+        Collect rooted = new Collect();
+        MessagesXml.Recognition wrongRoot = MessagesXml.parse(new ByteArrayInputStream(("<backup><sms address=\"" + RAVI + "\" date=\"5\" type=\"1\" body=\"x\"/></backup>").getBytes(StandardCharsets.UTF_8)), rooted, 10);
+        Harness.check("messages under another root are read but the file is not called recognised", wrongRoot.messages == 1 && !wrongRoot.recognised());
+        Collect typeless = new Collect();
+        MessagesXml.parse(new ByteArrayInputStream(("<smses><sms address=\"" + RAVI + "\" date=\"5\" body=\"x\"/></smses>").getBytes(StandardCharsets.UTF_8)), typeless, 10);
+        Harness.check("a message with no kind is kept as kind 0 (and so counted as other, not as received)", typeless.got.size() == 1 && typeless.got.get(0).type == 0);
+        Harness.check("nothing found yet says the file is not XML", new MessagesXml.Recognition().describe().startsWith("Not recognised: the file is not XML") && !new MessagesXml.Recognition().describe().contains("Found <"));
         Harness.check("an empty smses is not recognised either (nothing to keep)", !MessagesXml.parse(new ByteArrayInputStream("<smses count=\"0\"></smses>".getBytes(StandardCharsets.UTF_8)), new Collect(), 10).recognised());
         boolean leaked = false;
         Collect xxe = new Collect();
@@ -121,12 +130,28 @@ final class MessagesTest {
             Harness.check("looks like a code: " + w, MessagesRules.looksLikeCode(w));
         for (String w : Arrays.asList("see you at the pinnacle", "spinning class", "Let's meet at 7", "pining for you", "the hotspot", "", "optional"))
             Harness.check("not a code: " + w, !MessagesRules.looksLikeCode(w));
+        for (String w : Arrays.asList("a sharp hairpin bend", "whatpin", "mypassword", "hotpot"))
+            Harness.check("not a code, the word only ends or starts like one: " + w, !MessagesRules.looksLikeCode(w));
         Harness.check("null is not a code", !MessagesRules.looksLikeCode(null));
+        Harness.equal("a name written as null, unknown or (UNKNOWN) is no name; spaces are squeezed", new MessagesRules.Message(RAVI, "null", 1L, 1, "x").name + "|" + new MessagesRules.Message(RAVI, "UNKNOWN", 1L, 1, "x").name
+            + "|" + new MessagesRules.Message(RAVI, "(UNKNOWN)", 1L, 1, "x").name + "|" + new MessagesRules.Message(RAVI, "  Ravi \n  Kumar ", 1L, 1, "x").name, "|||Ravi Kumar");
+        for (String[] k : new String[][] {{"", "an empty file"}, {"PK\u0003\u0004abc", "a zip archive"}, {"SQLite format 3\u0000", "a SQLite database"}, {"  \n<?xml version", "XML or HTML text"},
+            {"\u00ef\u00bb\u00bf<smses>", "XML or HTML text"}, {"{\"a\":1}", "JSON text"}, {"[1,2]", "JSON text"}, {"hello there\r\n", "plain text"}, {"ab\u0001\u0002cd", "binary data (possibly encrypted)"}}) {
+            byte[] head = k[0].getBytes(StandardCharsets.ISO_8859_1);
+            Harness.equal("a file's kind from its first bytes: " + k[1], MessagesRules.kindOf(head, head.length), k[1]);
+        }
+        Harness.check("the kind is a fixed phrase, never the words", MessagesRules.kindOf("secret words".getBytes(StandardCharsets.ISO_8859_1), 12).equals("plain text"));
+        Harness.equal("a tab is a space", MessagesRules.oneLine("a\tb"), "a b");
+        StringBuilder edge = new StringBuilder();
+        for (int i = 0; i < MessagesRules.PREVIEW_CHARS; i++) edge.append('x');
+        Harness.equal("a message of exactly the preview length is shown whole", MessagesRules.preview(edge.toString()), edge.toString());
+        Harness.equal("one character more is cut and marked", MessagesRules.preview(edge.toString() + "y"), edge.toString() + "\u2026");
         Harness.equal("a message on one line", MessagesRules.oneLine("a\nb\r\nc\t  d \u0007e"), "a b c d e");
         StringBuilder many = new StringBuilder();
         for (int i = 0; i < 60; i++) many.append("word").append(i).append(' ');
         String p = MessagesRules.preview(many.toString());
         Harness.check("a preview is short, cut at a word and marked", p.length() <= MessagesRules.PREVIEW_CHARS + 1 && p.endsWith("\u2026") && MessagesRules.preview("hi there").equals("hi there"));
+        Harness.check("and the cut falls on a space, so no word is broken", many.toString().charAt(p.length() - 1) == ' ' && !p.substring(0, p.length() - 1).endsWith(" "));
 
         Harness.suite("finished months, the last twelve, in the person's zone");
         Harness.equal("a month of a moment", MessagesRules.monthOf(NOW, UTC), "2026-10");
@@ -158,6 +183,22 @@ final class MessagesTest {
         Harness.equal("most recent conversation first", s.listed().get(0).number, RAVI);
         Harness.check("the label carries the number and the name", ravi.label().equals(RAVI + " (Ravi K)") && s.by.get(PRIYA).label().equals(PRIYA + " (Priya Shah)"));
         Harness.check("a row says how many messages, between when, and up to how many items", MessagesRules.rowLabel(ravi, UTC).equals(RAVI + " (Ravi K)\n3 messages \u00b7 Aug 2026 to Sep 2026 \u00b7 up to 2 items"));
+        MessagesRules.Survey tie = new MessagesRules.Survey(NOW, UTC);
+        tie.message(new MessagesRules.Message(PRIYA, "Old Name", at("2026-09-12T14:05:00"), 1, "first words"));
+        tie.message(new MessagesRules.Message(PRIYA, "New Name", at("2026-09-12T14:05:00"), 1, "second words"));
+        tie.message(new MessagesRules.Message(RAVI, "", at("2026-09-12T14:05:00"), 1, "same moment"));
+        Harness.check("at the same moment the later in the file wins the snippet and the name", tie.by.get(PRIYA).snippet.equals("second words") && tie.by.get(PRIYA).name.equals("New Name"));
+        Harness.equal("conversations with the same last moment are ordered by number", tie.listed().get(0).number + "|" + tie.listed().get(1).number, PRIYA + "|" + RAVI);
+        MessagesRules.Survey names = new MessagesRules.Survey(NOW, UTC);
+        names.message(new MessagesRules.Message(PRIYA, "Latest Name", at("2026-09-12T14:05:00"), 1, "later in time"));
+        names.message(new MessagesRules.Message(PRIYA, "Older Name", at("2026-09-01T14:05:00"), 1, "earlier in time, later in the file"));
+        Harness.check("the name and the last words come from the latest message, wherever it sits in the file", names.by.get(PRIYA).name.equals("Latest Name") && names.by.get(PRIYA).snippet.equals("later in time"));
+        MessagesRules.Survey tieReverse = new MessagesRules.Survey(NOW, UTC);
+        tieReverse.message(new MessagesRules.Message(RAVI, "", at("2026-09-12T14:05:00"), 1, "a"));
+        tieReverse.message(new MessagesRules.Message(PRIYA, "", at("2026-09-12T14:05:00"), 1, "b"));
+        Harness.equal("whatever order the file gave them", tieReverse.listed().get(0).number, PRIYA);
+        Harness.equal("one message and one item are said in the singular, a single month is not written as a range",
+            MessagesRules.rowLabel(tie.by.get(RAVI), UTC), RAVI + "\n1 message \u00b7 Sep 2026 \u00b7 up to 1 item");
         MessagesRules.Survey crowd = new MessagesRules.Survey(NOW, UTC);
         for (int i = 0; i < 55; i++) crowd.message(new MessagesRules.Message(String.format("+9190000%05d", i), "", at("2026-09-12T14:05:00") + i * 1000L, 1, "hi"));
         Harness.check("at most fifty are listed, newest first, and the rest are counted", crowd.listed().size() == 50 && crowd.leftOutConversations() == 5 && crowd.listed().get(0).number.endsWith("00054"));
@@ -177,6 +218,19 @@ final class MessagesTest {
         Harness.equal("the words: a header, then each message with its own time, oldest first, one line each, sent ones marked",
             chunks.get(0).text,
             "Messages with +919876543210 (Ravi K) \u2014 Sep 2026\n[12 Sep 2026 14:05] +919876543210: Payment due by 12/10/2026 bring the file\n[15 Sep 2026 08:00] you to +919876543210: ok\n[20 Sep 2026 10:00] +919876543210: thanks");
+        MessagesRules.Harvest two = new MessagesRules.Harvest(new HashSet<>(Arrays.asList(RAVI, PRIYA)), NOW, UTC);
+        two.message(new MessagesRules.Message(RAVI, "", at("2026-09-12T14:05:00"), 1, "r"));
+        two.message(new MessagesRules.Message(PRIYA, "", at("2026-09-12T14:05:00"), 1, "p"));
+        List<MessagesRules.Chunk> both = MessagesRules.chunks(two, UTC);
+        Harness.equal("the same month is ordered by number", both.get(0).number + "|" + both.get(1).number, PRIYA + "|" + RAVI);
+        MessagesRules.Harvest twoBack = new MessagesRules.Harvest(new HashSet<>(Arrays.asList(RAVI, PRIYA)), NOW, UTC);
+        twoBack.message(new MessagesRules.Message(RAVI, "", at("2026-09-12T14:05:00"), 1, "r"));
+        twoBack.message(new MessagesRules.Message(PRIYA, "", at("2026-09-12T14:05:00"), 1, "p"));
+        twoBack.message(new MessagesRules.Message(RAVI, "", at("2026-08-12T14:05:00"), 1, "older"));
+        Harness.equal("and the newest month first across numbers", MessagesRules.chunks(twoBack, UTC).get(2).month, "2026-08");
+        List<MessagesRules.Message> long1 = new ArrayList<>();
+        for (int i = 0; i < 3000; i++) long1.add(new MessagesRules.Message(RAVI, "", at("2026-09-12T14:05:00") + i * 60000L, 1, "a fairly long line of words to fill the month up quickly, number " + i));
+        Harness.equal("a month is cut at the length every sealed text is held to", MessagesRules.chunkText(RAVI, "", "2026-09", long1, UTC).length(), DocumentsRules.MAX_TEXT_CHARS);
         Harness.check("nothing from other numbers, codes or the unfinished month", !chunks.get(0).text.contains("not ticked") && !chunks.get(0).text.contains("OTP") && !chunks.get(0).text.contains("unfinished"));
         Harness.equal("the times are in the person's zone", MessagesRules.chunkText(RAVI, "", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "late")), TimeZone.getTimeZone("Asia/Kolkata")),
             "Messages with +919876543210 \u2014 Sep 2026\n[13 Sep 2026 01:30] +919876543210: late");
@@ -184,7 +238,7 @@ final class MessagesTest {
         Harness.check("the same month always seals to the same words", MessagesRules.chunkText(RAVI, "x", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "a")), UTC)
             .equals(MessagesRules.chunkText(RAVI, "x", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "a")), UTC)));
         Harness.check("the limits are as designed", MessagesRules.MONTHS == 12 && MessagesRules.MAX_ITEMS_PER_KEEP == 60 && MessagesRules.MAX_LISTED == 50 && MessagesRules.MAX_MESSAGES == 200_000
-            && MessagesRules.MAX_BYTES == 200L * 1024 * 1024);
+            && MessagesRules.MAX_BYTES == 200L * 1024 * 1024 && MessagesRules.PREVIEW_CHARS == 120);
     }
 
     private static Context box(Context[] c, Journal[] j) throws Exception {
@@ -232,6 +286,9 @@ final class MessagesTest {
         Harness.suite("looking keeps nothing");
         MessagesFlow.Look look = MessagesFlow.look(from(export), NOW, UTC);
         Harness.check("recognised, two conversations, left out counted", look.recognition.recognised() && look.survey.by.size() == 2 && look.leftOut() == 2);
+        String broader = file(sms(RAVI, "2026-09-12T14:05:00", 1, "a", ""), sms(RAVI, "2026-10-01T14:05:00", 1, "this month", ""), sms(RAVI, "2025-01-01T14:05:00", 1, "long ago", ""),
+            sms(RAVI, "2026-09-13T14:05:00", 3, "a draft", ""), sms("AX-BANK", "2026-09-13T14:05:00", 1, "offer", ""), sms(RAVI, "2026-09-14T14:05:00", 1, "your OTP 1", ""));
+        Harness.equal("left out counts the service, code, unfinished/old and other-kind messages together", MessagesFlow.look(from(broader), NOW, UTC).leftOut(), 5);
         Harness.equal("nothing was sealed", Attachments.counts(context)[0], 0L);
         Harness.equal("nothing was written", journal.readLines().size(), 0);
         Harness.check("an unrecognised file is described, with nothing to keep", !MessagesFlow.look(from("<x><y a=\"1\"/></x>"), NOW, UTC).recognition.recognised());
@@ -332,6 +389,7 @@ final class MessagesTest {
         Capabilities.Status used = Capabilities.status(Capabilities.MESSAGES, j4.readLines());
         Harness.check("on, with the conversations seen and only the messages' kept months counted", used.state.startsWith("ON") && used.lastDetail.equals("12 conversations in the last file, 5 months kept in all"));
         Harness.check("the PDF source's status ignores the messages' events", !Capabilities.status(Capabilities.DOCUMENTS, j4.readLines()).lastDetail.contains("12"));
+        Harness.equal("and says it has never looked, whatever the messages did", Capabilities.status(Capabilities.DOCUMENTS, j4.readLines()).lastDetail, "never looked");
         Map<String, Object> looked = MessagesFacts.looked(12L, 3400L, 900L);
         Harness.equal("a look records counts only", looked.keySet().toString(), "[capability, conversations, leftOut, messages, source, version]");
         Harness.equal("a keep records a count only", MessagesFacts.kept(5L).keySet().toString(), "[capability, kept, source, version]");
@@ -373,6 +431,9 @@ final class MessagesTest {
         for (String bad : Arrays.asList("openOutputStream", "delete(", "insert(", "update(", "\"w\"", "\"rw\"", "startActivity", "Log.d(", "Log.e(", "System.out", "FileOutputStream", "getSharedPreferences")) {
             Harness.check("the reader never uses " + bad, !reader.contains(bad));
         }
+        Harness.check("a file that cannot be opened is a visible error, not an empty file", reader.contains("if (in == null) throw new java.io.IOException(\"the file could not be opened\");"));
+        Harness.check("a month is counted only when the store says stored", source.get("MessagesFlow").contains("if (!\"stored\".equals(stored.outcome)) continue;"));
+        Harness.check("an unreadable file is described by its kind alone", reader.contains("MessagesRules.kindOf(head, n)") && source.get("SourcesActivity").contains("It looks like \"\n                            + new MessagesReader(SourcesActivity.this, file).kind()"));
         Harness.check("it opens the one file and streams it", reader.contains("openInputStream(file)") && reader.contains("MessagesXml.parse(in, sink, MessagesRules.MAX_MESSAGES)"));
         Harness.check("the rules import no Android class and keep nothing", !source.get("MessagesRules").contains("import android.") && !source.get("MessagesRules").contains("Journal") && !source.get("MessagesRules").contains("Attachments."));
         String facts = source.get("MessagesFacts").replaceFirst("(?m)^package .*$", "");
@@ -381,7 +442,8 @@ final class MessagesTest {
         String access = source.get("MessagesAccess");
         int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");
         Harness.check("the grant is recorded before the flag", access.substring(grantAt, revokeAt).indexOf("record(journal, PackageGrants.GRANTED") < access.substring(grantAt, revokeAt).indexOf("\"rws\""));
-        Harness.check("a revocation removes the flag, then says so", access.substring(revokeAt, reconcileAt).indexOf(".delete()") < access.substring(revokeAt, reconcileAt).indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("a grant that is already on is not recorded twice", access.substring(grantAt, revokeAt).indexOf("if (granted(context)) return;") > 0 && access.substring(grantAt, revokeAt).indexOf("if (granted(context)) return;") < access.substring(grantAt, revokeAt).indexOf("record(journal, PackageGrants.GRANTED"));
+        Harness.check("a revocation removes the flag, then says so", access.substring(revokeAt, reconcileAt).contains("new File(context.getFilesDir(), FILE).delete();") && access.substring(revokeAt, reconcileAt).indexOf(".delete()") < access.substring(revokeAt, reconcileAt).indexOf("record(journal, PackageGrants.REVOKED"));
         Harness.check("after a restore a grant the phone does not exercise is recorded as withdrawn", access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.MESSAGES)") && access.substring(reconcileAt).contains("granted(context)) return;"));
         Harness.check("Orb makes the history agree at start", source.get("Orb").contains("MessagesAccess.reconcile(this, journal)"));
 
