@@ -64,6 +64,7 @@ final class FaultsTest {
         Harness.check("the payload holds kinds, frames, thread and where — and nothing the error said", payload.get("exception").equals("IllegalStateException") && payload.get("thread").equals("main") && payload.get("where").equals("People.show")
             && !shown.contains("Ravi") && !shown.contains("9198") && !shown.contains("hello"));
         Harness.equal("and its fields", new java.util.TreeSet<>(payload.keySet()).toString(), "[exception, frames, thread, where]");
+        Harness.equal("a payload with no place says none", new java.util.TreeSet<>(Faults.payload(e, "main", null).keySet()).toString(), "[exception, frames, thread]");
         Harness.equal("a caught fault has no thread", new java.util.TreeSet<>(Faults.payload(e, null, "People.show").keySet()).toString(), "[exception, frames, where]");
 
         Harness.suite("a crash is written as the process dies and recorded at the next start");
@@ -84,12 +85,16 @@ final class FaultsTest {
         Faults.recordLast(context, journal);
         Harness.check("a crash on a thread with no name records no thread", !journal.readLines().get(1).contains("\"thread\""));
 
+        Faults.write(context, e, "odd\nname");
+        Faults.recordLast(context, journal);
+        Harness.check("a thread name cannot add a line to the note", journal.readLines().get(2).contains("\"thread\":\"odd name\"") && journal.readLines().get(2).contains("PeopleActivity.show:512"));
+
         Harness.suite("a fault that was caught");
         Faults.caught(journal, e, "People.save");
-        String caught = journal.readLines().get(2);
+        String caught = journal.readLines().get(3);
         Harness.check("is one event saying where it was caught", Faults.CAUGHT.equals(Journal.typeOf(caught)) && caught.contains("\"where\":\"People.save\"") && caught.contains("PeopleActivity.show:512") && !caught.contains("Ravi"));
         Faults.caught(null, e, "x");
-        Harness.equal("with no journal, nothing happens", journal.readLines().size(), 3);
+        Harness.equal("with no journal, nothing happens", journal.readLines().size(), 4);
 
         Harness.suite("the handler writes, then lets the platform carry on");
         final Throwable[] passedOn = new Throwable[1];

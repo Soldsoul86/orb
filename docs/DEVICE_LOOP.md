@@ -7504,3 +7504,45 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 7. On a second person, say something, then **Remove** it. *(P296)*
 8. **Export and share journal** and send it. *(P298)*
 
+#### Result — export `orb-20261003-155352` (operator, 2026-10-03): "All working as intended, app crashed once"
+
+723 events; v51 (`29850347`) started three times. **Nothing in the journal contains a role, a note, a name or a number.** The operator reports P292–P299 working as intended. What the journal shows:
+
+- **Two saves** (`orb.person.described`, 122 and 99 bytes of sealed note) and **one removal** (`orb.erasure`) — the people's words went in and out as designed, with only an identity and a size on record.
+- **The app crashed three times, not once**, all within about 25 seconds of the second save and the removal: the platform recorded `crash` at +152.7 s (2.9 s after the second save), then twice more at +170.2 s and +173.2 s (the first 2.7 s after the removal; the system relaunched the screen and it failed again before Orb could write a start event). Each time the next start came up fine and the People screen drew correctly (+158.9 s, +180.1 s).
+- **The cause is not in the journal.** Android records only *that* the process crashed (`exitReasons: crash`). It is timed to the redraw of the person's page that follows saving or removing, for the second person whose page was opened (318 calls matched, against 19 for the first, whose save and redraw went through); reading the code and running the same steps off the phone did not reproduce it. **Which line failed is unknown, so it is not fixed — it is made diagnosable (§7b89).**
+
+### 7b89. Orb says why it crashed (v52) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v52-faults.apk` — the calls build, as v46–v51. Decision `DECISIONS.md` DR-39; limits `ARCHITECTURAL_DEBT.md` AD-34.
+
+**Why:** the journal could say *that* v51 crashed and not *where*. Guessing at the cause would risk a "fix" that changes nothing. So v52 adds the smallest thing that makes the next crash explain itself — and stops an unexpected error on the People screen from closing the app.
+
+#### What changed
+
+1. **A crash leaves a note,** written as the process dies: the error's **class names** (and its causes') and **Orb's own frames as `Class.method:line`** — never the error's message, which can hold a name or a number. The next start turns it into one **`orb.process.crashed`** event and removes the file.
+2. **The People screen catches an unexpected error** where it works out, draws, saves and removes: it shows a plain sentence (*Orb could not draw this screen … What went wrong is on record*) and writes one **`orb.fault.caught`** event saying where. The app does not close.
+3. Nothing else changes: no permission, no new read, no network.
+
+#### Checked before the device
+
+- Phone-side suite: 2430 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the kinds, the frames (which are kept, which are cut, the limits), the note and its recording, and the handler: **21 mutants; 17 caught by the first suite, 4 survived**: a payload with no place, a thread name carrying a line break (both now tests and caught), and two that are equivalent (the recording step already fails safely when there is no note file, and the recording of a caught fault already swallows a missing journal).
+- **Not testable off the phone:** the crash itself.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P300** | v52 installs over v51 with **no Play Protect warning** (manifest unchanged since v46) | flagged — record the exact words |
+| **P301** | People, a person's page, **Say what they are to you…**, **Remove** and **What Orb has noticed** work as in v51 | something changed |
+| **P302** | **Repeat the steps that crashed:** open the person with the most calls, **Save** words, then **Remove** them, a few times. If it fails, the app either **stays open with a plain sentence** (*Orb could not draw this screen …*) or **closes**; **either way the next export holds an event saying what and where** | a crash with no event in the next export |
+| **P303** | Any `orb.process.crashed` / `orb.fault.caught` in the export names an **error kind and Orb code locations**, and no word, name or number | a word or number is in it |
+
+#### Protocol
+
+1. Install `orb-app-v52-faults.apk` over v51; open Orb once. *(P300)*
+2. Use People as usual for a minute. *(P301)*
+3. On the person with the most calls: **Say what they are to you…** → save a role and a note; then **Remove** it. Do it two or three times, on that person and on another. Note what happens each time. *(P302)*
+4. **Export and share journal** and send it, whether or not anything failed. *(P303)*
+

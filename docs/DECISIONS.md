@@ -1397,6 +1397,14 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** about-you facts, anything read from the words of a message or document, acting on a statement, merging persons.
 
+## DR-39 — Orb says why it crashed: code locations only, never a message
+
+- **Status:** Built · **Decided:** 2026-10-03, by the engineer, as the smallest diagnostic aid for the crash the operator reported in `DEVICE_LOOP.md` §7b88 ("app crashed once"; the journal shows three). Reversible: removing `Faults` and its two calls restores the earlier behaviour. The operator is told and may ask for it to go.
+
+**The ruling.** The journal gains two event types, `orb.process.crashed` (written at the next start from a note the dying process left) and `orb.fault.caught` (an unexpected error the People screen caught, so the app did not close). Each carries **only the error's class names and Orb's own `Class.method:line` frames** — **never the error's message**, which can hold what the code was handling. No permission, no read, no network; the same journal as everything else, so it is replayable and nothing is hidden. The People screen stops an unexpected runtime error from closing the app and says so in a sentence — a visible failure, on record, not a swallowed one.
+
+**Not in this ruling:** native crashes and out-of-memory kills, which may leave no note; any upload of a crash anywhere; catching faults on screens other than People.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

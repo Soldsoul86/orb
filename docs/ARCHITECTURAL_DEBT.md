@@ -836,6 +836,19 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-34 — what recording crashes does not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-39). Debts, stated.
+
+1. **Only errors in Orb's own process that reach the handler.** A native crash, a kill for memory or a force-stop may leave no note; Android's own `grants.exits` still says *that* it ended.
+2. **The note is written as the process dies and can fail.** Then the next start records nothing for it, and the platform's reason is all there is.
+3. **Line numbers belong to one build.** `PeopleActivity.show:512` means the line in the APK that crashed; it is read against that version's source.
+4. **Only the People screen catches.** Other screens still close the app on an unexpected error (and the handler still records it). Catching is added where a crash was seen, not everywhere.
+5. **A caught error can hide a bug from the person.** It is on record and the screen says it could not, but the app carries on; a repeated `orb.fault.caught` is the sign to fix something.
+6. **No message, by design.** That loses detail (which value was null), and keeps a name or number out of the journal. A reader who needs more must reproduce the failure.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.
