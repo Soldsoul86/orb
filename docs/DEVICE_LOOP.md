@@ -7148,8 +7148,8 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 #### Checked before the device
 
-- Phone-side suite: 1793 checks; brain, TypeScript, lint and type-check unchanged and clean.
-- **Mutation checks** on the suggestion rules (which names count, the order, the cap and the count, linked-or-not, document-or-not), the change to People's matching (whole name over first name; how a person is named) and the screen (choose mode only, documents only, the same card, linked rows not tappable): @@MUT@@
+- Phone-side suite: 1795 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the suggestion rules (which names count, the order, the cap and the count, linked-or-not, document-or-not), the change to People's matching (whole name over first name; how a person is named) and the screen (choose mode only, documents only, the same card, linked rows not tappable): **35 deliberate breakages. 29 were caught at once; 4 survived and became tests — ties broken by name, whatever the case, and not by address-book order; the "and N more" line; and the two wordings of a suggestion's row — then were caught; 1 is equivalent and documented** (the search stops at a person's first evidence for the item, and a person has at most one per item); one mutation did not apply and proves nothing.
 - **Not testable off the phone:** how often your real PDFs name your contacts.
 
 #### Predictions

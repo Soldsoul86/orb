@@ -128,6 +128,14 @@ final class DocumentPeopleTest {
         Harness.equal("and two counted", wideResult.more, 2);
         Harness.equal("by name within a strength", wideResult.list.get(0).person.display() + "|" + wideResult.list.get(9).person.display(), "Alma Zed|Jorge Zed");
 
+        Harness.suite("ties are broken by name, whatever the case, not by the order of the address book");
+        List<People.Contact> tie = new ArrayList<>();
+        tie.add(contact("t1", "Zed Quinn", new String[] {}));
+        tie.add(contact("t2", "alpha Quinn", new String[] {}));
+        tie.add(contact("t3", "Mid Quinn", new String[] {}));
+        String tied = keepDocument(context, journal, "Zed Quinn, alpha Quinn and Mid Quinn attended.", "f");
+        Harness.equal("alpha before Mid before Zed", names(DocumentPeople.of(People.compute(context, journal, tie).all, tied)), Arrays.asList("alpha Quinn:full", "Mid Quinn:full", "Zed Quinn:full"));
+
         Harness.suite("only documents");
         Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 20L);
         SharedText.record(journal, context, payload, SharedText.seal(context, "Note: Ravi Kumar said hello", null), null);
@@ -163,6 +171,8 @@ final class DocumentPeopleTest {
             screen.contains("if (linkItem != null) suggestFor(journal, result);") && screen.contains("if (!document) return;") && screen.contains("if (named.list.isEmpty()) return;"));
         Harness.check("a suggestion opens the same card as a search result, and a linked one is not tappable",
             screen.contains("confirmLink(s.person, linkItem, null)") && screen.contains("if (!s.linked) {"));
+        Harness.check("the screen says how many more there are and what a tap does", screen.contains("if (named.more > 0) list.addView(text(\"and \" + named.more + \" more")
+            && screen.contains("You linked this to them.") && screen.contains("tap to link"));
         Harness.check("they sit above the search", screen.indexOf("suggestFor(journal, result);") < screen.indexOf("search.setHint("));
         Harness.check("the history is unreadable: nothing is suggested on a guess", screen.contains("return;   // The history cannot say what this item is, so nothing is suggested on a guess."));
         Harness.check("a suggestion writes nothing: the only link is the existing one", screen.split("PersonLink\\.link\\(", -1).length - 1 == 1);
