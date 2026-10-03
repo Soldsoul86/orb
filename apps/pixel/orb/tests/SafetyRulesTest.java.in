@@ -303,6 +303,7 @@ final class SafetyRulesTest {
             && screen.contains("if (!flipped.remove(id)) flipped.add(id);"));
         Harness.check("opening or closing a group redraws what is on screen and does not read the phone again", screen.contains("show(journal, shown)") && screen.contains("shown = result;")
             && screen.split("AppSecurityReader\\.read\\(", -1).length - 1 == 1);
+        Harness.check("a level with no findings draws no heading", screen.contains("if (groups.isEmpty()) return;"));
         Harness.check("checking again forgets what was opened or closed", screen.contains("flipped.clear();"));
         Harness.check("the group state is memory only", !screen.contains("getSharedPreferences") && !screen.contains("FileOutputStream"));
         String main = source.get("MainActivity");

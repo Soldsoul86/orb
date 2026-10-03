@@ -7106,8 +7106,8 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 #### Checked before the device
 
-- Phone-side suite: 1754 checks; brain, TypeScript, lint and type-check unchanged and clean.
-- **Mutation checks** on every rank, the choice of the strongest reason, the sort, the group building and counts, the open-or-closed rule and its limit, and the screen's toggle, redraw and reset: @@MUT@@
+- Phone-side suite: 1755 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on every rank, the choice of the strongest reason, the sort, the group building and counts, the open-or-closed rule and its limit, and the screen's toggle, redraw and reset: **36 deliberate breakages. 33 were caught at once; 1 survived and became a guard (a level with nothing in it draws no heading), then was caught; 2 are equivalent and documented** (the strongest reason is the minimum over all of a finding's reasons, so where the search starts changes nothing; and the level comparison is redundant while every *now* reason outranks every *worth a look* one, which a test holds).
 - **Not testable off the phone:** how the 42 findings distribute across the groups on your phone.
 
 #### Predictions
