@@ -21,7 +21,8 @@ final class MessagesFacts {
 
     static final String SOURCE = "messages";
     static final String ACTION = "orb.source.messages";
-    static final String MIME = "text/xml";
+    static final String MIME_XML = "text/xml";
+    static final String MIME_JSON = "application/json";
     static final String PREFIX = "orb-source://messages/";
 
     private static Map<String, Object> base() {
@@ -51,10 +52,14 @@ final class MessagesFacts {
         return PREFIX + key + "/" + month;
     }
 
+    /** What kind of file the months came from, as the record names it: the backup's format, not the sealed words'. */
+    static String mimeOf(String format) {
+        return "JSON".equals(format) ? MIME_JSON : MIME_XML;
+    }
+
     /** The share record for one kept month: where it is from and how many characters. No number, name or word. */
-    static Map<String, Object> payload(long textChars, String key, String month) {
-        Map<String, Object> p = Shares.declaredText(ACTION, MIME, referrer(key, month), textChars);
-        return p;
+    static Map<String, Object> payload(long textChars, String key, String month, String format) {
+        return Shares.declaredText(ACTION, mimeOf(format), referrer(key, month), textChars);
     }
 
     static boolean isMessages(String referrer) {

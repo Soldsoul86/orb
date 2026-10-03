@@ -7389,3 +7389,15 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 5. **Export and share journal** and send it. *(counts only; the words are sealed.)*
 6. **Delete the backup file** when you are done.
 
+#### Result — export `orb-20261003-124458` (operator, 2026-10-03)
+
+675 events before the export; two Orb starts in this stretch (v48 `29850130`, v49 `29850188`). **Nothing in the journal contains a word, name or number from any message** (scanned for the sample's words and numbers: zero hits).
+
+**v48 (XML sample), all as predicted.** The grant was recorded (`grants.capability.granted`, `orb.read.messages`, by operator) **before** any look. Two looks of the sample: 2 conversations, 8 messages, 2 left out. **Keep → 3 months** (Test Person Aug + Sep, the second number's Sep): three `orb.shared` records with `orb-source://messages/<blinded key>/<month>` referrers (157 to 323 characters each), three `orb.observation`, one `orb.source.kept` with `kept: 3`.
+
+**v49 (JSON), P274, P275, P277 confirmed.** The made-up JSON sample gave **exactly the XML sample's numbers** (2 conversations, 8 messages, 2 left out). The **real file** was recognised: **146 conversations, 25,552 messages, 25,093 left out** — the same numbers the off-phone run printed. Nothing was kept from it (you did not tick), so the records are `orb.source.looked` only, with counts.
+
+**Not in the journal, so still open:** P276 (a row's name is a contact name or nothing — never the number twice), P278 (how long the real file took and whether the screen stayed alive), P279 (the Play Protect words, if any), and the whole **Keep from the real file → Recall → Coming up** path (steps 4–5). Keeping one conversation from the real file would close them. The duplicate-keep prediction (P270) was not exercised either.
+
+**Found in reading it, fixed in code, not in the v49 APK:** the share record of a month kept from a JSON file would have said `mimeType: text/xml` (the constant was written when only XML existed). It now names the backup's format (`application/json` for JSON); three mutants, all caught. It ships with the next build; v49 is otherwise correct. The mutation harness was also corrected (it was blind to survivors when test names contained "error:"), and the JSON round re-run with it: **23 of 23 caught**.
+

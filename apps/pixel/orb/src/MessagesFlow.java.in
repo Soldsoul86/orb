@@ -65,7 +65,7 @@ final class MessagesFlow {
     /** Pass 2 and the keep. */
     static Kept keep(Context context, Journal journal, Source source, Set<String> numbers, long nowMs, TimeZone zone, long elapsedRealtimeMs) throws Exception {
         MessagesRules.Harvest harvest = new MessagesRules.Harvest(numbers, nowMs, zone);
-        source.stream(harvest);
+        MessagesXml.Recognition read = source.stream(harvest);
         Kept result = new Kept();
         Set<String> live = MessagesFacts.liveKeys(journal.readLines());
         for (MessagesRules.Chunk chunk : MessagesRules.chunks(harvest, zone)) {
@@ -79,7 +79,7 @@ final class MessagesFlow {
             try {
                 Attachments.Stored stored = SharedText.seal(context, chunk.text, null);
                 if (!"stored".equals(stored.outcome)) continue;
-                Map<String, Object> payload = MessagesFacts.payload(chunk.text.length(), key, chunk.month);
+                Map<String, Object> payload = MessagesFacts.payload(chunk.text.length(), key, chunk.month, read.format);
                 payload.put("elapsedRealtimeMs", elapsedRealtimeMs);
                 if (SharedText.record(journal, context, payload, stored, null) != null) {
                     result.kept++;

@@ -447,6 +447,7 @@ final class MessagesTest {
         for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) shares += line + "\n";
         Harness.check("each says where from, with a blinded key and its month, and how long", shares.contains("\"referrer\":\"orb-source://messages/") && shares.contains("/2026-09\"") && shares.contains("/2026-08\"")
             && shares.contains("\"action\":\"orb.source.messages\"") && shares.contains("\"textChars\":") && shares.contains("\"elapsedRealtimeMs\":4242"));
+        Harness.check("each record names the backup's format: XML here", shares.contains("\"mimeType\":\"text/xml\"") && !shares.contains("application/json"));
         Harness.check("nothing of any message, number or name is in the journal", !shares.contains("invoice 4471") && !shares.contains("Ravi") && !shares.contains("9876543210") && !shares.contains("see you soon"));
         Harness.check("nor on the disk in the clear", !onDisk(context.getFilesDir(), "for invoice 4471".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "9876543210".getBytes(StandardCharsets.UTF_8)));
         Harness.check("the other number, the bank and the code were not kept", Attachments.counts(context)[0] == 2L);
@@ -514,6 +515,21 @@ final class MessagesTest {
         book.add(contact);
         People.Result people = People.compute(ctx3, j3[0], book);
         Harness.check("the kept months are tied to Ravi by his number, as sure", people.people.size() == 1 && people.people.get(0).items.size() == 2 && People.BY_NUMBER.equals(people.people.get(0).items.get(0).by));
+
+        Harness.suite("a JSON backup is recorded as JSON");
+        Context[] c5 = new Context[1];
+        Journal[] j5 = new Journal[1];
+        Context ctx5 = box(c5, j5);
+        final String jsonExport = json(item(RAVI, at("2026-09-12T14:05:00"), 1, "Payment due by 12/11/2026", "Ravi Kumar"));
+        MessagesFlow.Kept viaJson = MessagesFlow.keep(ctx5, j5[0], new MessagesFlow.Source() {
+            @Override public MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception {
+                return MessagesFile.parse(bytes(jsonExport), sink, MessagesRules.MAX_MESSAGES);
+            }
+        }, new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 1L);
+        String jsonShares = "";
+        for (String line : j5[0].readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) jsonShares += line;
+        Harness.check("one month kept from a JSON file, and its record says application/json", viaJson.kept == 1 && jsonShares.contains("\"mimeType\":\"application/json\"") && !jsonShares.contains("text/xml"));
+        Harness.equal("the format names the type", MessagesFacts.mimeOf("JSON") + "|" + MessagesFacts.mimeOf("XML") + "|" + MessagesFacts.mimeOf(null), "application/json|text/xml|text/xml");
 
         Harness.suite("the capability's status");
         Journal j4 = j3[0];
