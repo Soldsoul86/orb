@@ -1,0 +1,22 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * The record of what the person said about someone — *what they are to me* — built here and nowhere else (`docs/UNDERSTANDING_PHONE.md` §10, DR-38).
+ * **The journal holds only that a description exists**: the identity and size of a sealed note, and the record's shape. **Never the words, a name, a
+ * number or an address.** Who it is about, and what was said, are inside the sealed note (`PersonNote`).
+ */
+final class PersonNoteFacts {
+    private PersonNoteFacts() {}
+
+    static final String DESCRIBED = "orb.person.described";
+
+    static Map<String, Object> described(String identity, long bytes) {
+        Map<String, Object> p = Json.obj();
+        p.put("attachment", identity);
+        p.put("attachmentBytes", bytes);
+        p.put("version", 1L);
+        return p;
+    }
+}

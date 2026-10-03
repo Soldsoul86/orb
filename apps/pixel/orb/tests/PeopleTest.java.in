@@ -305,7 +305,8 @@ final class PeopleTest {
             && activity.contains("flow.onPermissionResult(code, results)"));
         Harness.check("the note's window is secure, since it may start as a person's name", source.get("RemindFlow").split("FLAG_SECURE", -1).length - 1 >= 4);
         Harness.check("the screen opens on a search of every contact, typed in a watcher and read by no accessor; what the words mention is collapsed behind a button",
-            activity.contains("People.find(result.all, typed)") && activity.contains("addTextChangedListener") && !activity.contains(".getText(")
+            activity.contains("People.find(result.all, typed)") && activity.contains("addTextChangedListener")
+            && activity.split("\\.getText\\(", -1).length - 1 == 2 && activity.substring(activity.indexOf("private void describe("), activity.indexOf("private void saveDescription(")).split("\\.getText\\(", -1).length - 1 == 2
             && activity.contains("mentions.setVisibility(View.GONE)") && activity.contains("Who my words mention ("));
         Harness.check("Android's permission is asked only for the screen, at the grant", activity.contains("requestPermissions(") && !source.get("ContactsReader").contains("requestPermissions("));
         String access = source.get("ContactsAccess");

@@ -33,6 +33,7 @@ public final class Tests {
         CallsRulesTest.run();
         MessagesTest.run();
         UnderstandingTest.run();
+        PersonNoteTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

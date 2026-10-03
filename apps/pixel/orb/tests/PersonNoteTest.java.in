@@ -1,0 +1,222 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * *What is Ravi to you?* (`docs/UNDERSTANDING_PHONE.md` §10, DR-38): your own words about someone, sealed, found again by number, address or name,
+ * replaced by a newer note, erased by removing, shown on the page and in what Orb has noticed, and never in the clear.
+ */
+final class PersonNoteTest {
+    private PersonNoteTest() {}
+
+    private static People.Contact contact(String id, String name, String[] phones, String... emails) {
+        People.Contact c = new People.Contact(id, name);
+        c.phones.addAll(Arrays.asList(phones));
+        c.emails.addAll(Arrays.asList(emails));
+        return c;
+    }
+
+    private static People.Person person(String name, String[] phones, String... emails) {
+        People.Person p = new People.Person();
+        p.names.add(name);
+        p.phones.addAll(Arrays.asList(phones));
+        p.emails.addAll(Arrays.asList(emails));
+        return p;
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int k = 0; k < needle.length; k++) if (hay[i + k] != needle[k]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        Harness.suite("the words are tidied and bounded");
+        Harness.equal("a role is one tidy line", PersonNote.cleanRole("  elec\ntrician \t of   the\u0007 street "), "elec trician of the street");
+        StringBuilder longRole = new StringBuilder();
+        for (int i = 0; i < 90; i++) longRole.append('a');
+        Harness.equal("and at most sixty characters", PersonNote.cleanRole(longRole.toString()).length(), 60);
+        Harness.equal("a role of nothing is nothing", PersonNote.cleanRole(" \n ") + "|" + PersonNote.cleanRole(null), "|");
+        Harness.equal("a note keeps its line breaks and loses control characters", PersonNote.cleanText("  line one\r\nline two\u0007\n\n  "), "line one\nline two");
+        StringBuilder longNote = new StringBuilder();
+        for (int i = 0; i < 1200; i++) longNote.append('b');
+        Harness.equal("and at most a thousand", PersonNote.cleanText(longNote.toString()).length(), 1000);
+
+        Harness.suite("the sealed note says who and what, and is not mistaken for anything else");
+        People.Person ravi = person("Ravi Kumar", new String[] {"+919876543210"}, "ravi@x.example");
+        byte[] doc = PersonNote.document(ravi, "electrician", "Prefers evenings\nUses WhatsApp", "ab12");
+        PersonNote.Note back = PersonNote.parse(doc);
+        Harness.check("it reads back: who, the role, and the note with its lines", back != null && back.who.names.equals(Arrays.asList("Ravi Kumar")) && back.who.phones.equals(Arrays.asList("+919876543210"))
+            && back.who.emails.equals(Arrays.asList("ravi@x.example")) && back.role.equals("electrician") && back.text.equals("Prefers evenings\nUses WhatsApp"));
+        PersonNote.Note onlyRole = PersonNote.parse(PersonNote.document(ravi, "brother", "", "n"));
+        Harness.check("a role with no note reads back with an empty note", onlyRole.role.equals("brother") && onlyRole.text.isEmpty());
+        PersonNote.Note onlyNote = PersonNote.parse(PersonNote.document(ravi, "", "just a note", "n"));
+        Harness.check("a note with no role reads back with an empty role", onlyNote.role.isEmpty() && onlyNote.text.equals("just a note"));
+        Harness.check("other bytes are not a person note", PersonNote.parse("hello".getBytes(StandardCharsets.UTF_8)) == null && PersonNote.parse(PersonLink.document(ravi, "n")) == null && PersonLink.parse(doc) == null);
+        Harness.check("and a person note is never listed in Recall", Recall.parse(doc) == null);
+        Harness.check("each has its own nonce, so no two share bytes", !Arrays.equals(PersonNote.document(ravi, "a", "b", "1"), PersonNote.document(ravi, "a", "b", "2")));
+        People.Person odd = person("Line\nBreak", new String[] {});
+        Harness.equal("a line break in a name or a role cannot forge a line", PersonNote.parse(PersonNote.document(odd, "x\nrole:forged", "", "n")).who.names + "|" + PersonNote.parse(PersonNote.document(odd, "x\nrole:forged", "", "n")).role,
+            "[Line Break]|x role:forged");
+        Harness.equal("a note line that looks like a field is still a note line", PersonNote.parse(PersonNote.document(ravi, "r", "name:forged\nphone:+91", "n")).who.names, Arrays.asList("Ravi Kumar"));
+
+        Harness.suite("saying what someone is to you");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-person-note").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        List<People.Contact> book = new ArrayList<>();
+        book.add(contact("1", "Ravi Kumar", new String[] {"+919876543210"}, "ravi@x.example"));
+        book.add(contact("2", "Priya Shah", new String[] {"+919000000001"}));
+        People.Result before = People.compute(context, journal, book);
+        People.Person r = find(before, "Ravi Kumar");
+        Harness.check("nobody has a role yet", r.role == null && r.note == null && r.display().equals("Ravi Kumar"));
+        Harness.equal("saved", PersonNote.save(context, journal, r, "electrician", "Prefers evenings"), PersonNote.SAVED);
+        Harness.equal("one event", count(journal, PersonNoteFacts.DESCRIBED), 1);
+        String line = "";
+        for (String l : journal.readLines()) if (PersonNoteFacts.DESCRIBED.equals(Journal.typeOf(l))) line = l;
+        Harness.check("it names no one and carries no word", !line.contains("electrician") && !line.contains("evenings") && !line.contains("Ravi") && !line.contains("9876543210") && !line.contains("x.example") && line.contains("\"attachment\":\"sha256:"));
+        Harness.equal("its fields: the sealed note's identity and size, and the shape", new java.util.TreeSet<>(PersonNoteFacts.described("sha256:x", 5L).keySet()).toString(), "[attachment, attachmentBytes, version]");
+        Harness.check("nor is it on the disk in the clear", !onDisk(context.getFilesDir(), "electrician".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "evenings".getBytes(StandardCharsets.UTF_8))
+            && !onDisk(context.getFilesDir(), "9876543210".getBytes(StandardCharsets.UTF_8)));
+        People.Result after = People.compute(context, journal, book);
+        People.Person r2 = find(after, "Ravi Kumar");
+        Harness.check("the person now carries the words, and the name shows the role", "electrician".equals(r2.role) && "Prefers evenings".equals(r2.note) && r2.display().equals("Ravi Kumar (electrician)"));
+        Harness.check("and the other person is untouched", find(after, "Priya Shah").role == null);
+        Harness.equal("the same words again write nothing", PersonNote.save(context, journal, r2, "electrician", "Prefers evenings") + "|" + count(journal, PersonNoteFacts.DESCRIBED), "unchanged|1");
+
+        Harness.suite("changing is replacing");
+        Harness.equal("new words", PersonNote.save(context, journal, r2, "plumber", ""), PersonNote.SAVED);
+        Harness.equal("two events on record, one live note", count(journal, PersonNoteFacts.DESCRIBED) + "|" + PersonNote.all(context, journal).size(), "2|1");
+        People.Person r3 = find(People.compute(context, journal, book), "Ravi Kumar");
+        Harness.check("the newer words are the ones used, and the old are gone from the disk", "plumber".equals(r3.role) && r3.note == null
+            && !onDisk(context.getFilesDir(), "electrician".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "evenings".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("the old note's erasure is on record", count(journal, Erasure.TYPE) >= 1);
+        Harness.equal("a note with only a role is fine", r3.note, null);
+        Harness.equal("changing back to the first words seals them again", PersonNote.save(context, journal, r3, "electrician", "Prefers evenings"), PersonNote.SAVED);
+        Harness.equal("and still one live note", PersonNote.all(context, journal).size(), 1);
+
+        Harness.suite("found again by number, address or name; dormant when no one matches");
+        PersonLink.Who who = PersonNote.all(context, journal).get(0).who;
+        Harness.check("a number in common", PersonLink.matches(who, person("Other", new String[] {"+919876543210"})));
+        Harness.check("an address in common", PersonLink.matches(who, person("Other", new String[] {}, "ravi@x.example")));
+        List<People.Contact> changed = new ArrayList<>();
+        changed.add(contact("1", "Ravi K", new String[] {"+919876543210", "+919111111111"}));
+        Harness.equal("a new number added later does not lose the note", find(People.compute(context, journal, changed), "Ravi K").role, "electrician");
+        List<People.Contact> gone = new ArrayList<>();
+        gone.add(contact("2", "Priya Shah", new String[] {"+919000000001"}));
+        Harness.check("with the contact gone, the note is dormant: shown to no one", find(People.compute(context, journal, gone), "Priya Shah").role == null);
+        List<People.Contact> twin = new ArrayList<>();
+        twin.add(contact("3", "Ravi Kumar", new String[] {"+919222222222"}));
+        Harness.equal("and a different person with the same name is found by name", find(People.compute(context, journal, twin), "Ravi Kumar").role, "electrician");
+
+        Harness.suite("finding someone by what they are to you");
+        People.Result found = People.compute(context, journal, book);
+        Harness.equal("the role finds them", People.find(found.all, "electri").size() + "|" + People.find(found.all, "electri").get(0).names.get(0), "1|Ravi Kumar");
+        Harness.equal("anywhere in the role, at a word start", People.find(person2("Zed", "head electrician"), "electr").size(), 1);
+        Harness.equal("inside a word", People.find(person2("Zed", "head electrician"), "ctric").size(), 1);
+        Harness.equal("a person with no role is not found by one", People.find(found.all, "plumb").size(), 0);
+        List<People.Person> ranked = new ArrayList<>();
+        People.Person byName = person("Electra Jones", new String[] {"+919000000009"});
+        People.Person byRole = person("Zed", new String[] {"+919000000008"});
+        byRole.role = "electrician";
+        ranked.add(byRole);
+        ranked.add(byName);
+        Harness.equal("a name that starts the same way comes first, then the role", People.find(ranked, "electr").get(0).names.get(0) + "|" + People.find(ranked, "electr").get(1).names.get(0), "Electra Jones|Zed");
+
+        Harness.suite("what Orb has noticed says it as you did");
+        People.Person withRole = find(found, "Ravi Kumar");
+        withRole.phones.size();
+        List<UnderstandingRules.Subject> subjects = Understanding.subjects(Arrays.asList(withRole), null);
+        Harness.equal("the sentence names the person with the role", UnderstandingRules.sentence(UnderstandingRules.MANY, new UnderstandingRules.Subject("x", subjects.get(0).name, false, 4, 0)), "Ravi Kumar (electrician) appears in 4 things you kept.");
+
+        Harness.suite("removing erases it for good");
+        Harness.equal("removed", PersonNote.remove(context, journal, withRole), 1);
+        People.Person gone2 = find(People.compute(context, journal, book), "Ravi Kumar");
+        Harness.check("no role, no note, and the words are gone from the disk", gone2.role == null && gone2.note == null && PersonNote.all(context, journal).isEmpty()
+            && !onDisk(context.getFilesDir(), "electrician".getBytes(StandardCharsets.UTF_8)));
+        Harness.equal("saving nothing is removing: nothing is left and nothing new is sealed", PersonNote.save(context, journal, gone2, "  ", "") + "|" + PersonNote.all(context, journal).size(), "removed|0");
+        Harness.equal("removing again erases nothing", PersonNote.remove(context, journal, gone2), 0);
+
+        Harness.suite("a failure leaves things as they were");
+        Context[] c2 = new Context[1];
+        File dir2 = Files.createTempDirectory("orb-person-note2").toFile();
+        Install.forget();
+        c2[0] = new Context(dir2);
+        Journal j2 = Journal.open(c2[0], Install.lane(c2[0]), Install.id(c2[0]));
+        People.Person p2 = person("Sasi Rao", new String[] {"+919000000021"});
+        Harness.equal("saved first", PersonNote.save(c2[0], j2, p2, "sister", ""), PersonNote.SAVED);
+        String outcome = PersonNote.save(c2[0], j2, p2, "colleague", "", new PersonNote.Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload) { return null; }
+        });
+        Harness.equal("the journal refuses: said so", outcome, PersonNote.JOURNAL_FAILED);
+        Harness.equal("the person keeps what they had", PersonNote.latestFor(PersonNote.all(c2[0], j2), p2).role, "sister");
+        Harness.check("and the sealed new words went back", !onDisk(c2[0].getFilesDir(), "colleague".getBytes(StandardCharsets.UTF_8)));
+
+        Harness.suite("it is held in code");
+        java.nio.file.Path root = java.nio.file.Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<java.nio.file.Path> files = Files.list(root.resolve("src"))) {
+            for (java.nio.file.Path file : (Iterable<java.nio.file.Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        String facts = source.get("PersonNoteFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the record takes no word, name, number or address", !facts.contains("role") && !facts.contains("name") && !facts.contains("number") && !facts.contains("phone") && !facts.contains("email") && !facts.contains("text"));
+        Harness.check("the note logs nothing and keeps nothing beside the seal", !source.get("PersonNote").contains("Log.") && !source.get("PersonNote").contains("System.out") && !source.get("PersonNote").contains("FileOutputStream")
+            && !source.get("PersonNote").contains("getSharedPreferences") && !source.get("PersonNote").contains("startActivity"));
+        Harness.check("the note is sealed before the event is recorded, and older notes are erased only after", source.get("PersonNote").indexOf("Attachments.store(") < source.get("PersonNote").indexOf("recorder.record(")
+            && source.get("PersonNote").indexOf("recorder.record(") < source.get("PersonNote").indexOf("erase(context, journal, old.eventHash)"));
+        Harness.check("removing goes through the ordinary erasure", source.get("PersonNote").contains("Erase.execute(context, journal, hash)"));
+        Harness.check("the screen opens the form from the person's page and asks before removing, Cancel first", source.get("PeopleActivity").contains("Say what they are to you")
+            && source.get("PeopleActivity").substring(source.get("PeopleActivity").indexOf("private void confirmRemoveDescription(")).contains("sure.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();"));
+        Harness.check("the form and the card are secure", source.get("PeopleActivity").substring(source.get("PeopleActivity").indexOf("private void describe("), source.get("PeopleActivity").indexOf("private void saveDescription(")).contains("FLAG_SECURE")
+            && source.get("PeopleActivity").substring(source.get("PeopleActivity").indexOf("private void confirmRemoveDescription(")).contains("FLAG_SECURE"));
+        Harness.check("a sealed person note is listed with the held items and goes into a backup as words", source.get("ItemsActivity").contains("PersonNoteFacts.DESCRIBED") && source.get("Backup").contains("PersonNoteFacts.DESCRIBED.equals(item.type)"));
+        Harness.check("it needs no capability, no permission and no new read: it is words you write, like a commitment", !source.get("PersonNote").contains("Capabilities.") && !source.get("PersonNote").contains("ContactsContract"));
+    }
+
+    private static List<People.Person> person2(String name, String role) {
+        People.Person p = person(name, new String[] {"+919000000010"});
+        p.role = role;
+        return new ArrayList<>(Arrays.asList(p));
+    }
+
+    private static People.Person find(People.Result r, String name) {
+        for (People.Person p : r.all) if (p.names.contains(name)) return p;
+        return null;
+    }
+}

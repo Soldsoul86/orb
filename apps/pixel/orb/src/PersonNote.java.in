@@ -1,0 +1,234 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * *What is Ravi to you?* — the person's own words about someone (`docs/UNDERSTANDING_PHONE.md` §10, DR-38). **The only way a category ever enters Orb:** it
+ * proposes patterns from counts, but what someone *is* — *electrician*, *brother*, *landlord* — is said by you, and used as you said it.
+ *
+ * **What is recorded:** one `orb.person.described` event that carries the identity of a **sealed note**; the words (a short role and, if you like, a note)
+ * and **who** — the contact's names, numbers and addresses as they were that moment — are inside it, sealed with its own key like a commitment's words,
+ * never in the clear journal, never listed in Recall. People finds the person it means by a shared number or address, else by the same name; if the contact
+ * has gone, the note is **dormant** — nothing shown, nothing wrongly attributed.
+ *
+ * **Changing is replacing; removing is erasing.** Saving new words seals a new note, records it, and then erases the older notes about the same person,
+ * which destroys their keys; the newest live note about a person is the one used. Each note carries a random nonce so two notes never share bytes.
+ */
+final class PersonNote {
+    private PersonNote() {}
+
+    static final String HEADER = "orb.person.note.v1";
+    static final int ROLE_MAX = 60;
+    static final int NOTE_MAX = 1000;
+
+    /** A live note: its event, who it is about, and the words. */
+    static final class Note {
+        final String eventId;
+        final String eventHash;
+        final PersonLink.Who who;
+        final String role;
+        final String text;
+
+        Note(String eventId, String eventHash, PersonLink.Who who, String role, String text) {
+            this.eventId = eventId;
+            this.eventHash = eventHash;
+            this.who = who;
+            this.role = role;
+            this.text = text;
+        }
+    }
+
+    /** A role as one tidy line, at most `ROLE_MAX` characters; empty if there is nothing. */
+    static String cleanRole(String raw) {
+        if (raw == null) return "";
+        String t = raw.replaceAll("[\\p{Cntrl}&&[^\\n\\r\\t]]", "").replaceAll("\\s+", " ").trim();
+        return t.length() > ROLE_MAX ? t.substring(0, ROLE_MAX).trim() : t;
+    }
+
+    /** A note with its line breaks, at most `NOTE_MAX` characters; empty if there is nothing. */
+    static String cleanText(String raw) {
+        if (raw == null) return "";
+        String t = raw.replace("\r\n", "\n").replace('\r', '\n').replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "").trim();
+        return t.length() > NOTE_MAX ? t.substring(0, NOTE_MAX).trim() : t;
+    }
+
+    private static String oneLine(String value) {
+        return value.replace('\n', ' ').replace('\r', ' ').trim();
+    }
+
+    /** The sealed document: a header, a nonce, who it names, the role, and the note one line at a time. */
+    static byte[] document(People.Person person, String role, String text, String nonce) {
+        StringBuilder out = new StringBuilder(HEADER).append("\n---\n").append("nonce:").append(nonce).append('\n');
+        for (String n : person.names) out.append("name:").append(oneLine(n)).append('\n');
+        for (String p : person.phones) out.append("phone:").append(oneLine(p)).append('\n');
+        for (String e : person.emails) out.append("email:").append(oneLine(e)).append('\n');
+        out.append("role:").append(oneLine(role)).append('\n');
+        for (String line : text.split("\n", -1)) out.append("note:").append(line).append('\n');
+        return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Who, role and note, or null if these bytes are not a person note. */
+    static Note parse(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = HEADER + "\n---\n";
+        if (!s.startsWith(prefix)) return null;
+        PersonLink.Who who = new PersonLink.Who();
+        String role = "";
+        StringBuilder text = new StringBuilder();
+        boolean firstLine = true;
+        for (String line : s.substring(prefix.length()).split("\n", -1)) {
+            if (line.startsWith("name:")) who.names.add(line.substring(5));
+            else if (line.startsWith("phone:")) who.phones.add(line.substring(6));
+            else if (line.startsWith("email:")) who.emails.add(line.substring(6));
+            else if (line.startsWith("role:")) role = line.substring(5);
+            else if (line.startsWith("note:")) {
+                if (!firstLine) text.append('\n');
+                text.append(line.substring(5));
+                firstLine = false;
+            }
+        }
+        return new Note(null, null, who, role, text.toString());
+    }
+
+    private static final class Raw {
+        final String eventId;
+        final String eventHash;
+        final String identity;
+
+        Raw(String eventId, String eventHash, String identity) {
+            this.eventId = eventId;
+            this.eventHash = eventHash;
+            this.identity = identity;
+        }
+    }
+
+    private static List<Raw> raw(List<String> lines) {
+        Set<String> erased = Erasure.erasedHashes(lines);
+        java.util.Map<String, Erasure.Item> byHash = new java.util.LinkedHashMap<>();
+        for (Erasure.Item item : Erasure.items(lines)) if (PersonNoteFacts.DESCRIBED.equals(item.type)) byHash.put(item.hash, item);
+        List<Raw> out = new ArrayList<>();
+        for (String line : lines) {
+            if (!PersonNoteFacts.DESCRIBED.equals(Journal.typeOf(line))) continue;
+            String hash = Erasure.envelopeHash(line);
+            Erasure.Item item = hash == null ? null : byHash.get(hash);
+            if (item == null || erased.contains(hash)) continue;
+            out.add(new Raw(Erasure.eventId(line), hash, item.identity));
+        }
+        return out;
+    }
+
+    /** Every live note, oldest first. A note that cannot be opened is skipped, never guessed at. */
+    static List<Note> all(Context context, Journal journal) throws IOException {
+        List<Note> out = new ArrayList<>();
+        for (Raw r : raw(journal.readLines())) {
+            Note note = null;
+            try {
+                byte[] bytes = Attachments.open(context, r.identity);
+                note = bytes == null ? null : parse(bytes);
+            } catch (Exception unreadable) {
+                note = null;
+            }
+            if (note != null) out.add(new Note(r.eventId, r.eventHash, note.who, note.role, note.text));
+        }
+        return out;
+    }
+
+    /** The newest live note that names this person, or null. */
+    static Note latestFor(List<Note> notes, People.Person person) {
+        Note found = null;
+        for (Note n : notes) if (PersonLink.matches(n.who, person)) found = n;
+        return found;
+    }
+
+    /** Gives each person the words said about them, for the screen: the role and the note. Kept nowhere else. */
+    static void attach(Context context, Journal journal, List<People.Person> people) throws IOException {
+        List<Note> notes = all(context, journal);
+        if (notes.isEmpty()) return;
+        for (People.Person p : people) {
+            Note n = latestFor(notes, p);
+            if (n == null) continue;
+            p.role = n.role.isEmpty() ? null : n.role;
+            p.note = n.text.isEmpty() ? null : n.text;
+        }
+    }
+
+    static final String SAVED = "saved";
+    static final String UNCHANGED = "unchanged";
+    static final String REMOVED = "removed";
+    static final String NOTE_FAILED = "noteFailed";
+    static final String JOURNAL_FAILED = "journalFailed";
+
+    /** Writes the event. The journal in the app; a test makes it fail, to see the sealed note go back. */
+    interface Recorder {
+        Map<String, Object> record(Map<String, Object> payload);
+    }
+
+    private static String nonce() {
+        byte[] b = new byte[12];
+        new SecureRandom().nextBytes(b);
+        StringBuilder out = new StringBuilder();
+        for (byte x : b) out.append(String.format(Locale.ROOT, "%02x", x));
+        return out.toString();
+    }
+
+    static String save(final Context context, final Journal journal, People.Person person, String role, String text) throws IOException {
+        return save(context, journal, person, role, text, new Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload) {
+                return journal.append(PersonNoteFacts.DESCRIBED, payload);
+            }
+        });
+    }
+
+    /**
+     * Says what the person is to you. Empty words remove what was said. The same words as now write nothing. Otherwise the new note is sealed, recorded,
+     * and only then are the older notes about the same person erased — so a failure at any point leaves the person with what they had.
+     */
+    static String save(Context context, Journal journal, People.Person person, String role, String text, Recorder recorder) throws IOException {
+        String r = cleanRole(role);
+        String t = cleanText(text);
+        if (r.isEmpty() && t.isEmpty()) {
+            remove(context, journal, person);
+            return REMOVED;
+        }
+        List<Note> before = all(context, journal);
+        Note current = latestFor(before, person);
+        if (current != null && current.role.equals(r) && current.text.equals(t)) return UNCHANGED;
+        Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(document(person, r, t, nonce())));
+        if (stored.identity == null) return NOTE_FAILED;
+        boolean sealedNow = "stored".equals(stored.outcome);
+        Map<String, Object> event = recorder.record(PersonNoteFacts.described(stored.identity, stored.bytes));
+        if (event == null) {
+            if (sealedNow) {
+                try {
+                    Attachments.discard(context, stored.identity);
+                } catch (Exception leftBehind) {
+                    // Nothing cites it; the next erase pass cannot see it.
+                }
+            }
+            return JOURNAL_FAILED;
+        }
+        for (Note old : before) if (PersonLink.matches(old.who, person)) erase(context, journal, old.eventHash);
+        return SAVED;
+    }
+
+    private static boolean erase(Context context, Journal journal, String hash) throws IOException {
+        Erase.Result done = Erase.execute(context, journal, hash);
+        return Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome);
+    }
+
+    /** Erases every note about this person: what was said is gone for good. Returns how many. */
+    static int remove(Context context, Journal journal, People.Person person) throws IOException {
+        int n = 0;
+        for (Note note : all(context, journal)) if (PersonLink.matches(note.who, person) && erase(context, journal, note.eventHash)) n++;
+        return n;
+    }
+}

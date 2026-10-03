@@ -240,7 +240,7 @@ public final class PeopleActivity extends Activity {
             list.addView(noticed);
         }
         final EditText search = new EditText(this);
-        search.setHint("A name, two letters or more");
+        search.setHint("A name or what they are to you, two letters or more");
         search.setSingleLine(true);
         list.addView(search);
         final LinearLayout found = new LinearLayout(this);
@@ -743,6 +743,105 @@ public final class PeopleActivity extends Activity {
         sure.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
     }
 
+    // ---- What they are to you (PersonNote, docs/UNDERSTANDING_PHONE.md §10): your own words, sealed — the only way a category enters Orb.
+
+    private void addDescription(LinearLayout column, final People.Person person) {
+        if (person.role != null) column.addView(text("To you: " + person.role, 14, true));
+        if (person.note != null) column.addView(text(person.note, 13, false));
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        Button say = new Button(this);
+        say.setText(person.role == null && person.note == null ? "Say what they are to you\u2026" : "Change\u2026");
+        say.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { describe(person); }
+        });
+        buttons.addView(say);
+        if (person.role != null || person.note != null) {
+            Button remove = new Button(this);
+            remove.setText("Remove");
+            remove.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { confirmRemoveDescription(person); }
+            });
+            buttons.addView(remove);
+        }
+        column.addView(buttons);
+    }
+
+    /** The form: a few words and, if you like, a note. Orb uses them exactly as written and never guesses. Nothing is sent anywhere. */
+    private void describe(final People.Person person) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(48, 16, 48, 0);
+        form.addView(text("In your own words. It stays on this phone, sealed, and Orb never guesses what someone is to you.", 12, false));
+        final EditText role = new EditText(this);
+        role.setHint("e.g. electrician, brother, landlord");
+        role.setSingleLine(true);
+        role.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(PersonNote.ROLE_MAX)});
+        if (person.role != null) role.setText(person.role);
+        form.addView(role);
+        final EditText note = new EditText(this);
+        note.setHint("Anything you want Orb to remember (optional)");
+        note.setMinLines(3);
+        note.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(PersonNote.NOTE_MAX)});
+        if (person.note != null) note.setText(person.note);
+        form.addView(note);
+        AlertDialog card = new AlertDialog.Builder(this)
+            .setTitle("What is " + person.names.get(0) + " to you?")
+            .setView(form)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) { saveDescription(person, role.getText().toString(), note.getText().toString()); }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+    }
+
+    private void saveDescription(People.Person person, String role, String note) {
+        Journal journal = journal();
+        if (journal == null) return;
+        String outcome;
+        try {
+            outcome = PersonNote.save(this, journal, person, role, note);
+        } catch (IOException unreadable) {
+            say("Orb could not read its history, so it saved nothing.", null);
+            return;
+        }
+        if (PersonNote.NOTE_FAILED.equals(outcome) || PersonNote.JOURNAL_FAILED.equals(outcome)) {
+            say("Orb could not record this, so nothing changed.", null);
+            return;
+        }
+        reopenName = person.names.get(0);
+        if (shown != null) shown.dismiss();
+        render();
+    }
+
+    private void confirmRemoveDescription(final People.Person person) {
+        AlertDialog sure = new AlertDialog.Builder(this)
+            .setTitle("Remove what you said?")
+            .setMessage("What you said about " + person.names.get(0) + " is erased for good. Nothing else changes.")
+            .setNegativeButton("Keep it", null)
+            .setPositiveButton("Remove", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    try {
+                        PersonNote.remove(PeopleActivity.this, journal, person);
+                    } catch (IOException unreadable) {
+                        say("Orb could not read its history, so it removed nothing.", null);
+                        return;
+                    }
+                    reopenName = person.names.get(0);
+                    if (shown != null) shown.dismiss();
+                    render();
+                }
+            })
+            .create();
+        sure.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        sure.show();
+        sure.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
     /** After a commitment is kept or changed, the screen is recomputed and the same person's page opens again. */
     private Runnable reopenAfter(final People.Person person) {
         return new Runnable() {
@@ -815,6 +914,7 @@ public final class PeopleActivity extends Activity {
         for (String n : person.names) who.append(who.length() > 0 ? ", " : "").append(n);
         column.addView(text(who.toString(), 14, true));
         if (inRegularTouch(person)) column.addView(text("You said: in regular touch.", 13, true));
+        addDescription(column, person);
         for (String p : person.phones) column.addView(text("Phone  " + Mentions.show(new Mentions.Handle("phone", p)), 13, false));
         for (String e : person.emails) column.addView(text("Email  " + e, 13, false));
         // Reach them from here: each opens another app after a confirmation; Orb sends nothing and calls no one (`Handoff`).
