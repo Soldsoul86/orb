@@ -1321,6 +1321,8 @@ box — **where they are the app's by design, like the number**.
 
 **Records.** `orb.safety.checked` (apps looked at, how many *Now*, how many *Worth a look*) once per run, and `orb.safety.deferred` for *Not now*. **Counts only: never an app, a package, a label or a permission.** What the check found is **computed and shown, never stored** (DR-19): *what is installed on a phone* describes a life. The first-run offer happens once — *any* `orb.safety.*` record in the journal ends it.
 
+**Amended 2026-10-03** (operator: "Yes, go ahead with option 1", after the first device round showed 42 *Worth a look* findings in one list): findings are **grouped by severity** — a fixed order of reasons, each finding under its strongest, headings with counts that open and close, *Worth a look* starting closed above eight findings (`SAFETY_CHECK_PHONE.md` §11). No rule, level, record or permission changed.
+
 **Not in this ruling:** a malware or reputation database (needs the network); scanning APK files; Wi‑Fi, Bluetooth, NFC and keys; remembering *"I know this app"*; background re-checks; a score.
 
 ## DR-33 — Sources: the framework, and PDFs you point Orb at (slice 2a)

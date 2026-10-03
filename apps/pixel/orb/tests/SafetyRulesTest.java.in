@@ -42,7 +42,84 @@ final class SafetyRulesTest {
         return out;
     }
 
+    private static final List<SafetyRules.Reason> ALL = Arrays.asList(SafetyRules.ACCESSIBILITY_OVERLAY, SafetyRules.SMS_NOTIFICATIONS, SafetyRules.ACCESSIBILITY, SafetyRules.NOTIFICATIONS,
+        SafetyRules.ADMIN, SafetyRules.NO_LOCK, SafetyRules.INSTALLER, SafetyRules.KEYBOARD, SafetyRules.SMS, SafetyRules.CALL_LOG, SafetyRules.BACKGROUND_LOC, SafetyRules.FILES,
+        SafetyRules.OVERLAY_ONLY, SafetyRules.USB_DEBUGGING, SafetyRules.OLD_PATCH);
+
+    private static List<String> titles(List<SafetyRules.Group> groups) {
+        List<String> out = new ArrayList<>();
+        for (SafetyRules.Group g : groups) out.add(g.title());
+        return out;
+    }
+
+    private static void severity() throws Exception {
+        Harness.suite("grouped by severity: each finding under its strongest reason, strongest group first");
+        java.util.Set<Integer> ranks = new java.util.HashSet<>();
+        for (SafetyRules.Reason reason : ALL) ranks.add(reason.rank);
+        Harness.equal("every reason has its own place in the order", ranks.size(), ALL.size());
+        int weakestNow = 0, strongestReview = 1000;
+        for (SafetyRules.Reason reason : ALL) {
+            if (reason.level.equals(SafetyRules.NOW)) weakestNow = Math.max(weakestNow, reason.rank); else strongestReview = Math.min(strongestReview, reason.rank);
+        }
+        Harness.check("everything to look at now outranks everything worth a look", weakestNow < strongestReview);
+        Harness.equal("the order of the abilities that read you, as decided",
+            Arrays.asList(SafetyRules.ACCESSIBILITY_OVERLAY.rank, SafetyRules.SMS_NOTIFICATIONS.rank, SafetyRules.ACCESSIBILITY.rank, SafetyRules.NOTIFICATIONS.rank, SafetyRules.ADMIN.rank, SafetyRules.NO_LOCK.rank),
+            Arrays.asList(1, 2, 3, 4, 5, 6));
+        Harness.equal("and of the weaker ones",
+            Arrays.asList(SafetyRules.INSTALLER.rank, SafetyRules.KEYBOARD.rank, SafetyRules.SMS.rank, SafetyRules.CALL_LOG.rank, SafetyRules.BACKGROUND_LOC.rank, SafetyRules.FILES.rank,
+                SafetyRules.OVERLAY_ONLY.rank, SafetyRules.USB_DEBUGGING.rank, SafetyRules.OLD_PATCH.rank),
+            Arrays.asList(10, 11, 12, 13, 14, 15, 16, 17, 18));
+        for (SafetyRules.Reason reason : ALL) {
+            String g = reason.group.toLowerCase();
+            Harness.check("a plain heading for " + reason.id, reason.group.length() > 8 && reason.group.length() < 70 && !g.contains("safe") && !g.contains("certif") && !g.contains("malware") && !g.contains("dangerous"));
+        }
+
+        SafetyRules.Finding many = one(app("Many", PLAY, "kbd", "g:" + SafetyRules.READ_SMS, "g:" + SafetyRules.READ_CALL_LOG));
+        Harness.equal("a finding's strongest reason is the one it is grouped under", many.primary().id, "keyboard");
+        Harness.equal("with an install permission from outside a store it is the installer", one(app("Side", "com.example.sideload", "r:" + SafetyRules.INSTALL_APPS, "r:" + SafetyRules.OVERLAY)).primary().id, "installer");
+        Harness.equal("a combination is the strongest of all", one(app("Combo", PLAY, "acc", "nl", "admin", "r:" + SafetyRules.OVERLAY)).primary().id, "accessibilityOverlay");
+
+        List<SafetyRules.App> apps = new ArrayList<>();
+        apps.add(app("Zed Texts", PLAY, "g:" + SafetyRules.READ_SMS));
+        apps.add(app("Alpha Files", PLAY, "r:" + SafetyRules.ALL_FILES));
+        apps.add(app("Bob Keys", PLAY, "kbd"));
+        apps.add(app("Amy Keys", PLAY, "kbd", "g:" + SafetyRules.READ_CALL_LOG));
+        apps.add(app("Calls", PLAY, "g:" + SafetyRules.READ_CALL_LOG));
+        apps.add(app("Draw", PLAY, "r:" + SafetyRules.OVERLAY));
+        apps.add(app("Side", "com.example.sideload", "r:" + SafetyRules.INSTALL_APPS));
+        apps.add(app("Screen B", PLAY, "acc"));
+        apps.add(app("Screen A", PLAY, "acc"));
+        apps.add(app("Codes", PLAY, "nl"));
+        SafetyRules.Result result = SafetyRules.check(apps, new SafetyRules.Phone(false, true, 400), "orb");
+        List<String> order = new ArrayList<>();
+        for (SafetyRules.Finding f : result.findings) order.add(f.label);
+        Harness.equal("strongest first within a level; by name within a group; the phone is a finding like any other",
+            order, Arrays.asList("Screen A", "Screen B", "Codes", "This phone", "Side", "Amy Keys", "Bob Keys", "Zed Texts", "Calls", "Alpha Files", "Draw", "This phone"));
+        Harness.equal("the groups to look at now, with their counts", titles(SafetyRules.groups(result, SafetyRules.NOW)),
+            Arrays.asList("Read your screen and tap for you (2)", "Read all your notifications (1)", "This phone has no screen lock (1)"));
+        Harness.equal("and the weaker ones", titles(SafetyRules.groups(result, SafetyRules.REVIEW)),
+            Arrays.asList("Can install other apps, from outside a known app store (1)", "A keyboard that is not Android's own (2)", "Read your text messages (1)", "Read your call history (1)",
+                "Ask to see every file on the phone (1)", "Draw over other apps (1)", "USB debugging is on (1)"));
+        int inGroups = 0;
+        for (SafetyRules.Group g : SafetyRules.groups(result, SafetyRules.NOW)) inGroups += g.findings.size();
+        for (SafetyRules.Group g : SafetyRules.groups(result, SafetyRules.REVIEW)) inGroups += g.findings.size();
+        Harness.equal("every finding is in exactly one group", inGroups, result.findings.size());
+        Harness.check("an app with two reasons is only under its strongest", SafetyRules.groups(result, SafetyRules.REVIEW).get(1).findings.get(0).label.equals("Amy Keys")
+            && SafetyRules.groups(result, SafetyRules.REVIEW).get(3).findings.get(0).label.equals("Calls"));
+        Harness.check("no groups for a level with nothing in it", SafetyRules.groups(SafetyRules.check(new ArrayList<SafetyRules.App>(), null, "orb"), SafetyRules.NOW).isEmpty());
+
+        SafetyRules.Result few = new SafetyRules.Result();
+        few.review = SafetyRules.OPEN_LIMIT;
+        SafetyRules.Result lots = new SafetyRules.Result();
+        lots.review = SafetyRules.OPEN_LIMIT + 1;
+        Harness.check("what to look at now starts open, however many", SafetyRules.startsOpen(lots, SafetyRules.NOW) && SafetyRules.startsOpen(few, SafetyRules.NOW));
+        Harness.check("the weaker ones start open when there are eight or fewer, closed from nine", SafetyRules.startsOpen(few, SafetyRules.REVIEW) && !SafetyRules.startsOpen(lots, SafetyRules.REVIEW));
+        Harness.equal("the limit is eight", SafetyRules.OPEN_LIMIT, 8);
+        Harness.equal("the summary line is the same as before: two levels, counts", SafetyRules.summary(result, "d"), "Checked d \u00b7 4 to look at now \u00b7 8 worth a look");
+    }
+
     static void run() throws Exception {
+        severity();
         Harness.suite("the powerful abilities: each one, and the combinations that replace their parts");
         Harness.equal("an accessibility service reads your screen", ids(one(app("Acme", PLAY, "acc"))), Arrays.asList("accessibility"));
         Harness.equal("it is a *now* finding", one(app("Acme", PLAY, "acc")).level, SafetyRules.NOW);
@@ -220,6 +297,14 @@ final class SafetyRulesTest {
         Harness.check("only a keyboard that is not part of Android counts", readerSource.contains("app.keyboard = !system && imes.contains(info.packageName);"));
         Harness.check("USB debugging is on only when it reads 1, and unreadable is off, not on",
             readerSource.contains("Settings.Global.getInt(resolver, Settings.Global.ADB_ENABLED, 0) == 1"));
+        Harness.check("findings are drawn in groups, strongest first, each opened and closed by its heading",
+            screen.contains("SafetyRules.groups(result, level)") && screen.contains("heading.setText((open ? \"Hide \\u2014 \" : \"Show \\u2014 \") + group.title());") && screen.contains("if (!open) continue;"));
+        Harness.check("a group starts open or closed by the rule, and a tap flips it against that default", screen.contains("SafetyRules.startsOpen(result, level) != flipped.contains(id)")
+            && screen.contains("if (!flipped.remove(id)) flipped.add(id);"));
+        Harness.check("opening or closing a group redraws what is on screen and does not read the phone again", screen.contains("show(journal, shown)") && screen.contains("shown = result;")
+            && screen.split("AppSecurityReader\\.read\\(", -1).length - 1 == 1);
+        Harness.check("checking again forgets what was opened or closed", screen.contains("flipped.clear();"));
+        Harness.check("the group state is memory only", !screen.contains("getSharedPreferences") && !screen.contains("FileOutputStream"));
         String main = source.get("MainActivity");
         Harness.check("the offer comes by itself only on a fresh start and only when it is the first run",
             main.contains("if (state == null)") && main.contains("SafetyFacts.firstRun(journal.readLines())") && main.contains("new Intent(this, SafetyActivity.class)")

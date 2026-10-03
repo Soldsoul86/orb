@@ -122,6 +122,7 @@ public final class SafetyActivity extends Activity {
     }
 
     private void show(Journal journal, SafetyRules.Result result) {
+        shown = result;
         list.removeAllViews();
         list.addView(text("Safety check", 17, true));
         if (!recorded) {
@@ -140,21 +141,38 @@ public final class SafetyActivity extends Activity {
         again.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) {
                 recorded = false;
+                flipped.clear();
                 render();
             }
         });
         list.addView(again);
     }
 
-    private void addSection(String title, String level, SafetyRules.Result result) {
-        boolean any = false;
-        for (SafetyRules.Finding f : result.findings) {
-            if (!f.level.equals(level)) continue;
-            if (!any) {
-                list.addView(text(title, 15, true));
-                any = true;
-            }
-            list.addView(row(f));
+    /** The groups the person opened or closed against their default; memory only, gone when the screen is. */
+    private final java.util.Set<String> flipped = new java.util.HashSet<>();
+    /** The result on screen, so a tap on a group heading can redraw without reading the phone again. */
+    private SafetyRules.Result shown;
+
+    /** One level: its heading, then its groups — strongest first, each a heading with a count that opens and closes it. */
+    private void addSection(String title, final String level, final SafetyRules.Result result) {
+        java.util.List<SafetyRules.Group> groups = SafetyRules.groups(result, level);
+        if (groups.isEmpty()) return;
+        list.addView(text(title, 15, true));
+        for (final SafetyRules.Group group : groups) {
+            final String id = group.reason.id;
+            boolean open = SafetyRules.startsOpen(result, level) != flipped.contains(id);
+            Button heading = new Button(this);
+            heading.setText((open ? "Hide \u2014 " : "Show \u2014 ") + group.title());
+            heading.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (!flipped.remove(id)) flipped.add(id);
+                    Journal journal = journal();
+                    if (journal != null && shown != null) show(journal, shown);
+                }
+            });
+            list.addView(heading);
+            if (!open) continue;
+            for (SafetyRules.Finding f : group.findings) list.addView(row(f));
         }
     }
 

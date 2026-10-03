@@ -47,45 +47,51 @@ final class SafetyRules {
         final String text;
         final String why;
         final String level;
+        /** How strong, as a plain order: lower is stronger. A finding is grouped under its strongest reason. */
+        final int rank;
+        /** The heading of the group of findings whose strongest reason this is. */
+        final String group;
 
-        Reason(String id, String level, String text, String why) {
+        Reason(String id, String level, int rank, String group, String text, String why) {
             this.id = id;
             this.level = level;
+            this.rank = rank;
+            this.group = group;
             this.text = text;
             this.why = why;
         }
     }
 
-    static final Reason ACCESSIBILITY_OVERLAY = new Reason("accessibilityOverlay", NOW, "Reads your screen, can tap for you, and can draw over other apps",
+    static final Reason ACCESSIBILITY_OVERLAY = new Reason("accessibilityOverlay", NOW, 1, "Read your screen, tap for you and draw over other apps", "Reads your screen, can tap for you, and can draw over other apps",
         "That is how fake login screens and screen-reading malware work: it sees what you see, taps for you, and can cover what you are really looking at.");
-    static final Reason SMS_NOTIFICATIONS = new Reason("smsNotifications", NOW, "Reads your text messages and all your notifications",
+    static final Reason SMS_NOTIFICATIONS = new Reason("smsNotifications", NOW, 2, "Read your texts and all your notifications", "Reads your text messages and all your notifications",
         "One-time codes and bank alerts arrive in both. An app that reads both can see them before you do.");
-    static final Reason ACCESSIBILITY = new Reason("accessibility", NOW, "Reads your screen and can tap for you",
+    static final Reason ACCESSIBILITY = new Reason("accessibility", NOW, 3, "Read your screen and tap for you", "Reads your screen and can tap for you",
         "An accessibility service sees everything on screen and can act on it. Real accessibility tools need it; little else should.");
-    static final Reason NOTIFICATIONS = new Reason("notifications", NOW, "Reads all your notifications, including one-time codes",
+    static final Reason NOTIFICATIONS = new Reason("notifications", NOW, 4, "Read all your notifications", "Reads all your notifications, including one-time codes",
         "Every message, every code, every alert passes through it.");
-    static final Reason ADMIN = new Reason("admin", NOW, "Can lock or wipe this phone",
+    static final Reason ADMIN = new Reason("admin", NOW, 5, "Can lock or wipe this phone", "Can lock or wipe this phone",
         "A device administrator can lock the phone, change its password or erase it, and is hard to remove.");
-    static final Reason SMS = new Reason("sms", REVIEW, "Reads your text messages",
+    static final Reason SMS = new Reason("sms", REVIEW, 12, "Read your text messages", "Reads your text messages",
         "Texts carry one-time codes, bank messages and private conversations.");
-    static final Reason CALL_LOG = new Reason("callLog", REVIEW, "Reads your call history",
+    static final Reason CALL_LOG = new Reason("callLog", REVIEW, 13, "Read your call history", "Reads your call history",
         "Who you call, when, and for how long.");
-    static final Reason BACKGROUND_LOC = new Reason("backgroundLocation", REVIEW, "Can see where you are when it is closed",
+    static final Reason BACKGROUND_LOC = new Reason("backgroundLocation", REVIEW, 14, "See where you are when they are closed", "Can see where you are when it is closed",
         "It can follow you through the day without being open.");
-    static final Reason FILES = new Reason("allFiles", REVIEW, "Asks to see every file on the phone",
+    static final Reason FILES = new Reason("allFiles", REVIEW, 15, "Ask to see every file on the phone", "Asks to see every file on the phone",
         "Documents, photos and downloads, beyond what an app normally needs.");
-    static final Reason OVERLAY_ONLY = new Reason("overlay", REVIEW, "Can draw over other apps",
+    static final Reason OVERLAY_ONLY = new Reason("overlay", REVIEW, 16, "Draw over other apps", "Can draw over other apps",
         "Used for chat bubbles and screen filters — and for covering a real screen with a fake one.");
-    static final Reason INSTALLER = new Reason("installer", REVIEW, "Can install other apps, and came from outside a known app store",
+    static final Reason INSTALLER = new Reason("installer", REVIEW, 10, "Can install other apps, from outside a known app store", "Can install other apps, and came from outside a known app store",
         "An app that can install others, from an unknown source, can bring in anything.");
-    static final Reason KEYBOARD = new Reason("keyboard", REVIEW, "A keyboard that is not Android's own",
+    static final Reason KEYBOARD = new Reason("keyboard", REVIEW, 11, "A keyboard that is not Android's own", "A keyboard that is not Android's own",
         "A keyboard sees every word you type, including passwords.");
 
-    static final Reason NO_LOCK = new Reason("noLock", NOW, "This phone has no screen lock",
+    static final Reason NO_LOCK = new Reason("noLock", NOW, 6, "This phone has no screen lock", "This phone has no screen lock",
         "Anyone who picks it up can open everything, including Orb.");
-    static final Reason USB_DEBUGGING = new Reason("usbDebugging", REVIEW, "USB debugging is on",
+    static final Reason USB_DEBUGGING = new Reason("usbDebugging", REVIEW, 17, "USB debugging is on", "USB debugging is on",
         "A computer plugged into this phone can read and change it.");
-    static final Reason OLD_PATCH = new Reason("oldPatch", REVIEW, "The phone's security update is more than six months old",
+    static final Reason OLD_PATCH = new Reason("oldPatch", REVIEW, 18, "The security update is old", "The phone's security update is more than six months old",
         "Known weaknesses stay open until the phone is updated.");
 
     /** Days after which a security update is called old. */
@@ -151,6 +157,13 @@ final class SafetyRules {
             this.pkg = pkg;
             this.label = label;
             this.outsideStore = outsideStore;
+        }
+
+        /** The strongest of this finding's reasons: the one it is grouped under. */
+        Reason primary() {
+            Reason best = reasons.get(0);
+            for (Reason r : reasons) if (r.rank < best.rank) best = r;
+            return best;
         }
 
         /** The one sentence. */
@@ -231,7 +244,9 @@ final class SafetyRules {
         Collections.sort(r.findings, new Comparator<Finding>() {
             @Override public int compare(Finding a, Finding b) {
                 int level = (NOW.equals(a.level) ? 0 : 1) - (NOW.equals(b.level) ? 0 : 1);
-                return level != 0 ? level : a.label.compareToIgnoreCase(b.label);
+                if (level != 0) return level;
+                int strength = a.primary().rank - b.primary().rank;
+                return strength != 0 ? strength : a.label.compareToIgnoreCase(b.label);
             }
         });
         for (Finding f : r.findings) {
@@ -239,6 +254,43 @@ final class SafetyRules {
             else r.review++;
         }
         return r;
+    }
+
+    /** The findings of one level that share a strongest reason — one heading on the screen. */
+    static final class Group {
+        final Reason reason;
+        final List<Finding> findings = new ArrayList<>();
+
+        Group(Reason reason) {
+            this.reason = reason;
+        }
+
+        /** *Read your screen and tap for you (3)*. */
+        String title() {
+            return reason.group + " (" + findings.size() + ")";
+        }
+    }
+
+    /** More than this many *Worth a look* findings and every group of them starts closed. */
+    static final int OPEN_LIMIT = 8;
+
+    /** The groups of one level, strongest first; each finding is in one group, the one for its strongest reason. */
+    static List<Group> groups(Result result, String level) {
+        List<Group> out = new ArrayList<>();
+        for (Finding f : result.findings) {
+            if (!f.level.equals(level)) continue;
+            Reason p = f.primary();
+            Group group = null;
+            for (Group g : out) if (g.reason == p) { group = g; break; }
+            if (group == null) { group = new Group(p); out.add(group); }
+            group.findings.add(f);
+        }
+        return out;
+    }
+
+    /** Whether a group starts open: always for what to look at now; for the rest only when there are few of them. */
+    static boolean startsOpen(Result result, String level) {
+        return NOW.equals(level) || result.review <= OPEN_LIMIT;
     }
 
     /** *Checked 2 Oct 2026 · 2 to look at now · 5 worth a look* — never *safe*, never *certified*. */

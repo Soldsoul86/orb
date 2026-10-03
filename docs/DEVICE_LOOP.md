@@ -7089,3 +7089,45 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 - Today lists overdue, today, this week, waiting, no-date and recently closed, and only a count for open commitments dated more than a week ahead. The operator's ruling (2026-10-03): **"Logic is okay, else Today will get crowded; Coming up is the right way."** **Nothing changes**: far dates belong in Coming up (documents' deadlines and folds are there), Today stays short.
 - The proposed "make the count open" and "Coming up button on Today" were **declined by the operator and are not built.**
+
+### 7b80. The Safety check, grouped by severity (DR-32 amended) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v44-safety-groups.apk`. v43 is §7b79 (partly verified). Design: `docs/SAFETY_CHECK_PHONE.md` §11.
+
+**Why:** the first check on your phone found 299 apps and put 42 of them in one flat list. A list that long is not read. Same rules as before — only the order and the drawing change.
+
+#### What changed
+
+1. **Findings are grouped under their strongest reason**, strongest group first. *Look at these now*: reads your screen + draws over apps · texts + notifications · reads your screen · all notifications · can lock or wipe · no screen lock. *Worth a look*: installs other apps from outside a store · a non-standard keyboard · reads texts · reads call history · sees where you are when closed · every file · draws over apps · USB debugging · old security update.
+2. **Each group has a heading with its count** (*Show — A keyboard that is not Android's own (2)*) that opens and closes it. A finding appears once, under its strongest reason.
+3. **What to look at now starts open. *Worth a look* starts closed when there are more than 8** (it starts open when there are 8 or fewer) — so on your phone you see the overview first.
+4. Within a group, apps A–Z. *Check again* resets what you opened.
+5. **Nothing recorded changes** (the same three counts); no new permission, capability or record; still never *safe* or *certified*.
+
+#### Checked before the device
+
+- Phone-side suite: 1754 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on every rank, the choice of the strongest reason, the sort, the group building and counts, the open-or-closed rule and its limit, and the screen's toggle, redraw and reset: @@MUT@@
+- **Not testable off the phone:** how the 42 findings distribute across the groups on your phone.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P233** | **v44 installs over v43 without a warning**; the Safety check opens as before | flagged — say what it said |
+| **P234** | **Check my phone / Check again**: the summary line is the same as before (*299 apps looked at… 1 to look at now · 42 worth a look*) and **Look at these now** shows its one finding under a heading with a count, open | the counts or the heading are wrong |
+| **P235** | **Worth a look** shows **only headings** (each *Show — … (N)*), none open, and **the counts add up to 42** (plus any phone items) | rows are shown open, or the counts do not add up |
+| **P236** | The headings are in this order (those that apply): **installs other apps · keyboard · texts · call history · location when closed · every file · draws over apps · USB debugging · old update** | a different order |
+| **P237** | Tapping a heading **opens** it (*Hide — …*) and shows its apps **A–Z**, each with its reasons and **Open its settings**; tapping again closes it; the rest of the screen does not jump back to the top | a tap does nothing or re-runs the check |
+| **P238** | **Check again** puts every group back to its start (closed) | a group stays open |
+| **P239** | **Export and share journal**: each check is still one `orb.safety.checked` with the same numbers; **nothing new** | something new was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v44-safety-groups.apk` over v43; open Orb once. *(P233)*
+2. **Safety check → Check again.** Read the summary and the one open group. *(P234)*
+3. Read the **Worth a look** headings and counts; add them up. *(P235, P236)*
+4. Open two or three groups; look at the apps and the order inside; close one. *(P237)*
+5. Tap **Check again**. *(P238)*
+6. **Export and share journal**. *(P239)*
+7. Tell me: **does the order feel right, and which group would you move?**

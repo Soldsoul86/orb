@@ -85,3 +85,13 @@ A malware or reputation database (it would need the network); scanning APK files
 - **Tests.** Every rule and boundary (182/183/184 days), the sideload list, the skip rules, the sort, the summary words (never *safe*/*certified*), the records, first-run, and source guards: one reader, no write APIs, pure rules, secure window, one `startActivity`, grant before read, two journal appends, manifest queries. Mutation checks are recorded in `DEVICE_LOOP.md` §7b77.
 
 **Verified 2026-10-02.** The operator found nothing wrong; asked for *grouping by severity* later (299 apps, 42 in *Worth a look* — too coarse). Not built.
+
+## 11. Grouped by severity (added 2026-10-03, after the first device round)
+
+On the operator's phone the check looked at 299 apps and put **42 in one flat *Worth a look* list** (`DEVICE_LOOP.md` §7b77). The operator asked for it **grouped by severity** ("that can be later"; then "Yes, go ahead with option 1"). Same rules, same two levels, same record — only the order and the drawing change:
+
+- **Each reason has a place in a fixed order** (stronger first). *Look at these now*: reads your screen + draws over other apps · reads your texts + notifications · reads your screen · reads all notifications · can lock or wipe the phone · no screen lock. *Worth a look*: can install other apps from outside a store · a keyboard that is not Android's own · reads texts · reads call history · sees where you are when closed · asks for every file · draws over other apps · USB debugging · old security update.
+- **A finding sits under its strongest reason**, once. An app that is a third-party keyboard and reads call history is under *keyboard*, not both.
+- **Within a group, by name** (A–Z, any case).
+- **A heading with a count opens and closes its group.** *Look at these now* starts open. *Worth a look* starts open only when there are **8 or fewer** such findings; with more, every group starts **closed** and the headings are the overview. A tap redraws what is on screen; it does not read the phone again. *Check again* forgets what you opened.
+- **Nothing recorded changes**: `orb.safety.checked` still carries the same three numbers. The order is a fixed table, not a score, and still never says *safe* or *certified*.
