@@ -87,3 +87,5 @@ The call log and messages (above); email (Gmail, last — the first thing that n
 **Verified 2026-10-03** on the operator's phone through *Pick files*: four PDFs read by Android's reader and kept as text; records counts only. The folder path (*Choose a folder*) has not been exercised yet.
 
 **Finding 2026-10-03 (from the calls research, `CALLS_PHONE.md` §0):** Play Protect's documented block on sideloaded apps names `READ_SMS` and `RECEIVE_SMS` and is running in India. A sideloaded Orb declaring them would very probably be **blocked at install**, not just warned. Slice 2c (messages) by permission is therefore **probably closed for this distribution**; the route that remains is what the person **shares** (which already works), or a different distribution. It is not to be designed further until that is settled.
+
+**Probe 2026-10-03:** the operator asked to test `READ_SMS` on his phone before anything is built — `DEVICE_LOOP.md` §7b83, `orb-sms-probe.apk`. The block predicted above is a prediction until then.

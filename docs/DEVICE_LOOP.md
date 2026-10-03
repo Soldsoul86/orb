@@ -7217,3 +7217,33 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 5. If it said NOT granted, tap **3. Open this app's settings page**, look at the ⋮ menu and **Permissions → Call logs**, try **Allow restricted settings** if you see it, come back and tap **1** again. *(P252)*
 6. Paste the whole report here (tap **4. Share**, choose a messaging app or Notes, copy it), plus anything Android said at install.
 7. Afterwards you can uninstall the probe; it holds nothing.
+
+### 7b83. The SMS Probe — can an app like Orb be given the text-message permission here? (`SOURCES_PHONE.md` §5) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-sms-probe.apk` (package `dev.orb.probesms`, **a separate app from the calls probe; Orb v45 is not touched**). Source `apps/pixel/probe-sms`. The operator: after the calls probe installed silently ("Play Protect didn't say anything"), *"before the build, let's test the SMS as well in the probe."*
+
+**Why a second app and not the same one:** if Play Protect blocks an app that declares `READ_SMS` — which its published sideload rule says it does in India — a block on a combined app would hide whether the call-log permission was fine. Two apps keep the answers apart. The calls answer already stands (§7b82).
+
+**What it is:** the twin of the calls probe — one screen, four buttons, one report; declares **only `READ_SMS`** (not `RECEIVE_SMS`, not `SEND_SMS`); shows **a count and one date** — never a sender, a message or a time of day; writes and sends nothing. `tests/check.sh` holds that to its source and built APK.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P253** | **Installing the SMS probe is blocked by Play Protect** — `READ_SMS` is on its published sideload-blocking list, and the pilot covers India | **it installs silently or with a dismissable warning**: the rule does not apply to this phone and SMS by permission is **open**, which changes the plan for messages (§ below) |
+| **P254** | *(If it installs)* **Ask for the text-message permission** shows Android's prompt and **GRANTED** | no prompt and *NOT granted* quickly: Android refuses a hard-restricted permission for this install route |
+| **P255** | *(If granted)* **Count my messages** shows how many messages the inbox holds and the newest date | an error or zero |
+
+#### What each answer means
+
+- **Blocked with no way past it** (P253 holds): reading texts by permission is **closed** for a hand-installed Orb. Messages stay what you **share**; any other route is a distribution decision, not a build. The calls feature is unaffected.
+- **Blocked but with *Install anyway*:** open, at the cost of a warning you accept each install; I would report that plainly and not build on it without your word.
+- **Installs and grants:** open. I design the messages slice (after the scale-and-time design) knowing the permission can be had.
+
+#### The operator's protocol
+
+1. Install `orb-sms-probe.apk` **the same way you install Orb**. **Do not change any Play Protect setting.** If it is **blocked**, **screenshot the exact words** and **stop**: the block is the answer. If it asks **Install anyway**, screenshot that too and tell me before choosing. *(P253)*
+2. *(Only if it installed)* Open **Orb SMS Probe** → **1. Ask for the text-message permission** → **Allow** if asked. *(P254)*
+3. *(Only if granted)* **2. Count my messages**. *(P255)*
+4. Paste the report here (**4. Share**, then copy it), or the screenshot of the block.
+5. Afterwards, uninstall the probe if it installed; it holds nothing.

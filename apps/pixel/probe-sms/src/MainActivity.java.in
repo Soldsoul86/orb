@@ -1,0 +1,185 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.content.pm.InstallSourceInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.provider.Telephony;
+import android.provider.Settings;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+/**
+ * The SMS Probe (`docs/SOURCES_PHONE.md` §5, `docs/DEVICE_LOOP.md` §7b83): does Android let an app that declares `READ_SMS`, installed the way the operator
+ * installs, be granted it — and can it read the inbox once it is? (Play Protect's published sideload block names this permission.)
+ *
+ * It reports **counts and one date, nothing else**: whether the permission is held, what Android answered when it was asked and how fast,
+ * how many messages the inbox holds and the date of the newest. It never shows, stores, logs or sends a sender, a message or a time of day. It
+ * writes nothing. The report can be shared as plain text, and holds nothing personal.
+ */
+public final class MainActivity extends Activity {
+    private static final String PERMISSION = "android.permission.READ_SMS";
+    private static final int ASK = 1;
+
+    private TextView report;
+    private long askedAt;
+    private String askOutcome = "not asked yet";
+    private String countOutcome = "not tried yet";
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(40, 120, 40, 40);
+        scroll.addView(list);
+        setContentView(scroll);
+
+        TextView title = new TextView(this);
+        title.setTextSize(17);
+        title.setText("Orb SMS Probe");
+        list.addView(title);
+        TextView what = new TextView(this);
+        what.setTextSize(13);
+        what.setText("This tests one thing: whether this phone lets an app like Orb be given the permission to read text messages. It shows only a count and one date — never a sender or a message — and changes nothing.");
+        what.setPadding(0, 8, 0, 16);
+        list.addView(what);
+
+        list.addView(button("1. Ask for the text-message permission", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                askedAt = SystemClock.elapsedRealtime();
+                askOutcome = "asked; waiting for Android…";
+                refresh();
+                requestPermissions(new String[] {PERMISSION}, ASK);
+            }
+        }));
+        list.addView(button("2. Count my messages", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                countOutcome = count();
+                refresh();
+            }
+        }));
+        list.addView(button("3. Open this app's settings page", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getPackageName(), null)));
+                } catch (RuntimeException none) {
+                    countOutcome = "could not open the settings page";
+                    refresh();
+                }
+            }
+        }));
+        list.addView(button("4. Share this report as text", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text());
+                startActivity(Intent.createChooser(send, "Share the report"));
+            }
+        }));
+
+        report = new TextView(this);
+        report.setTextSize(12);
+        report.setPadding(0, 24, 0, 0);
+        list.addView(report);
+        refresh();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (report != null) refresh();
+    }
+
+    private Button button(String label, View.OnClickListener click) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(click);
+        return b;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != ASK) return;
+        long ms = SystemClock.elapsedRealtime() - askedAt;
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        askOutcome = (granted ? "GRANTED" : "NOT granted") + " after " + ms + " ms"
+            + (!granted && ms < 400 ? " — that is fast: Android probably showed no prompt (tell me if you saw one)" : "");
+        refresh();
+    }
+
+    private boolean held() {
+        return checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** How many messages the inbox holds and the date of the newest — nothing that identifies a message. */
+    private String count() {
+        if (!held()) return "not tried: the permission is not held";
+        try (Cursor c = getContentResolver().query(Telephony.Sms.Inbox.CONTENT_URI, new String[] {Telephony.Sms.DATE}, null, null, Telephony.Sms.DATE + " DESC")) {
+            if (c == null) return "the inbox gave no answer (null)";
+            int n = c.getCount();
+            if (n == 0) return "0 messages in the inbox";
+            c.moveToFirst();
+            return n + " messages in the inbox; the newest was on " + new SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(new Date(c.getLong(0)));
+        } catch (SecurityException refused) {
+            return "Android refused the read (SecurityException)";
+        } catch (RuntimeException other) {
+            return "the read failed: " + other.getClass().getSimpleName();
+        }
+    }
+
+    private String installLine() {
+        try {
+            InstallSourceInfo info = getPackageManager().getInstallSourceInfo(getPackageName());
+            return "installing app: " + info.getInstallingPackageName() + "; started by: " + info.getInitiatingPackageName()
+                + "; package source: " + info.getPackageSource();
+        } catch (PackageManager.NameNotFoundException | RuntimeException unknown) {
+            return "install source unreadable";
+        }
+    }
+
+    private String declaredLine() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS));
+            if (info.requestedPermissions == null) return "no permissions declared";
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < info.requestedPermissions.length; i++) {
+                boolean granted = info.requestedPermissionsFlags != null && (info.requestedPermissionsFlags[i] & PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0;
+                out.append(info.requestedPermissions[i]).append(granted ? " (granted)" : " (not granted)");
+            }
+            return out.toString();
+        } catch (PackageManager.NameNotFoundException | RuntimeException unknown) {
+            return "unreadable";
+        }
+    }
+
+    private String text() {
+        return "Orb SMS Probe report\n"
+            + "installed: yes (it is running)\n"
+            + "phone: " + Build.MANUFACTURER + " " + Build.MODEL + ", Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + "), security patch " + Build.VERSION.SECURITY_PATCH + "\n"
+            + installLine() + "\n"
+            + "declared: " + declaredLine() + "\n"
+            + "permission held now: " + (held() ? "YES" : "no") + "\n"
+            + "should Android explain first: " + shouldShowRequestPermissionRationale(PERMISSION) + "\n"
+            + "asking: " + askOutcome + "\n"
+            + "counting: " + countOutcome + "\n";
+    }
+
+    private void refresh() {
+        report.setText(text());
+    }
+}
