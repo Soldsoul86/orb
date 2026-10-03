@@ -1,6 +1,6 @@
 # Using what Orb now holds — the dates in a document, the line they are on, and a commitment from it (option 1; proposed)
 
-> Status: **proposed 2026-10-03, awaiting the operator's go-ahead** (\"Yes, go ahead with the design for option 1\" asked for this write-up; building waits for the next \"yes\"). Nothing here is built.
+> Status: **proposed 2026-10-03, awaiting the operator's go-ahead** ("Yes, go ahead with the design for option 1" asked for this write-up; building waits for the next "yes"). Nothing here is built.
 > Builds on: Sources (`SOURCES_PHONE.md`, DR-33 — four PDFs are kept on the operator's phone), Coming up (`COMING_UP_PHONE.md`, DR-21), relative days (`RELATIVE_DAYS_PHONE.md`, DR-23), Commitments (`COMMITMENTS_PHONE.md`, DR-30), person links (`PERSON_LINK_PHONE.md`, DR-29). **No new capability, no new permission, no new record.**
 
 ## 1. Why, in plain words
@@ -37,17 +37,17 @@ This slice fixes the first three. The fourth is a smaller, separate step (§5).
 
 | Risk | Handling |
 | --- | --- |
-| **A PDF's text comes out in the reader's order, not the page's.** Columns can interleave, so \"the line a date is on\" can be a fragment or two things joined (AD-28 item 1). | The line is shown as read and is **editable on the commitment card**; if your PDFs read badly the dates still show, with a worse line. This is exactly what the first device round decides. |
+| **A PDF's text comes out in the reader's order, not the page's.** Columns can interleave, so "the line a date is on" can be a fragment or two things joined (AD-28 item 1). | The line is shown as read and is **editable on the commitment card**; if your PDFs read badly the dates still show, with a worse line. This is exactly what the first device round decides. |
 | **A cue word in the wrong place** (*prepared by 3 Oct*, *by* appearing in a sentence). | *By* counts only when it is **immediately before the date**; the rest of the cues are whole words. A wrong cue puts a date first instead of second — it never hides one. |
 | **A date format the reader does not know.** | Same as today everywhere in Orb: day-first numeric and *12 Oct 2026* forms are read; others are not. Documents using other forms show fewer dates, never wrong ones. |
 | **English only.** A Hindi or Tamil document's cue words are not in the list. | Its dates still appear (second group). Other languages are a later step, as for nudges. |
-| **A date in the past kept as \"upcoming\"** | Dropped, as today. |
+| **A date in the past kept as "upcoming"** | Dropped, as today. |
 | **Speed.** A 43,000-character document is ~1,000 lines. | Each document is read once when Coming up opens; a measured cap on lines per document is part of the build (and a test), not a guess. |
 | **Not testable off the phone:** how *your* PDFs read. | Everything except that is. The first round asks you to look at three real documents. |
 
 ## 5. Not in this slice (and what is next in line)
 
-- **Who a PDF is about.** The proposal for the next step: on a document's detail, **\"People in this document\"** — only the contacts it names *surely* (full name, number or email; never a first-name guess, which over 43,000 characters is noise) — each with one tap to *This is about (name)*, the link you already make by hand. Nothing is linked unless you tap.
+- **Who a PDF is about.** The proposal for the next step: on a document's detail, **"People in this document"** — only the contacts it names *surely* (full name, number or email; never a first-name guess, which over 43,000 characters is noise) — each with one tap to *This is about (name)*, the link you already make by hand. Nothing is linked unless you tap.
 - **Amounts** (*Amount due ₹18,250*) as a second line on a deadline row — tempting, but money and currency need their own care.
 - **A model proposing commitments** from the text — its own decision about what leaves the phone (DR-9); the deterministic version above comes first so you can see how far rules go.
 - **Document kinds** (invoice, ticket, statement) — the cue list is the cheap version of this.
