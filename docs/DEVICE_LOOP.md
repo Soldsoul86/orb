@@ -7134,7 +7134,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b81. People in a document — the contacts a PDF names, one tap to link (DR-35) — 2026-10-03
 
-**Status: built, awaiting the device.** `orb-app-v45-document-people.apk`. v44 is §7b80 (verified). Design: `docs/DOCUMENT_PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-35; limits `ARCHITECTURAL_DEBT.md` AD-30.
+**Status: verified on the device — the operator: "All steps done and working as intended." The export (`55a3e794`, 636 events) shows, for v45 (versionCode 29849938): two `orb.person.linked` events (each a sealed note of 80–83 bytes, citing its item, no name or number anywhere in the file), a shared note recorded alongside, and the contacts count going 2536 → 2537 → 2536 while the test contact existed (*people* 3 → 4 once the invoice was linked to it, back to 3 after it was deleted) — P240–P247 on the export and the operator's word.** `orb-app-v45-document-people.apk`. v44 is §7b80 (verified). Design: `docs/DOCUMENT_PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-35; limits `ARCHITECTURAL_DEBT.md` AD-30.
 
 **Why:** a PDF names its parties in plain sight — the telecom on the invoice, the doctor on the report. Telling Orb who a document is about meant searching your contacts from nothing. Now Orb offers the contacts the document names, and you tap.
 
