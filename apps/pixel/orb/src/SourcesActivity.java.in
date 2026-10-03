@@ -391,7 +391,7 @@ public final class SourcesActivity extends Activity {
             }));
             return;
         }
-        list.addView(text("On. Pick the backup file (XML) your backup app made.", 13, false));
+        list.addView(text("On. Pick the backup file (XML or JSON) your backup app made.", 13, false));
         list.addView(button("Pick the backup file", new View.OnClickListener() {
             @Override public void onClick(View view) {
                 Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -435,7 +435,7 @@ public final class SourcesActivity extends Activity {
                         result = MessagesFlow.look(new MessagesReader(SourcesActivity.this, file), System.currentTimeMillis(), java.util.TimeZone.getDefault());
                     } catch (Exception unreadable) {
                         failure = "Orb could not read that file (" + unreadable.getClass().getSimpleName() + "). It looks like "
-                            + new MessagesReader(SourcesActivity.this, file).kind() + "; Orb reads message backups written as XML.";
+                            + new MessagesReader(SourcesActivity.this, file).kind() + "; Orb reads message backups written as XML or JSON.";
                     }
                 }
                 final MessagesFlow.Look found = result;

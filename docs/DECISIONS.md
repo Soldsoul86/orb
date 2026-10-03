@@ -1385,7 +1385,7 @@ box — **where they are the app's by design, like the number**.
 
 **Message months are read by the document rules** (DR-34): written dates only, with their message, deadlines first, the rest folded; the number in each line ties the month to the person by number.
 
-**Not in this ruling:** MMS and group chats; formats other than the common backup XML (an unrecognised file is described by tag and attribute **names** only); the current month; bank/service senders; relative-day guesses from a message's own day; an index; deleting the export.
+**Amended 2026-10-03:** the operator's backup app writes **JSON**, so a second reader (`MessagesJson`, behind one front door that looks at the first character) was added; the file's shape is in `MESSAGES_PHONE.md` §14. It changes nothing after the parser. **Not in this ruling:** MMS and group chats; formats other than the common backup XML and that JSON (an unrecognised file is described by tag, attribute or field **names** only); the current month; bank/service senders; relative-day guesses from a message's own day; an index; deleting the export.
 
 ## Provenance
 

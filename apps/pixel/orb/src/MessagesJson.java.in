@@ -1,0 +1,256 @@
+package @PKG@;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Reads a message-backup export written as **JSON** as a stream (`docs/MESSAGES_PHONE.md` §14), handing each message to a sink and keeping nothing. The
+ * shape it knows is the one the operator's backup app writes: an object whose list of messages is `listSms`, each message an object with `adress` (sic),
+ * `body`, `name`, `time` (milliseconds) and `type` (1 received, 2 sent). It also accepts the spellings `address`, `contact_name` and `date`, and a bare
+ * list at the top.
+ *
+ * **It reads five fields of a message and no others** (`read`, `serviceCenter` and anything else are stepped over unread). A `time` of ten digits or
+ * fewer is taken as seconds. Like `MessagesXml` it stops at `max` messages, and if the file is not what it expects it says only **names** — never a value.
+ * Our own small tokenizer: Android's JSON reader does not exist off the phone, and a streaming one keeps a 200 MB file out of memory.
+ */
+final class MessagesJson {
+    private MessagesJson() {}
+
+    private static final int MAX_DEPTH = 64;
+
+    private static final class Stop extends IOException {
+        Stop() {
+            super("cap");
+        }
+    }
+
+    /** A cursor over the characters, one of look-ahead. */
+    private static final class Cursor {
+        private final Reader in;
+        private int ahead = -2;
+
+        Cursor(Reader in) {
+            this.in = in;
+        }
+
+        int peek() throws IOException {
+            if (ahead == -2) ahead = in.read();
+            return ahead;
+        }
+
+        int next() throws IOException {
+            int c = peek();
+            ahead = -2;
+            return c;
+        }
+
+        int skipSpace() throws IOException {
+            while (true) {
+                int c = peek();
+                if (c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == 0xFEFF) { next(); continue; }
+                return c;
+            }
+        }
+
+        void expect(char want) throws IOException {
+            if (skipSpace() != want) throw new IOException("not valid JSON: expected '" + want + "'");
+            next();
+        }
+    }
+
+    /** Streams `in`, offering each message to the sink. Throws if the text is not JSON. */
+    static MessagesXml.Recognition parse(InputStream in, MessagesXml.Sink sink, int max) throws Exception {
+        MessagesXml.Recognition found = new MessagesXml.Recognition();
+        found.format = "JSON";
+        Cursor cursor = new Cursor(new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 1 << 16));
+        try {
+            int first = cursor.skipSpace();
+            if (first == '[') {
+                found.root = "(list)";
+                list(cursor, found, sink, max);
+            } else if (first == '{') {
+                top(cursor, found, sink, max);
+            } else {
+                throw new IOException("not valid JSON");
+            }
+        } catch (Stop capped) {
+            // Reading stopped at the cap, on purpose.
+        }
+        return found;
+    }
+
+    private static void top(Cursor c, MessagesXml.Recognition found, MessagesXml.Sink sink, int max) throws IOException {
+        c.expect('{');
+        List<String> keys = new ArrayList<>();
+        boolean listed = false;
+        if (c.skipSpace() == '}') {
+            c.next();
+        } else {
+            while (true) {
+                String key = string(c);
+                c.expect(':');
+                keys.add(key);
+                if (!listed && c.skipSpace() == '[') {
+                    listed = true;
+                    found.root = key;
+                    list(c, found, sink, max);
+                } else {
+                    skipValue(c, 0);
+                }
+                int sep = c.skipSpace();
+                c.next();
+                if (sep == '}') break;
+                if (sep != ',') throw new IOException("not valid JSON: expected ',' or '}'");
+            }
+        }
+        if (!listed) {
+            found.root = "(object)";
+            found.attributes.addAll(keys);
+        }
+    }
+
+    private static void list(Cursor c, MessagesXml.Recognition found, MessagesXml.Sink sink, int max) throws IOException {
+        c.expect('[');
+        if (c.skipSpace() == ']') { c.next(); return; }
+        while (true) {
+            if (c.skipSpace() == '{') item(c, found, sink, max); else skipValue(c, 0);
+            int sep = c.skipSpace();
+            c.next();
+            if (sep == ']') return;
+            if (sep != ',') throw new IOException("not valid JSON: expected ',' or ']'");
+        }
+    }
+
+    private static void item(Cursor c, MessagesXml.Recognition found, MessagesXml.Sink sink, int max) throws IOException {
+        c.expect('{');
+        boolean firstItem = found.child.isEmpty();
+        if (firstItem) found.child = "item";
+        String address = null, name = null, time = null, type = null, body = null;
+        if (c.skipSpace() == '}') {
+            c.next();
+        } else {
+            while (true) {
+                String key = string(c);
+                c.expect(':');
+                if (firstItem) found.attributes.add(key);
+                String value = null;
+                int lead = c.skipSpace();
+                if (lead == '"') value = string(c);
+                else if (lead == '{' || lead == '[') skipValue(c, 0);
+                else value = scalar(c);
+                if (value != null) {
+                    if (key.equals("adress") || key.equals("address")) address = value;
+                    else if (key.equals("name") || key.equals("contact_name")) name = value;
+                    else if (key.equals("time") || key.equals("date")) time = value;
+                    else if (key.equals("type")) type = value;
+                    else if (key.equals("body")) body = value;
+                }
+                int sep = c.skipSpace();
+                c.next();
+                if (sep == '}') break;
+                if (sep != ',') throw new IOException("not valid JSON: expected ',' or '}'");
+            }
+        }
+        if (address == null || time == null) return;
+        long when;
+        int kind;
+        try {
+            when = Long.parseLong(time.trim());
+            kind = type == null ? 0 : Integer.parseInt(type.trim());
+        } catch (NumberFormatException skip) {
+            return;
+        }
+        if (Math.abs(when) < 100_000_000_000L) when *= 1000L;
+        found.messages++;
+        sink.message(new MessagesRules.Message(address, name, when, kind, body));
+        if (found.messages >= max) {
+            found.cut = true;
+            throw new Stop();
+        }
+    }
+
+    /** A number, `true`, `false` or `null`, as its text; `null` is no value at all. */
+    private static String scalar(Cursor c) throws IOException {
+        StringBuilder out = new StringBuilder();
+        while (true) {
+            int ch = c.peek();
+            if (ch < 0 || ch == ',' || ch == '}' || ch == ']' || ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t') break;
+            out.append((char) c.next());
+            if (out.length() > 64) throw new IOException("not valid JSON: a value is too long");
+        }
+        String text = out.toString();
+        if (text.isEmpty()) throw new IOException("not valid JSON: a value is missing");
+        return text.equals("null") ? null : text;
+    }
+
+    private static String string(Cursor c) throws IOException {
+        if (c.skipSpace() != '"') throw new IOException("not valid JSON: expected a string");
+        c.next();
+        StringBuilder out = new StringBuilder();
+        while (true) {
+            int ch = c.next();
+            if (ch < 0) throw new IOException("not valid JSON: a string never ends");
+            if (ch == '"') return out.toString();
+            if (ch != '\\') { out.append((char) ch); continue; }
+            int esc = c.next();
+            switch (esc) {
+                case 'n': out.append('\n'); break;
+                case 'r': out.append('\r'); break;
+                case 't': out.append('\t'); break;
+                case 'b': out.append('\b'); break;
+                case 'f': out.append('\f'); break;
+                case '/': out.append('/'); break;
+                case '\\': out.append('\\'); break;
+                case '"': out.append('"'); break;
+                case 'u': {
+                    int code = 0;
+                    for (int i = 0; i < 4; i++) {
+                        int h = Character.digit(c.next(), 16);
+                        if (h < 0) throw new IOException("not valid JSON: a bad \\u escape");
+                        code = code * 16 + h;
+                    }
+                    out.append((char) code);
+                    break;
+                }
+                default: throw new IOException("not valid JSON: a bad escape");
+            }
+        }
+    }
+
+    private static void skipValue(Cursor c, int depth) throws IOException {
+        if (depth > MAX_DEPTH) throw new IOException("not valid JSON: nested too deeply");
+        int lead = c.skipSpace();
+        if (lead == '"') { string(c); return; }
+        if (lead == '{') {
+            c.next();
+            if (c.skipSpace() == '}') { c.next(); return; }
+            while (true) {
+                string(c);
+                c.expect(':');
+                skipValue(c, depth + 1);
+                int sep = c.skipSpace();
+                c.next();
+                if (sep == '}') return;
+                if (sep != ',') throw new IOException("not valid JSON: expected ',' or '}'");
+            }
+        }
+        if (lead == '[') {
+            c.next();
+            if (c.skipSpace() == ']') { c.next(); return; }
+            while (true) {
+                skipValue(c, depth + 1);
+                int sep = c.skipSpace();
+                c.next();
+                if (sep == ']') return;
+                if (sep != ',') throw new IOException("not valid JSON: expected ',' or ']'");
+            }
+        }
+        scalar(c);
+    }
+}

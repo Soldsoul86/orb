@@ -1,0 +1,33 @@
+package @PKG@;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * The one front door for a message-backup file: it looks at the first character and hands the stream to the XML reader (`<`) or the JSON reader (`{` or
+ * `[`). Nothing else decides the format — not the file's name, whose extension says nothing certain.
+ */
+final class MessagesFile {
+    private MessagesFile() {}
+
+    static MessagesXml.Recognition parse(InputStream in, MessagesXml.Sink sink, int max) throws Exception {
+        BufferedInputStream buffered = new BufferedInputStream(in, 1 << 16);
+        buffered.mark(1);
+        int c = buffered.read();
+        if (c == 0xEF) {                       // a UTF-8 byte-order mark: step over it, so neither reader meets it
+            buffered.read();
+            buffered.read();
+            buffered.mark(1);
+            c = buffered.read();
+        }
+        while (c == ' ' || c == '\n' || c == '\r' || c == '\t') {   // and over the blank space before the first character
+            buffered.mark(1);
+            c = buffered.read();
+        }
+        buffered.reset();
+        if (c == '{' || c == '[') return MessagesJson.parse(buffered, sink, max);
+        if (c == '<') return MessagesXml.parse(buffered, sink, max);
+        throw new IOException("the file is neither XML nor JSON");
+    }
+}

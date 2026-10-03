@@ -51,7 +51,8 @@ final class MessagesRules {
         Message(String address, String name, long dateMs, int type, String body) {
             this.address = address == null ? "" : address;
             this.number = numberOf(this.address);
-            this.name = cleanName(name);
+            String cleaned = cleanName(name);
+            this.name = cleaned.equals(this.address.trim()) ? "" : cleaned;   // a backup that writes the number as the name has no name
             this.dateMs = dateMs;
             this.type = type;
             this.body = body == null ? "" : body;

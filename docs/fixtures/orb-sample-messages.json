@@ -1,0 +1,70 @@
+{
+ "listSms": [
+  {
+   "adress": "+919000012345",
+   "body": "Your verification code is 482913 (made-up code message, should be left out).",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1789210800000,
+   "type": 1
+  },
+  {
+   "adress": "AX-TESTBK",
+   "body": "Rs 500 debited from your account (made-up service message).",
+   "name": "AX-TESTBK",
+   "read": 1,
+   "time": 1789110000000,
+   "type": 1,
+   "serviceCenter": "+919000000000"
+  },
+  {
+   "adress": "+919000067890",
+   "body": "Hello from a second made-up number, just to see two conversations.",
+   "name": "Another Person",
+   "read": 1,
+   "time": 1789027200000,
+   "type": 1
+  },
+  {
+   "adress": "+919000012345",
+   "body": "Yes, 20/12/2026 works. Bring the signed form.",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1788458460000,
+   "type": 1
+  },
+  {
+   "adress": "+919000012345",
+   "body": "Will do. Can we meet on 20/12/2026 at the office?",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1788342300000,
+   "type": 2
+  },
+  {
+   "adress": "+919000012345",
+   "body": "Reminder: please pay by 12/12/2026 so we can confirm the booking.",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1788341400000,
+   "type": 1
+  },
+  {
+   "adress": "+919000012345",
+   "body": "Thanks, got it. I will check and come back.",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1785838800000,
+   "type": 2
+  },
+  {
+   "adress": "+919000012345",
+   "body": "Hi, this is a made-up test conversation for Orb. The invoice for the workshop is attached to the email.",
+   "name": "Test Person",
+   "read": 1,
+   "time": 1785838320000,
+   "type": 1
+  }
+ ],
+ "size": 8
+}

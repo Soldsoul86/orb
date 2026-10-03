@@ -7346,3 +7346,46 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 8. **Your own file:** make a backup with your backup app (XML, to Downloads), **Pick the backup file** → choose it. **Do not tick anything yet if it surprises you**; tell me what the list looks like (counts and left-out numbers only — no need to read me any message). Then tick **one** conversation you are comfortable with and **Keep**. *(P271)*
 9. **Delete the backup files** you made when you are done.
 10. **What Orb may do** → the new line. **Export and share journal**. *(P272, P273)*
+
+### 7b86. Messages — the JSON backup (v49) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v49-messages-json.apk` (the calls build, as v46–v48). The operator's backup app writes `Sat, Oct 3, 2026, 11.00.48.sms`, which is **JSON**, not XML; v48 said so honestly ("looks like JSON text") and read nothing. The operator uploaded the file; **only its structure was inspected** (field names, counts, the kinds of values — never a message), and it is not in the repository.
+
+**What the file is:** one object, `{"listSms": [ … ], "size": 25552}`; each item has `adress` (sic — one *d*), `body`, `name` (**the number itself when there is no contact name**), `read`, `serviceCenter` (sometimes), `time` (13 digits: milliseconds, newest first, June 2023 to today) and `type` (1 received, 2 sent). About 92 % of the messages are from named senders (banks and the like) and are only counted; about 2,000 are from numbers.
+
+#### What changed
+
+1. **One front door** (`MessagesFile`): the first character decides — `<` XML, `{` or `[` JSON — never the file's name or extension.
+2. **A JSON reader** (`MessagesJson`): our own streaming tokenizer (a 200 MB file never sits in memory), reads **five fields and steps over the rest unread**, the same caps (200,000 messages, 200 MB), nesting limited to 64, broken JSON is an error — not an empty file. It also accepts `address`, `contact_name` and `date`, a bare list, and a `time` of ten digits or fewer as seconds.
+3. **A name that is only the number is no name** (all formats), so the list reads *+91… (Name)* only when there is a name.
+4. **An unrecognised JSON file** is described by **names only** (*Found a JSON list "x" whose first item has: …*), as XML is.
+5. Everything after the reader — the survey, the rules, the sealed months, the records, the screens — is **unchanged**.
+
+#### Checked before the device
+
+- Phone-side suite: @@COUNT@@ checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the JSON reader, the front door and the recognition (@@MUTN@@ mutants): @@MUT@@
+- The reader was run against the operator's real file **off the phone, counts only**: @@REAL@@
+- A **made-up JSON sample** in the operator's app's shape (`orb-sample-messages.json`) is sent too.
+- **Not testable off the phone:** how long a 6 MB file takes on the Pixel, and how the conversation list feels with ~2,000 numeric-sender messages.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P274** | **Pick the backup file** → choose `Sat, Oct 3, 2026, 11.00.48.sms`: Orb **recognises it** and lists conversations by number (the real file has **@@CONV@@**), counting the bank/name senders and code-like messages as *left out* | *Not recognised* or *could not read* — copy the words it shows |
+| **P275** | The left-out line shows a **large number from names or short codes** (the real file: about **23,500**) and a **small number from numbers** | the numbers are the other way round |
+| **P276** | A conversation row's name is a **real contact name or nothing** — never the number twice | the number appears as its own name |
+| **P277** | The **made-up JSON sample** gives two conversations (Test Person, 5 messages) exactly as the XML sample did | different from the XML sample |
+| **P278** | Reading the real file takes **a few seconds**, with the "Reading the file…" line shown meanwhile | the screen freezes or Orb closes |
+| **P279** | v49 installs over v48 with **no Play Protect warning** (manifest unchanged since v48) | flagged — record the exact words |
+
+#### Protocol
+
+1. Install `orb-app-v49-messages-json.apk` over v48; open Orb once. *(P279)*
+2. **Sources → Text messages** (already on from v48, or turn it on). **Pick the backup file** → choose the **made-up** `orb-sample-messages.json` first (copy it to Downloads). *(P277)*
+3. **Pick the backup file** again → choose **your** `Sat, Oct 3, 2026, 11.00.48.sms` (use **Pick files**/the file picker, Downloads root is not offered by the folder picker). Look at the list and the left-out line; **do not tick anything yet**. *(P274–P278)*
+4. If it reads, tick **one conversation you are comfortable with** → **Keep**. Then **Recall** → search a word you know is in it.
+5. **Export and share journal** and send it. *(counts only; the words are sealed.)*
+6. **Delete the backup file** when you are done.
+

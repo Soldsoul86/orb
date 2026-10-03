@@ -1,6 +1,6 @@
 # Messages — from an export file you make, read the way PDFs are (stage 2c, redesigned after the SMS probe; proposed)
 
-> Status: **built 2026-10-03 (DR-37, AD-32) — awaiting the device (`DEVICE_LOOP.md` §7b85, `orb-app-v48-messages.apk`).** The operator approved the design and the build ("Yes, go ahead with the messages build").
+> Status: **built 2026-10-03 (DR-37, AD-32) — awaiting the device (`DEVICE_LOOP.md` §7b85 and §7b86; v48 reads XML, v49 reads XML and JSON, `orb-app-v49-messages-json.apk`).** The operator approved the design and the build ("Yes, go ahead with the messages build").
 > **Why this and not the permission:** an app declaring `READ_SMS` is **blocked by Play Protect on the operator's phone with no override** (`DEVICE_LOOP.md` §7b83). Orb will never hold an SMS permission. The route left is the one already proved with PDFs: **you hand Orb a file, you see what is in it, you tick what to keep.** Here the file is a **message export made by another app**.
 > Builds on: Sources (`SOURCES_PHONE.md`, DR-33), documents in Coming up (`DOCUMENT_USE_PHONE.md`, DR-34), People (DR-24/25), person links (DR-29). Written together with the **scale and time** questions that `Is the system equipped…` (2026-10-03) found open — they are §4–5 here.
 
@@ -100,7 +100,7 @@ Two cautions given to the operator: that app asks for ***All files access*** (re
 
 **The file turned out to be `Sat, Oct 3, 2026, 11.00.48.sms`** (6.22 MB, beside a 151 MB WhatsApp file that Orb must not be pointed at). The `.sms` extension says nothing certain about the inside. So v48 adds one small thing: when a file **cannot be read at all**, Orb says **what kind of file it looks like from its first bytes only** (`MessagesRules.kindOf`: empty / zip archive / SQLite database / XML or HTML text / JSON text / plain text / binary data possibly encrypted) and that it reads message backups written as XML. It is a fixed phrase, never a word of the content, so the operator can describe an unrecognised file by what Orb shows without pasting a message. If the kind is XML or JSON, the next build adapts `MessagesXml` to the real shape; if it is binary or encrypted, the honest answer is that Orb cannot read that app's format and the backup app must be set to write XML (or another route chosen).
 
-## 14. The operator's file is JSON (2026-10-03) — proposed, not built
+## 14. The operator's file is JSON (2026-10-03) — built (v49)
 
 The operator reports that `Sat, Oct 3, 2026, 11.00.48.sms` is **JSON**. Orb's reader is XML only. **Nothing is built until the shape is known**; guessing field names would pass its own tests and still misread real dates and message kinds.
 
@@ -113,3 +113,5 @@ The operator reports that `Sat, Oct 3, 2026, 11.00.48.sms` is **JSON**. Orb's re
 **Risks.** The date may be seconds, milliseconds or text; the kind may be a word (*inbox/sent*) or a number; the conversation may be nested rather than flat. Each needs a stated rule and a test before it is read. A field with few distinct values could in principle be a name; B lets the operator see it before sharing and the words are capped at 12 characters.
 
 **Third route.** If the backup app can write **XML** instead, v48 already reads it.
+
+**As built (v49).** The operator uploaded the file; its structure (never a message) was read: `{"listSms":[{adress, body, name, read, serviceCenter?, time, type}…], "size"}`, 25,552 items, `time` in milliseconds newest first, `type` 1/2, and `name` equal to the number when there is no contact. Route A, with the real file in place of ten lines. So: `MessagesFile` chooses the reader from the first character (never the extension), `MessagesJson` is a streaming tokenizer reading five fields (`adress`|`address`, `body`, `name`|`contact_name`, `time`|`date`, `type`) and stepping over everything else, `Recognition` carries a `format` and describes an unknown JSON file by names only, and **a name equal to the number is no name** (for every format). Nothing after the parser changed. Limits as for XML (200,000 messages, 200 MB) plus 64 levels of nesting. The made-up sample is `docs/fixtures/orb-sample-messages.json`. The real file is **not** in the repository and must never be.

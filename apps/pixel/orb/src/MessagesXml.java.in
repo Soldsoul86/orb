@@ -37,14 +37,20 @@ final class MessagesXml {
         int messages;
         /** Reading stopped at the cap: there may be more in the file. */
         boolean cut;
+        /** *XML* or *JSON*. */
+        String format = "XML";
 
         boolean recognised() {
-            return "smses".equals(root) && messages > 0;
+            return messages > 0 && ("JSON".equals(format) || "smses".equals(root));
         }
 
         /** *Not recognised. Found: <x> → <y> with attributes: a, b (names only).* */
         String describe() {
-            if (root.isEmpty()) return "Not recognised: the file is not XML Orb could read.";
+            if (root.isEmpty()) return "Not recognised: the file is not XML or JSON Orb could read.";
+            if ("JSON".equals(format)) {
+                return "Not recognised. Found a JSON " + (child.isEmpty() ? "object" + (attributes.isEmpty() ? "" : " with: " + String.join(", ", attributes)) : "list \"" + root + "\""
+                    + (attributes.isEmpty() ? "" : " whose first item has: " + String.join(", ", attributes))) + " (names only; Orb expects a list of messages with adress or address, time, type, body).";
+            }
             return "Not recognised. Found <" + root + ">" + (child.isEmpty() ? "" : " \u2192 <" + child + ">" + (attributes.isEmpty() ? "" : " with attributes: " + String.join(", ", attributes)))
                 + " (names only; Orb expects <smses> \u2192 <sms> with address, date, type, body).";
         }

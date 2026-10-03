@@ -3,6 +3,7 @@ package @PKG@;
 import android.content.Context;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,11 +65,99 @@ final class MessagesTest {
         return out.toString();
     }
 
+    private static InputStream bytes(String text) {
+        return new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String json(String... items) {
+        return "{\"listSms\":[" + String.join(",", items) + "],\"size\":" + items.length + "}";
+    }
+
+    private static String item(String address, long time, int type, String body, String name) {
+        return "{\"adress\":\"" + address + "\",\"body\":\"" + body + "\",\"name\":\"" + name + "\",\"read\":1,\"time\":" + time + ",\"type\":" + type + "}";
+    }
+
     static void run() throws Exception {
+        json();
         xml();
         rules();
         flow();
         guards();
+    }
+
+    private static void json() throws Exception {
+        Harness.suite("reading a JSON backup as a stream");
+        Collect c = new Collect();
+        String body = "Pay by 12\\/10\\/2026 \\u0026 call \\\"me\\\"\\nsecond line \\ud83d\\ude42 \\u20b9";
+        MessagesXml.Recognition r = MessagesFile.parse(bytes("\ufeff \n" + json(item(RAVI, at("2026-09-12T14:05:00"), 1, body, "Ravi Kumar"),
+            "{\"adress\":\"AX-HDFCBK\",\"body\":\"Your OTP is 1234\",\"name\":\"AX-HDFCBK\",\"read\":0,\"serviceCenter\":\"+919000000000\",\"time\":" + at("2026-09-13T09:00:00") + ",\"type\":1,\"extra\":{\"a\":[1,2,{\"b\":null}],\"c\":\"}]\"}}")), c, 1000);
+        Harness.check("recognised, JSON, both messages read, the extra nested field stepped over", r.recognised() && r.format.equals("JSON") && r.messages == 2 && c.got.size() == 2 && !r.cut);
+        Harness.equal("escapes, a surrogate pair and a rupee sign are decoded", c.got.get(0).body, "Pay by 12/10/2026 & call \"me\"\nsecond line " + new String(Character.toChars(0x1F642)) + " \u20b9");
+        Harness.check("address, name, time and kind", c.got.get(0).address.equals(RAVI) && c.got.get(0).name.equals("Ravi Kumar") && c.got.get(0).dateMs == at("2026-09-12T14:05:00") && c.got.get(0).type == 1);
+        Harness.check("a name that is only the address is no name", c.got.get(1).name.isEmpty() && c.got.get(1).number == null);
+        Collect few = new Collect();
+        MessagesXml.Recognition cut = MessagesFile.parse(bytes(json(item(RAVI, 1000000000000L, 1, "a", ""), item(RAVI, 1000000060000L, 1, "b", ""), item(RAVI, 1000000120000L, 1, "c", ""))), few, 2);
+        Harness.check("it stops at the cap and says so", cut.cut && few.got.size() == 2 && cut.messages == 2);
+        Collect odd = new Collect();
+        MessagesFile.parse(bytes("{\"listSms\":[{\"adress\":\"" + RAVI + "\",\"time\":\"abc\",\"type\":1,\"body\":\"x\"},{\"adress\":\"" + RAVI + "\",\"type\":1,\"body\":\"y\"},"
+            + "{\"time\":5,\"type\":1,\"body\":\"z\"},{\"adress\":\"" + RAVI + "\",\"time\":1789210800000,\"type\":null},7,[1],{\"adress\":\"" + RAVI + "\",\"time\":\"1789210800000\",\"type\":\"2\",\"body\":null}]}"), odd, 100);
+        Harness.equal("a bad time, a missing time or address, and a non-object are skipped; a text time and kind are accepted", odd.got.size(), 2);
+        Harness.check("a missing kind is 0, a missing body is empty", odd.got.get(0).type == 0 && odd.got.get(0).body.isEmpty() && odd.got.get(1).type == 2 && odd.got.get(1).dateMs == 1789210800000L);
+        Collect secs = new Collect();
+        MessagesFile.parse(bytes(json(item(RAVI, 1789210800L, 1, "s", ""))), secs, 10);
+        Harness.equal("a time of ten digits is seconds", secs.got.get(0).dateMs, 1789210800000L);
+        Collect alt = new Collect();
+        MessagesFile.parse(bytes("[{\"address\":\"" + RAVI + "\",\"date\":1789210800000,\"type\":1,\"body\":\"hi\",\"contact_name\":\"Ravi\"}]"), alt, 10);
+        Harness.check("a bare list and the other spellings are read", alt.got.size() == 1 && alt.got.get(0).name.equals("Ravi") && alt.got.get(0).address.equals(RAVI));
+        Collect all5 = new Collect();
+        MessagesFile.parse(bytes("{\"listSms\":[{\"adress\":\"" + RAVI + "\",\"time\":1789210800000,\"type\":1,\"body\":\"hi\",\"name\":\"R\",\"read\":0,\"zzz\":\"secret\"}]}"), all5, 10);
+        Harness.check("only the five fields are read", all5.got.size() == 1 && !all5.got.get(0).body.contains("secret") && !all5.got.get(0).name.contains("secret"));
+        MessagesXml.Recognition shape = MessagesFile.parse(bytes("{\"things\":[{\"foo\":\"hunter2\",\"bar\":1},{\"baz\":2}],\"count\":2}"), new Collect(), 10);
+        Harness.check("an unknown JSON list is not recognised", !shape.recognised() && shape.messages == 0);
+        Harness.check("and is described by names only", shape.describe().contains("\"things\"") && shape.describe().contains("foo, bar") && !shape.describe().contains("baz") && !shape.describe().contains("hunter2"));
+        MessagesXml.Recognition obj = MessagesFile.parse(bytes("{\"a\":1,\"b\":{\"c\":2}}"), new Collect(), 10);
+        Harness.check("an object with no list is described by its top names", !obj.recognised() && obj.describe().contains("JSON object with: a, b") && !obj.describe().contains(", c") && !obj.describe().contains("with: c"));
+        Harness.check("an empty list is not recognised either", !MessagesFile.parse(bytes("{\"listSms\":[],\"size\":0}"), new Collect(), 10).recognised() && !MessagesFile.parse(bytes("{}"), new Collect(), 10).recognised());
+        Harness.check("the first list is the one read", MessagesFile.parse(bytes("{\"x\":[1],\"listSms\":[" + item(RAVI, 1789210800000L, 1, "q", "") + "]}"), new Collect(), 10).messages == 0);
+        for (String broken : Arrays.asList("{\"listSms\":[{\"adress\":\"x", "{\"listSms\":[{\"adress\" \"x\"}]}", "{\"listSms\":[{\"a\":1 \"b\":2}]}", "{\"listSms\":[1 2]}", "{\"a\":\"\\q\"}", "{\"a\":\"\\u12\"}", "{\"listSms\":[{\"a\":}]}", "{\"a\":1 \"b\":2}")) {
+            boolean threw = false;
+            try {
+                MessagesFile.parse(bytes(broken), new Collect(), 10);
+            } catch (Exception bad) {
+                threw = true;
+            }
+            Harness.check("broken JSON is an error, not an empty file: " + broken, threw);
+        }
+        StringBuilder deep = new StringBuilder("{\"x\":");
+        for (int i = 0; i < 100; i++) deep.append('[');
+        boolean deepThrew = false;
+        try {
+            MessagesFile.parse(bytes(deep.toString()), new Collect(), 10);
+        } catch (Exception tooDeep) {
+            deepThrew = true;
+        }
+        Harness.check("nesting past sixty-four levels is refused", deepThrew);
+        MessagesXml.Recognition viaXml = MessagesFile.parse(bytes(file(sms(RAVI, "2026-09-12T14:05:00", 1, "hi", ""))), new Collect(), 10);
+        Harness.check("the same front door still reads XML, with or without a byte-order mark and spaces", viaXml.recognised() && viaXml.format.equals("XML")
+            && MessagesFile.parse(bytes("\ufeff\n  " + file(sms(RAVI, "2026-09-12T14:05:00", 1, "hi", ""))), new Collect(), 10).recognised());
+        boolean neither = false;
+        try {
+            MessagesFile.parse(bytes("hello"), new Collect(), 10);
+        } catch (Exception no) {
+            neither = true;
+        }
+        Harness.check("text that is neither is an error", neither);
+        Path sample = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/orb-sample-messages.json");
+        if (Files.exists(sample)) {
+            MessagesFlow.Look made = MessagesFlow.look(new MessagesFlow.Source() {
+                @Override public MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception {
+                    return MessagesFile.parse(new ByteArrayInputStream(Files.readAllBytes(sample)), sink, MessagesRules.MAX_MESSAGES);
+                }
+            }, NOW, UTC);
+            Harness.check("the made-up JSON sample in the repository reads the same as the XML one: two conversations, one service message, one code",
+                made.recognition.recognised() && made.survey.by.size() == 2 && made.survey.service == 1 && made.survey.codes == 1 && made.survey.by.get("+919000012345").messages == 5
+                && made.survey.by.get("+919000012345").name.equals("Test Person"));
+        }
     }
 
     private static void xml() throws Exception {
@@ -310,8 +399,8 @@ final class MessagesTest {
         for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) shares += line + "\n";
         Harness.check("each says where from, with a blinded key and its month, and how long", shares.contains("\"referrer\":\"orb-source://messages/") && shares.contains("/2026-09\"") && shares.contains("/2026-08\"")
             && shares.contains("\"action\":\"orb.source.messages\"") && shares.contains("\"textChars\":") && shares.contains("\"elapsedRealtimeMs\":4242"));
-        Harness.check("nothing of any message, number or name is in the journal", !shares.contains("4471") && !shares.contains("Ravi") && !shares.contains("9876543210") && !shares.contains("see you soon"));
-        Harness.check("nor on the disk in the clear", !onDisk(context.getFilesDir(), "4471".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "9876543210".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("nothing of any message, number or name is in the journal", !shares.contains("invoice 4471") && !shares.contains("Ravi") && !shares.contains("9876543210") && !shares.contains("see you soon"));
+        Harness.check("nor on the disk in the clear", !onDisk(context.getFilesDir(), "for invoice 4471".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "9876543210".getBytes(StandardCharsets.UTF_8)));
         Harness.check("the other number, the bank and the code were not kept", Attachments.counts(context)[0] == 2L);
         Harness.check("they became observations like any share", count(journal, "orb.observation") >= 2);
         Set<String> live = MessagesFacts.liveKeys(journal.readLines());
@@ -434,7 +523,11 @@ final class MessagesTest {
         Harness.check("a file that cannot be opened is a visible error, not an empty file", reader.contains("if (in == null) throw new java.io.IOException(\"the file could not be opened\");"));
         Harness.check("a month is counted only when the store says stored", source.get("MessagesFlow").contains("if (!\"stored\".equals(stored.outcome)) continue;"));
         Harness.check("an unreadable file is described by its kind alone", reader.contains("MessagesRules.kindOf(head, n)") && source.get("SourcesActivity").contains("It looks like \"\n                            + new MessagesReader(SourcesActivity.this, file).kind()"));
-        Harness.check("it opens the one file and streams it", reader.contains("openInputStream(file)") && reader.contains("MessagesXml.parse(in, sink, MessagesRules.MAX_MESSAGES)"));
+        Harness.check("it opens the one file and streams it through the one front door", reader.contains("openInputStream(file)") && reader.contains("MessagesFile.parse(in, sink, MessagesRules.MAX_MESSAGES)"));
+        String jsonSource = source.get("MessagesJson");
+        Harness.check("the JSON reader reads the five fields and no others, and writes and fetches nothing", jsonSource.contains("\"adress\"") && jsonSource.contains("\"body\"") && jsonSource.contains("\"time\"") && jsonSource.contains("\"type\"") && jsonSource.contains("\"name\"")
+            && !jsonSource.contains("\"read\"") && !jsonSource.contains("serviceCenter") && !jsonSource.contains("java.net") && !jsonSource.contains("Output") && !jsonSource.contains("Log."));
+        Harness.check("only MessagesFile chooses the reader", source.get("MessagesFile").contains("MessagesJson.parse(") && source.get("MessagesFile").contains("MessagesXml.parse(") && !reader.contains("MessagesJson") && !reader.contains("MessagesXml.parse"));
         Harness.check("the rules import no Android class and keep nothing", !source.get("MessagesRules").contains("import android.") && !source.get("MessagesRules").contains("Journal") && !source.get("MessagesRules").contains("Attachments."));
         String facts = source.get("MessagesFacts").replaceFirst("(?m)^package .*$", "");
         Harness.check("the records take no number, name or words", !facts.contains("number") && !facts.contains("body") && !facts.contains("address") && !facts.contains("name"));
