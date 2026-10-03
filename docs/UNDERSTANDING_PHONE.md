@@ -1,6 +1,6 @@
 # What Orb has noticed — understanding, not a profile (B5; proposed)
 
-> Status: **proposed 2026-10-03 — awaiting approval** ("Yes, go ahead with the design for the profile"; the build waits for a separate "go ahead"). Decision record: `DECISIONS.md` DR-38 (proposed).
+> Status: **approved 2026-10-03 ("Yes, go ahead with the design for the profile", then "Yes, go ahead with the build") and built — slice 1, awaiting the device** (`DEVICE_LOOP.md` §7b87, `orb-app-v50-noticed.apk`). Slice 2 (your own words) waits for the device check. Decision record: `DECISIONS.md` DR-38. As-built notes in §9.
 > Builds on `PEOPLE_PHONE.md`, `CALLS_PHONE.md`, `MESSAGES_PHONE.md`, `DOCUMENT_PEOPLE_PHONE.md`, `COMMITMENTS_PHONE.md` (the pattern for a thing *you* confirm), `PERSON_LINK_PHONE.md` (the sealed-note pattern). Governed by **Constitution Art. XII** (§44–47): *identity is an evolving model, not a profile.*
 
 ## 1. Why, in plain words
@@ -32,7 +32,7 @@ Pure rules, fixed thresholds, English words from templates — the same input gi
 | Statement | Proposed when | Working shown |
 | --- | --- | --- |
 | **Regular touch** | **≥ 6 spoken calls in the last 90 days**, or **kept messages in ≥ 3 of the last 6 finished months** | the two counts |
-| **Gone quiet** | **≥ 4 spoken calls in the 91–365 days before**, none in the last 120 days, and no kept message in the last 4 months | the counts, the gap |
+| **Gone quiet** | **≥ 4 spoken calls from 120 to 365 days ago**, none in the last 120 days, and no kept message in the last 4 finished months | the counts, the gap |
 | **Appears in many things** | **≥ 4 kept items** (documents, message months) tie to the person | items by kind |
 
 Calls are *spoken* (incoming or outgoing with a duration), as `CallsRules` already says. Persons are People's *sure* persons (a number, an email or a link); a person only a name ties to is never the subject. At most **30** statements are listed, strongest first. **No message word, document word or call detail is read** — only **counts** that People and Calls already compute.
@@ -41,7 +41,7 @@ Calls are *spoken* (incoming or outgoing with a duration), as `CallsRules` alrea
 
 - `orb.understand.granted` / `orb.understand.revoked` — the recorded decision to use the feature (the same `PackageGrants` pattern, with the same marker-file reconcile at start).
 - `orb.understanding.judged` — one per answer: the **kind**, a **blinded key** for the subject, the **verdict** (`confirmed`, `rejected`, `cleared`), and the **evidence band** at that moment (the counts, as numbers), citing the kept items it rested on in its `causes` (*show your working*). **No name, number, email or word is in the journal.** The key is a keyed hash made with Orb's own secret (as the Messages keys are), so it reveals nothing and cannot be reversed. **The verdict is the last event for a key**, so a restore and a replay agree.
-- `orb.understanding.read` — counts only (how many were proposed, confirmed, rejected) each time the screen opens, like `orb.calls.read`.
+- `orb.understand.read` — counts only (how many were proposed, confirmed, rejected) each time the screen opens, like `orb.calls.read`.
 - **Not recorded:** the statements themselves (they are computed), anyone's name, a number of calls beside a person, anything from a message or document.
 - **Erasing a kept item** weakens the statements that rested on it (they are recomputed); a statement with no evidence left simply stops appearing, and an old *That's right* for it sits inert in the journal — a few bytes naming nothing.
 - **A contact whose numbers change** gets a new key; the old verdict is orphaned (inert). Said plainly in §6.
@@ -75,3 +75,16 @@ Calls are *spoken* (incoming or outgoing with a duration), as `CallsRules` alrea
 ## 8. Not in this slice
 
 About-you facts (your own numbers, emails, places, routines), money or payment patterns, anything read from the words of a message or document, anything that acts on a statement (a reminder, a nudge, a message), merging or splitting persons, and any model or network use.
+
+## 9. As built (slice 1, v50)
+
+- **Where it lives.** `UnderstandingRules` (thresholds, the three rules, the sentences, the plan), `Understanding` (the counts, from People and the call log), `UnderstandingFacts` (the two records, the blinded key, the last verdict per key), `UnderstandingAccess` (grant, revoke, reconcile), the capability `orb.understand` v1 in `Capabilities` (words pinned), a **mode of `PeopleActivity`** (a button **What Orb has noticed**), a control in What Orb may do, and the reconcile at start. **No manifest change, no permission, no network.**
+- **Who is a subject.** Every person in the book who has a number or an address, not only those a kept item mentions — so *regular touch* can come from calls alone. The stable identifier is the smallest of their numbers and addresses; the key is `HMAC(secret, "und:" + kind + ":" + id)`, sixteen hex characters. A person whose numbers change is asked again.
+- **What is counted.** Spoken calls (as `CallsRules` says) against the person's numbers; kept message months (told from documents by where they came from) and other kept items tied by a **number, an address or your own link — never by a name alone**. No word of any item is looked at (a guard holds it).
+- **Cannot check is not nothing.** With Calls off, or unreadable, no statement is made about calls either way, and a confirmed *regular touch* is **not** said to have faded (`faded` needs the log). The screen says which sources it used.
+- **Quiet, as built:** ≥ 4 spoken calls from 120 to 365 days ago, none in the last 120 days, no kept message in the last 4 finished months (the design's "91–365" overlapped its own "last 120 days" and was made exact).
+- **The answer.** `orb.understanding.judged` carries the kind, the key, the verdict (`confirmed`, `rejected`, `cleared`) and the numbers (`calls`/`months`, `earlier`, `items`), and **cites up to ten of the kept items** it rested on. **Not now** records nothing. A refusal stays a refusal however strong the evidence becomes; **Undo** is a `cleared` answer.
+- **Effects, small and visible:** a confirmed *regular touch* puts *you said: in regular touch* on the person's row and page and lists them first among those a kept item names. Nothing acts on a statement.
+- **Cost.** The call log is read once per opening of the mode, only if Calls is on; keys are made only for people with something to look at.
+- **Not built:** slice 2 (your own words), merging persons, anything about you, anything read from words.
+

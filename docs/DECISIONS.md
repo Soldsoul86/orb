@@ -1389,7 +1389,7 @@ box — **where they are the app's by design, like the number**.
 
 ## DR-38 — What Orb has noticed: understanding across the sources, not a profile
 
-- **Status:** Proposed · **Proposed:** 2026-10-03, after the operator chose "Your profile" as the next step and said "Yes, go ahead with the design for the profile" (`UNDERSTANDING_PHONE.md`). **Not yet approved for building.**
+- **Status:** Decided and built (slice 1) · **Decided:** 2026-10-03, operator ("Yes, go ahead with the design for the profile", then "Yes, go ahead with the build"; `UNDERSTANDING_PHONE.md`). Slice 2 (the person's own words) waits for the device check.
 
 **The ruling proposed.** The operator's *profile with explicit permission* is built as **understanding**, as Constitution Art. XII requires (§44–45): Orb draws its sources together into plain statements it **computes each time** from what it holds (never stored as attributes), shows **the working** for each, and records only **the person's answer** (*That's right / Not true*, with a blinded subject key and the evidence counts) as a history event. A new capability `orb.understand` v1 is **off until the person turns it on** (a recorded grant), adds no permission and no network, never turns another source on, and lives as a mode of People so the contacts are still read only there. Slice 1: three count-based kinds (*regular touch*, *gone quiet*, *appears in many things*), no model. Slice 2 (after the device check): the person's own words for what someone is to them, as a sealed note.
 

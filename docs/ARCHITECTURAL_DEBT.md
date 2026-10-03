@@ -803,7 +803,7 @@ a second source for the compiler's checksum exists (item 1).
 
 **Opened 2026-10-03** (`DECISIONS.md` DR-37). Debts, stated.
 
-1. **The file's shape is a guess until a real one is read.** The reader is written to the common *SMS Backup & Restore* XML. Another app's XML, a JSON backup, or a newer version of that app may not be recognised; the screen then says the tag and attribute names it found (never a value).
+1. **The file's shape is a guess until a real one is read.** The reader is written to the common *SMS Backup & Restore* XML **and, since 2026-10-03, to the JSON the operator's backup app writes** (`MESSAGES_PHONE.md` §14). Another app's format, or a newer version of either, may not be recognised; the screen then says the tag and attribute names it found (never a value).
 2. **The export is every message in the clear, in Downloads.** Orb cannot delete it for the person and says so. Until it is deleted it is readable by anything with storage access.
 3. **A third-party backup app needs the SMS permission itself.** Orb names none as endorsed; the person chooses whom to trust.
 4. **No index and a 500-item window.** A year of many conversations is many items; screens read the newest 500, so old PDFs and shares can fall out of view of People and Coming up. The tally says so; an index is a design of its own (and must be proven against erasure).
@@ -814,6 +814,21 @@ a second source for the compiler's checksum exists (item 1).
 9. **One conversation is one number.** Group messages (MMS) and conversations with several numbers are not read.
 10. **Looking reads the whole file once; keeping reads it again.** A large export takes a while (it is streamed and capped at 200 MB and 200,000 messages), and the second pass is the price of holding almost nothing in memory.
 11. **Not testable off the phone:** the real file, the picker's grant for a large file, and how the screens feel with hundreds of items.
+
+---
+
+## AD-33 — what "What Orb has noticed" does not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-38). Debts, stated.
+
+1. **The thresholds are guesses.** Six calls in ninety days, three months of messages in six, four calls and then silence, four kept items: fixed in one place, shown in the working, and tested for the first time by the operator's phone.
+2. **Counts are not closeness.** *Nine calls* may be a plumber or a mother. The sentences say what was counted, never what it means; the person's own words for what someone is (slice 2) are not built.
+3. **A changed number is a new person.** The key follows the smallest number or address; if it changes, the old answer is orphaned (inert) and Orb asks again. Merging and splitting persons is still unbuilt (AD-17).
+4. **Only the phone's own call log, and only what Calls and Messages have kept.** WhatsApp calls, messages not backed up, and anything not kept are invisible; so *gone quiet* can be wrong for someone reached another way. The sentence says "have not for a while", not "have not spoken".
+5. **A confirmed answer stays after its evidence is erased,** as an inert event naming nothing (history is not edited). The statement itself stops appearing.
+6. **Recomputed on every opening.** People and the call log are read each time the mode opens; fine at a second for a year of calls, to be measured, with an index only if it hurts.
+7. **Nothing acts on a statement yet.** No reminder, nudge or message is made from one — deliberately; the first use is the mark on a person's row.
+8. **Not about you.** Facts about the person themselves (their own numbers, places, routines) are a different, more sensitive slice and are not here.
 
 ---
 
