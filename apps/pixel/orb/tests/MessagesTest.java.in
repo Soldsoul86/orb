@@ -147,6 +147,54 @@ final class MessagesTest {
             neither = true;
         }
         Harness.check("text that is neither is an error", neither);
+        Collect direct = new Collect();
+        MessagesXml.Recognition viaJson = MessagesJson.parse(bytes("\ufeff\t{\t\"listSms\":\t[" + item(RAVI, 1789210800000L, 1, "t", "") + "]}"), direct, 10);
+        Harness.check("the JSON reader itself steps over a byte-order mark and tabs", viaJson.messages == 1 && direct.got.size() == 1);
+        Harness.equal("a bare list is named so when it is described", MessagesFile.parse(bytes("[{\"zz\":1}]"), new Collect(), 10).root, "(list)");
+        Harness.check("escapes: carriage return, tab, backspace, form feed, backslash", MessagesFile.parse(bytes(json(item(RAVI, 1789210800000L, 1, "a\\rb\\tc\\bd\\fe\\\\f", ""))), direct, 10).messages == 1
+            && direct.got.get(1).body.equals("a\rb\tc\bd\fe\\f"));
+        Collect near = new Collect();
+        MessagesFile.parse(bytes(json(item(RAVI, 99_999_999_999L, 1, "a", ""), item(RAVI, 500_000_000_000L, 1, "b", ""), item(RAVI, 99_999_999L, 1, "c", ""))), near, 10);
+        Harness.check("seconds up to eleven digits are lifted to milliseconds; twelve digits are already milliseconds", near.got.get(0).dateMs == 99_999_999_999_000L && near.got.get(1).dateMs == 500_000_000_000L && near.got.get(2).dateMs == 99_999_999_000L);
+        StringBuilder longNumber = new StringBuilder();
+        for (int i = 0; i < 100; i++) longNumber.append('7');
+        for (String broken : Arrays.asList("{\"a\":1 x\"b\":2}", "{\"listSms\":[1 x2]}", "{\"a\":\"\\uZZZZ\"}", "{\"listSms\":[{\"time\":" + longNumber + "}]}", "{\"listSms\":[{\"time\":}]}")) {
+            boolean threw = false;
+            try {
+                MessagesFile.parse(bytes(broken), new Collect(), 10);
+            } catch (Exception bad) {
+                threw = true;
+            }
+            Harness.check("broken JSON is an error: " + broken.substring(0, Math.min(40, broken.length())), threw);
+        }
+        for (int levels : new int[] {64, 65}) {
+            StringBuilder nest = new StringBuilder("{\"o\":{\"p\":");
+            for (int i = 0; i < levels; i++) nest.append('[');
+            for (int i = 0; i < levels; i++) nest.append(']');
+            nest.append("}}");
+            boolean threw = false;
+            try {
+                MessagesFile.parse(bytes(nest.toString()), new Collect(), 10);
+            } catch (Exception tooDeep) {
+                threw = true;
+            }
+            Harness.check("lists nested " + levels + " deep: " + (levels > 64 ? "refused" : "allowed"), threw == (levels > 64));
+        }
+        StringBuilder objects = new StringBuilder();
+        for (int i = 0; i < 100; i++) objects.append("{\"k\":");
+        objects.append('1');
+        for (int i = 0; i < 100; i++) objects.append('}');
+        boolean objectsThrew = false;
+        try {
+            MessagesFile.parse(bytes("{\"o\":" + objects + "}"), new Collect(), 10);
+        } catch (Exception tooDeep) {
+            objectsThrew = true;
+        }
+        Harness.check("objects nested a hundred deep are refused", objectsThrew);
+        Collect empties = new Collect();
+        MessagesFile.parse(bytes("{\"o\":{},\"listSms\":[{\"adress\":\"" + RAVI + "\",\"time\":1789210800000,\"type\":1,\"body\":\"x\",\"e\":[],\"f\":{},\"g\":[[],{}]}]}"), empties, 10);
+        Harness.equal("empty lists and objects inside a message are stepped over", empties.got.size(), 1);
+        Harness.equal("a name that is the number with blanks around it is still no name", new MessagesRules.Message(" " + RAVI + " ", RAVI, 1L, 1, "x").name, "");
         Path sample = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/orb-sample-messages.json");
         if (Files.exists(sample)) {
             MessagesFlow.Look made = MessagesFlow.look(new MessagesFlow.Source() {

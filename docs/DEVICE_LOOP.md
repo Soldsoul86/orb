@@ -7363,9 +7363,9 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 #### Checked before the device
 
-- Phone-side suite: @@COUNT@@ checks; brain (378), TypeScript (600), lint and type-check clean.
-- **Mutation checks** on the JSON reader, the front door and the recognition (@@MUTN@@ mutants): @@MUT@@
-- The reader was run against the operator's real file **off the phone, counts only**: @@REAL@@
+- Phone-side suite: 2127 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the JSON reader, the front door and the recognition (67 mutants): **67 mutants; 47 caught by the first suite, 20 survived** (a tab or byte-order mark before the text, the separators between fields and items, the escapes, the seconds-versus-milliseconds edges, the 64-level nesting limit, empty lists and objects stepped over, a name written with blanks around the number). Each became a test and **all 20 are now caught**; none is equivalent.
+- The reader was run against the operator's real file **off the phone, counts only**: recognised as JSON in about half a second; **25,552 messages → 146 conversations can be kept** (105 with a contact name, none whose "name" is the number), **459 messages in 241 month-items if every one were ticked**; **25,093 left out**: 23,633 from names or short codes, 1,458 from this month or older than a year, 2 that look like codes, 0 other kinds. Nothing of any message was printed or kept.
 - A **made-up JSON sample** in the operator's app's shape (`orb-sample-messages.json`) is sent too.
 - **Not testable off the phone:** how long a 6 MB file takes on the Pixel, and how the conversation list feels with ~2,000 numeric-sender messages.
 
@@ -7373,8 +7373,8 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 | | Prediction | If false |
 | --- | --- | --- |
-| **P274** | **Pick the backup file** → choose `Sat, Oct 3, 2026, 11.00.48.sms`: Orb **recognises it** and lists conversations by number (the real file has **@@CONV@@**), counting the bank/name senders and code-like messages as *left out* | *Not recognised* or *could not read* — copy the words it shows |
-| **P275** | The left-out line shows a **large number from names or short codes** (the real file: about **23,500**) and a **small number from numbers** | the numbers are the other way round |
+| **P274** | **Pick the backup file** → choose `Sat, Oct 3, 2026, 11.00.48.sms`: Orb **recognises it** and lists conversations by number (the real file has **146**, the 50 most recent are listed), counting the bank/name senders and code-like messages as *left out* | *Not recognised* or *could not read* — copy the words it shows |
+| **P275** | The left-out line shows a **large number from names or short codes** (the real file: **23,633**), **1,458** from this month or older than a year and **2** that look like codes | the numbers differ a lot from these |
 | **P276** | A conversation row's name is a **real contact name or nothing** — never the number twice | the number appears as its own name |
 | **P277** | The **made-up JSON sample** gives two conversations (Test Person, 5 messages) exactly as the XML sample did | different from the XML sample |
 | **P278** | Reading the real file takes **a few seconds**, with the "Reading the file…" line shown meanwhile | the screen freezes or Orb closes |
