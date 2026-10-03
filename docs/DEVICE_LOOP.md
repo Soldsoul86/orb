@@ -7405,3 +7405,49 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 **P279 confirmed:** v49 installed with **no Play Protect warning**. **P278 confirmed:** reading the real file (25,552 messages) took **about a second**. **P276 confirmed:** each row reads *number (name)*. **Keep one conversation from the real file → Recall → search** ("Behaves"): worked as designed. **§7b85 and §7b86 are verified on the device.** The one open item is the `application/json` record fix (code, tests and mutation checks done; ships with the next build).
 
+### 7b87. What Orb has noticed — understanding, not a profile (DR-38, slice 1) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v50-noticed.apk` — also the **calls build** (it declares `READ_CALL_LOG`, as v46–v49 did) and it carries the **`application/json` record fix** found in §7b86. Design: `docs/UNDERSTANDING_PHONE.md` (§9 as built); decision `DECISIONS.md` DR-38; limits `ARCHITECTURAL_DEBT.md` AD-33.
+
+**Why:** Orb now holds your contacts, calls and kept items, each shown on its own. Drawing them together is what a "profile" is — so it is built as **understanding** (Constitution Art. XII): short statements **Orb has noticed**, each with its working, which **you** confirm or refuse. Nothing is stored as a fact about anyone; only your answer is history.
+
+#### What changed
+
+1. **People** gains a button **What Orb has noticed**. **Off until you turn it on:** a card says what it does, **Cancel** is the default, **Turn on** is a recorded decision, and What Orb may do can switch it off. **No permission, no manifest change, no network.**
+2. **Three kinds of statement,** from counts only: *You are in regular touch with …* (6 spoken calls in 90 days, or kept messages in 3 of the last 6 months); *You used to speak with … regularly, and have not for a while* (4 spoken calls from 4 to 12 months ago, none in the last 120 days, no kept message in the last 4 months); *… appears in N things you kept* (4 or more, tied by number, address or your link).
+3. Each shows **Because: …** (what was counted) and **That's right · Not true · Not now.** *Not now* records nothing and it returns. *Not true* is permanent until you **Undo** it. A *That's right* you gave comes back as a question (*Still in regular touch with …?*) if its evidence fades — Orb never removes your answer itself.
+4. **A confirmed *regular touch*** puts **you said: in regular touch** on that person's row and page, and lists them first among those a kept item names. Nothing else acts on a statement.
+5. It uses **only what you already allowed**: calls only if Calls is on (the screen says so), kept items as always. With the call log unreadable, nothing about calls is claimed — *cannot check* is not *nothing happened*.
+6. **Also in this build:** a month kept from a JSON backup is recorded as `application/json`, not `text/xml`.
+
+#### Checked before the device
+
+- Phone-side suite: 2339 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the rules (every threshold and both edges of each window, the three rules, fading, the order of questions, the plan, the words), the records and key, the counts from People and the call log, the grant, and the status: **78 mutants; 65 caught by the first suite, 13 survived** (a call at this very moment, calls present but the log unread, quiet fading by messages alone, the weight of a call against a month, only the kinds that are there being named, a person with nothing to look at costing no key, the order of the yes and no lists, another record type with the same fields, a referrer that only ends like a month). Each became a test and **all 13 are now caught**; none is equivalent.
+- **Not testable off the phone:** whether the statements are *right* for your life — the thresholds are first guesses — and how long the screen takes with ~2,500 contacts and a year of calls.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P280** | v50 installs over v49 with **no Play Protect warning** (manifest unchanged since v46) | flagged — record the exact words |
+| **P281** | **People** shows **What Orb has noticed**; tapping it (feature off) shows the explanation and **Turn on What Orb has noticed** only; **nothing is computed** | statements appear before you turned it on |
+| **P282** | **Turn on** → a card with **Cancel** focused → **Turn on** → the list opens; the **Using:** line says *your contacts · what you kept · your calls* (calls are on since v46) | calls are said to be off though you granted them |
+| **P283** | Each statement shows **Because: …** with numbers you can **check yourself** against the person's page (*Last spoke…*, kept items) | the numbers do not match the person's page |
+| **P284** | **That's right** on a *regular touch* → it moves to **You said yes (1)**; that person shows **you said: in regular touch** on the People list row and on their page | nothing changes, or the mark is on the wrong person |
+| **P285** | **Not true** → it moves to **You said no**; leave and reopen: it is **not asked again**; **Undo** → asked again | it comes back, or Undo does nothing |
+| **P286** | **Not now** → it disappears; **Back to People** then reopen → it is back; the export has **no record** for it | a record is written |
+| **P287** | **Export and share journal:** one `grants.capability.granted` for `orb.understand`, an `orb.understand.read` per opening (counts only), an `orb.understanding.judged` per answer with `kind`, `key`, `verdict` and the numbers — **no name, number or word** | a name or number is in the journal |
+| **P288** | **What Orb may do** shows ***What Orb has noticed about your people — ON …*** with the last look's counts; **Switch off** removes the marks and the button leads back to the explanation | the marks stay, or the line is wrong |
+| **P289** | Opening the screen takes **a few seconds at most** (~2,500 contacts, a year of calls) | it freezes or Orb closes |
+| **P290** | Keeping a month from the **JSON** backup now records `mimeType: application/json` in the export | still `text/xml` |
+
+#### Protocol
+
+1. Install `orb-app-v50-noticed.apk` over v49; open Orb once. *(P280)*
+2. **People** → **What Orb has noticed**. Read it; do **not** turn it on yet. *(P281)*
+3. **Turn on** → read the card → **Cancel** once (nothing should change) → **Turn on** again → **Turn on**. Read the **Using** line and the list. *(P282, P289)*
+4. For two or three statements, **check the Because line against that person's page.** Tell me which are **right**, which are **wrong**, and which are **right but odd to say** — counts and first names are enough. *(P283)*
+5. **That's right** on one *regular touch*; look at People and that person's page. *(P284)* **Not true** on one other; leave and reopen; **Undo**. *(P285)* **Not now** on one; **Back to People** and reopen. *(P286)*
+6. **What Orb may do** → look at the new line. *(P288)* **Export and share journal** and send it. *(P287, P290 if you kept a JSON month)*
+

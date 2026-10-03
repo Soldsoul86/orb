@@ -61,6 +61,9 @@ final class UnderstandingTest {
         edge.spokenMs.add(NOW - 90 * DAY + 1);
         edge.spokenMs.add(NOW + 1);
         Harness.equal("exactly 90 days ago is outside, a moment later is inside, the future is not counted", UnderstandingRules.callsWithin(edge, NOW, 90), 1);
+        UnderstandingRules.Subject atNow = subject("+93b", "AtNow", true);
+        atNow.spokenMs.add(NOW);
+        Harness.equal("a call at this very moment counts", UnderstandingRules.callsWithin(atNow, NOW, 90), 1);
         UnderstandingRules.Subject unread = subject("+94", "Unread", false);
         calls(unread, 9, 1);
         Harness.check("with the call log unread, calls claim nothing", !UnderstandingRules.holds(UnderstandingRules.REGULAR, unread, NOW, UTC));
@@ -101,6 +104,9 @@ final class UnderstandingTest {
         UnderstandingRules.Subject window = subject("+103", "Window", true);
         window.spokenMs.addAll(Arrays.asList(NOW - 120 * DAY, NOW - 365 * DAY, NOW - 200 * DAY, NOW - 300 * DAY));
         Harness.check("the 120th and the 365th day are both inside the window", UnderstandingRules.callsBetween(window, NOW, 120, 365) == 4);
+        UnderstandingRules.Subject blindCalls = subject("+104a", "BlindCalls", false);
+        calls(blindCalls, 4, 130);
+        Harness.check("calls present but the log unread: nothing is said to have gone quiet", !UnderstandingRules.holds(UnderstandingRules.QUIET, blindCalls, NOW, UTC));
         UnderstandingRules.Subject blind = subject("+104", "Blind", false);
         Harness.check("with the call log unread, nothing is said to have gone quiet", !UnderstandingRules.holds(UnderstandingRules.QUIET, blind, NOW, UTC) && !UnderstandingRules.faded(UnderstandingRules.QUIET, blind, NOW, UTC));
 
@@ -123,6 +129,12 @@ final class UnderstandingTest {
         quiet.spokenMs.add(NOW - 10 * DAY);
         Harness.check("quiet is faded when they speak again", UnderstandingRules.faded(UnderstandingRules.QUIET, quiet, NOW, UTC));
         Harness.check("many never fades", !UnderstandingRules.faded(UnderstandingRules.MANY, m, NOW, UTC));
+        UnderstandingRules.Subject quietBlind = subject("+108b", "QuietBlind", false);
+        quietBlind.spokenMs.add(NOW - 10 * DAY);
+        Harness.check("quiet is not said to have faded when the log was not read", !UnderstandingRules.faded(UnderstandingRules.QUIET, quietBlind, NOW, UTC));
+        UnderstandingRules.Subject quietTexted = subject("+108c", "QuietTexted", true);
+        quietTexted.messageMonths.add("2026-08");
+        Harness.check("quiet is faded by a kept message month alone", UnderstandingRules.faded(UnderstandingRules.QUIET, quietTexted, NOW, UTC));
         UnderstandingRules.Subject unreadF = subject("+109", "Unread", false);
         Harness.check("with the call log unread, regular is not said to have faded: cannot check is not nothing", !UnderstandingRules.faded(UnderstandingRules.REGULAR, unreadF, NOW, UTC));
 
@@ -147,6 +159,19 @@ final class UnderstandingTest {
             && UnderstandingRules.MANY_ITEMS == 4 && UnderstandingRules.MAX_LISTED == 30);
         Harness.check("strength puts the stronger first", UnderstandingRules.strength(UnderstandingRules.REGULAR, w, NOW, UTC) > UnderstandingRules.strength(UnderstandingRules.REGULAR, s, NOW, UTC)
             && UnderstandingRules.strength(UnderstandingRules.QUIET, q, NOW, UTC) == 4 && UnderstandingRules.strength(UnderstandingRules.MANY, m, NOW, UTC) == 4);
+        UnderstandingRules.Subject fewCalls = subject("+113", "Few", true);
+        calls(fewCalls, 3, 1);
+        UnderstandingRules.Subject manyMonths = subject("+114", "Months", true);
+        manyMonths.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-07", "2026-06", "2026-05", "2026-04"));
+        Harness.check("a call weighs ten times a month: three calls and nothing else outweigh six months of messages", UnderstandingRules.strength(UnderstandingRules.REGULAR, fewCalls, NOW, UTC) < 31
+            && UnderstandingRules.strength(UnderstandingRules.REGULAR, fewCalls, NOW, UTC) > UnderstandingRules.strength(UnderstandingRules.REGULAR, manyMonths, NOW, UTC));
+        UnderstandingRules.Subject onlyMonths = new UnderstandingRules.Subject("+115", "OnlyMonths", false, 0, 0);
+        onlyMonths.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-07", "2026-06"));
+        UnderstandingRules.Subject onlyDocs = new UnderstandingRules.Subject("+116", "OnlyDocs", false, 4, 0);
+        UnderstandingRules.Subject onlyOthers = new UnderstandingRules.Subject("+117", "OnlyOthers", false, 0, 4);
+        Harness.equal("many: only the kinds that are there are named (months)", UnderstandingRules.working(UnderstandingRules.MANY, onlyMonths, NOW, UTC), "4 message months");
+        Harness.equal("many: documents alone", UnderstandingRules.working(UnderstandingRules.MANY, onlyDocs, NOW, UTC), "4 documents");
+        Harness.equal("many: others alone", UnderstandingRules.working(UnderstandingRules.MANY, onlyOthers, NOW, UTC), "4 other items");
         Harness.check("relevance: nothing to look at, nothing computed", !UnderstandingRules.relevant(UnderstandingRules.REGULAR, subject("x", "x", true)) && !UnderstandingRules.relevant(UnderstandingRules.QUIET, subject("x", "x", true))
             && !UnderstandingRules.relevant(UnderstandingRules.MANY, subject("x", "x", true)) && UnderstandingRules.relevant(UnderstandingRules.REGULAR, texts()) && !UnderstandingRules.relevant(UnderstandingRules.QUIET, texts())
             && UnderstandingRules.relevant(UnderstandingRules.QUIET, q) && UnderstandingRules.relevant(UnderstandingRules.MANY, m));
@@ -244,6 +269,21 @@ final class UnderstandingTest {
         };
         UnderstandingRules.plan(Arrays.asList(nobody, noId), none, counting, NOW, UTC);
         Harness.equal("a person with nothing to look at costs no key", keyed[0], 0);
+        Map<String, String> someAnswer = new HashMap<>();
+        someAnswer.put("regular:0000000000000000", "confirmed");
+        UnderstandingRules.plan(Arrays.asList(nobody, noId), someAnswer, counting, NOW, UTC);
+        Harness.equal("nor does one when answers exist", keyed[0], 0);
+        UnderstandingRules.Subject zed = subject("+9400Z", "Zed", true), amy = subject("+9400A", "Amy", true), mia = subject("+9400M", "Mia", true);
+        for (UnderstandingRules.Subject x : Arrays.asList(zed, amy, mia)) calls(x, 7, 1);
+        Map<String, String> both = new HashMap<>();
+        both.put("regular:" + FIXED.key("regular", "+9400Z"), "confirmed");
+        both.put("regular:" + FIXED.key("regular", "+9400A"), "confirmed");
+        both.put("regular:" + FIXED.key("regular", "+9400M"), "rejected");
+        UnderstandingRules.Subject bob = subject("+9400B", "Bob", true);
+        calls(bob, 7, 1);
+        both.put("regular:" + FIXED.key("regular", "+9400B"), "rejected");
+        UnderstandingRules.Plan listed = UnderstandingRules.plan(Arrays.asList(zed, mia, amy, bob), both, FIXED, NOW, UTC);
+        Harness.equal("yes and no are each listed by name", names(listed.yes) + "|" + names(listed.no), "Amy:regular,Zed:regular|Bob:regular,Mia:regular");
     }
 
     private static String names(List<UnderstandingRules.Item> items) {
@@ -287,6 +327,7 @@ final class UnderstandingTest {
         People.Person bare = new People.Person();
         bare.names.add("No Number");
         Harness.check("someone with no number or address is no subject", Understanding.subjects(Arrays.asList(bare), log).isEmpty());
+        Harness.check("a referrer that only ends like a month is not a message", Understanding.monthOf("com.example.chat/2026-09") == null);
         Harness.equal("a message month is read from its referrer", Understanding.monthOf(MessagesFacts.referrer("abcdabcdabcdabcd", "2026-09")), "2026-09");
         Harness.check("and nothing else is", Understanding.monthOf("orb-source://messages/abc/xx") == null && Understanding.monthOf(DocumentsFacts.REFERRER) == null && Understanding.monthOf(null) == null);
         List<String> ids = new ArrayList<>();
@@ -328,6 +369,12 @@ final class UnderstandingTest {
         Harness.check("a later answer replaces an earlier one, and kinds are apart", v.get("regular:" + key).equals("rejected") && v.get("many:" + key).equals("confirmed") && v.size() == 2);
         journal.append(UnderstandingFacts.JUDGED, UnderstandingFacts.judged("regular", key, UnderstandingFacts.CLEARED, ev), Arrays.asList());
         Harness.equal("undo is a later answer", UnderstandingFacts.verdicts(journal.readLines()).get("regular:" + key), "cleared");
+        Map<String, Object> foreign = Json.obj();
+        foreign.put("kind", "regular");
+        foreign.put("key", "ffffffffffffffff");
+        foreign.put("verdict", "confirmed");
+        journal.append("orb.something.else", foreign, Arrays.asList());
+        Harness.check("a record of another type with the same fields is not an answer", !UnderstandingFacts.verdicts(journal.readLines()).containsKey("regular:ffffffffffffffff"));
         Harness.equal("a read records counts only", UnderstandingFacts.read(3, 1, 2).keySet().toString(), "[asked, capability, confirmed, rejected, version]");
         Harness.equal("an answer records its numbers", UnderstandingFacts.judged("regular", key, "confirmed", ev).keySet().toString(), "[calls, capability, key, kind, months, verdict, version]");
 
