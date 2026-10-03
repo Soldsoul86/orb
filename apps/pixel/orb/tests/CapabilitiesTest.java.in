@@ -34,9 +34,9 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("ten capabilities, each declared once and frozen");
+        Harness.suite("eleven capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.read.calls", "orb.remind.local", "orb.handoff.communicate"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.read.calls", "orb.understand", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
@@ -69,6 +69,7 @@ final class CapabilitiesTest {
         Harness.check("the call history is Observe and switchable, says phone and a page being open, and that nothing is kept",
             Capabilities.byId(Capabilities.CALLS).tier.equals("Observe") && Capabilities.byId(Capabilities.CALLS).switchable
             && Capabilities.CALLS_SAYS.contains("only while a person's page is open") && Capabilities.CALLS_SAYS.contains("Nothing is kept; only how many calls were looked at is recorded"));
+        Harness.equal("what Orb has noticed: its words are pinned", pin(Capabilities.UNDERSTAND_SAYS), "sha256:45955615d1c0be960c5e8ff85dd16c8db2d7956976278818091328e217d00f02");
         Harness.check("the contacts read says it is only while People is open and never writes", Capabilities.CONTACTS_SAYS.contains("only while the People screen is open")
             && Capabilities.CONTACTS_SAYS.contains("nothing is written to your contacts"));
         Harness.check("the screen read says it is only when you invoke it and never a login screen",

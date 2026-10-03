@@ -93,6 +93,7 @@ public final class Orb extends Application {
         DocumentsAccess.reconcile(this, journal);
         CallsAccess.reconcile(this, journal);
         MessagesAccess.reconcile(this, journal);
+        UnderstandingAccess.reconcile(this, journal);
         PersonLink.reconcile(this, journal);
 
         // Turn anything kept and not yet observed into an Observation (B2a). Idempotent;

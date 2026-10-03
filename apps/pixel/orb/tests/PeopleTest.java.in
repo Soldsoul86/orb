@@ -285,7 +285,9 @@ final class PeopleTest {
         int appends = 0;
         for (int at = activity.indexOf("journal.append("); at >= 0; at = activity.indexOf("journal.append(", at + 1)) appends++;
         Harness.check("the screen's only writes are the records of a read (counts only): the contacts, and the call history in the calls build",
-            appends == 2 && activity.contains("journal.append(ContactsFacts.READ, ContactsFacts.read(") && activity.contains("journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched))"));
+            appends == 4 && activity.contains("journal.append(ContactsFacts.READ, ContactsFacts.read(") && activity.contains("journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched))")
+            && activity.contains("journal.append(UnderstandingFacts.READ, UnderstandingFacts.read(plan.ask.size() + plan.left, plan.yes.size(), plan.no.size()))")
+            && activity.contains("journal.append(UnderstandingFacts.JUDGED, payload, item.subject.evidenceIds)"));
         Harness.check("the contacts are read only after the grant is checked and Android's permission is there",
             activity.contains("ContactsAccess.granted(this)") && activity.indexOf("ContactsAccess.granted(this)") < activity.indexOf("ContactsReader.read(context)")
             && source.get("ContactsReader").contains("if (!permitted(context)) return null;"));

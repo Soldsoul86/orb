@@ -63,6 +63,12 @@ public final class PeopleActivity extends Activity {
     /** The person's window that is open, and the person to open again after a link or an unlink changes the screen. */
     private AlertDialog shown;
     private String reopenName;
+    /** *What Orb has noticed* is open (a mode of this screen), the call log as read for it (null if it was not), and the answers on record. */
+    private boolean noticing;
+    private boolean noticedRecorded;
+    private List<CallsRules.Call> callLog;
+    private java.util.Map<String, String> answers = new java.util.HashMap<>();
+    private final java.util.Map<String, Boolean> closeMarks = new java.util.HashMap<>();
 
     @Override
     protected void onCreate(Bundle state) {
@@ -132,6 +138,11 @@ public final class PeopleActivity extends Activity {
                     try {
                         owed = Commitments.all(context, journal);
                         computed = People.compute(context, journal, book);
+                        callLog = null;
+                        if (noticing && UnderstandingAccess.granted(context) && CallsAccess.granted(context)) {
+                            CallsReader.Read read = CallsReader.read(context, System.currentTimeMillis());
+                            callLog = read.calls;
+                        }
                         dates = ComingUp.compute(context, journal, System.currentTimeMillis(), java.util.TimeZone.getDefault().getID());
                     } catch (IOException unreadable) {
                         computed = null;
@@ -208,9 +219,26 @@ public final class PeopleActivity extends Activity {
             // The read happened: said, with counts only — never a name, a number or an address.
             journal.append(ContactsFacts.READ, ContactsFacts.read(result.contacts, result.people.size(), result.possible.size()));
         }
+        loadAnswers(journal, result);
+        if (noticing && linkItem == null) {
+            showNoticed(journal, result);
+            return;
+        }
         // You choose the person: type a few letters of a contact's name. Nothing is listed until you do.
         list.addView(text(linkItem != null ? "Choose who this is about. Orb will list it on their page." : "Find a person in your contacts, then set a reminder about them.", 13, false));
         if (linkItem != null) suggestFor(journal, result);
+        if (linkItem == null) {
+            Button noticed = new Button(this);
+            noticed.setText("What Orb has noticed");
+            noticed.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    noticing = true;
+                    noticedRecorded = false;
+                    render();
+                }
+            });
+            list.addView(noticed);
+        }
         final EditText search = new EditText(this);
         search.setHint("A name, two letters or more");
         search.setSingleLine(true);
@@ -397,12 +425,181 @@ public final class PeopleActivity extends Activity {
         render();
     }
 
+    // ---- What Orb has noticed (docs/UNDERSTANDING_PHONE.md, DR-38): a mode of this screen, because the contacts are read only here.
+
+    /** The answers on record, and — if the feature is on — the people you confirmed as in regular touch first among those a kept item names. */
+    private void loadAnswers(Journal journal, People.Result result) {
+        closeMarks.clear();
+        answers = new java.util.HashMap<>();
+        if (!UnderstandingAccess.granted(this)) return;
+        try {
+            answers = UnderstandingFacts.verdicts(journal.readLines());
+        } catch (IOException unreadable) {
+            return;   // The history cannot say what you answered, so nothing is marked on a guess.
+        }
+        if (answers.isEmpty()) return;
+        final java.util.Map<People.Person, Boolean> marked = new java.util.HashMap<>();
+        for (People.Person p : result.people) marked.put(p, inRegularTouch(p));
+        java.util.Collections.sort(result.people, new java.util.Comparator<People.Person>() {
+            @Override public int compare(People.Person a, People.Person b) {
+                boolean x = marked.get(a), y = marked.get(b);
+                return x == y ? 0 : (x ? -1 : 1);
+            }
+        });
+    }
+
+    /** You confirmed *regular touch* for this person (and the feature is still on). */
+    private boolean inRegularTouch(People.Person person) {
+        if (answers.isEmpty()) return false;
+        String id = Understanding.idOf(person);
+        if (id == null) return false;
+        Boolean known = closeMarks.get(id);
+        if (known != null) return known;
+        boolean yes = false;
+        try {
+            yes = UnderstandingFacts.CONFIRMED.equals(answers.get(UnderstandingRules.REGULAR + ":" + UnderstandingFacts.keyer(this).key(UnderstandingRules.REGULAR, id)));
+        } catch (Exception cannotKey) {
+            yes = false;
+        }
+        closeMarks.put(id, yes);
+        return yes;
+    }
+
+    private void showNoticed(final Journal journal, final People.Result result) {
+        list.removeAllViews();
+        list.addView(text("What Orb has noticed", 17, true));
+        Button back = new Button(this);
+        back.setText("Back to People");
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                noticing = false;
+                render();
+            }
+        });
+        list.addView(back);
+        if (!UnderstandingAccess.granted(this)) {
+            list.addView(text("Orb can look across your contacts, your calls and the things you kept, and suggest things it has noticed \u2014 for example, who you are in regular touch with. "
+                + "It only uses what you have already allowed: if calls are off, it does not use calls. Nothing leaves your phone, and you decide each one.", 13, false));
+            Button on = new Button(this);
+            on.setText("Turn on What Orb has noticed");
+            on.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { confirmNoticed(); }
+            });
+            list.addView(on);
+            return;
+        }
+        final long now = System.currentTimeMillis();
+        final java.util.TimeZone zone = java.util.TimeZone.getDefault();
+        UnderstandingRules.Plan plan;
+        try {
+            List<UnderstandingRules.Subject> subjects = Understanding.subjects(result.all, callLog);
+            plan = UnderstandingRules.plan(subjects, UnderstandingFacts.verdicts(journal.readLines()), UnderstandingFacts.keyer(this), now, zone);
+        } catch (Exception cannot) {
+            list.addView(text("Orb could not work this out, so it shows nothing rather than a guess.", 13, false));
+            return;
+        }
+        if (!noticedRecorded) {
+            noticedRecorded = true;
+            journal.append(UnderstandingFacts.READ, UnderstandingFacts.read(plan.ask.size() + plan.left, plan.yes.size(), plan.no.size()));
+        }
+        list.addView(text("Using: your contacts \u00b7 what you kept \u00b7 " + (callLog != null ? "your calls" : (CallsAccess.granted(this) ? "calls could not be read" : "calls are off, so none are used")) + ".", 12, false));
+        list.addView(text("These are things Orb has noticed from counts, not facts about anyone. Nothing is saved except your answer.", 12, false));
+        if (plan.ask.isEmpty() && plan.yes.isEmpty() && plan.no.isEmpty()) {
+            list.addView(text("Nothing to ask right now. Orb needs a few spoken calls or kept messages with someone before it notices anything.", 14, false));
+            return;
+        }
+        if (!plan.ask.isEmpty()) {
+            list.addView(text("To confirm (" + (plan.ask.size() + plan.left) + ")", 15, true));
+            for (final UnderstandingRules.Item item : plan.ask) list.addView(noticedRow(item, now, zone, true));
+            if (plan.left > 0) list.addView(text("and " + plan.left + " more waiting \u2014 answer these first.", 12, false));
+        }
+        if (!plan.yes.isEmpty()) {
+            list.addView(text("You said yes (" + plan.yes.size() + ")", 15, true));
+            for (final UnderstandingRules.Item item : plan.yes) list.addView(noticedRow(item, now, zone, false));
+        }
+        if (!plan.no.isEmpty()) {
+            list.addView(text("You said no (" + plan.no.size() + ")", 15, true));
+            for (final UnderstandingRules.Item item : plan.no) list.addView(noticedRow(item, now, zone, false));
+        }
+    }
+
+    private View noticedRow(final UnderstandingRules.Item item, final long now, final java.util.TimeZone zone, boolean asking) {
+        final LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, 16, 0, 16);
+        row.addView(text(item.text, 15, true));
+        row.addView(text("Because: " + item.working + ".", 12, false));
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        if (asking) {
+            addAnswer(buttons, "That's right", item, UnderstandingFacts.CONFIRMED, now, zone);
+            addAnswer(buttons, "Not true", item, UnderstandingFacts.REJECTED, now, zone);
+            Button later = new Button(this);
+            later.setText("Not now");
+            later.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { row.setVisibility(View.GONE); }   // nothing is recorded: it comes back when this opens again
+            });
+            buttons.addView(later);
+        } else {
+            addAnswer(buttons, "Undo", item, UnderstandingFacts.CLEARED, now, zone);
+        }
+        row.addView(buttons);
+        return row;
+    }
+
+    private void addAnswer(LinearLayout buttons, String label, final UnderstandingRules.Item item, final String verdict, final long now, final java.util.TimeZone zone) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { answer(item, verdict, now, zone); }
+        });
+        buttons.addView(b);
+    }
+
+    /** The person's answer is history: one event, citing the kept items it rested on, with the numbers and the blinded key — no name, number or word. */
+    private void answer(UnderstandingRules.Item item, String verdict, long now, java.util.TimeZone zone) {
+        Journal journal = journal();
+        if (journal == null || item.key == null) return;
+        java.util.Map<String, Object> payload = UnderstandingFacts.judged(item.kind, item.key, verdict, UnderstandingRules.evidence(item.kind, item.subject, now, zone));
+        if (journal.append(UnderstandingFacts.JUDGED, payload, item.subject.evidenceIds) == null) {
+            say("Orb could not record this, so nothing changed.", null);
+            return;
+        }
+        render();
+    }
+
+    /** The card before it is turned on: what it does and does not do — Cancel is the default. Nothing is asked of Android. */
+    private void confirmNoticed() {
+        AlertDialog card = new AlertDialog.Builder(this)
+            .setTitle("Turn on What Orb has noticed?")
+            .setMessage(Capabilities.UNDERSTAND_SAYS + " If calls are off, it does not use calls. You can switch it off on What Orb may do.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Turn on", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    try {
+                        UnderstandingAccess.grant(PeopleActivity.this, journal);
+                    } catch (IOException notRecorded) {
+                        say("Orb could not record this, so it turned nothing on.", null);
+                        return;
+                    }
+                    render();
+                }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
     private View row(final People.Person person) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(0, 16, 0, 16);
         row.addView(text(person.display(), 15, true));
         row.addView(text(person.items.isEmpty() ? "nothing you kept mentions them" : person.items.size() + (person.items.size() == 1 ? " kept item" : " kept items") + " \u00b7 " + People.evidenceLine(person), 12, false));
+        if (inRegularTouch(person)) row.addView(text("you said: in regular touch", 12, true));
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) {
                 if (linkItem != null) confirmLink(person, linkItem, null);
@@ -617,6 +814,7 @@ public final class PeopleActivity extends Activity {
         StringBuilder who = new StringBuilder();
         for (String n : person.names) who.append(who.length() > 0 ? ", " : "").append(n);
         column.addView(text(who.toString(), 14, true));
+        if (inRegularTouch(person)) column.addView(text("You said: in regular touch.", 13, true));
         for (String p : person.phones) column.addView(text("Phone  " + Mentions.show(new Mentions.Handle("phone", p)), 13, false));
         for (String e : person.emails) column.addView(text("Email  " + e, 13, false));
         // Reach them from here: each opens another app after a confirmation; Orb sends nothing and calls no one (`Handoff`).

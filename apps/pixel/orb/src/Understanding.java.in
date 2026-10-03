@@ -1,0 +1,78 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+/**
+ * Builds the **counts** `UnderstandingRules` works from — pure, from a `People.Result` and (if it was read) the call log (`docs/UNDERSTANDING_PHONE.md` §3).
+ * A person's kept items count only when a number, an address or the person's own link ties them (never a name alone); a kept message month is told from a
+ * document by where it came from. **No word of any item is looked at.**
+ */
+final class Understanding {
+    private Understanding() {}
+
+    private static final Pattern MONTH = Pattern.compile("\\d{4}-\\d{2}");
+
+    /** The month a kept message item covers, from its referrer (`orb-source://messages/<key>/<YYYY-MM>`), or null. */
+    static String monthOf(String referrer) {
+        if (!MessagesFacts.isMessages(referrer)) return null;
+        int slash = referrer.lastIndexOf('/');
+        String month = referrer.substring(slash + 1);
+        return MONTH.matcher(month).matches() ? month : null;
+    }
+
+    /** The smallest of a person's numbers and addresses — stable while they keep them — or null if they have none. */
+    static String idOf(People.Person person) {
+        TreeSet<String> all = new TreeSet<>();
+        all.addAll(person.phones);
+        all.addAll(person.emails);
+        return all.isEmpty() ? null : all.first();
+    }
+
+    /**
+     * One subject per person in the book who has a number or an address. `calls` is the call log as read, or **null if it was not read** (then no call
+     * is claimed either way).
+     */
+    static List<UnderstandingRules.Subject> subjects(Collection<People.Person> people, List<CallsRules.Call> calls) {
+        Map<String, List<Long>> spokenBy = new HashMap<>();
+        if (calls != null) {
+            for (CallsRules.Call c : calls) {
+                if (!c.spoken() || c.number == null) continue;
+                List<Long> list = spokenBy.get(c.number);
+                if (list == null) { list = new ArrayList<>(); spokenBy.put(c.number, list); }
+                list.add(c.dateMs);
+            }
+        }
+        List<UnderstandingRules.Subject> out = new ArrayList<>();
+        for (People.Person person : people) {
+            String id = idOf(person);
+            if (id == null) continue;
+            int documents = 0;
+            int others = 0;
+            List<String> months = new ArrayList<>();
+            List<String> evidence = new ArrayList<>();
+            for (People.Evidence e : person.items) {
+                if (People.BY_NAME.equals(e.by)) continue;
+                String month = monthOf(e.entry.referrer);
+                if (month != null) months.add(month);
+                else if (DocumentsFacts.REFERRER.equals(e.entry.referrer)) documents++;
+                else others++;
+                if (e.entry.id != null) evidence.add(e.entry.id);
+            }
+            UnderstandingRules.Subject s = new UnderstandingRules.Subject(id, person.display(), calls != null, documents, others);
+            s.messageMonths.addAll(months);
+            for (String phone : person.phones) {
+                List<Long> spoken = spokenBy.get(phone);
+                if (spoken != null) s.spokenMs.addAll(spoken);
+            }
+            for (int i = 0; i < evidence.size() && i < 10; i++) s.evidenceIds.add(evidence.get(i));
+            out.add(s);
+        }
+        return out;
+    }
+}

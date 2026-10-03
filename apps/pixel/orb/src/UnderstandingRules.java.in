@@ -1,0 +1,288 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeSet;
+
+/**
+ * What Orb has noticed (`docs/UNDERSTANDING_PHONE.md`, DR-38): plain statements worked out, each time, from **counts** Orb already holds — spoken calls with a
+ * person, and the kept items that a number or an address ties to them. **Pure: no Android class, no model, no network.** The same counts give the same
+ * statements, so a replay agrees with the phone.
+ *
+ * **A statement is computed, never stored** (Constitution Art. XII §44: *a profile stores attributes; Orb stores understanding*). Only the person's answer to it
+ * is history (`UnderstandingFacts`). Three kinds, with fixed thresholds in one place so the first device round can test them:
+ * *regular touch*, *gone quiet*, *appears in many things*. Nothing is read from the words of any message, document or call.
+ */
+final class UnderstandingRules {
+    private UnderstandingRules() {}
+
+    static final String REGULAR = "regular";
+    static final String QUIET = "quiet";
+    static final String MANY = "many";
+    static final List<String> KINDS = Collections.unmodifiableList(java.util.Arrays.asList(REGULAR, QUIET, MANY));
+
+    /** Regular touch: this many spoken calls in the last `REGULAR_DAYS`, or kept messages in this many of the last `REGULAR_SPAN` finished months. */
+    static final int REGULAR_CALLS = 6;
+    static final int REGULAR_DAYS = 90;
+    static final int REGULAR_MONTHS = 3;
+    static final int REGULAR_SPAN = 6;
+    /** Gone quiet: this many spoken calls from `QUIET_SILENT_DAYS` to `QUIET_WINDOW_DAYS` ago, none since, and no kept message in the last `QUIET_MONTHS` finished months. */
+    static final int QUIET_EARLIER_CALLS = 4;
+    static final int QUIET_SILENT_DAYS = 120;
+    static final int QUIET_WINDOW_DAYS = 365;
+    static final int QUIET_MONTHS = 4;
+    /** Appears in many things: this many kept items tied by a number, an address or the person's own link. */
+    static final int MANY_ITEMS = 4;
+    /** At most this many statements are asked about at once. */
+    static final int MAX_LISTED = 30;
+
+    private static final long DAY_MS = 86_400_000L;
+
+    /** One person, as the counts see them. Built by `Understanding`; holds no word of any item. */
+    static final class Subject {
+        /** A stable identifier — the smallest of their numbers and addresses — or null if they have none (then they are no subject). */
+        final String id;
+        final String name;
+        /** The call log was read. When it was not, nothing about calls is claimed — *cannot check* is not *nothing happened*. */
+        final boolean callsKnown;
+        final List<Long> spokenMs = new ArrayList<>();
+        /** `YYYY-MM` of the kept message months tied to them. */
+        final Set<String> messageMonths = new TreeSet<>();
+        final int documents;
+        final int others;
+        /** The events of the items they rest on, newest first — what an answer cites. */
+        final List<String> evidenceIds = new ArrayList<>();
+
+        Subject(String id, String name, boolean callsKnown, int documents, int others) {
+            this.id = id;
+            this.name = name;
+            this.callsKnown = callsKnown;
+            this.documents = documents;
+            this.others = others;
+        }
+
+        int items() {
+            return documents + messageMonths.size() + others;
+        }
+    }
+
+    // ---- the counts
+
+    static int callsWithin(Subject s, long nowMs, int days) {
+        int n = 0;
+        for (long t : s.spokenMs) if (t <= nowMs && t > nowMs - days * DAY_MS) n++;
+        return n;
+    }
+
+    /** Spoken calls whose age is from `fromDays` up to `toDays`. */
+    static int callsBetween(Subject s, long nowMs, int fromDays, int toDays) {
+        int n = 0;
+        for (long t : s.spokenMs) {
+            long age = nowMs - t;
+            if (age >= fromDays * DAY_MS && age <= toDays * DAY_MS) n++;
+        }
+        return n;
+    }
+
+    /** How many of the last `span` finished months hold a kept message month of theirs. */
+    static int monthsWithin(Subject s, long nowMs, TimeZone zone, int span) {
+        String current = MessagesRules.monthOf(nowMs, zone);
+        int n = 0;
+        for (int back = 1; back <= span; back++) if (s.messageMonths.contains(MessagesRules.minusMonths(current, back))) n++;
+        return n;
+    }
+
+    /** Whether there is anything at all for a kind to look at — a person with no calls and no kept items needs no key and no statement. */
+    static boolean relevant(String kind, Subject s) {
+        if (REGULAR.equals(kind)) return !s.spokenMs.isEmpty() || !s.messageMonths.isEmpty();
+        if (QUIET.equals(kind)) return !s.spokenMs.isEmpty();
+        return s.items() > 0;
+    }
+
+    // ---- the rules
+
+    static boolean holds(String kind, Subject s, long nowMs, TimeZone zone) {
+        if (REGULAR.equals(kind)) {
+            return (s.callsKnown && callsWithin(s, nowMs, REGULAR_DAYS) >= REGULAR_CALLS) || monthsWithin(s, nowMs, zone, REGULAR_SPAN) >= REGULAR_MONTHS;
+        }
+        if (QUIET.equals(kind)) {
+            return s.callsKnown && callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS) >= QUIET_EARLIER_CALLS
+                && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;
+        }
+        return s.items() >= MANY_ITEMS;
+    }
+
+    /**
+     * A statement the person confirmed whose evidence has gone: Orb asks again and never removes the answer itself. Only when it can *tell* — with the call
+     * log unread, nothing is said to have faded.
+     */
+    static boolean faded(String kind, Subject s, long nowMs, TimeZone zone) {
+        if (REGULAR.equals(kind)) {
+            return s.callsKnown && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;
+        }
+        if (QUIET.equals(kind)) {
+            return s.callsKnown && (callsWithin(s, nowMs, QUIET_SILENT_DAYS) > 0 || monthsWithin(s, nowMs, zone, QUIET_MONTHS) > 0);
+        }
+        return false;
+    }
+
+    /** How strong the evidence is, to put the strongest first. */
+    static long strength(String kind, Subject s, long nowMs, TimeZone zone) {
+        if (REGULAR.equals(kind)) return callsWithin(s, nowMs, REGULAR_DAYS) * 10L + monthsWithin(s, nowMs, zone, REGULAR_SPAN);
+        if (QUIET.equals(kind)) return callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS);
+        return s.items();
+    }
+
+    /** The numbers an answer rests on, recorded with it. */
+    static Map<String, Long> evidence(String kind, Subject s, long nowMs, TimeZone zone) {
+        Map<String, Long> out = new LinkedHashMap<>();
+        if (REGULAR.equals(kind)) {
+            out.put("calls", (long) callsWithin(s, nowMs, REGULAR_DAYS));
+            out.put("months", (long) monthsWithin(s, nowMs, zone, REGULAR_SPAN));
+        } else if (QUIET.equals(kind)) {
+            out.put("earlier", (long) callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS));
+        } else {
+            out.put("items", (long) s.items());
+        }
+        return out;
+    }
+
+    // ---- the words
+
+    private static String plural(long n, String one, String many) {
+        return n + " " + (n == 1 ? one : many);
+    }
+
+    /** *Because: …* — what was counted, not what it means. */
+    static String working(String kind, Subject s, long nowMs, TimeZone zone) {
+        List<String> parts = new ArrayList<>();
+        if (REGULAR.equals(kind)) {
+            if (s.callsKnown) parts.add(plural(callsWithin(s, nowMs, REGULAR_DAYS), "spoken call", "spoken calls") + " in the last " + REGULAR_DAYS + " days");
+            int months = monthsWithin(s, nowMs, zone, REGULAR_SPAN);
+            if (months > 0) parts.add("messages kept from " + months + " of the last " + REGULAR_SPAN + " months");
+        } else if (QUIET.equals(kind)) {
+            parts.add(plural(callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS), "spoken call", "spoken calls") + " from 4 to 12 months ago");
+            parts.add("none in the last " + QUIET_SILENT_DAYS + " days");
+            parts.add("no messages kept from the last " + QUIET_MONTHS + " months");
+        } else {
+            if (s.documents > 0) parts.add(plural(s.documents, "document", "documents"));
+            if (!s.messageMonths.isEmpty()) parts.add(plural(s.messageMonths.size(), "message month", "message months"));
+            if (s.others > 0) parts.add(plural(s.others, "other item", "other items"));
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < parts.size(); i++) out.append(i == 0 ? "" : "; ").append(parts.get(i));
+        return out.toString();
+    }
+
+    static String sentence(String kind, Subject s) {
+        if (REGULAR.equals(kind)) return "You are in regular touch with " + s.name + ".";
+        if (QUIET.equals(kind)) return "You used to speak with " + s.name + " regularly, and have not for a while.";
+        return s.name + " appears in " + s.items() + " things you kept.";
+    }
+
+    /** The same statement put as a question, for one you confirmed whose evidence has faded. */
+    static String askAgain(String kind, Subject s) {
+        if (REGULAR.equals(kind)) return "Still in regular touch with " + s.name + "?";
+        if (QUIET.equals(kind)) return "Is it still true that you have not spoken with " + s.name + " for a while?";
+        return s.name + " still appears in the things you kept?";
+    }
+
+    // ---- the plan: statements and what the person said
+
+    static final String ASK = "ask";
+    static final String ASK_AGAIN = "again";
+    static final String YES = "yes";
+    static final String NO = "no";
+
+    /** One line of the screen. */
+    static final class Item {
+        final String kind;
+        final Subject subject;
+        final String key;
+        final String state;
+        final String text;
+        final String working;
+        final long strength;
+
+        Item(String kind, Subject subject, String key, String state, String text, String working, long strength) {
+            this.kind = kind;
+            this.subject = subject;
+            this.key = key;
+            this.state = state;
+            this.text = text;
+            this.working = working;
+            this.strength = strength;
+        }
+    }
+
+    /** Makes the blinded key of a (kind, subject) — `UnderstandingFacts.keyer`, or a fixed one in tests. */
+    interface Keyer {
+        String key(String kind, String subjectId) throws Exception;
+    }
+
+    static final class Plan {
+        /** Questions: those asked again first, then the strongest; at most `MAX_LISTED`. */
+        final List<Item> ask = new ArrayList<>();
+        final List<Item> yes = new ArrayList<>();
+        final List<Item> no = new ArrayList<>();
+        /** More were waiting than the screen lists. */
+        int left;
+    }
+
+    /** `verdicts` maps `kind:key` to `confirmed`, `rejected` or `cleared` (the last event for it). */
+    static Plan plan(List<Subject> subjects, Map<String, String> verdicts, Keyer keyer, long nowMs, TimeZone zone) throws Exception {
+        Plan plan = new Plan();
+        List<Item> asks = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Subject s : subjects) {
+            if (s.id == null || !seen.add(s.id)) continue;
+            for (String kind : KINDS) {
+                if (!relevant(kind, s)) continue;
+                boolean holds = holds(kind, s, nowMs, zone);
+                String verdict = null;
+                String key = null;
+                if (!verdicts.isEmpty() || holds) {
+                    key = keyer.key(kind, s.id);
+                    verdict = verdicts.get(kind + ":" + key);
+                }
+                long strength = strength(kind, s, nowMs, zone);
+                if ("rejected".equals(verdict)) {
+                    plan.no.add(new Item(kind, s, key, NO, sentence(kind, s), working(kind, s, nowMs, zone), strength));
+                } else if ("confirmed".equals(verdict)) {
+                    if (faded(kind, s, nowMs, zone)) asks.add(new Item(kind, s, key, ASK_AGAIN, askAgain(kind, s), working(kind, s, nowMs, zone), strength));
+                    else plan.yes.add(new Item(kind, s, key, YES, sentence(kind, s), working(kind, s, nowMs, zone), strength));
+                } else if (holds) {
+                    asks.add(new Item(kind, s, key, ASK, sentence(kind, s), working(kind, s, nowMs, zone), strength));
+                }
+            }
+        }
+        Collections.sort(asks, new Comparator<Item>() {
+            @Override public int compare(Item a, Item b) {
+                boolean aAgain = ASK_AGAIN.equals(a.state), bAgain = ASK_AGAIN.equals(b.state);
+                if (aAgain != bAgain) return aAgain ? -1 : 1;
+                if (a.strength != b.strength) return a.strength > b.strength ? -1 : 1;
+                int byName = a.subject.name.compareToIgnoreCase(b.subject.name);
+                return byName != 0 ? byName : a.kind.compareTo(b.kind);
+            }
+        });
+        for (int i = 0; i < asks.size(); i++) {
+            if (i < MAX_LISTED) plan.ask.add(asks.get(i)); else plan.left++;
+        }
+        Comparator<Item> byName = new Comparator<Item>() {
+            @Override public int compare(Item a, Item b) {
+                int c = a.subject.name.compareToIgnoreCase(b.subject.name);
+                return c != 0 ? c : a.kind.compareTo(b.kind);
+            }
+        };
+        Collections.sort(plan.yes, byName);
+        Collections.sort(plan.no, byName);
+        return plan;
+    }
+}

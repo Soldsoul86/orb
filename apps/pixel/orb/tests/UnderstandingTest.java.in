@@ -1,0 +1,403 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/** What Orb has noticed (`docs/UNDERSTANDING_PHONE.md`, DR-38): the rules, the counts, the plan, the records, and the guards. */
+final class UnderstandingTest {
+    private UnderstandingTest() {}
+
+    /** 2026-10-03 12:00 UTC. */
+    private static final long NOW = 1791028800000L;
+    private static final long DAY = 86_400_000L;
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+
+    private static UnderstandingRules.Subject subject(String id, String name, boolean callsKnown) {
+        return new UnderstandingRules.Subject(id, name, callsKnown, 0, 0);
+    }
+
+    /** `count` spoken calls, one every day, the first `startAgeDays` before now. */
+    private static void calls(UnderstandingRules.Subject s, int count, int startAgeDays) {
+        for (int i = 0; i < count; i++) s.spokenMs.add(NOW - (startAgeDays + i) * DAY);
+    }
+
+    private static final UnderstandingRules.Keyer FIXED = new UnderstandingRules.Keyer() {
+        @Override public String key(String kind, String subjectId) {
+            return String.format("%016x", (kind + ":" + subjectId).hashCode() & 0xffffffffL);
+        }
+    };
+
+    static void run() throws Exception {
+        rules();
+        plan();
+        counts();
+        facts();
+        guards();
+    }
+
+    private static void rules() {
+        Harness.suite("regular touch");
+        UnderstandingRules.Subject s = subject("+91", "Ravi", true);
+        calls(s, 5, 1);
+        Harness.check("five spoken calls in 90 days is not enough", !UnderstandingRules.holds(UnderstandingRules.REGULAR, s, NOW, UTC));
+        calls(s, 1, 6);
+        Harness.check("six is", UnderstandingRules.holds(UnderstandingRules.REGULAR, s, NOW, UTC));
+        UnderstandingRules.Subject old = subject("+92", "Old", true);
+        for (int i = 0; i < 6; i++) old.spokenMs.add(NOW - (89 + i * 0) * DAY + i);
+        Harness.check("a call on the 89th day counts", UnderstandingRules.callsWithin(old, NOW, 90) == 6);
+        UnderstandingRules.Subject edge = subject("+93", "Edge", true);
+        edge.spokenMs.add(NOW - 90 * DAY);
+        edge.spokenMs.add(NOW - 90 * DAY + 1);
+        edge.spokenMs.add(NOW + 1);
+        Harness.equal("exactly 90 days ago is outside, a moment later is inside, the future is not counted", UnderstandingRules.callsWithin(edge, NOW, 90), 1);
+        UnderstandingRules.Subject unread = subject("+94", "Unread", false);
+        calls(unread, 9, 1);
+        Harness.check("with the call log unread, calls claim nothing", !UnderstandingRules.holds(UnderstandingRules.REGULAR, unread, NOW, UTC));
+        UnderstandingRules.Subject texts = subject("+95", "Texts", false);
+        texts.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-07"));
+        Harness.check("three of the last six finished months of kept messages is enough, with no calls at all", UnderstandingRules.holds(UnderstandingRules.REGULAR, texts, NOW, UTC));
+        texts.messageMonths.remove("2026-07");
+        Harness.check("two is not", !UnderstandingRules.holds(UnderstandingRules.REGULAR, texts, NOW, UTC));
+        UnderstandingRules.Subject thisMonth = subject("+96", "Now", false);
+        thisMonth.messageMonths.addAll(Arrays.asList("2026-10", "2026-09", "2026-08"));
+        Harness.check("the unfinished month is not counted", !UnderstandingRules.holds(UnderstandingRules.REGULAR, thisMonth, NOW, UTC));
+        UnderstandingRules.Subject far = subject("+97", "Far", false);
+        far.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-03"));
+        Harness.equal("a month past the sixth is not counted either", UnderstandingRules.monthsWithin(far, NOW, UTC, 6), 2);
+        Harness.equal("and the sixth finished month is", UnderstandingRules.monthsWithin(far, NOW, UTC, 7), 3);
+
+        Harness.suite("gone quiet");
+        UnderstandingRules.Subject q = subject("+98", "Priya", true);
+        calls(q, 4, 130);
+        Harness.check("four spoken calls from 4 to 12 months ago and none since", UnderstandingRules.holds(UnderstandingRules.QUIET, q, NOW, UTC));
+        UnderstandingRules.Subject three = subject("+99", "Three", true);
+        calls(three, 3, 130);
+        Harness.check("three is not enough", !UnderstandingRules.holds(UnderstandingRules.QUIET, three, NOW, UTC));
+        UnderstandingRules.Subject recent = subject("+100", "Recent", true);
+        calls(recent, 4, 130);
+        recent.spokenMs.add(NOW - 100 * DAY);
+        Harness.check("one call in the last 120 days ends it", !UnderstandingRules.holds(UnderstandingRules.QUIET, recent, NOW, UTC));
+        UnderstandingRules.Subject texted = subject("+101", "Texted", true);
+        calls(texted, 4, 130);
+        texted.messageMonths.add("2026-07");
+        Harness.check("a kept message month in the last four finished months ends it", !UnderstandingRules.holds(UnderstandingRules.QUIET, texted, NOW, UTC));
+        texted.messageMonths.clear();
+        texted.messageMonths.add("2026-05");
+        Harness.check("an older one does not", UnderstandingRules.holds(UnderstandingRules.QUIET, texted, NOW, UTC));
+        UnderstandingRules.Subject ancient = subject("+102", "Ancient", true);
+        calls(ancient, 4, 370);
+        Harness.check("calls older than a year are not seen", !UnderstandingRules.holds(UnderstandingRules.QUIET, ancient, NOW, UTC));
+        UnderstandingRules.Subject window = subject("+103", "Window", true);
+        window.spokenMs.addAll(Arrays.asList(NOW - 120 * DAY, NOW - 365 * DAY, NOW - 200 * DAY, NOW - 300 * DAY));
+        Harness.check("the 120th and the 365th day are both inside the window", UnderstandingRules.callsBetween(window, NOW, 120, 365) == 4);
+        UnderstandingRules.Subject blind = subject("+104", "Blind", false);
+        Harness.check("with the call log unread, nothing is said to have gone quiet", !UnderstandingRules.holds(UnderstandingRules.QUIET, blind, NOW, UTC) && !UnderstandingRules.faded(UnderstandingRules.QUIET, blind, NOW, UTC));
+
+        Harness.suite("appears in many things");
+        UnderstandingRules.Subject m = new UnderstandingRules.Subject("+105", "Sharma", false, 2, 1);
+        m.messageMonths.add("2026-09");
+        Harness.check("documents, message months and others add up: four is enough", UnderstandingRules.holds(UnderstandingRules.MANY, m, NOW, UTC) && m.items() == 4);
+        UnderstandingRules.Subject fewer = new UnderstandingRules.Subject("+106", "Few", false, 2, 1);
+        Harness.check("three is not", !UnderstandingRules.holds(UnderstandingRules.MANY, fewer, NOW, UTC));
+
+        Harness.suite("fading: Orb asks again and never removes an answer");
+        UnderstandingRules.Subject f = subject("+107", "Fading", true);
+        Harness.check("regular, nothing in 120 days and no messages in 4 months: faded", UnderstandingRules.faded(UnderstandingRules.REGULAR, f, NOW, UTC));
+        f.spokenMs.add(NOW - 119 * DAY);
+        Harness.check("one call in the last 120 days: not faded", !UnderstandingRules.faded(UnderstandingRules.REGULAR, f, NOW, UTC));
+        f.spokenMs.clear();
+        f.messageMonths.add("2026-06");
+        Harness.check("a kept message month in the last four finished months: not faded", !UnderstandingRules.faded(UnderstandingRules.REGULAR, f, NOW, UTC));
+        UnderstandingRules.Subject quiet = subject("+108", "Quiet", true);
+        quiet.spokenMs.add(NOW - 10 * DAY);
+        Harness.check("quiet is faded when they speak again", UnderstandingRules.faded(UnderstandingRules.QUIET, quiet, NOW, UTC));
+        Harness.check("many never fades", !UnderstandingRules.faded(UnderstandingRules.MANY, m, NOW, UTC));
+        UnderstandingRules.Subject unreadF = subject("+109", "Unread", false);
+        Harness.check("with the call log unread, regular is not said to have faded: cannot check is not nothing", !UnderstandingRules.faded(UnderstandingRules.REGULAR, unreadF, NOW, UTC));
+
+        Harness.suite("the words and the working");
+        UnderstandingRules.Subject w = subject("+110", "Ravi Kumar", true);
+        calls(w, 9, 2);
+        w.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-07", "2026-06"));
+        Harness.equal("regular: what was counted", UnderstandingRules.working(UnderstandingRules.REGULAR, w, NOW, UTC), "9 spoken calls in the last 90 days; messages kept from 4 of the last 6 months");
+        Harness.equal("and the sentence says noticed, not is", UnderstandingRules.sentence(UnderstandingRules.REGULAR, w), "You are in regular touch with Ravi Kumar.");
+        Harness.equal("one call is the singular", UnderstandingRules.working(UnderstandingRules.REGULAR, singleCall(), NOW, UTC), "1 spoken call in the last 90 days");
+        Harness.equal("with the log unread, only the messages are said", UnderstandingRules.working(UnderstandingRules.REGULAR, texts(), NOW, UTC), "messages kept from 3 of the last 6 months");
+        Harness.equal("quiet: the gap is spelled out", UnderstandingRules.working(UnderstandingRules.QUIET, q, NOW, UTC),
+            "4 spoken calls from 4 to 12 months ago; none in the last 120 days; no messages kept from the last 4 months");
+        Harness.equal("many: by kind", UnderstandingRules.working(UnderstandingRules.MANY, m, NOW, UTC), "2 documents; 1 message month; 1 other item");
+        Harness.equal("many: the sentence", UnderstandingRules.sentence(UnderstandingRules.MANY, m), "Sharma appears in 4 things you kept.");
+        Harness.equal("quiet: the sentence", UnderstandingRules.sentence(UnderstandingRules.QUIET, q), "You used to speak with Priya regularly, and have not for a while.");
+        Harness.equal("asked again", UnderstandingRules.askAgain(UnderstandingRules.REGULAR, w), "Still in regular touch with Ravi Kumar?");
+        Harness.equal("the numbers an answer rests on", UnderstandingRules.evidence(UnderstandingRules.REGULAR, w, NOW, UTC).toString(), "{calls=9, months=4}");
+        Harness.equal("and for the others", UnderstandingRules.evidence(UnderstandingRules.QUIET, q, NOW, UTC) + "|" + UnderstandingRules.evidence(UnderstandingRules.MANY, m, NOW, UTC), "{earlier=4}|{items=4}");
+        Harness.check("the thresholds are as designed", UnderstandingRules.REGULAR_CALLS == 6 && UnderstandingRules.REGULAR_DAYS == 90 && UnderstandingRules.REGULAR_MONTHS == 3 && UnderstandingRules.REGULAR_SPAN == 6
+            && UnderstandingRules.QUIET_EARLIER_CALLS == 4 && UnderstandingRules.QUIET_SILENT_DAYS == 120 && UnderstandingRules.QUIET_WINDOW_DAYS == 365 && UnderstandingRules.QUIET_MONTHS == 4
+            && UnderstandingRules.MANY_ITEMS == 4 && UnderstandingRules.MAX_LISTED == 30);
+        Harness.check("strength puts the stronger first", UnderstandingRules.strength(UnderstandingRules.REGULAR, w, NOW, UTC) > UnderstandingRules.strength(UnderstandingRules.REGULAR, s, NOW, UTC)
+            && UnderstandingRules.strength(UnderstandingRules.QUIET, q, NOW, UTC) == 4 && UnderstandingRules.strength(UnderstandingRules.MANY, m, NOW, UTC) == 4);
+        Harness.check("relevance: nothing to look at, nothing computed", !UnderstandingRules.relevant(UnderstandingRules.REGULAR, subject("x", "x", true)) && !UnderstandingRules.relevant(UnderstandingRules.QUIET, subject("x", "x", true))
+            && !UnderstandingRules.relevant(UnderstandingRules.MANY, subject("x", "x", true)) && UnderstandingRules.relevant(UnderstandingRules.REGULAR, texts()) && !UnderstandingRules.relevant(UnderstandingRules.QUIET, texts())
+            && UnderstandingRules.relevant(UnderstandingRules.QUIET, q) && UnderstandingRules.relevant(UnderstandingRules.MANY, m));
+    }
+
+    private static UnderstandingRules.Subject singleCall() {
+        UnderstandingRules.Subject s = subject("+111", "One", true);
+        calls(s, 1, 1);
+        s.messageMonths.addAll(Arrays.asList());
+        return s;
+    }
+
+    private static UnderstandingRules.Subject texts() {
+        UnderstandingRules.Subject s = subject("+112", "Texts", false);
+        s.messageMonths.addAll(Arrays.asList("2026-09", "2026-08", "2026-07"));
+        return s;
+    }
+
+    private static void plan() throws Exception {
+        Harness.suite("the plan: what to ask, what you said yes to, what you said no to");
+        UnderstandingRules.Subject ravi = subject("+91A", "Ravi", true);
+        calls(ravi, 9, 1);
+        UnderstandingRules.Subject sam = subject("+91B", "Sam", true);
+        calls(sam, 7, 1);
+        UnderstandingRules.Subject priya = subject("+91C", "Priya", true);
+        calls(priya, 4, 130);
+        UnderstandingRules.Subject nobody = subject("+91D", "Nobody", true);
+        UnderstandingRules.Subject noId = subject(null, "Nameless", true);
+        calls(noId, 9, 1);
+        UnderstandingRules.Subject dup = subject("+91A", "Ravi again", true);
+        calls(dup, 9, 1);
+        Map<String, String> none = new HashMap<>();
+        UnderstandingRules.Plan p = UnderstandingRules.plan(Arrays.asList(sam, nobody, noId, ravi, priya, dup), none, FIXED, NOW, UTC);
+        Harness.equal("three questions, the strongest first, and no one without an identifier or twice", names(p.ask), "Ravi:regular,Sam:regular,Priya:quiet");
+        Harness.check("nothing answered yet", p.yes.isEmpty() && p.no.isEmpty() && p.left == 0);
+        Harness.check("each carries its working", p.ask.get(0).working.startsWith("9 spoken calls") && p.ask.get(0).state.equals(UnderstandingRules.ASK));
+
+        Map<String, String> said = new HashMap<>();
+        said.put("regular:" + FIXED.key("regular", "+91A"), "confirmed");
+        said.put("regular:" + FIXED.key("regular", "+91B"), "rejected");
+        UnderstandingRules.Plan answered = UnderstandingRules.plan(Arrays.asList(sam, ravi, priya), said, FIXED, NOW, UTC);
+        Harness.equal("Ravi is confirmed, Sam is refused, Priya is still asked", names(answered.yes) + "|" + names(answered.no) + "|" + names(answered.ask), "Ravi:regular|Sam:regular|Priya:quiet");
+        said.put("regular:" + FIXED.key("regular", "+91B"), "cleared");
+        Harness.equal("an undone refusal is asked again", names(UnderstandingRules.plan(Arrays.asList(sam), said, FIXED, NOW, UTC).ask), "Sam:regular");
+
+        UnderstandingRules.Subject fading = subject("+91E", "Fade", true);
+        Map<String, String> faded = new HashMap<>();
+        faded.put("regular:" + FIXED.key("regular", "+91E"), "confirmed");
+        fading.messageMonths.add("2026-01");
+        UnderstandingRules.Plan again = UnderstandingRules.plan(Arrays.asList(fading), faded, FIXED, NOW, UTC);
+        Harness.check("a yes whose evidence faded is asked again, first, and is worded as a question", again.yes.isEmpty() && again.ask.size() == 1 && again.ask.get(0).state.equals(UnderstandingRules.ASK_AGAIN)
+            && again.ask.get(0).text.equals("Still in regular touch with Fade?"));
+        UnderstandingRules.Subject thin = subject("+91F", "Thin", true);
+        thin.spokenMs.add(NOW - 5 * DAY);
+        Map<String, String> held = new HashMap<>();
+        held.put("regular:" + FIXED.key("regular", "+91F"), "confirmed");
+        Harness.equal("a yes whose evidence is thinner but there stays a yes", names(UnderstandingRules.plan(Arrays.asList(thin), held, FIXED, NOW, UTC).yes), "Thin:regular");
+        Map<String, String> order = new HashMap<>();
+        order.put("regular:" + FIXED.key("regular", "+91E"), "confirmed");
+        UnderstandingRules.Plan mixed = UnderstandingRules.plan(Arrays.asList(ravi, fading), order, FIXED, NOW, UTC);
+        Harness.equal("those asked again come before new questions", names(mixed.ask), "Fade:regular,Ravi:regular");
+
+        Harness.suite("a refusal is not undone by new evidence");
+        UnderstandingRules.Subject stronger = subject("+91G", "Grew", true);
+        calls(stronger, 40, 1);
+        Map<String, String> refused = new HashMap<>();
+        refused.put("regular:" + FIXED.key("regular", "+91G"), "rejected");
+        UnderstandingRules.Plan r = UnderstandingRules.plan(Arrays.asList(stronger), refused, FIXED, NOW, UTC);
+        Harness.check("it stays refused however much evidence there is, and is listed to undo", r.ask.isEmpty() && names(r.no).equals("Grew:regular"));
+        UnderstandingRules.Subject gone = subject("+91H", "Gone", true);
+        Map<String, String> orphan = new HashMap<>();
+        orphan.put("regular:" + FIXED.key("regular", "+91ZZZ"), "confirmed");
+        UnderstandingRules.Plan o = UnderstandingRules.plan(Arrays.asList(gone), orphan, FIXED, NOW, UTC);
+        Harness.check("an answer for someone no longer there is inert", o.ask.isEmpty() && o.yes.isEmpty() && o.no.isEmpty());
+
+        Harness.suite("thirty at a time");
+        List<UnderstandingRules.Subject> crowd = new ArrayList<>();
+        for (int i = 0; i < 35; i++) {
+            UnderstandingRules.Subject c = subject(String.format("+9100%03d", i), String.format("P%02d", i), true);
+            calls(c, 6 + i, 1);
+            crowd.add(c);
+        }
+        UnderstandingRules.Plan big = UnderstandingRules.plan(crowd, none, FIXED, NOW, UTC);
+        Harness.check("thirty are asked, the strongest first, and the rest are counted", big.ask.size() == 30 && big.left == 5 && big.ask.get(0).subject.name.equals("P34") && big.ask.get(29).subject.name.equals("P05"));
+        UnderstandingRules.Subject b1 = subject("+9200B", "Bea", true), b2 = subject("+9200A", "Ann", true);
+        calls(b1, 6, 1);
+        calls(b2, 6, 1);
+        Harness.equal("equal strength is ordered by name", names(UnderstandingRules.plan(Arrays.asList(b1, b2), none, FIXED, NOW, UTC).ask), "Ann:regular,Bea:regular");
+        UnderstandingRules.Subject twoKinds = new UnderstandingRules.Subject("+9300", "Many", true, 5, 0);
+        calls(twoKinds, 6, 1);
+        Harness.equal("one person can have two statements", names(UnderstandingRules.plan(Arrays.asList(twoKinds), none, FIXED, NOW, UTC).ask), "Many:regular,Many:many");
+        final int[] keyed = {0};
+        UnderstandingRules.Keyer counting = new UnderstandingRules.Keyer() {
+            @Override public String key(String kind, String id) { keyed[0]++; return "0000000000000000"; }
+        };
+        UnderstandingRules.plan(Arrays.asList(nobody, noId), none, counting, NOW, UTC);
+        Harness.equal("a person with nothing to look at costs no key", keyed[0], 0);
+    }
+
+    private static String names(List<UnderstandingRules.Item> items) {
+        StringBuilder out = new StringBuilder();
+        for (UnderstandingRules.Item i : items) out.append(out.length() == 0 ? "" : ",").append(i.subject.name).append(':').append(i.kind);
+        return out.toString();
+    }
+
+    private static People.Evidence item(String referrer, String by, String id) {
+        return new People.Evidence(new Recall.Entry("h" + id, id, "i", 0L, "x", "s", "orb.shared", "text/plain", referrer, 1L), by, null);
+    }
+
+    private static void counts() {
+        Harness.suite("the counts, from People and the call log");
+        People.Person p = new People.Person();
+        p.names.add("Ravi Kumar");
+        p.phones.add("+919876543210");
+        p.phones.add("+919000000001");
+        p.emails.add("ravi@example.com");
+        p.items.add(item(MessagesFacts.referrer("abcdabcdabcdabcd", "2026-09"), People.BY_NUMBER, "1"));
+        p.items.add(item(MessagesFacts.referrer("1111111111111111", "2026-08"), People.BY_NUMBER, "2"));
+        p.items.add(item(DocumentsFacts.REFERRER, People.BY_EMAIL, "3"));
+        p.items.add(item("com.example.chat", People.BY_LINK, "4"));
+        p.items.add(item(MessagesFacts.referrer("2222222222222222", "2026-07"), People.BY_NAME, "5"));
+        p.items.add(item(null, People.BY_NUMBER, "6"));
+        List<CallsRules.Call> log = new ArrayList<>();
+        log.add(new CallsRules.Call("+919876543210", 1, NOW - DAY, 120));
+        log.add(new CallsRules.Call("+919000000001", 2, NOW - 2 * DAY, 30));
+        log.add(new CallsRules.Call("+919876543210", 3, NOW - 3 * DAY, 0));
+        log.add(new CallsRules.Call("+919876543210", 1, NOW - 4 * DAY, 0));
+        log.add(new CallsRules.Call("+910000000000", 1, NOW - DAY, 60));
+        log.add(new CallsRules.Call(null, 1, NOW - DAY, 60));
+        List<UnderstandingRules.Subject> subjects = Understanding.subjects(Arrays.asList(p), log);
+        UnderstandingRules.Subject s = subjects.get(0);
+        Harness.equal("the identifier is the smallest number or address", s.id, "+919000000001");
+        Harness.equal("a name tied only by a word is not counted; months, documents and others are told apart", s.messageMonths + "|" + s.documents + "|" + s.others, "[2026-08, 2026-09]|1|2");
+        Harness.equal("only spoken calls with the person's numbers", s.spokenMs.size(), 2);
+        Harness.check("the call log was read", s.callsKnown);
+        Harness.equal("the evidence they rest on, not the one tied by a name", s.evidenceIds.toString(), "[1, 2, 3, 4, 6]");
+        Harness.check("with the log unread nothing about calls is claimed", !Understanding.subjects(Arrays.asList(p), null).get(0).callsKnown && Understanding.subjects(Arrays.asList(p), null).get(0).spokenMs.isEmpty());
+        People.Person bare = new People.Person();
+        bare.names.add("No Number");
+        Harness.check("someone with no number or address is no subject", Understanding.subjects(Arrays.asList(bare), log).isEmpty());
+        Harness.equal("a message month is read from its referrer", Understanding.monthOf(MessagesFacts.referrer("abcdabcdabcdabcd", "2026-09")), "2026-09");
+        Harness.check("and nothing else is", Understanding.monthOf("orb-source://messages/abc/xx") == null && Understanding.monthOf(DocumentsFacts.REFERRER) == null && Understanding.monthOf(null) == null);
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i < 15; i++) p.items.add(item(DocumentsFacts.REFERRER, People.BY_NUMBER, "x" + i));
+        Harness.equal("at most ten items are cited", Understanding.subjects(Arrays.asList(p), log).get(0).evidenceIds.size(), 10);
+    }
+
+    private static Context box(Context[] c, Journal[] j) throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-understand").toFile();
+        c[0] = new Context(dir);
+        j[0] = Journal.open(c[0], Install.lane(c[0]), Install.id(c[0]));
+        return c[0];
+    }
+
+    private static void facts() throws Exception {
+        Harness.suite("what is recorded: an answer, as numbers and a blinded key");
+        Context[] cc = new Context[1];
+        Journal[] jj = new Journal[1];
+        Context context = box(cc, jj);
+        Journal journal = jj[0];
+        String key = UnderstandingFacts.keyer(context).key("regular", "+919000000001");
+        Harness.check("a key is sixteen hex characters and says nothing", key.matches("[0-9a-f]{16}") && !key.contains("9000"));
+        Harness.equal("a key is stable", key, UnderstandingFacts.keyer(context).key("regular", "+919000000001"));
+        Harness.check("and differs by kind and by person", !key.equals(UnderstandingFacts.keyer(context).key("many", "+919000000001")) && !key.equals(UnderstandingFacts.keyer(context).key("regular", "+919000000002")));
+        Map<String, Long> ev = new TreeMap<>();
+        ev.put("calls", 9L);
+        ev.put("months", 4L);
+        journal.append(UnderstandingFacts.JUDGED, UnderstandingFacts.judged("regular", key, UnderstandingFacts.CONFIRMED, ev), Arrays.asList());
+        journal.append(UnderstandingFacts.READ, UnderstandingFacts.read(3, 1, 0));
+        String all = "";
+        for (String line : journal.readLines()) all += line + "\n";
+        Harness.check("the record holds the kind, the key, the verdict and the numbers", all.contains("\"kind\":\"regular\"") && all.contains("\"key\":\"" + key + "\"") && all.contains("\"verdict\":\"confirmed\"") && all.contains("\"calls\":9") && all.contains("\"months\":4"));
+        Harness.check("and no name, number or address", !all.contains("9000000001") && !all.contains("Ravi") && !all.contains("@"));
+        Harness.equal("the last verdict for a key is the one that counts", UnderstandingFacts.verdicts(journal.readLines()).get("regular:" + key), "confirmed");
+        journal.append(UnderstandingFacts.JUDGED, UnderstandingFacts.judged("regular", key, UnderstandingFacts.REJECTED, ev), Arrays.asList());
+        journal.append(UnderstandingFacts.JUDGED, UnderstandingFacts.judged("many", key, UnderstandingFacts.CONFIRMED, new TreeMap<String, Long>()), Arrays.asList());
+        Map<String, String> v = UnderstandingFacts.verdicts(journal.readLines());
+        Harness.check("a later answer replaces an earlier one, and kinds are apart", v.get("regular:" + key).equals("rejected") && v.get("many:" + key).equals("confirmed") && v.size() == 2);
+        journal.append(UnderstandingFacts.JUDGED, UnderstandingFacts.judged("regular", key, UnderstandingFacts.CLEARED, ev), Arrays.asList());
+        Harness.equal("undo is a later answer", UnderstandingFacts.verdicts(journal.readLines()).get("regular:" + key), "cleared");
+        Harness.equal("a read records counts only", UnderstandingFacts.read(3, 1, 2).keySet().toString(), "[asked, capability, confirmed, rejected, version]");
+        Harness.equal("an answer records its numbers", UnderstandingFacts.judged("regular", key, "confirmed", ev).keySet().toString(), "[calls, capability, key, kind, months, verdict, version]");
+
+        Harness.suite("the capability's status");
+        Context[] c2 = new Context[1];
+        Journal[] j2 = new Journal[1];
+        box(c2, j2);
+        Capabilities.Status never = Capabilities.status(Capabilities.UNDERSTAND, j2[0].readLines());
+        Harness.check("never granted, never opened", never.state.startsWith("OFF") && never.lastDetail.equals("never opened"));
+        Map<String, Object> grant = Json.obj();
+        grant.put("capability", Capabilities.UNDERSTAND);
+        grant.put("tier", Capabilities.TIER_OBSERVE);
+        grant.put("by", "operator");
+        j2[0].append(PackageGrants.GRANTED, grant);
+        j2[0].append(UnderstandingFacts.READ, UnderstandingFacts.read(7, 2, 1));
+        Capabilities.Status used = Capabilities.status(Capabilities.UNDERSTAND, j2[0].readLines());
+        Harness.check("on, with what the last look came to", used.state.startsWith("ON") && used.lastDetail.equals("7 to confirm, 2 you said yes to, 1 you said no to, at the last look"));
+        Harness.check("it is Observe, switchable, uses nothing it was not given, and its words are fixed", Capabilities.byId(Capabilities.UNDERSTAND).tier.equals("Observe") && Capabilities.byId(Capabilities.UNDERSTAND).switchable
+            && Capabilities.UNDERSTAND_SAYS.contains("uses a source only if that source is on") && Capabilities.UNDERSTAND_SAYS.contains("Nothing is kept except your answer to each one; nothing leaves the phone"));
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("nothing here reads, sends or keeps anything it was not given");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String file : Arrays.asList("UnderstandingRules", "UnderstandingFacts", "Understanding", "UnderstandingAccess")) {
+            String text = source.get(file);
+            Harness.check(file + " makes no platform read, no network call and no log", !text.contains("ContentResolver") && !text.contains("ContactsContract") && !text.contains("CallLog") && !text.contains("java.net") && !text.contains("HttpURLConnection")
+                && !text.contains("Log.") && !text.contains("System.out") && !text.contains("getSharedPreferences") && !text.contains("startActivity"));
+            for (String api : Capabilities.READ_APIS) Harness.check(file + " does not use " + api, !text.contains(api));
+        }
+        String facts = source.get("UnderstandingFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the records take no number, name, address or word", !facts.contains("number") && !facts.contains("name") && !facts.contains("body") && !facts.replace("Attachments.address(", "").contains("address") && !facts.contains("email") && !facts.contains("phone"));
+        Harness.check("the rules look at counts and never at any item's words", !source.get("UnderstandingRules").contains("snippet") && !source.get("UnderstandingRules").contains("Recall.") && !source.get("Understanding").contains("snippet")
+            && !source.get("Understanding").contains(".body") && !source.get("Understanding").contains("Attachments"));
+        Harness.check("the rules import no Android class", !source.get("UnderstandingRules").contains("import android.") && !source.get("Understanding").contains("import android."));
+
+        String access = source.get("UnderstandingAccess");
+        int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");
+        Harness.check("the grant is recorded before the flag, and not twice", access.substring(grantAt, revokeAt).indexOf("record(journal, PackageGrants.GRANTED") < access.substring(grantAt, revokeAt).indexOf("\"rws\"")
+            && access.substring(grantAt, revokeAt).indexOf("if (granted(context)) return;") > 0 && access.substring(grantAt, revokeAt).indexOf("if (granted(context)) return;") < access.substring(grantAt, revokeAt).indexOf("record(journal, PackageGrants.GRANTED"));
+        Harness.check("a revocation removes the flag, then says so", access.substring(revokeAt, reconcileAt).contains("new File(context.getFilesDir(), FILE).delete();")
+            && access.substring(revokeAt, reconcileAt).indexOf(".delete()") < access.substring(revokeAt, reconcileAt).indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("after a restore a grant the phone does not exercise is recorded as withdrawn", access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.UNDERSTAND)") && access.substring(reconcileAt).contains("granted(context)) return;"));
+        Harness.check("Orb makes the history agree at start", source.get("Orb").contains("UnderstandingAccess.reconcile(this, journal)"));
+        Harness.check("What Orb may do can switch it off", source.get("MayDoActivity").contains("UnderstandingAccess.revoke(MayDoActivity.this, journal)") && source.get("MayDoActivity").contains("Switch off What Orb has noticed"));
+
+        String screen = source.get("PeopleActivity");
+        Harness.check("the contacts are still read only by the People screen", screen.contains("ContactsReader.read(context)")
+            && !source.get("Understanding").contains("ContactsReader") && !source.get("UnderstandingRules").contains("ContactsReader"));
+        int noticedAt = screen.indexOf("private void showNoticed(");
+        Harness.check("the screen is a mode of People, and asks before anything is computed", noticedAt > 0 && screen.contains("if (!UnderstandingAccess.granted(this)) {") && screen.indexOf("UnderstandingAccess.granted(this)") < screen.indexOf("Understanding.subjects("));
+        Harness.check("the call log is used only if Calls is on", screen.contains("CallsAccess.granted(context) ? CallsReader.read(context, now) : null") || screen.contains("CallsAccess.granted(context)"));
+        Harness.check("Cancel is the default on the card, and nothing is asked of Android", screen.contains("Turn on What Orb has noticed") && !screen.substring(screen.indexOf("private void confirmNoticed(")).substring(0, 1400).contains("requestPermissions"));
+        Harness.check("each answer is a recorded event citing what it rested on", screen.contains("UnderstandingFacts.judged(") && screen.contains("item.subject.evidenceIds"));
+    }
+}

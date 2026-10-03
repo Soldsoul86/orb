@@ -1,0 +1,72 @@
+package @PKG@;
+
+import android.content.Context;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * What using *What Orb has noticed* writes to the journal (`docs/UNDERSTANDING_PHONE.md` §4). Two records: that the screen was opened, with **counts**;
+ * and the person's **answer** to one statement — its kind, a blinded key for the subject, the verdict, and the numbers it rested on. **Never a name, a
+ * number, an address or a word.** The key is a keyed hash made with Orb's own secret, so it reveals nothing and cannot be reversed. The verdict that counts
+ * is the last event for a key, so a restore and a replay agree. The grant is a `PackageGrants` event written by `UnderstandingAccess`.
+ */
+final class UnderstandingFacts {
+    private UnderstandingFacts() {}
+
+    static final String READ = "orb.understand.read";
+    static final String JUDGED = "orb.understanding.judged";
+
+    static final String CONFIRMED = "confirmed";
+    static final String REJECTED = "rejected";
+    static final String CLEARED = "cleared";
+
+    static Map<String, Object> read(long asked, long confirmed, long rejected) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.UNDERSTAND);
+        p.put("version", Capabilities.UNDERSTAND_VERSION);
+        p.put("asked", asked);
+        p.put("confirmed", confirmed);
+        p.put("rejected", rejected);
+        return p;
+    }
+
+    static Map<String, Object> judged(String kind, String key, String verdict, Map<String, Long> evidence) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.UNDERSTAND);
+        p.put("version", Capabilities.UNDERSTAND_VERSION);
+        p.put("kind", kind);
+        p.put("key", key);
+        p.put("verdict", verdict);
+        for (Map.Entry<String, Long> e : evidence.entrySet()) p.put(e.getKey(), e.getValue());
+        return p;
+    }
+
+    /** The blinded key of one statement's subject. */
+    static UnderstandingRules.Keyer keyer(final Context context) {
+        return new UnderstandingRules.Keyer() {
+            @Override public String key(String kind, String subjectId) throws Exception {
+                return Attachments.address(context, "und:" + kind + ":" + subjectId).substring(0, 16);
+            }
+        };
+    }
+
+    private static final Pattern KIND = Pattern.compile("\"kind\":\"([a-z]+)\"");
+    private static final Pattern KEY = Pattern.compile("\"key\":\"([0-9a-f]{16})\"");
+    private static final Pattern VERDICT = Pattern.compile("\"verdict\":\"([a-z]+)\"");
+
+    /** `kind:key` → the last verdict recorded for it (`confirmed`, `rejected` or `cleared`). */
+    static Map<String, String> verdicts(List<String> lines) {
+        Map<String, String> out = new HashMap<>();
+        for (String line : lines) {
+            if (!JUDGED.equals(Journal.typeOf(line))) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0) continue;
+            Matcher kind = KIND.matcher(line), key = KEY.matcher(line), verdict = VERDICT.matcher(line);
+            if (kind.find(payload) && key.find(payload) && verdict.find(payload)) out.put(kind.group(1) + ":" + key.group(1), verdict.group(1));
+        }
+        return out;
+    }
+}
