@@ -1,0 +1,301 @@
+package @PKG@;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+/**
+ * The Messages source's rules (`docs/MESSAGES_PHONE.md`, DR-37): which messages count, how they are grouped, which months are kept, and what exactly is
+ * sealed. **Pure: no Android class.** The export is read by `MessagesXml` and handed here one message at a time; nothing is kept in memory beyond counts
+ * (pass 1) or the ticked conversations' messages (pass 2).
+ *
+ * **Conversations by number only.** A message from a name (`AX-HDFCBK`, a short code) is a service message — banks, offers, one-time codes — and is only
+ * counted. A message whose words look like a code (OTP, PIN, CVV, a password) is left out and counted, even from a number. **Months, closed ones only,
+ * the last twelve, in the phone's time zone:** a month's text never changes once it is over, so the same month from a later export is the same words.
+ */
+final class MessagesRules {
+    private MessagesRules() {}
+
+    static final int MONTHS = 12;
+    static final int MAX_ITEMS_PER_KEEP = 60;
+    static final int MAX_LISTED = 50;
+    static final int MAX_MESSAGES = 200_000;
+    static final long MAX_BYTES = 200L * 1024 * 1024;
+    static final int PREVIEW_CHARS = 120;
+
+    // The backup's own message kinds.
+    static final int RECEIVED = 1;
+    static final int SENT = 2;
+
+    /** One message as the export gave it. `number` is the sender's or recipient's number as People writes it, or null for a name or a short code. */
+    static final class Message {
+        final String address;
+        final String number;
+        final String name;
+        final long dateMs;
+        final int type;
+        final String body;
+
+        Message(String address, String name, long dateMs, int type, String body) {
+            this.address = address == null ? "" : address;
+            this.number = numberOf(this.address);
+            this.name = cleanName(name);
+            this.dateMs = dateMs;
+            this.type = type;
+            this.body = body == null ? "" : body;
+        }
+    }
+
+    static String numberOf(String address) {
+        return People.normalPhone(address);
+    }
+
+    private static String cleanName(String name) {
+        if (name == null) return "";
+        String n = name.replaceAll("\\s+", " ").trim();
+        return n.equalsIgnoreCase("(Unknown)") || n.equalsIgnoreCase("null") || n.equalsIgnoreCase("unknown") ? "" : n;
+    }
+
+    // Whole words, any case. A short fixed list, held by tests: a miss means a code in a sealed item the person ticked; a false hit means a message left out.
+    private static final Pattern CODE = Pattern.compile("(?i)(?<![\\p{L}\\p{N}])(?:otp|one[- ]time|verification code|security code|login code|pin|cvv|password|passcode)(?![\\p{L}\\p{N}])");
+
+    static boolean looksLikeCode(String body) {
+        return body != null && CODE.matcher(body).find();
+    }
+
+    /** The body on one line: new lines and runs of spaces become one space, control characters go. */
+    static String oneLine(String body) {
+        StringBuilder out = new StringBuilder(body.length());
+        for (int i = 0; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (c == '\n' || c == '\r' || c == '\t') out.append(' ');
+            else if (c >= ' ' && c != '\u007f' && !(c >= '\u0080' && c < '\u00a0')) out.append(c);
+        }
+        return out.toString().replaceAll(" {2,}", " ").trim();
+    }
+
+    static String preview(String body) {
+        String flat = oneLine(body);
+        if (flat.length() <= PREVIEW_CHARS) return flat;
+        String cut = flat.substring(0, PREVIEW_CHARS);
+        int space = cut.lastIndexOf(' ');
+        if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);
+        return cut + "\u2026";
+    }
+
+    // ---- months
+
+    /** `YYYY-MM` for a moment, in a zone. */
+    static String monthOf(long whenMs, TimeZone zone) {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM", Locale.ROOT);
+        f.setTimeZone(zone);
+        return f.format(new Date(whenMs));
+    }
+
+    /** The month `n` before a `YYYY-MM` month. */
+    static String minusMonths(String month, int n) {
+        int y = Integer.parseInt(month.substring(0, 4));
+        int m = Integer.parseInt(month.substring(5, 7)) - 1 - n;
+        y += Math.floorDiv(m, 12);
+        m = Math.floorMod(m, 12);
+        return String.format(Locale.ROOT, "%04d-%02d", y, m + 1);
+    }
+
+    /** A finished month within the last `MONTHS`: before this month, and no earlier than twelve months before it. */
+    static boolean inWindow(String month, String current) {
+        return month.compareTo(current) < 0 && month.compareTo(minusMonths(current, MONTHS)) >= 0;
+    }
+
+    /** *Sep 2026*. */
+    static String monthLabel(String month) {
+        SimpleDateFormat f = new SimpleDateFormat("MMM yyyy", Locale.ENGLISH);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f.format(new Date(java.time.LocalDate.of(Integer.parseInt(month.substring(0, 4)), Integer.parseInt(month.substring(5, 7)), 15)
+            .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()));
+    }
+
+    // ---- pass 1: what is in the file
+
+    static final class Conversation {
+        final String number;
+        String name = "";
+        long nameAt = -1L;
+        /** Messages that would be kept: from this number, not a code, in a finished month of the last twelve. */
+        int messages;
+        final Set<String> months = new TreeSet<>();
+        long first = Long.MAX_VALUE;
+        long last = -1L;
+        String snippet = "";
+
+        Conversation(String number) {
+            this.number = number;
+        }
+
+        String label() {
+            return number + (name.isEmpty() ? "" : " (" + name + ")");
+        }
+    }
+
+    /** Pass 1: counts per conversation, and what was left out. Holds no message body beyond a short snippet per conversation. */
+    static final class Survey implements MessagesXml.Sink {
+        final String current;
+        final Map<String, Conversation> by = new LinkedHashMap<>();
+        int total;
+        /** From a name or a short code: banks, offers, one-time codes. */
+        int service;
+        /** From a number, but the words look like a code. */
+        int codes;
+        /** From a number, in the unfinished month or older than twelve months. */
+        int outside;
+        /** Drafts, failed sends and other kinds. */
+        int other;
+        private final TimeZone zone;
+
+        Survey(long nowMs, TimeZone zone) {
+            this.zone = zone;
+            this.current = monthOf(nowMs, zone);
+        }
+
+        @Override public void message(Message m) {
+            total++;
+            if (m.type != RECEIVED && m.type != SENT) { other++; return; }
+            if (m.number == null) { service++; return; }
+            if (looksLikeCode(m.body)) { codes++; return; }
+            String month = monthOf(m.dateMs, zone);
+            if (!inWindow(month, current)) { outside++; return; }
+            Conversation c = by.get(m.number);
+            if (c == null) { c = new Conversation(m.number); by.put(m.number, c); }
+            c.messages++;
+            c.months.add(month);
+            if (m.dateMs < c.first) c.first = m.dateMs;
+            if (m.dateMs >= c.last) { c.last = m.dateMs; c.snippet = preview(m.body); }
+            if (!m.name.isEmpty() && m.dateMs >= c.nameAt) { c.name = m.name; c.nameAt = m.dateMs; }
+        }
+
+        /** The conversations, the most recent first (ties by number), at most `MAX_LISTED`. */
+        List<Conversation> listed() {
+            List<Conversation> all = new ArrayList<>(by.values());
+            Collections.sort(all, new Comparator<Conversation>() {
+                @Override public int compare(Conversation a, Conversation b) {
+                    if (a.last != b.last) return a.last > b.last ? -1 : 1;
+                    return a.number.compareTo(b.number);
+                }
+            });
+            return all.size() > MAX_LISTED ? new ArrayList<>(all.subList(0, MAX_LISTED)) : all;
+        }
+
+        int leftOutConversations() {
+            return Math.max(0, by.size() - MAX_LISTED);
+        }
+    }
+
+    // ---- pass 2: what is kept
+
+    /** Pass 2: the messages of the ticked conversations, by number and finished month, in the order the file gave them. */
+    static final class Harvest implements MessagesXml.Sink {
+        final Set<String> numbers;
+        final String current;
+        final Map<String, TreeMap<String, List<Message>>> byNumber = new LinkedHashMap<>();
+        private final TimeZone zone;
+
+        Harvest(Set<String> numbers, long nowMs, TimeZone zone) {
+            this.numbers = new HashSet<>(numbers);
+            this.zone = zone;
+            this.current = monthOf(nowMs, zone);
+        }
+
+        @Override public void message(Message m) {
+            if ((m.type != RECEIVED && m.type != SENT) || m.number == null || !numbers.contains(m.number) || looksLikeCode(m.body)) return;
+            String month = monthOf(m.dateMs, zone);
+            if (!inWindow(month, current)) return;
+            TreeMap<String, List<Message>> months = byNumber.get(m.number);
+            if (months == null) { months = new TreeMap<>(); byNumber.put(m.number, months); }
+            List<Message> list = months.get(month);
+            if (list == null) { list = new ArrayList<>(); months.put(month, list); }
+            list.add(m);
+        }
+    }
+
+    /** One item to seal: a conversation's finished month. */
+    static final class Chunk {
+        final String number;
+        final String month;
+        final String text;
+
+        Chunk(String number, String month, String text) {
+            this.number = number;
+            this.month = month;
+            this.text = text;
+        }
+    }
+
+    /**
+     * The words that are sealed for one conversation-month: a header naming the number (and the name the backup wrote), then each message on its own line
+     * with its own time, oldest first. The number is in every line **on purpose** — it is what ties the item to the person. Times are in the person's zone,
+     * in English, so the same month always seals to the same words.
+     */
+    static String chunkText(String number, String name, String month, List<Message> messages, TimeZone zone) {
+        List<Message> sorted = new ArrayList<>(messages);
+        Collections.sort(sorted, new Comparator<Message>() {
+            @Override public int compare(Message a, Message b) { return Long.compare(a.dateMs, b.dateMs); }
+        });
+        SimpleDateFormat stamp = new SimpleDateFormat("d MMM yyyy HH:mm", Locale.ENGLISH);
+        stamp.setTimeZone(zone);
+        StringBuilder out = new StringBuilder("Messages with ").append(number).append(name.isEmpty() ? "" : " (" + name + ")").append(" \u2014 ").append(monthLabel(month)).append('\n');
+        for (Message m : sorted) {
+            String line = oneLine(m.body);
+            if (line.isEmpty()) continue;
+            out.append('[').append(stamp.format(new Date(m.dateMs))).append("] ")
+                .append(m.type == SENT ? "you to " : "").append(number).append(": ").append(line).append('\n');
+        }
+        String text = out.toString().trim();
+        return text.length() > DocumentsRules.MAX_TEXT_CHARS ? text.substring(0, DocumentsRules.MAX_TEXT_CHARS) : text;
+    }
+
+    /** The name a conversation's header carries: the latest the backup wrote in these messages. */
+    static String latestName(List<Message> messages) {
+        String name = "";
+        long at = -1L;
+        for (Message m : messages) if (!m.name.isEmpty() && m.dateMs >= at) { name = m.name; at = m.dateMs; }
+        return name;
+    }
+
+    /** The chunks of a harvest, the newest month first, then by number. */
+    static List<Chunk> chunks(Harvest harvest, TimeZone zone) {
+        List<Chunk> out = new ArrayList<>();
+        for (Map.Entry<String, TreeMap<String, List<Message>>> conversation : harvest.byNumber.entrySet()) {
+            for (Map.Entry<String, List<Message>> month : conversation.getValue().entrySet()) {
+                out.add(new Chunk(conversation.getKey(), month.getKey(), chunkText(conversation.getKey(), latestName(month.getValue()), month.getKey(), month.getValue(), zone)));
+            }
+        }
+        Collections.sort(out, new Comparator<Chunk>() {
+            @Override public int compare(Chunk a, Chunk b) {
+                int byMonth = b.month.compareTo(a.month);
+                return byMonth != 0 ? byMonth : a.number.compareTo(b.number);
+            }
+        });
+        return out;
+    }
+
+    /** *+91… (name) · 12 messages · Sep 2026 to Mar 2027 · up to 7 items* — the row above a conversation. */
+    static String rowLabel(Conversation c, TimeZone zone) {
+        SimpleDateFormat f = new SimpleDateFormat("MMM yyyy", Locale.ENGLISH);
+        f.setTimeZone(zone);
+        String from = f.format(new Date(c.first));
+        String to = f.format(new Date(c.last));
+        return c.label() + "\n" + c.messages + (c.messages == 1 ? " message" : " messages") + " \u00b7 " + (from.equals(to) ? from : from + " to " + to)
+            + " \u00b7 up to " + c.months.size() + (c.months.size() == 1 ? " item" : " items");
+    }
+}

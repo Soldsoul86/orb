@@ -36,6 +36,7 @@ import java.util.Locale;
 public final class SourcesActivity extends Activity {
     private static final int PICK_FOLDER = 1;
     private static final int PICK_FILES = 2;
+    private static final int PICK_MESSAGES = 3;
 
     private LinearLayout list;
     /** The files of the current look, with the controls that show them; memory only. */
@@ -114,6 +115,12 @@ public final class SourcesActivity extends Activity {
             list.addView(text("journal unavailable", 13, false));
             return;
         }
+        documents(journal);
+        messages(journal);
+    }
+
+    /** The PDF source's section (`SOURCES_PHONE.md`). */
+    private void documents(final Journal journal) {
         list.addView(text("PDF files", 15, true));
         if (!DocumentsAccess.granted(this)) {
             list.addView(text("Orb can read the PDFs you point it at \u2014 invoices, tickets, letters \u2014 so that what is in them can be found, "
@@ -176,6 +183,13 @@ public final class SourcesActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_MESSAGES) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && journal() != null && MessagesAccess.granted(this)) {
+                messagesFile = data.getData();
+                lookMessages = true;
+            }
+            return;
+        }
         if (resultCode != RESULT_OK || data == null) return;
         Journal journal = journal();
         if (journal == null || !DocumentsAccess.granted(this)) return;
@@ -339,6 +353,201 @@ public final class SourcesActivity extends Activity {
                             show(tickedViews.get(i), after.get(i));
                         }
                         if (summary != null) summary.setText("Kept " + kept + " of " + ticked.size() + ". Find the words in Recall.");
+                    }
+                });
+            }
+        }).start();
+    }
+
+    // ---- text messages, from a backup file the person makes and picks (`docs/MESSAGES_PHONE.md`)
+
+    /** The file just picked; memory only, and Android's grant for it lasts only as long as this screen. */
+    private Uri messagesFile;
+    private boolean lookMessages;
+    private LinearLayout messageResults;
+    private MessagesFlow.Look messagesLook;
+    private final List<CheckBox> messageBoxes = new ArrayList<>();
+    private final List<MessagesRules.Conversation> messageRows = new ArrayList<>();
+    private TextView tally;
+
+    private void messages(final Journal journal) {
+        list.addView(text("Text messages", 15, true));
+        if (!MessagesAccess.granted(this)) {
+            list.addView(text("Android and Google do not let an app installed like Orb read your texts directly, and Orb will not ask. But a free backup app "
+                + "from the Play Store can write your messages to a file, and Orb can read that file the way it reads a PDF: you pick it, you see the "
+                + "conversations, and only the ones you tick are kept \u2014 as words, sealed, tied to the right person by their number.", 13, false));
+            list.addView(text("Bank and one-time-code messages are left out and only counted. Only finished months are kept. The backup file holds every message "
+                + "in the clear, so delete it when you are done: Orb never makes or deletes it.", 12, false));
+            list.addView(button("Turn on text messages", new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    try {
+                        MessagesAccess.grant(SourcesActivity.this, journal);
+                    } catch (IOException notRecorded) {
+                        message("Orb could not record this, so it turned nothing on.");
+                        return;
+                    }
+                    render();
+                }
+            }));
+            return;
+        }
+        list.addView(text("On. Pick the backup file (XML) your backup app made.", 13, false));
+        list.addView(button("Pick the backup file", new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("*/*");
+                startActivityForResult(pick, PICK_MESSAGES);
+            }
+        }));
+        list.addView(button("Switch off text messages", new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                MessagesAccess.revoke(SourcesActivity.this, journal);
+                messagesFile = null;
+                messagesLook = null;
+                render();
+            }
+        }));
+        messageResults = new LinearLayout(this);
+        messageResults.setOrientation(LinearLayout.VERTICAL);
+        list.addView(messageResults);
+        if (lookMessages && messagesFile != null) {
+            lookMessages = false;
+            startMessagesLook(messagesFile);
+        }
+    }
+
+    private void startMessagesLook(final Uri file) {
+        messageResults.removeAllViews();
+        messageBoxes.clear();
+        messageRows.clear();
+        messageResults.addView(text("Reading the file\u2026 this can take a little while for a big one.", 13, false));
+        looking = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                long size = MessagesReader.sizeOf(SourcesActivity.this, file);
+                MessagesFlow.Look result = null;
+                String failure = null;
+                if (size > MessagesRules.MAX_BYTES) {
+                    failure = "That file is over 200 MB, which Orb will not read.";
+                } else {
+                    try {
+                        result = MessagesFlow.look(new MessagesReader(SourcesActivity.this, file), System.currentTimeMillis(), java.util.TimeZone.getDefault());
+                    } catch (Exception unreadable) {
+                        failure = "Orb could not read that file (" + unreadable.getClass().getSimpleName() + ").";
+                    }
+                }
+                final MessagesFlow.Look found = result;
+                final String why = failure;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { showMessagesLook(found, why); }
+                });
+            }
+        }).start();
+    }
+
+    private void showMessagesLook(MessagesFlow.Look found, String failure) {
+        looking = false;
+        if (messageResults == null) return;
+        messageResults.removeAllViews();
+        Journal journal = journal();
+        if (found == null) {
+            messageResults.addView(text(failure, 13, true));
+            return;
+        }
+        MessagesRules.Survey survey = found.survey;
+        if (journal != null) journal.append(MessagesFacts.LOOKED_TYPE, MessagesFacts.looked(survey.by.size(), survey.total, found.leftOut()));
+        if (!found.recognition.recognised()) {
+            messageResults.addView(text(found.recognition.describe(), 13, true));
+            return;
+        }
+        messagesLook = found;
+        List<MessagesRules.Conversation> rows = survey.listed();
+        messageResults.addView(text(survey.by.size() + (survey.by.size() == 1 ? " conversation" : " conversations") + " can be kept"
+            + (survey.leftOutConversations() > 0 ? " (the " + MessagesRules.MAX_LISTED + " most recent are listed)" : "") + ".", 13, true));
+        messageResults.addView(text("Left out, and only counted: " + survey.service + " from names or short codes (banks, offers, codes) \u00b7 " + survey.codes
+            + " that look like codes \u00b7 " + survey.outside + " from this month or older than a year \u00b7 " + survey.other + " drafts or other kinds."
+            + (found.recognition.cut ? " The file is longer than " + MessagesRules.MAX_MESSAGES + " messages; Orb read the first " + MessagesRules.MAX_MESSAGES + "." : ""), 11, false));
+        final java.util.TimeZone zone = java.util.TimeZone.getDefault();
+        for (MessagesRules.Conversation c : rows) {
+            CheckBox box = new CheckBox(this);
+            box.setText(MessagesRules.rowLabel(c, zone));
+            box.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
+                @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean checked) { updateTally(); }
+            });
+            messageResults.addView(box);
+            messageResults.addView(text("Last: " + c.snippet, 12, false));
+            messageBoxes.add(box);
+            messageRows.add(c);
+        }
+        tally = text("", 12, true);
+        messageResults.addView(tally);
+        updateTally();
+        if (!rows.isEmpty()) {
+            messageResults.addView(button("Keep the ticked ones", new View.OnClickListener() {
+                @Override public void onClick(View view) { keepMessages(); }
+            }));
+        }
+        messageResults.addView(text("Only the words are kept, sealed on this phone, one item per finished month. Delete the backup file when you are done.", 11, false));
+    }
+
+    /** *3 conversations ticked \u2014 up to 14 items (at most 60 per Keep). Orb holds 312 kept items; its screens read the newest 500.* */
+    private void updateTally() {
+        if (tally == null) return;
+        int ticked = 0;
+        int items = 0;
+        for (int i = 0; i < messageBoxes.size(); i++) {
+            if (messageBoxes.get(i).isChecked()) {
+                ticked++;
+                items += messageRows.get(i).months.size();
+            }
+        }
+        Journal journal = journal();
+        int held = 0;
+        try {
+            if (journal != null) held = MessagesFlow.heldItems(journal.readLines());
+        } catch (IOException unreadable) {
+            held = -1;
+        }
+        String hold = held < 0 ? "" : " Orb holds " + held + " kept items" + (held + Math.min(items, MessagesRules.MAX_ITEMS_PER_KEEP) > Recall.SCAN_LIMIT - 100
+            ? " and its screens read only the newest " + Recall.SCAN_LIMIT + " \u2014 this may push older ones out of view." : "; its screens read the newest " + Recall.SCAN_LIMIT + ".");
+        tally.setText(ticked + (ticked == 1 ? " conversation ticked" : " conversations ticked") + " \u2014 up to " + items + (items == 1 ? " item" : " items")
+            + " (at most " + MessagesRules.MAX_ITEMS_PER_KEEP + " per Keep)." + hold);
+    }
+
+    private void keepMessages() {
+        final java.util.Set<String> numbers = new java.util.HashSet<>();
+        for (int i = 0; i < messageBoxes.size(); i++) if (messageBoxes.get(i).isChecked()) numbers.add(messageRows.get(i).number);
+        if (numbers.isEmpty()) {
+            message("Nothing is ticked, so nothing was kept.");
+            return;
+        }
+        final Journal journal = journal();
+        final Uri file = messagesFile;
+        if (journal == null || file == null) return;
+        looking = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                MessagesFlow.Kept kept = null;
+                String failure = null;
+                try {
+                    kept = MessagesFlow.keep(SourcesActivity.this, journal, new MessagesReader(SourcesActivity.this, file), numbers, System.currentTimeMillis(),
+                        java.util.TimeZone.getDefault(), SystemClock.elapsedRealtime());
+                } catch (Exception unreadable) {
+                    failure = "Orb could not keep these (" + unreadable.getClass().getSimpleName() + ").";
+                }
+                final MessagesFlow.Kept done = kept;
+                final String why = failure;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        looking = false;
+                        if (done != null) journal.append(MessagesFacts.KEPT_TYPE, MessagesFacts.kept(done.kept));
+                        if (messageResults == null) return;
+                        String said = done == null ? why : "Kept " + done.kept + (done.kept == 1 ? " month" : " months") + ". Already in Orb: " + done.held
+                            + " \u00b7 an earlier version of the month is already in Orb: " + done.earlier + " \u00b7 erased before, not kept again: " + done.erased
+                            + (done.capped > 0 ? " \u00b7 not kept, over the " + MessagesRules.MAX_ITEMS_PER_KEEP + " per Keep: " + done.capped : "")
+                            + ". Find them in Recall. Delete the backup file now.";
+                        messageResults.addView(text(said, 13, true));
                     }
                 });
             }

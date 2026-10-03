@@ -799,6 +799,24 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-32 — what the Messages source does not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-37). Debts, stated.
+
+1. **The file's shape is a guess until a real one is read.** The reader is written to the common *SMS Backup & Restore* XML. Another app's XML, a JSON backup, or a newer version of that app may not be recognised; the screen then says the tag and attribute names it found (never a value).
+2. **The export is every message in the clear, in Downloads.** Orb cannot delete it for the person and says so. Until it is deleted it is readable by anything with storage access.
+3. **A third-party backup app needs the SMS permission itself.** Orb names none as endorsed; the person chooses whom to trust.
+4. **No index and a 500-item window.** A year of many conversations is many items; screens read the newest 500, so old PDFs and shares can fall out of view of People and Coming up. The tally says so; an index is a design of its own (and must be proven against erasure).
+5. **Codes are matched by a short English word list.** A code worded another way (or in another language) can be sealed in an item the person ticked — erasable, never sent. Service senders, where most codes come from, are not offered at all, so bank messages are not kept by this slice.
+6. **Months are in the phone's current time zone,** so travelling or changing zone can move a message across a month boundary and change a month's words (an *earlier version*, not kept again).
+7. **A number with no country code** is read as an Indian number by People's rules; the same person's two spellings can appear as two conversations.
+8. **No relative-day guesses** from messages: *Friday* in a text is not read, though the message's own day would make it exact. A later step.
+9. **One conversation is one number.** Group messages (MMS) and conversations with several numbers are not read.
+10. **Looking reads the whole file once; keeping reads it again.** A large export takes a while (it is streamed and capped at 200 MB and 200,000 messages), and the second pass is the price of holding almost nothing in memory.
+11. **Not testable off the phone:** the real file, the picker's grant for a large file, and how the screens feel with hundreds of items.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

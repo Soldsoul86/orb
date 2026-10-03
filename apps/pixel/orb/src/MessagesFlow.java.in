@@ -1,0 +1,115 @@
+package @PKG@;
+
+import android.content.Context;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+
+/**
+ * Looking at an export and keeping what is ticked — the part of the Messages source that touches no Android API beyond a `Context` for the sealed
+ * store, so it runs off the phone with a source the test supplies (`docs/MESSAGES_PHONE.md`).
+ *
+ * **Looking keeps nothing**: one streamed pass counts conversations and what was left out. **Keeping** streams the file again, collects only the ticked
+ * conversations' messages, and seals each finished month as one text exactly as a shared text is sealed, recorded with a blinded key and the month.
+ * A month already held, erased, or present in an earlier version is not written again.
+ */
+final class MessagesFlow {
+    private MessagesFlow() {}
+
+    /** Where the messages come from: streams the export to a sink. May throw. */
+    interface Source {
+        MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception;
+    }
+
+    static final class Look {
+        final MessagesXml.Recognition recognition;
+        final MessagesRules.Survey survey;
+
+        Look(MessagesXml.Recognition recognition, MessagesRules.Survey survey) {
+            this.recognition = recognition;
+            this.survey = survey;
+        }
+
+        /** Messages not offered for keeping: names and short codes, code-like words, the unfinished or older months, other kinds. */
+        int leftOut() {
+            return survey.service + survey.codes + survey.outside + survey.other;
+        }
+    }
+
+    /** Pass 1. Keeps nothing but counts and a short snippet per conversation. */
+    static Look look(Source source, long nowMs, TimeZone zone) throws Exception {
+        MessagesRules.Survey survey = new MessagesRules.Survey(nowMs, zone);
+        MessagesXml.Recognition recognition = source.stream(survey);
+        return new Look(recognition, survey);
+    }
+
+    static final class Kept {
+        int kept;
+        /** The same words were already held. */
+        int held;
+        /** An earlier version of this month (fewer messages) is already kept. */
+        int earlier;
+        /** These exact words were erased before. */
+        int erased;
+        /** More than `MAX_ITEMS_PER_KEEP` new months: the rest were not kept. */
+        int capped;
+    }
+
+    /** The blinded key for a conversation-month: a keyed hash made with Orb's own secret, so it reveals nothing and cannot be reversed. */
+    static String key(Context context, String number, String month) throws Exception {
+        return Attachments.address(context, "msgconv:" + number + ":" + month).substring(0, 16);
+    }
+
+    /** Pass 2 and the keep. */
+    static Kept keep(Context context, Journal journal, Source source, Set<String> numbers, long nowMs, TimeZone zone, long elapsedRealtimeMs) throws Exception {
+        MessagesRules.Harvest harvest = new MessagesRules.Harvest(numbers, nowMs, zone);
+        source.stream(harvest);
+        Kept result = new Kept();
+        Set<String> live = MessagesFacts.liveKeys(journal.readLines());
+        for (MessagesRules.Chunk chunk : MessagesRules.chunks(harvest, zone)) {
+            String identity = Attachments.identity(SharedText.document(chunk.text));
+            String state = Attachments.state(context, identity);
+            String key = key(context, chunk.number, chunk.month);
+            if (Attachments.HELD_STATE.equals(state)) { result.held++; continue; }
+            if (Attachments.DESTROYED_STATE.equals(state)) { result.erased++; continue; }
+            if (live.contains(key)) { result.earlier++; continue; }
+            if (result.kept >= MessagesRules.MAX_ITEMS_PER_KEEP) { result.capped++; continue; }
+            try {
+                Attachments.Stored stored = SharedText.seal(context, chunk.text, null);
+                if (!"stored".equals(stored.outcome)) continue;
+                Map<String, Object> payload = MessagesFacts.payload(chunk.text.length(), key, chunk.month);
+                payload.put("elapsedRealtimeMs", elapsedRealtimeMs);
+                if (SharedText.record(journal, context, payload, stored, null) != null) {
+                    result.kept++;
+                    live.add(key);
+                }
+            } catch (Exception skipped) {
+                // One month that cannot be sealed does not stop the others, and nothing is claimed for it.
+            }
+        }
+        if (result.kept > 0) Observe.run(journal);
+        return result;
+    }
+
+    /** The items Orb holds that the screens will read (live shared texts and remembered screens), for the "you will hold N" line. */
+    static int heldItems(List<String> lines) {
+        int n = 0;
+        for (Erasure.Item item : Erasure.items(lines)) if (!item.erased) n++;
+        return n;
+    }
+
+    /** A source that streams nothing — for tests of the empty case. */
+    static Source empty() {
+        return new Source() {
+            @Override public MessagesXml.Recognition stream(MessagesXml.Sink sink) {
+                return new MessagesXml.Recognition();
+            }
+        };
+    }
+
+    static List<String> noNumbers() {
+        return Collections.emptyList();
+    }
+}

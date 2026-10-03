@@ -1,0 +1,124 @@
+package @PKG@;
+
+import java.io.InputStream;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
+
+/**
+ * Reads a message-backup export (the XML a backup app such as *SMS Backup & Restore* writes) as a **stream**, handing each message to a sink
+ * and keeping nothing (`docs/MESSAGES_PHONE.md` §7). It uses the platform's own SAX parser, so it runs off the phone as it does on it.
+ *
+ * **It reads five attributes of an `<sms>` element and no others** — `address`, `date`, `type`, `body`, `contact_name` — and ignores `<mms>` and
+ * everything else. External entities are never fetched. It stops at `max` messages. If the file is not what it expects it says only the **names**
+ * of the tags and attributes it found, never a value, so a file that is not understood can be described without anyone pasting a message.
+ */
+final class MessagesXml {
+    private MessagesXml() {}
+
+    interface Sink {
+        void message(MessagesRules.Message message);
+    }
+
+    /** What was found, in names and counts only. */
+    static final class Recognition {
+        /** The root tag, the first child's tag and that child's attribute names — names, never values. */
+        String root = "";
+        String child = "";
+        final List<String> attributes = new ArrayList<>();
+        int messages;
+        /** Reading stopped at the cap: there may be more in the file. */
+        boolean cut;
+
+        boolean recognised() {
+            return "smses".equals(root) && messages > 0;
+        }
+
+        /** *Not recognised. Found: <x> → <y> with attributes: a, b (names only).* */
+        String describe() {
+            if (root.isEmpty()) return "Not recognised: the file is not XML Orb could read.";
+            return "Not recognised. Found <" + root + ">" + (child.isEmpty() ? "" : " \u2192 <" + child + ">" + (attributes.isEmpty() ? "" : " with attributes: " + String.join(", ", attributes)))
+                + " (names only; Orb expects <smses> \u2192 <sms> with address, date, type, body).";
+        }
+    }
+
+    private static final class Stop extends SAXException {
+        Stop() {
+            super("cap");
+        }
+    }
+
+    /** Streams `in`, offering each `<sms>` to the sink. Throws if the XML is broken before anything useful was read. */
+    static Recognition parse(InputStream in, final Sink sink, final int max) throws Exception {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setNamespaceAware(false);
+        try {
+            factory.setFeature("http://javax.xml.XMLConstants/feature/secure-processing", true);
+        } catch (Exception notSupported) {
+            // The entity resolver below is the guard that matters.
+        }
+        SAXParser parser = factory.newSAXParser();
+        XMLReader reader = parser.getXMLReader();
+        reader.setEntityResolver(new EntityResolver() {
+            @Override public InputSource resolveEntity(String publicId, String systemId) {
+                return new InputSource(new StringReader(""));   // nothing external is ever fetched
+            }
+        });
+        final Recognition found = new Recognition();
+        DefaultHandler handler = new DefaultHandler() {
+            private int depth;
+
+            @Override public void startElement(String uri, String local, String qName, Attributes attrs) throws SAXException {
+                if (depth == 0) {
+                    found.root = qName;
+                } else if (depth == 1) {
+                    if (found.child.isEmpty()) {
+                        found.child = qName;
+                        for (int i = 0; i < attrs.getLength(); i++) found.attributes.add(attrs.getQName(i));
+                    }
+                    if ("sms".equals(qName)) {
+                        String address = attrs.getValue("address");
+                        String date = attrs.getValue("date");
+                        if (address != null && date != null) {
+                            long when;
+                            int type;
+                            try {
+                                when = Long.parseLong(date.trim());
+                                type = attrs.getValue("type") == null ? 0 : Integer.parseInt(attrs.getValue("type").trim());
+                            } catch (NumberFormatException skip) {
+                                depth++;
+                                return;
+                            }
+                            found.messages++;
+                            sink.message(new MessagesRules.Message(address, attrs.getValue("contact_name"), when, type, attrs.getValue("body")));
+                            if (found.messages >= max) {
+                                found.cut = true;
+                                throw new Stop();
+                            }
+                        }
+                    }
+                }
+                depth++;
+            }
+
+            @Override public void endElement(String uri, String local, String qName) {
+                depth--;
+            }
+        };
+        reader.setContentHandler(handler);
+        try {
+            reader.parse(new InputSource(in));
+        } catch (Stop capped) {
+            // Reading stopped at the cap, on purpose.
+        }
+        return found;
+    }
+}

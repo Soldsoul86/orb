@@ -58,7 +58,8 @@ final class DocumentsFacts {
     static java.util.Set<String> documentHashes(java.util.List<String> lines) {
         java.util.Set<String> out = new java.util.HashSet<>();
         for (String line : lines) {
-            if (!Shares.TYPE.equals(Journal.typeOf(line)) || !line.contains("\"referrer\":\"" + REFERRER + "\"")) continue;
+            if (!Shares.TYPE.equals(Journal.typeOf(line))
+                || !(line.contains("\"referrer\":\"" + REFERRER + "\"") || line.contains("\"referrer\":\"" + MessagesFacts.PREFIX))) continue;
             String hash = Erasure.envelopeHash(line);
             if (hash != null) out.add(hash);
         }
@@ -67,6 +68,7 @@ final class DocumentsFacts {
 
     /** The person-facing name of where kept words came from, or null when the referrer is not a source. */
     static String fromLabel(String referrer) {
-        return REFERRER.equals(referrer) ? "a PDF you chose" : null;
+        if (REFERRER.equals(referrer)) return "a PDF you chose";
+        return MessagesFacts.fromLabel(referrer);
     }
 }

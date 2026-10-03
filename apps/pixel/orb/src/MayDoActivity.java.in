@@ -118,6 +118,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.MESSAGES)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.MESSAGES);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is granted, so no control is offered on a guess.
+            }
+            final boolean messagesOn = known;
+            b.setText(messagesOn ? "Switch off the Messages source" : "Turn on (opens Sources)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (messagesOn) {
+                        MessagesAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, SourcesActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Capabilities.CALLS)) {
             if (!CallsAccess.available(this)) {
                 b.setText("Not in this build of Orb");

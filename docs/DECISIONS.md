@@ -1373,6 +1373,20 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** keeping or listing any call; calls in the commitment card, Today or the nudge; other apps' calls; SMS (closed by permission; see `MESSAGES_PHONE.md`).
 
+## DR-37 — Messages: from a backup file you make, read as PDFs are; no SMS permission, ever
+
+- **Status:** Decided and built · **Decided:** 2026-10-03, operator ("Sms second idea is good, design for calls and the sms as well", then "Yes, go ahead with the messages build" on `MESSAGES_PHONE.md`) · **Bears on:** DR-33 (Sources), DR-34 (documents in Coming up), the SMS probe (`DEVICE_LOOP.md` §7b83)
+
+**The ruling.** Orb **never holds an SMS permission**: Play Protect blocks an app declaring `READ_SMS` on the operator's phone with no override (§7b83). Messages reach Orb two ways, neither needing a permission: **what the person shares** (already built), and **a message-backup export file** (the XML a Play Store backup app writes to Downloads) **that Orb reads through Android's file picker**, as it reads PDFs. The person turns the source on (a recorded decision), picks the file, sees the conversations, and **only the ticked ones are kept**.
+
+**What is read and kept.** Conversations **by number only**; **service senders (names, short codes) and code-like messages (OTP, PIN, CVV, a password…) are left out and only counted**; **only finished months of the last twelve, in the phone's time zone**. A kept month is **one sealed text** (each message on a line with its own time and the number), recorded as an `orb.shared` with a `referrer` carrying a **blinded key and the month** — so the same month from a later export is recognised by its words, and a month that comes back different is **not kept again** (an earlier version is already there). At most **60 items per Keep**, with the count shown before and Orb's 500-item reading window stated. **Records are counts only**; nothing is recorded about unticked conversations; the export file is neither made nor deleted by Orb, and the screen says to delete it.
+
+**No index now.** The screens still read the newest 500 kept items each time. An index is a derived copy that must be kept in step with erasure (DR-19), so it waits for evidence: the first device round says how the screens feel with hundreds of message items, and an index gets its own design only if they are slow or the window bites.
+
+**Message months are read by the document rules** (DR-34): written dates only, with their message, deadlines first, the rest folded; the number in each line ties the month to the person by number.
+
+**Not in this ruling:** MMS and group chats; formats other than the common backup XML (an unrecognised file is described by tag and attribute **names** only); the current month; bank/service senders; relative-day guesses from a message's own day; an index; deleting the export.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

@@ -1,0 +1,93 @@
+package @PKG@;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * What the Messages source writes to the journal (`docs/MESSAGES_PHONE.md` §3, §5): that a file was looked at and how many conversations and messages
+ * it held, that some were kept. **Counts only — never a number, a name, a word of any message, or the file's name.** A kept month is the same
+ * `orb.shared` record a shared text or a document is, with a `referrer` that names where it came from and the **blinded key and month** it covers —
+ * the key is a keyed hash of *(conversation, month)* made with Orb's own secret, so it says nothing to anyone else and lets Orb notice the same month
+ * arriving again with different words.
+ */
+final class MessagesFacts {
+    private MessagesFacts() {}
+
+    /** The documents and messages sources share these two event types; the payload's `source` says which. */
+    static final String LOOKED_TYPE = "orb.source.looked";
+    static final String KEPT_TYPE = "orb.source.kept";
+
+    static final String SOURCE = "messages";
+    static final String ACTION = "orb.source.messages";
+    static final String MIME = "text/xml";
+    static final String PREFIX = "orb-source://messages/";
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.MESSAGES);
+        p.put("version", Capabilities.MESSAGES_VERSION);
+        p.put("source", SOURCE);
+        return p;
+    }
+
+    /** A look at a file: conversations and messages found, and how many messages were left out (names, codes, the unfinished month, older, other kinds). */
+    static Map<String, Object> looked(long conversations, long messages, long leftOut) {
+        Map<String, Object> p = base();
+        p.put("conversations", conversations);
+        p.put("messages", messages);
+        p.put("leftOut", leftOut);
+        return p;
+    }
+
+    static Map<String, Object> kept(long kept) {
+        Map<String, Object> p = base();
+        p.put("kept", kept);
+        return p;
+    }
+
+    static String referrer(String key, String month) {
+        return PREFIX + key + "/" + month;
+    }
+
+    /** The share record for one kept month: where it is from and how many characters. No number, name or word. */
+    static Map<String, Object> payload(long textChars, String key, String month) {
+        Map<String, Object> p = Shares.declaredText(ACTION, MIME, referrer(key, month), textChars);
+        return p;
+    }
+
+    static boolean isMessages(String referrer) {
+        return referrer != null && referrer.startsWith(PREFIX);
+    }
+
+    /** The key of a message item's referrer, or null. */
+    static String keyOf(String referrer) {
+        if (!isMessages(referrer)) return null;
+        String rest = referrer.substring(PREFIX.length());
+        int slash = rest.indexOf('/');
+        return slash > 0 ? rest.substring(0, slash) : null;
+    }
+
+    /** The keys of the message items still kept (not erased) — read from the clear records, nothing is opened. */
+    static Set<String> liveKeys(List<String> lines) {
+        Set<String> erased = Erasure.erasedHashes(lines);
+        Set<String> out = new HashSet<>();
+        for (String line : lines) {
+            if (!Shares.TYPE.equals(Journal.typeOf(line))) continue;
+            int at = line.indexOf("\"referrer\":\"" + PREFIX);
+            if (at < 0) continue;
+            int start = at + "\"referrer\":\"".length();
+            int end = line.indexOf('"', start);
+            if (end < 0) continue;
+            String key = keyOf(line.substring(start, end));
+            String hash = Erasure.envelopeHash(line);
+            if (key != null && hash != null && !erased.contains(hash)) out.add(key);
+        }
+        return out;
+    }
+
+    static String fromLabel(String referrer) {
+        return isMessages(referrer) ? "a message backup you chose" : null;
+    }
+}

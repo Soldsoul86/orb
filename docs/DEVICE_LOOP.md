@@ -7297,3 +7297,52 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 #### Round 2 (v47, the calls build again)
 
 Same install and steps as above (install over v46 or v45; **Show when we last spoke** is already on after v46's grant — open a person with a saved number who you have called). New in v47: the sort order is a column and a direction only; the cap is applied while reading; a failed read names its kind. **If the line still says it could not be read, copy the words in the brackets** — they are the answer. P259–P263 are unchanged.
+
+### 7b85. Messages — from a backup file you make (DR-37) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v48-messages.apk` — also the **calls build** (it declares `READ_CALL_LOG`, as v46/v47 did; nothing about messages needs a permission). v47 is the verified calls build. Design: `docs/MESSAGES_PHONE.md` (§12 as built); decision `DECISIONS.md` DR-37; limits `ARCHITECTURAL_DEBT.md` AD-32.
+
+**Why:** your conversations hold what people promised and asked for. Android and Google do not let Orb read texts directly (§7b83), and Orb will not ask. A free backup app can write them to a file; Orb reads **that file** as it reads a PDF: you pick it, see the conversations, tick the ones you want, and only those are kept — sealed, tied to the right person by number, with their dates in Coming up.
+
+#### What changed
+
+1. **Sources** gains **Text messages**: off until you turn it on (**Turn on text messages**, a recorded decision). **No Android permission, no manifest change.**
+2. **Pick the backup file** (the XML your backup app wrote). Orb reads it **once**, as a stream, and lists up to **50 conversations by number** — messages, from–to month, *up to N items*, the last words — and counts what it **left out**: names and short codes (banks, offers, codes), code-like messages, this month or older than a year, drafts.
+3. **Tick and Keep.** Each ticked conversation is kept as **one sealed item per finished month** (last 12), **at most 60 per Keep**. A line updates as you tick: *N conversations — up to M items — Orb holds H items; its screens read the newest 500.*
+4. **After that** they are ordinary kept words: search them in Recall (*from a message backup you chose*); the person's page lists them as *has their number*; dates written in them are in **Coming up** with the message they are in.
+5. **Same month again** → *already in Orb*. **A month that came back with different messages** → *an earlier version is already in Orb*, not kept again. **Erased** → not kept again from here.
+6. **Orb never makes or deletes the backup file.** It holds every message in the clear — **delete it when you are done.**
+
+#### Checked before the device
+
+- Phone-side suite: 2047 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the parser, the rules (the code words, the months and their edges, the survey, the caps, the sealed words), the flow (held / earlier / erased / sixty), the records and key, the status, and the screen's order of asking and reading: @@MUT@@
+- A **made-up sample file** (`orb-sample-messages.xml`) is sent with the APK so the flow can be tried without exposing a real export.
+- **Not testable off the phone:** your real backup file's shape, the picker's grant for a large file, and how the screens feel with hundreds of message items.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P265** | **v48 installs over v47 with no Play Protect warning** (nothing in the manifest changed since v47) | flagged — **record the exact words** |
+| **P266** | **Sources → Text messages** shows the explanation and **Turn on text messages**; **nothing is read** | it reads before you turn it on |
+| **P267** | With the **sample file** in Downloads: **Pick the backup file** → Orb lists **two conversations** — ***+919000012345 (Test Person) · 5 messages · Aug 2026 to Sep 2026 · up to 2 items*** and ***+919000067890 (Another Person) · 1 message · up to 1 item*** — and says **1 from names or short codes** and **1 that look like codes** were left out | the counts or the labels differ |
+| **P268** | Tick the first, **Keep the ticked ones** → ***Kept 2 months***; **Recall → search "pay by"** finds it, *from a message backup you chose* | nothing is kept, or it is not found |
+| **P269** | **Coming up** shows the **12 Dec 2026** date with the message ***Reminder: please pay by 12/12/2026…*** (a deadline) and **20 Dec 2026** ("meet on 20/12/2026") — the second under *Other dates in your documents* | a date is missing or has no message |
+| **P270** | Tap **Keep** again on the same file (pick it again, tick it) → ***Already in Orb: 2*** | duplicates appear |
+| **P271** | **Your own backup file:** Orb either **recognises** it (a conversation list) or says **Not recognised. Found <…> → <…> with attributes: …** *(names only)*; bank senders and codes are counted as left out | a crash, a wrong format, or message text on the screen |
+| **P272** | **Export and share journal**: `orb.source.looked` and `orb.source.kept` with `source: messages` and counts; `orb.shared` records with `referrer: orb-source://messages/<key>/<month>` — **no number, name or message word anywhere in the file** | something about a message was recorded in the clear |
+| **P273** | **What Orb may do** shows ***Text messages from a backup file you choose — ON*** with *N conversations in the last file, M months kept in all*; **Switch off the Messages source** turns it OFF | missing or ignores the switch |
+
+#### The operator's protocol
+
+1. Install `orb-app-v48-messages.apk` over v47; open Orb once. *(P265)*
+2. Save **`orb-sample-messages.xml`** (sent with the APK) to **Downloads**.
+3. **Sources → Text messages** → read it → **Turn on text messages**. *(P266)*
+4. **Pick the backup file** → choose the sample. Read the list and the left-out line. *(P267)*
+5. **Tick the Test Person row** → **Keep the ticked ones**. Then **Recall** → search *pay by*. *(P268)*
+6. **Coming up** → look for 12 Dec and 20 Dec. *(P269)*
+7. Back in Sources, pick the sample again, tick it, **Keep**. *(P270)*
+8. **Your own file:** make a backup with your backup app (XML, to Downloads), **Pick the backup file** → choose it. **Do not tick anything yet if it surprises you**; tell me what the list looks like (counts and left-out numbers only — no need to read me any message). Then tick **one** conversation you are comfortable with and **Keep**. *(P271)*
+9. **Delete the backup files** you made when you are done.
+10. **What Orb may do** → the new line. **Export and share journal**. *(P272, P273)*

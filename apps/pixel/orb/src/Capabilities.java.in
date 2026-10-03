@@ -66,6 +66,8 @@ final class Capabilities {
     static final String CONTACTS = "orb.read.contacts";
     static final String APPSEC = "orb.read.appsecurity";
     static final long APPSEC_VERSION = 1L;
+    static final String MESSAGES = "orb.read.messages";
+    static final long MESSAGES_VERSION = 1L;
     static final String CALLS = "orb.read.calls";
     static final long CALLS_VERSION = 1L;
     static final String DOCUMENTS = "orb.read.documents";
@@ -95,6 +97,10 @@ final class Capabilities {
 
     static final String DOCUMENTS_SAYS =
         "Reads, in the one folder you chose, the names, dates and text of PDF files \u2014 only when you tap Look now, only on the phone. "
+        + "Nothing is kept unless you tick it; only counts are recorded.";
+
+    static final String MESSAGES_SAYS =
+        "Reads, in the one message-backup file you choose, the conversations and messages \u2014 only when you pick it and tap Look, only on the phone. "
         + "Nothing is kept unless you tick it; only counts are recorded.";
 
     static final String CALLS_SAYS =
@@ -128,6 +134,10 @@ final class Capabilities {
             "your grant \u2014 a recorded decision \u2014 the folder you chose, and your tapping Look now", Arrays.asList(DocumentsFacts.LOOKED),
             "Switch off the Documents source", true,
             Arrays.asList("DocumentsReader", "DocumentsAccess", "SourcesActivity")),
+        new Declaration(MESSAGES, MESSAGES_VERSION, "Text messages from a backup file you choose", MESSAGES_SAYS, TIER_OBSERVE,
+            "your grant \u2014 a recorded decision \u2014 the file you pick, and your tapping Look", Arrays.asList(MessagesFacts.LOOKED_TYPE),
+            "Switch off the Messages source", true,
+            Arrays.asList("MessagesReader", "MessagesAccess", "SourcesActivity")),
         new Declaration(CALLS, CALLS_VERSION, "When you last spoke with someone", CALLS_SAYS, TIER_OBSERVE,
             "your grant \u2014 a recorded decision \u2014 Android's own permission, and a person's page being open (only in the calls build)", Arrays.asList(CallsFacts.READ),
             "Switch off the call-history line", true,
@@ -159,7 +169,7 @@ final class Capabilities {
     static final List<String> UNDECLARED_READS = Collections.unmodifiableList(Arrays.asList(
         "CalendarContract", "LocationManager", "FusedLocation", "UsageStatsManager", "AudioRecord", "MediaRecorder",
         "CameraManager", "ClipboardManager", "getPrimaryClip", "TelephonyManager", "SmsManager", "READ_SMS",
-        "BODY_SENSORS", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"));
+        "BODY_SENSORS", "Telephony.Sms", "content://sms", "ACCESS_FINE_LOCATION", "READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"));
 
     // ---- state and last use: projections over the journal, never stored
 
@@ -184,6 +194,13 @@ final class Capabilities {
     private static String lastOfType(List<String> lines, String type) {
         String found = null;
         for (String line : lines) if (type.equals(Journal.typeOf(line))) found = line;
+        return found;
+    }
+
+    /** The last event of a type that also carries `"source":"<source>"` in its payload — the documents and messages sources share their event types. */
+    private static String lastOfTypeFrom(List<String> lines, String type, String source) {
+        String found = null;
+        for (String line : lines) if (type.equals(Journal.typeOf(line)) && line.contains("\"source\":\"" + source + "\"")) found = line;
         return found;
     }
 
@@ -273,6 +290,19 @@ final class Capabilities {
             String detail = read == null ? "never looked" : number(read, "examined") + " calls examined, " + number(read, "matched") + " with that person, at the last look";
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(read), detail);
         }
+        if (MESSAGES.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, MESSAGES);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String looked = lastOfTypeFrom(lines, MessagesFacts.LOOKED_TYPE, MessagesFacts.SOURCE);
+            long kept = 0L;
+            for (String line : lines) if (MessagesFacts.KEPT_TYPE.equals(Journal.typeOf(line)) && line.contains("\"source\":\"" + MessagesFacts.SOURCE + "\"")) kept += Math.max(0L, number(line, "kept"));
+            String detail = looked == null ? "never looked" : number(looked, "conversations") + " conversations in the last file, " + kept + " months kept in all";
+            return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(looked), detail);
+        }
         if (DOCUMENTS.equals(id)) {
             boolean granted;
             try {
@@ -280,9 +310,9 @@ final class Capabilities {
             } catch (java.io.IOException unreadable) {
                 return new Status("unknown \u2014 the history could not be read", -1L, "");
             }
-            String looked = lastOfType(lines, DocumentsFacts.LOOKED);
+            String looked = lastOfTypeFrom(lines, DocumentsFacts.LOOKED, DocumentsFacts.SOURCE);
             long kept = 0L;
-            for (String line : lines) if (DocumentsFacts.KEPT.equals(Journal.typeOf(line))) kept += Math.max(0L, number(line, "kept"));
+            for (String line : lines) if (DocumentsFacts.KEPT.equals(Journal.typeOf(line)) && line.contains("\"source\":\"" + DocumentsFacts.SOURCE + "\"")) kept += Math.max(0L, number(line, "kept"));
             String detail = looked == null ? "never looked" : number(looked, "found") + " PDFs found at the last look, " + kept + " kept in all";
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(looked), detail);
         }

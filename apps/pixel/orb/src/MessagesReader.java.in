@@ -1,0 +1,40 @@
+package @PKG@;
+
+import android.content.Context;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
+import java.io.InputStream;
+
+/**
+ * The one file that opens the message-backup export the person picked (`orb.read.messages` v1, `docs/MESSAGES_PHONE.md`). It opens that one file for
+ * reading, streams it through `MessagesXml` and keeps nothing; it opens nothing for writing and reads no other file. Orb does not make, move or delete the
+ * export. Only after `MessagesAccess` says yes, and only for the address Android granted this screen.
+ */
+final class MessagesReader implements MessagesFlow.Source {
+    private final Context context;
+    private final Uri file;
+
+    MessagesReader(Context context, Uri file) {
+        this.context = context;
+        this.file = file;
+    }
+
+    /** The file's size in bytes as the picker says, or -1. */
+    static long sizeOf(Context context, Uri file) {
+        try (Cursor c = context.getContentResolver().query(file, new String[] {OpenableColumns.SIZE}, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        } catch (RuntimeException unreadable) {
+            // The size is unknown; the stream's own caps still apply.
+        }
+        return -1L;
+    }
+
+    @Override
+    public MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception {
+        try (InputStream in = context.getContentResolver().openInputStream(file)) {
+            if (in == null) throw new java.io.IOException("the file could not be opened");
+            return MessagesXml.parse(in, sink, MessagesRules.MAX_MESSAGES);
+        }
+    }
+}

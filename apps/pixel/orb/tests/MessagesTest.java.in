@@ -1,0 +1,399 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/** Messages from a backup file (`docs/MESSAGES_PHONE.md`, DR-37): the parser, the rules, the look-and-keep path, how kept months relate to People and Coming up, and the guards. */
+final class MessagesTest {
+    private MessagesTest() {}
+
+    /** 2026-10-03 12:00 UTC. */
+    private static final long NOW = 1791028800000L;
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+    private static final String RAVI = "+919876543210";
+    private static final String PRIYA = "+919000000001";
+
+    private static long at(String iso) {
+        return java.time.LocalDateTime.parse(iso).atZone(java.time.ZoneOffset.UTC).toInstant().toEpochMilli();
+    }
+
+    private static String sms(String address, String iso, int type, String body, String name) {
+        return "<sms protocol=\"0\" address=\"" + address + "\" date=\"" + at(iso) + "\" type=\"" + type + "\" subject=\"null\" body=\"" + body
+            + "\" toa=\"null\" sc_toa=\"null\" service_center=\"null\" read=\"1\" status=\"-1\" locked=\"0\" date_sent=\"0\" readable_date=\"x\" contact_name=\"" + name + "\" />\n";
+    }
+
+    private static String file(String... messages) {
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<?xml-stylesheet type=\"text/xsl\" href=\"sms.xsl\"?>\n<smses count=\"" + messages.length + "\">\n"
+            + String.join("", messages) + "</smses>\n";
+    }
+
+    private static MessagesFlow.Source from(final String xml) {
+        return new MessagesFlow.Source() {
+            @Override public MessagesXml.Recognition stream(MessagesXml.Sink sink) throws Exception {
+                return MessagesXml.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)), sink, MessagesRules.MAX_MESSAGES);
+            }
+        };
+    }
+
+    private static final class Collect implements MessagesXml.Sink {
+        final List<MessagesRules.Message> got = new ArrayList<>();
+
+        @Override public void message(MessagesRules.Message m) { got.add(m); }
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        xml();
+        rules();
+        flow();
+        guards();
+    }
+
+    private static void xml() throws Exception {
+        Harness.suite("reading the backup file as a stream");
+        Collect c = new Collect();
+        String body = "Pay by 12/10/2026 &amp; call &lt;me&gt;&#10;second line &#128578;";
+        MessagesXml.Recognition r = MessagesXml.parse(new ByteArrayInputStream(file(sms(RAVI, "2026-09-12T14:05:00", 1, body, "Ravi Kumar"),
+            sms("AX-HDFCBK", "2026-09-13T09:00:00", 1, "Your OTP is 1234", "(Unknown)"),
+            "<mms date=\"1\" address=\"" + RAVI + "\"><parts><part text=\"ignored\"/></parts><addrs><addr address=\"" + PRIYA + "\"/></addrs></mms>\n").getBytes(StandardCharsets.UTF_8)), c, 1000);
+        Harness.check("recognised, with the messages counted and the mms ignored", r.recognised() && r.messages == 2 && c.got.size() == 2 && !r.cut);
+        Harness.equal("entities and a newline are decoded, an emoji survives", c.got.get(0).body, "Pay by 12/10/2026 & call <me>\nsecond line " + new String(Character.toChars(0x1F642)));
+        Harness.check("address, name, time and kind", c.got.get(0).address.equals(RAVI) && c.got.get(0).name.equals("Ravi Kumar") && c.got.get(0).dateMs == at("2026-09-12T14:05:00") && c.got.get(0).type == 1);
+        Harness.check("a name written as (Unknown) is no name", c.got.get(1).name.isEmpty() && c.got.get(1).number == null);
+        Collect few = new Collect();
+        MessagesXml.Recognition cut = MessagesXml.parse(new ByteArrayInputStream(file(sms(RAVI, "2026-09-12T14:05:00", 1, "a", ""), sms(RAVI, "2026-09-12T14:06:00", 1, "b", ""),
+            sms(RAVI, "2026-09-12T14:07:00", 1, "c", "")).getBytes(StandardCharsets.UTF_8)), few, 2);
+        Harness.check("it stops at the cap and says so", cut.cut && few.got.size() == 2 && cut.messages == 2);
+        Collect odd = new Collect();
+        MessagesXml.parse(new ByteArrayInputStream(("<smses><sms address=\"" + RAVI + "\" date=\"abc\" type=\"1\" body=\"x\"/><sms address=\"" + RAVI + "\" type=\"1\" body=\"y\"/>"
+            + "<sms date=\"5\" type=\"1\" body=\"z\"/><sms address=\"" + RAVI + "\" date=\"7\" type=\"1\"/></smses>").getBytes(StandardCharsets.UTF_8)), odd, 100);
+        Harness.equal("a bad date, a missing date or address is skipped; a missing body is an empty one", odd.got.size(), 1);
+        Harness.equal("and its body is empty", odd.got.get(0).body, "");
+        MessagesXml.Recognition other = MessagesXml.parse(new ByteArrayInputStream("<backup><entry secret=\"hunter2\" other=\"x\"/></backup>".getBytes(StandardCharsets.UTF_8)), new Collect(), 10);
+        Harness.check("an unknown file is not recognised", !other.recognised());
+        Harness.check("and is described by names only", other.describe().contains("<backup>") && other.describe().contains("<entry>") && other.describe().contains("secret, other") && !other.describe().contains("hunter2"));
+        Harness.check("an empty smses is not recognised either (nothing to keep)", !MessagesXml.parse(new ByteArrayInputStream("<smses count=\"0\"></smses>".getBytes(StandardCharsets.UTF_8)), new Collect(), 10).recognised());
+        boolean leaked = false;
+        Collect xxe = new Collect();
+        try {
+            MessagesXml.parse(new ByteArrayInputStream(("<!DOCTYPE smses [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><smses><sms address=\"" + RAVI + "\" date=\"5\" type=\"1\" body=\"&x;\"/></smses>").getBytes(StandardCharsets.UTF_8)), xxe, 10);
+            for (MessagesRules.Message m : xxe.got) leaked |= m.body.contains("root:");
+        } catch (Exception refused) {
+            // Refusing a file that points outside itself is fine.
+        }
+        Harness.check("an external entity is never fetched", !leaked);
+        boolean threw = false;
+        try {
+            MessagesXml.parse(new ByteArrayInputStream("this is not xml".getBytes(StandardCharsets.UTF_8)), new Collect(), 10);
+        } catch (Exception broken) {
+            threw = true;
+        }
+        Harness.check("text that is not XML is an error, not an empty file", threw);
+    }
+
+    private static void rules() {
+        Harness.suite("which messages count");
+        Harness.equal("a number, as People writes it", MessagesRules.numberOf("098765 43210"), RAVI);
+        Harness.check("a name or a short code is not a number", MessagesRules.numberOf("AX-HDFCBK") == null && MessagesRules.numberOf("56767") == null && MessagesRules.numberOf("") == null);
+        for (String w : Arrays.asList("Your OTP is 123456", "one-time password 99", "One time code", "verification code 4455", "Security code: 1", "login code 12", "PIN 4321", "cvv 123", "password reset", "passcode"))
+            Harness.check("looks like a code: " + w, MessagesRules.looksLikeCode(w));
+        for (String w : Arrays.asList("see you at the pinnacle", "spinning class", "Let's meet at 7", "pining for you", "the hotspot", "", "optional"))
+            Harness.check("not a code: " + w, !MessagesRules.looksLikeCode(w));
+        Harness.check("null is not a code", !MessagesRules.looksLikeCode(null));
+        Harness.equal("a message on one line", MessagesRules.oneLine("a\nb\r\nc\t  d \u0007e"), "a b c d e");
+        StringBuilder many = new StringBuilder();
+        for (int i = 0; i < 60; i++) many.append("word").append(i).append(' ');
+        String p = MessagesRules.preview(many.toString());
+        Harness.check("a preview is short, cut at a word and marked", p.length() <= MessagesRules.PREVIEW_CHARS + 1 && p.endsWith("\u2026") && MessagesRules.preview("hi there").equals("hi there"));
+
+        Harness.suite("finished months, the last twelve, in the person's zone");
+        Harness.equal("a month of a moment", MessagesRules.monthOf(NOW, UTC), "2026-10");
+        Harness.equal("the same moment can be another month elsewhere (23:30 UTC on 30 Sep is 1 Oct in Kolkata)", MessagesRules.monthOf(at("2026-09-30T23:30:00"), UTC) + "|" + MessagesRules.monthOf(at("2026-09-30T23:30:00"), TimeZone.getTimeZone("Asia/Kolkata")), "2026-09|2026-10");
+        Harness.equal("months before, across a year end", MessagesRules.minusMonths("2026-02", 3) + "|" + MessagesRules.minusMonths("2026-10", 12) + "|" + MessagesRules.minusMonths("2026-01", 1), "2025-11|2025-10|2025-12");
+        Harness.check("this month is not finished", !MessagesRules.inWindow("2026-10", "2026-10"));
+        Harness.check("last month is", MessagesRules.inWindow("2026-09", "2026-10"));
+        Harness.check("twelve months back is the oldest", MessagesRules.inWindow("2025-10", "2026-10") && !MessagesRules.inWindow("2025-09", "2026-10"));
+        Harness.check("the future is not", !MessagesRules.inWindow("2026-11", "2026-10"));
+        Harness.equal("a month in words", MessagesRules.monthLabel("2026-09"), "Sep 2026");
+
+        Harness.suite("pass 1: what is in the file");
+        MessagesRules.Survey s = new MessagesRules.Survey(NOW, UTC);
+        s.message(new MessagesRules.Message(RAVI, "Ravi Kumar", at("2026-09-12T14:05:00"), 1, "Payment due by 12/10/2026"));
+        s.message(new MessagesRules.Message(RAVI, "", at("2026-08-30T10:00:00"), 2, "ok will pay"));
+        s.message(new MessagesRules.Message(RAVI, "Ravi K", at("2026-09-20T10:00:00"), 1, "thanks"));
+        s.message(new MessagesRules.Message(PRIYA, "Priya Shah", at("2026-03-01T08:00:00"), 1, "hello"));
+        s.message(new MessagesRules.Message("AX-HDFCBK", "", at("2026-09-13T09:00:00"), 1, "Rs 500 debited"));
+        s.message(new MessagesRules.Message(RAVI, "", at("2026-09-14T09:00:00"), 1, "your OTP is 4411"));
+        s.message(new MessagesRules.Message(RAVI, "", at("2026-10-01T09:00:00"), 1, "this month"));
+        s.message(new MessagesRules.Message(RAVI, "", at("2025-09-30T09:00:00"), 1, "too old"));
+        s.message(new MessagesRules.Message(RAVI, "", at("2026-09-15T09:00:00"), 3, "a draft"));
+        Harness.check("total, service, codes, outside, other", s.total == 9 && s.service == 1 && s.codes == 1 && s.outside == 2 && s.other == 1);
+        Harness.equal("two conversations", s.by.size(), 2);
+        MessagesRules.Conversation ravi = s.by.get(RAVI);
+        Harness.check("Ravi: three messages in two finished months", ravi.messages == 3 && ravi.months.equals(new java.util.TreeSet<>(Arrays.asList("2026-08", "2026-09"))));
+        Harness.equal("his latest name is the one used", ravi.name, "Ravi K");
+        Harness.equal("and his last words", ravi.snippet, "thanks");
+        Harness.equal("most recent conversation first", s.listed().get(0).number, RAVI);
+        Harness.check("the label carries the number and the name", ravi.label().equals(RAVI + " (Ravi K)") && s.by.get(PRIYA).label().equals(PRIYA + " (Priya Shah)"));
+        Harness.check("a row says how many messages, between when, and up to how many items", MessagesRules.rowLabel(ravi, UTC).equals(RAVI + " (Ravi K)\n3 messages \u00b7 Aug 2026 to Sep 2026 \u00b7 up to 2 items"));
+        MessagesRules.Survey crowd = new MessagesRules.Survey(NOW, UTC);
+        for (int i = 0; i < 55; i++) crowd.message(new MessagesRules.Message(String.format("+9190000%05d", i), "", at("2026-09-12T14:05:00") + i * 1000L, 1, "hi"));
+        Harness.check("at most fifty are listed, newest first, and the rest are counted", crowd.listed().size() == 50 && crowd.leftOutConversations() == 5 && crowd.listed().get(0).number.endsWith("00054"));
+
+        Harness.suite("pass 2: what is sealed");
+        MessagesRules.Harvest h = new MessagesRules.Harvest(new HashSet<>(Arrays.asList(RAVI)), NOW, UTC);
+        for (MessagesRules.Message m : Arrays.asList(
+            new MessagesRules.Message(RAVI, "Ravi K", at("2026-09-20T10:00:00"), 1, "thanks"),
+            new MessagesRules.Message(RAVI, "Ravi Kumar", at("2026-09-12T14:05:00"), 1, "Payment due by 12/10/2026\nbring the file"),
+            new MessagesRules.Message(RAVI, "", at("2026-09-15T08:00:00"), 2, "ok"),
+            new MessagesRules.Message(RAVI, "", at("2026-09-16T08:00:00"), 1, "your OTP is 9"),
+            new MessagesRules.Message(PRIYA, "Priya Shah", at("2026-09-17T08:00:00"), 1, "not ticked"),
+            new MessagesRules.Message(RAVI, "", at("2026-10-02T08:00:00"), 1, "unfinished month"),
+            new MessagesRules.Message(RAVI, "", at("2026-08-01T08:00:00"), 1, "august"))) h.message(m);
+        List<MessagesRules.Chunk> chunks = MessagesRules.chunks(h, UTC);
+        Harness.equal("two finished months for the ticked number, the newest first", chunks.size() + "|" + chunks.get(0).month + "|" + chunks.get(1).month, "2|2026-09|2026-08");
+        Harness.equal("the words: a header, then each message with its own time, oldest first, one line each, sent ones marked",
+            chunks.get(0).text,
+            "Messages with +919876543210 (Ravi K) \u2014 Sep 2026\n[12 Sep 2026 14:05] +919876543210: Payment due by 12/10/2026 bring the file\n[15 Sep 2026 08:00] you to +919876543210: ok\n[20 Sep 2026 10:00] +919876543210: thanks");
+        Harness.check("nothing from other numbers, codes or the unfinished month", !chunks.get(0).text.contains("not ticked") && !chunks.get(0).text.contains("OTP") && !chunks.get(0).text.contains("unfinished"));
+        Harness.equal("the times are in the person's zone", MessagesRules.chunkText(RAVI, "", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "late")), TimeZone.getTimeZone("Asia/Kolkata")),
+            "Messages with +919876543210 \u2014 Sep 2026\n[13 Sep 2026 01:30] +919876543210: late");
+        Harness.equal("an empty message leaves no line", MessagesRules.chunkText(RAVI, "", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "  ")), UTC), "Messages with +919876543210 \u2014 Sep 2026");
+        Harness.check("the same month always seals to the same words", MessagesRules.chunkText(RAVI, "x", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "a")), UTC)
+            .equals(MessagesRules.chunkText(RAVI, "x", "2026-09", Arrays.asList(new MessagesRules.Message(RAVI, "", at("2026-09-12T20:00:00"), 1, "a")), UTC)));
+        Harness.check("the limits are as designed", MessagesRules.MONTHS == 12 && MessagesRules.MAX_ITEMS_PER_KEEP == 60 && MessagesRules.MAX_LISTED == 50 && MessagesRules.MAX_MESSAGES == 200_000
+            && MessagesRules.MAX_BYTES == 200L * 1024 * 1024);
+    }
+
+    private static Context box(Context[] c, Journal[] j) throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-messages").toFile();
+        c[0] = new Context(dir);
+        j[0] = Journal.open(c[0], Install.lane(c[0]), Install.id(c[0]));
+        return c[0];
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String line : journal.readLines()) if (type.equals(Journal.typeOf(line))) n++;
+        return n;
+    }
+
+    private static boolean onDisk(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (onDisk(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int k = 0; k < needle.length; k++) if (hay[i + k] != needle[k]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void flow() throws Exception {
+        Context[] cc = new Context[1];
+        Journal[] jj = new Journal[1];
+        Context context = box(cc, jj);
+        Journal journal = jj[0];
+        String export = file(
+            sms(RAVI, "2026-09-12T14:05:00", 1, "Payment due by 12/11/2026 for invoice 4471", "Ravi Kumar"),
+            sms(RAVI, "2026-09-20T10:00:00", 2, "ok will pay", ""),
+            sms(RAVI, "2026-08-03T10:00:00", 1, "see you soon", "Ravi Kumar"),
+            sms(PRIYA, "2026-09-17T08:00:00", 1, "lunch on friday", "Priya Shah"),
+            sms("AX-HDFCBK", "2026-09-13T09:00:00", 1, "Rs 500 debited from a/c", ""),
+            sms(RAVI, "2026-09-14T09:00:00", 1, "your OTP is 4411", ""));
+
+        Harness.suite("looking keeps nothing");
+        MessagesFlow.Look look = MessagesFlow.look(from(export), NOW, UTC);
+        Harness.check("recognised, two conversations, left out counted", look.recognition.recognised() && look.survey.by.size() == 2 && look.leftOut() == 2);
+        Harness.equal("nothing was sealed", Attachments.counts(context)[0], 0L);
+        Harness.equal("nothing was written", journal.readLines().size(), 0);
+        Harness.check("an unrecognised file is described, with nothing to keep", !MessagesFlow.look(from("<x><y a=\"1\"/></x>"), NOW, UTC).recognition.recognised());
+
+        Path sample = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/orb-sample-messages.xml");
+        if (Files.exists(sample)) {
+            MessagesFlow.Look made = MessagesFlow.look(from(new String(Files.readAllBytes(sample), StandardCharsets.UTF_8)), NOW, UTC);
+            Harness.check("the made-up sample file in the repository is recognised: two conversations, one service message and one code left out",
+                made.recognition.recognised() && made.survey.by.size() == 2 && made.survey.service == 1 && made.survey.codes == 1 && made.survey.by.get("+919000012345").messages == 5
+                && made.survey.by.get("+919000012345").months.size() == 2 && made.survey.by.get("+919000012345").name.equals("Test Person"));
+        }
+
+        Harness.suite("keeping what is ticked");
+        MessagesFlow.Kept kept = MessagesFlow.keep(context, journal, from(export), new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 4242L);
+        Harness.equal("two finished months of Ravi are kept", kept.kept, 2);
+        Harness.equal("two sealed items", Attachments.counts(context)[0], 2L);
+        Harness.equal("two share records", count(journal, Shares.TYPE), 2);
+        String shares = "";
+        for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) shares += line + "\n";
+        Harness.check("each says where from, with a blinded key and its month, and how long", shares.contains("\"referrer\":\"orb-source://messages/") && shares.contains("/2026-09\"") && shares.contains("/2026-08\"")
+            && shares.contains("\"action\":\"orb.source.messages\"") && shares.contains("\"textChars\":") && shares.contains("\"elapsedRealtimeMs\":4242"));
+        Harness.check("nothing of any message, number or name is in the journal", !shares.contains("4471") && !shares.contains("Ravi") && !shares.contains("9876543210") && !shares.contains("see you soon"));
+        Harness.check("nor on the disk in the clear", !onDisk(context.getFilesDir(), "4471".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "9876543210".getBytes(StandardCharsets.UTF_8)));
+        Harness.check("the other number, the bank and the code were not kept", Attachments.counts(context)[0] == 2L);
+        Harness.check("they became observations like any share", count(journal, "orb.observation") >= 2);
+        Set<String> live = MessagesFacts.liveKeys(journal.readLines());
+        Harness.equal("the keys of what is kept are read from the clear record", live.size(), 2);
+        Harness.check("a key is sixteen hex characters and says nothing", live.iterator().next().matches("[0-9a-f]{16}") && !live.toString().contains("9876"));
+        Harness.equal("a key is stable", MessagesFlow.key(context, RAVI, "2026-09"), MessagesFlow.key(context, RAVI, "2026-09"));
+        Harness.check("and differs by month and by number", !MessagesFlow.key(context, RAVI, "2026-09").equals(MessagesFlow.key(context, RAVI, "2026-08")) && !MessagesFlow.key(context, RAVI, "2026-09").equals(MessagesFlow.key(context, PRIYA, "2026-09")));
+
+        Harness.suite("the same months again add nothing");
+        MessagesFlow.Kept again = MessagesFlow.keep(context, journal, from(export), new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 1L);
+        Harness.check("both are already in Orb", again.kept == 0 && again.held == 2 && again.earlier == 0);
+        Harness.equal("still two share records", count(journal, Shares.TYPE), 2);
+
+        Harness.suite("an earlier version of a month is not kept again");
+        String longer = file(
+            sms(RAVI, "2026-09-12T14:05:00", 1, "Payment due by 12/11/2026 for invoice 4471", "Ravi Kumar"),
+            sms(RAVI, "2026-09-20T10:00:00", 2, "ok will pay", ""),
+            sms(RAVI, "2026-09-25T10:00:00", 1, "one more message arrived later", ""),
+            sms(RAVI, "2026-08-03T10:00:00", 1, "see you soon", "Ravi Kumar"));
+        MessagesFlow.Kept more = MessagesFlow.keep(context, journal, from(longer), new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 1L);
+        Harness.check("September differs from what is kept; August is the same", more.kept == 0 && more.earlier == 1 && more.held == 1);
+
+        Harness.suite("erased months are not kept again");
+        String hash = null;
+        for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line)) && line.contains("/2026-08\"")) hash = Erasure.envelopeHash(line);
+        Harness.equal("erase August", Erase.execute(context, journal, hash).outcome, Erase.DESTROYED);
+        MessagesFlow.Kept afterErase = MessagesFlow.keep(context, journal, from(export), new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 1L);
+        Harness.check("August is erased, not kept again; September is held", afterErase.kept == 0 && afterErase.erased == 1 && afterErase.held == 1);
+        Harness.check("the live keys no longer include August", MessagesFacts.liveKeys(journal.readLines()).size() == 1);
+
+        Harness.suite("sixty a time");
+        Context[] c2 = new Context[1];
+        Journal[] j2 = new Journal[1];
+        Context ctx2 = box(c2, j2);
+        StringBuilder big = new StringBuilder();
+        for (int p = 0; p < 6; p++) {
+            for (int m = 0; m < 12; m++) {
+                String month = MessagesRules.minusMonths("2026-10", m + 1);
+                big.append(sms(String.format("+9190000%05d", p), month + "-10T10:00:00", 1, "hello " + p + " " + m, ""));
+            }
+        }
+        Set<String> all = new HashSet<>();
+        for (int p = 0; p < 6; p++) all.add(String.format("+9190000%05d", p));
+        MessagesFlow.Kept capped = MessagesFlow.keep(ctx2, j2[0], from(file(big.toString())), all, NOW, UTC, 1L);
+        Harness.check("seventy-two months ticked: sixty kept, twelve left", capped.kept == 60 && capped.capped == 12);
+        MessagesFlow.Kept rest = MessagesFlow.keep(ctx2, j2[0], from(file(big.toString())), all, NOW, UTC, 1L);
+        Harness.check("keeping again takes the twelve that were left and finds sixty already here", rest.kept == 12 && rest.held == 60 && rest.capped == 0);
+
+        Harness.suite("what a kept month is to the rest of Orb");
+        Context[] c3 = new Context[1];
+        Journal[] j3 = new Journal[1];
+        Context ctx3 = box(c3, j3);
+        MessagesFlow.keep(ctx3, j3[0], from(export), new HashSet<>(Arrays.asList(RAVI)), NOW, UTC, 1L);
+        Harness.equal("the provenance says where it came from", Recall.fromLabel(MessagesFacts.referrer("abcdabcdabcdabcd", "2026-09")), "a message backup you chose");
+        Harness.check("a message month is read by the document rules in Coming up", DocumentsFacts.documentHashes(j3[0].readLines()).size() == 2);
+        ComingUp.Result ahead = ComingUp.compute(ctx3, j3[0], NOW, "UTC");
+        boolean found = false;
+        for (ComingUp.Day d : ahead.days) for (ComingUp.Item i : d.items) if (d.date.equals("2026-11-12") && i.shown().contains("Payment due by 12/11/2026")) found = true;
+        Harness.check("its deadline is in Coming up with the message that holds it", found);
+        People.Contact contact = new People.Contact("1", "Ravi Kumar");
+        contact.phones.add(RAVI);
+        List<People.Contact> book = new ArrayList<>();
+        book.add(contact);
+        People.Result people = People.compute(ctx3, j3[0], book);
+        Harness.check("the kept months are tied to Ravi by his number, as sure", people.people.size() == 1 && people.people.get(0).items.size() == 2 && People.BY_NUMBER.equals(people.people.get(0).items.get(0).by));
+
+        Harness.suite("the capability's status");
+        Journal j4 = j3[0];
+        Capabilities.Status never = Capabilities.status(Capabilities.MESSAGES, j4.readLines());
+        Harness.check("never granted, never looked", never.state.startsWith("OFF") && never.lastDetail.equals("never looked"));
+        j4.append(PackageGrants.GRANTED, grantPayload(PackageGrants.GRANTED));
+        j4.append(MessagesFacts.LOOKED_TYPE, MessagesFacts.looked(12L, 3400L, 900L));
+        j4.append(MessagesFacts.KEPT_TYPE, MessagesFacts.kept(5L));
+        j4.append(DocumentsFacts.KEPT, DocumentsFacts.kept(7L));
+        Capabilities.Status used = Capabilities.status(Capabilities.MESSAGES, j4.readLines());
+        Harness.check("on, with the conversations seen and only the messages' kept months counted", used.state.startsWith("ON") && used.lastDetail.equals("12 conversations in the last file, 5 months kept in all"));
+        Harness.check("the PDF source's status ignores the messages' events", !Capabilities.status(Capabilities.DOCUMENTS, j4.readLines()).lastDetail.contains("12"));
+        Map<String, Object> looked = MessagesFacts.looked(12L, 3400L, 900L);
+        Harness.equal("a look records counts only", looked.keySet().toString(), "[capability, conversations, leftOut, messages, source, version]");
+        Harness.equal("a keep records a count only", MessagesFacts.kept(5L).keySet().toString(), "[capability, kept, source, version]");
+    }
+
+    private static Map<String, Object> grantPayload(String type) {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.MESSAGES);
+        p.put("tier", Capabilities.TIER_OBSERVE);
+        p.put("by", "operator");
+        return p;
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("no SMS permission or API anywhere; one parser; read-only; the screen asks before it reads");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String api : Arrays.asList("Telephony", "content://sms", "SmsManager", "RECEIVE_SMS", "SEND_SMS", "READ_SMS")) {
+            List<String> users = new ArrayList<>();
+            for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains(api)) users.add(e.getKey());
+            users.remove("Capabilities");
+            users.remove("SafetyRules");
+            Harness.check("no file reads texts through Android: " + api + " " + users, users.isEmpty());
+        }
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("the manifest has no SMS permission", !manifest.contains("SMS") && !manifest.contains("sms"));
+        List<String> parsers = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains("SAXParser") || e.getValue().contains("XMLReader")) parsers.add(e.getKey());
+        Harness.equal("only MessagesXml parses the export", parsers.toString(), "[MessagesXml]");
+        Harness.check("the parser fetches nothing external and reads five attributes", source.get("MessagesXml").contains("new InputSource(new StringReader(\"\"))")
+            && source.get("MessagesXml").contains("attrs.getValue(\"address\")") && source.get("MessagesXml").contains("attrs.getValue(\"contact_name\")") && !source.get("MessagesXml").contains("getValue(\"readable_date\")"));
+        String reader = source.get("MessagesReader");
+        for (String bad : Arrays.asList("openOutputStream", "delete(", "insert(", "update(", "\"w\"", "\"rw\"", "startActivity", "Log.d(", "Log.e(", "System.out", "FileOutputStream", "getSharedPreferences")) {
+            Harness.check("the reader never uses " + bad, !reader.contains(bad));
+        }
+        Harness.check("it opens the one file and streams it", reader.contains("openInputStream(file)") && reader.contains("MessagesXml.parse(in, sink, MessagesRules.MAX_MESSAGES)"));
+        Harness.check("the rules import no Android class and keep nothing", !source.get("MessagesRules").contains("import android.") && !source.get("MessagesRules").contains("Journal") && !source.get("MessagesRules").contains("Attachments."));
+        String facts = source.get("MessagesFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the records take no number, name or words", !facts.contains("number") && !facts.contains("body") && !facts.contains("address") && !facts.contains("name"));
+
+        String access = source.get("MessagesAccess");
+        int grantAt = access.indexOf("static void grant("), revokeAt = access.indexOf("static void revoke("), reconcileAt = access.indexOf("static void reconcile(");
+        Harness.check("the grant is recorded before the flag", access.substring(grantAt, revokeAt).indexOf("record(journal, PackageGrants.GRANTED") < access.substring(grantAt, revokeAt).indexOf("\"rws\""));
+        Harness.check("a revocation removes the flag, then says so", access.substring(revokeAt, reconcileAt).indexOf(".delete()") < access.substring(revokeAt, reconcileAt).indexOf("record(journal, PackageGrants.REVOKED"));
+        Harness.check("after a restore a grant the phone does not exercise is recorded as withdrawn", access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.MESSAGES)") && access.substring(reconcileAt).contains("granted(context)) return;"));
+        Harness.check("Orb makes the history agree at start", source.get("Orb").contains("MessagesAccess.reconcile(this, journal)"));
+
+        String screen = source.get("SourcesActivity");
+        String messages = screen.substring(screen.indexOf("private void messages("));
+        Harness.check("nothing is offered or read until the source is on", messages.indexOf("if (!MessagesAccess.granted(this)) {") > 0 && messages.indexOf("return;", messages.indexOf("if (!MessagesAccess.granted(this)) {")) < messages.indexOf("Pick the backup file"));
+        Harness.check("a file is looked at only just after it is picked", messages.contains("if (lookMessages && messagesFile != null) {") && screen.contains("messagesFile = data.getData();\n                lookMessages = true;"));
+        Harness.check("the pick is honoured only if the source is on", screen.contains("&& MessagesAccess.granted(this)) {\n                messagesFile = data.getData();"));
+        Harness.check("only ticked conversations are kept", screen.contains("if (messageBoxes.get(i).isChecked()) numbers.add(messageRows.get(i).number);") && screen.contains("Nothing is ticked, so nothing was kept."));
+        Harness.check("a file over 200 MB is refused before it is read", screen.contains("if (size > MessagesRules.MAX_BYTES) {"));
+        Harness.check("the screen says what is left out, what is kept, and to delete the file", screen.contains("Left out, and only counted:") && screen.contains("Delete the backup file when you are done.") && screen.contains("Orb never makes or deletes it"));
+        Harness.check("the screen says how many items Orb will hold against what the screens read", screen.contains("Recall.SCAN_LIMIT") && screen.contains("at most \" + MessagesRules.MAX_ITEMS_PER_KEEP + \" per Keep"));
+        Harness.check("What Orb may do can switch the source off", source.get("MayDoActivity").contains("MessagesAccess.revoke(MayDoActivity.this, journal)") && source.get("MayDoActivity").contains("Switch off the Messages source"));
+    }
+}
