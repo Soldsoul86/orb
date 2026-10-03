@@ -7451,3 +7451,11 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 5. **That's right** on one *regular touch*; look at People and that person's page. *(P284)* **Not true** on one other; leave and reopen; **Undo**. *(P285)* **Not now** on one; **Back to People** and reopen. *(P286)*
 6. **What Orb may do** → look at the new line. *(P288)* **Export and share journal** and send it. *(P287, P290 if you kept a JSON month)*
 
+#### Result — export `orb-20261003-144913` (operator, 2026-10-03)
+
+699 events; v50 (`29850281`) started once in this stretch. **Nothing in the journal contains a name, number, address or word** (scanned for the names and number prefixes of the day's data: none).
+
+**P287 confirmed in shape.** One `grants.capability.granted` for `orb.understand` (by operator) **before** anything was computed; one `orb.understand.read` with **asked: 23, confirmed: 0, rejected: 0**; then **12 answers, all *That's right***: **eleven *regular touch*** (spoken calls in the last 90 days: 126, 86, 40, 34, 31, 28, 22, 18, 18, 14, 14 — every one **by calls alone, `months: 0`**: no kept message month yet ties to any of them) and **one *gone quiet*** (the minimum, 4 earlier calls). Each `orb.understanding.judged` carries only the kind, the blinded key, the verdict and the numbers it rested on.
+
+**Read from it:** the statements Orb can make from counts are *how often*, and the operator accepted what was asked; **no *Not true*, no *Not now*, no Undo** was exercised, so P285 and P286 are still open, as are P280 (Play Protect), P283 (the working matched the person's page — the operator has not said), P288, P289 and P290. The operator's own reading of the result: **regular touch is all Orb understands about a person so far; what is the right way to bring more context?** — answered in `UNDERSTANDING_PHONE.md` §10 (proposed).
+
