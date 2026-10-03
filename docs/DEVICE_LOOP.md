@@ -7055,8 +7055,8 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 #### Checked before the device
 
-- Phone-side suite: @@COUNT@@ checks; brain, TypeScript, lint and type-check unchanged and clean.
-- **Mutation checks** on the cue list, the *by* rule, the line cutting, the date rules (today, one per date, the deadline line wins, ordering), the cap and the counts, the document branch in Coming up, the fold, the dot, the person's page and the three screens: @@MUT@@
+- Phone-side suite: 1717 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the cue list, the *by* rule, the line cutting, the date rules (today, one per date, the deadline line wins, ordering), the cap and the counts, the document branch in Coming up, the fold, the dot, the person's page and the three screens: **64 deliberate breakages. 45 were caught at once; 17 survived (or, for one, did not apply) and became tests — the exact line and chunk limits, "pay" and "due" alone, sentence ends at ! and ?, other kinds of handle on a line (an email, a number), two deadline lines for one date, a tab inside a line, a document with only ordinary dates, one with fifteen deadlines, a reminder already set on a document's date, and the screen's fold and ordering guards — then all were caught; 2 are equivalent and documented** (skipping lines with no digit only saves work, since a date always has a digit; a deadline list of exactly twelve needs no trimming).
 - **Not testable off the phone:** how your PDFs' lines actually come out of Android's reader (AD-29 item 1).
 
 #### Predictions
