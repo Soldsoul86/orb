@@ -1387,6 +1387,14 @@ box — **where they are the app's by design, like the number**.
 
 **Amended 2026-10-03:** the operator's backup app writes **JSON**, so a second reader (`MessagesJson`, behind one front door that looks at the first character) was added; the file's shape is in `MESSAGES_PHONE.md` §14. It changes nothing after the parser. **Not in this ruling:** MMS and group chats; formats other than the common backup XML and that JSON (an unrecognised file is described by tag, attribute or field **names** only); the current month; bank/service senders; relative-day guesses from a message's own day; an index; deleting the export.
 
+## DR-38 — What Orb has noticed: understanding across the sources, not a profile
+
+- **Status:** Proposed · **Proposed:** 2026-10-03, after the operator chose "Your profile" as the next step and said "Yes, go ahead with the design for the profile" (`UNDERSTANDING_PHONE.md`). **Not yet approved for building.**
+
+**The ruling proposed.** The operator's *profile with explicit permission* is built as **understanding**, as Constitution Art. XII requires (§44–45): Orb draws its sources together into plain statements it **computes each time** from what it holds (never stored as attributes), shows **the working** for each, and records only **the person's answer** (*That's right / Not true*, with a blinded subject key and the evidence counts) as a history event. A new capability `orb.understand` v1 is **off until the person turns it on** (a recorded grant), adds no permission and no network, never turns another source on, and lives as a mode of People so the contacts are still read only there. Slice 1: three count-based kinds (*regular touch*, *gone quiet*, *appears in many things*), no model. Slice 2 (after the device check): the person's own words for what someone is to them, as a sealed note.
+
+**Not in this ruling:** about-you facts, anything read from the words of a message or document, acting on a statement, merging persons.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
