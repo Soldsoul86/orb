@@ -7265,7 +7265,7 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 
 #### Checked before the device
 
-- Phone-side suite: @1909 checks; brain, TypeScript, lint and type-check unchanged and clean. **Both builds were built:** the default declares three permissions, the calls build four.
+- Phone-side suite: 1909 checks; brain, TypeScript, lint and type-check unchanged and clean. **Both builds were built:** the default declares three permissions, the calls build four.
 - **Mutation checks** on the kinds of call, the summary and its edges (a year, 90 days, the future, 5,000), the words, the record, the access (grant before flag, both conditions, revoke order, reconcile), the reader (the query, the columns, the null on failure) and the screen (the order of asking and recording, the card's default): **86 deliberate breakages. 74 were caught at once; 11 survived and became tests — a log form that differs from the number as written, a missed call at the very instant of the last spoken one, the person's time zone on an older day, turning on twice, the reconcile guards, whether this build declared the permission, the order of the columns read, and the card's Allow and reopen — then were caught; 1 is equivalent and documented** (an unmatched null number is also not found in a set of real numbers).
 - **Not testable off the phone:** that Android's call-log provider returns what it returned to the probe for the whole of Orb, and that Play Protect lets the whole of Orb through with this permission.
 
