@@ -7459,3 +7459,48 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 **Read from it:** the statements Orb can make from counts are *how often*, and the operator accepted what was asked; **no *Not true*, no *Not now*, no Undo** was exercised, so P285 and P286 are still open, as are P280 (Play Protect), P283 (the working matched the person's page — the operator has not said), P288, P289 and P290. The operator's own reading of the result: **regular touch is all Orb understands about a person so far; what is the right way to bring more context?** — answered in `UNDERSTANDING_PHONE.md` §10 (proposed).
 
+### 7b88. What someone is to you — your own words (DR-38, step 1 of more context) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v51-notes.apk` — the calls build, as v46–v50. Design: `docs/UNDERSTANDING_PHONE.md` §10 (approved) and §11 (as built); decision `DECISIONS.md` DR-38 (amended); limits `ARCHITECTURAL_DEBT.md` AD-33 items 9–12.
+
+**Why:** from counts Orb can say *how often*, never *who someone is to you*. That has to come from you, in your words — and be used exactly as you wrote it. Orb never guesses a category.
+
+#### What changed
+
+1. **A person's page** gains **Say what they are to you…** — a role (60 characters at most) and an optional note (1,000 at most). It then reads **To you: …** with **Change…** and **Remove**.
+2. **Sealed, like a commitment's words.** The journal holds only that a description exists; **no word, name or number**. **Change** replaces (the older note is erased after the new one is recorded); **the same words write nothing**; **Remove** erases for good, with **Keep it** focused on the card. **No capability, no permission** — it reads nothing.
+3. **It shows where the person's name shows** — *Ravi Kumar (electrician)* — on the page, in the People list and search results, and in the sentences of *What Orb has noticed*.
+4. **People's search finds it:** type *electri* and the electrician appears (just after a name that starts the same way).
+5. The sealed note is listed with **Orb's held items** as a *person note* and goes into a backup as words.
+
+#### Checked before the device
+
+- Phone-side suite: 2395 checks before the mutation additions; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the words (their limits, tidying and line breaks), the note's format and reading, which notes are live, which is newest, saving, changing, removing, a failure, the name and the search: @@MUT@@
+- **Not testable off the phone:** how the form looks and feels, and whether a role you type is found as you expect.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P291** | v51 installs over v50 with **no Play Protect warning** (manifest unchanged since v46) | flagged — record the exact words |
+| **P292** | On a person's page: **Say what they are to you…**; the form has a role line and a note box; **Cancel** changes nothing | the button is missing, or Cancel saves |
+| **P293** | **Save** *electrician* with a note → the page reads **To you: electrician** and the note; the title and the People list show ***Name (electrician)*** | not shown, or shown on the wrong person |
+| **P294** | In People's search, typing ***electri*** finds that person | not found |
+| **P295** | **Change…** is filled with your words; saving new words replaces them; the old ones do not come back | both appear, or the old words return |
+| **P296** | **Remove** → a card with **Keep it** focused → **Remove**: the words are gone from the page and the search | still shown, or Keep it is not the default |
+| **P297** | In **What Orb has noticed**, a statement about that person reads ***…Ravi Kumar (electrician)…*** | the role is missing there |
+| **P298** | **Export and share journal:** one `orb.person.described` per save, carrying **only an `attachment` identity and size** — no word, name or number; erasure events for the replaced and removed notes | a word, name or number is in the journal |
+| **P299** | Close and reopen Orb: the words are still there | they are gone |
+
+#### Protocol
+
+1. Install `orb-app-v51-notes.apk` over v50; open Orb once. *(P291)*
+2. **People** → search a contact you know → tap them. Find **Say what they are to you…**; open it, then **Cancel**. *(P292)*
+3. Open it again: role *electrician* (or what is true for them), a short note, **Save**. Read the page and the title; go back to the People list. *(P293)*
+4. In People's search, type part of the role. *(P294)*
+5. **Change…** → new words → **Save**. *(P295)* Look at **What Orb has noticed** if that person is in it. *(P297)*
+6. Close and reopen Orb; look again. *(P299)*
+7. On a second person, say something, then **Remove** it. *(P296)*
+8. **Export and share journal** and send it. *(P298)*
+

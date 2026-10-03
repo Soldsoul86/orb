@@ -1393,6 +1393,8 @@ box — **where they are the app's by design, like the number**.
 
 **The ruling proposed.** The operator's *profile with explicit permission* is built as **understanding**, as Constitution Art. XII requires (§44–45): Orb draws its sources together into plain statements it **computes each time** from what it holds (never stored as attributes), shows **the working** for each, and records only **the person's answer** (*That's right / Not true*, with a blinded subject key and the evidence counts) as a history event. A new capability `orb.understand` v1 is **off until the person turns it on** (a recorded grant), adds no permission and no network, never turns another source on, and lives as a mode of People so the contacts are still read only there. Slice 1: three count-based kinds (*regular touch*, *gone quiet*, *appears in many things*), no model. Slice 2 (after the device check): the person's own words for what someone is to them, as a sealed note.
 
+**Amended 2026-10-03 (step 1 of bringing in more context):** the person's own words about someone — a role and a note, sealed, replaceable, erasable, searchable — are built (`UNDERSTANDING_PHONE.md` §10–11). It is the only way a category enters Orb, needs no capability because it reads nothing, and is recorded as one event carrying only a sealed note's identity. Steps 2 (the shape from counts) and 3 (anything from words) are not decided.
+
 **Not in this ruling:** about-you facts, anything read from the words of a message or document, acting on a statement, merging persons.
 
 ## Provenance

@@ -89,7 +89,7 @@ About-you facts (your own numbers, emails, places, routines), money or payment p
 - **Not built:** slice 2 (your own words), merging persons, anything about you, anything read from words.
 
 
-## 10. Bringing more context about a person — proposed (2026-10-03, after the first device export)
+## 10. Bringing more context about a person — approved; step 1 ("your words") built, steps 2–3 not (2026-10-03, after the first device export)
 
 **What the device showed.** Eleven *regular touch* and one *gone quiet* were confirmed, **all from calls alone** (`months: 0`): Orb knows *how often*, nothing about *who they are to you* or *what is between you*. That is what counts can give. More context has to come in a way that keeps Art. XII (§44–45): Orb never stores "who someone is"; context is either **told to it** (history, as intent), or **worked out again from what it holds** (computed, with its working), or **asked as a question** (your answer is the fact).
 
@@ -104,3 +104,16 @@ About-you facts (your own numbers, emails, places, routines), money or payment p
 **Risks.** A *role* typed by you can be wrong or unkind — it is yours, sealed, erasable, shown only on your phone. The *shape* of calls (times, who calls whom) is more intimate than a count — it stays on the page, behind the person, and is never recorded as a fact. Words-based suggestions are the most sensitive step and are not part of 2a or 2b. Each new statement needs a threshold, a working line, and mutation checks like the first three.
 
 **For the operator to approve.** (1) Build **2a** first — your words about a person (role and note), sealed, searchable. (2) Then **2b** (the shape and what is between you) and **2c** (Messages marks the people you said you are in touch with). (3) **Words-based suggestions** wait for their own design.
+
+## 11. As built — step 1, "What is Ravi to you?" (slice 2a, v51)
+
+Approved 2026-10-03 ("Yes, go ahead with the build for step 1").
+
+- **Where it lives.** `PersonNote` (the sealed note, reading the live notes, replacing and removing), `PersonNoteFacts` (the only builder of the record), `People.Person.role`/`note` (attached when People is computed), the form and the buttons on the person's page in `PeopleActivity`, a label in the held-items list, and the sealed note carried into a backup as words. **No capability, no permission, no manifest change, no network:** it reads nothing — it is words you write, like a commitment's.
+- **What you do.** On a person's page, **Say what they are to you…** — a role (at most 60 characters) and an optional note (at most 1,000), in a form that says it stays on the phone, sealed, and that Orb never guesses. Later it reads **To you: electrician** and the note, with **Change…** and **Remove**. **Cancel** is the default on Remove's card.
+- **What is recorded.** One `orb.person.described` event per save, carrying only the identity and size of the **sealed note**; **no word, name, number or address** is in the journal. The note holds who (names, numbers, addresses as they were that moment), the role and the note, with a nonce so two notes never share bytes.
+- **Changing is replacing.** The new note is sealed and recorded first; only then are the older notes about the same person erased (their keys destroyed). A failure at any point leaves what was there. **The same words write nothing.** **Saving nothing removes.** **Remove erases for good.**
+- **Which person.** Found again by a shared number or address, else by the same name; a different person who happens to share a name is also found by name (the same rule links use). If the contact has gone, the note is dormant — shown to no one.
+- **Where it shows.** The page; the name wherever it is shown (*Ravi Kumar (electrician)*), including in the sentences of *What Orb has noticed*; and **People's search finds it** — typing *electri* finds the person, ranked just after a name that starts the same way.
+- **Not built:** step 2 (the shape: who starts the calls, usual times, what is between you), step 3 (anything inferred from words), the Messages marks, and any use of the role to decide anything.
+

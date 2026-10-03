@@ -829,6 +829,10 @@ a second source for the compiler's checksum exists (item 1).
 6. **Recomputed on every opening.** People and the call log are read each time the mode opens; fine at a second for a year of calls, to be measured, with an index only if it hurts.
 7. **Nothing acts on a statement yet.** No reminder, nudge or message is made from one — deliberately; the first use is the mark on a person's row.
 8. **Not about you.** Facts about the person themselves (their own numbers, places, routines) are a different, more sensitive slice and are not here.
+9. **A role is a free phrase, used as written.** Orb does not know that *electrician* and *plumber* are trades or that *brother* is family: it matches the letters you typed and nothing more, so a search for *family* will not find *brother*. Meaning from words is step 3 and is not built.
+10. **A note is found again by number, address or name.** A contact who changes every number and the name loses their note (dormant, not lost: it returns if one matches again); two contacts sharing a name share a note until the first is told apart. Merging and splitting persons is still unbuilt (AD-17).
+11. **One note per person, the newest.** An older note is erased when a newer one is saved; there is no history of what you used to say. (Erasing is the only way a sealed note is ever removed.)
+12. **The note is on this phone only.** It is carried by a backup, as words, but nothing syncs it elsewhere.
 
 ---
 
