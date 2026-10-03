@@ -7092,7 +7092,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b80. The Safety check, grouped by severity (DR-32 amended) — 2026-10-03
 
-**Status: built, awaiting the device.** `orb-app-v44-safety-groups.apk`. v43 is §7b79 (partly verified). Design: `docs/SAFETY_CHECK_PHONE.md` §11.
+**Status: verified on the device — the operator: "All looks fine." The export (`6f648552`, 615 events) shows, for v44 (versionCode 29849917): the install and two checks, each one `orb.safety.checked` with the same counts as before (299 apps, 1 now, 42 worth a look), and nothing else new (P233, P234, P239; the grouping itself — P235–P238 — is the operator's reading, and he moved no group).** `orb-app-v44-safety-groups.apk`. v43 is §7b79 (partly verified). Design: `docs/SAFETY_CHECK_PHONE.md` §11.
 
 **Why:** the first check on your phone found 299 apps and put 42 of them in one flat list. A list that long is not read. Same rules as before — only the order and the drawing change.
 

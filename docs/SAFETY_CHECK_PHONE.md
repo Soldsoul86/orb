@@ -95,3 +95,5 @@ On the operator's phone the check looked at 299 apps and put **42 in one flat *W
 - **Within a group, by name** (A–Z, any case).
 - **A heading with a count opens and closes its group.** *Look at these now* starts open. *Worth a look* starts open only when there are **8 or fewer** such findings; with more, every group starts **closed** and the headings are the overview. A tap redraws what is on screen; it does not read the phone again. *Check again* forgets what you opened.
 - **Nothing recorded changes**: `orb.safety.checked` still carries the same three numbers. The order is a fixed table, not a score, and still never says *safe* or *certified*.
+
+**Verified 2026-10-03** on the operator's phone (v44): the grouping read well and no group was moved; the record is unchanged.
