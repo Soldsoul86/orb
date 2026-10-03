@@ -47,6 +47,7 @@ final class CallsRulesTest {
     private static void numbersAndKinds() {
         Harness.suite("numbers as People writes them, and what a call is");
         Harness.equal("the log's own normalised form is preferred", CallsRules.normal("098765 43210", "+919876543210"), RAVI);
+        Harness.equal("the log's form wins even when it differs from the written one", CallsRules.normal("98765 43210", "+919123456789"), "+919123456789");
         Harness.equal("else the number as written", CallsRules.normal("098765 43210", null), RAVI);
         Harness.equal("a garbled normalised form falls back to the written one", CallsRules.normal("98765 43210", "abc"), RAVI);
         Harness.check("a short code or nothing cannot be matched", CallsRules.normal("12345", null) == null && CallsRules.normal(null, null) == null && CallsRules.normal("", "") == null);
@@ -84,6 +85,9 @@ final class CallsRulesTest {
         Harness.equal("two numbers of one person", CallsRules.summarize(log, Arrays.asList(RAVI, OTHER), NOW).matched, 7);
         Harness.equal("a person with no numbers matches nothing", CallsRules.summarize(log, new ArrayList<String>(), NOW).matched, 0);
         Harness.equal("a null number in the list is ignored", CallsRules.summarize(log, Arrays.asList((String) null), NOW).matched, 0);
+
+        Harness.equal("a call that rang at the very moment of the last spoken one is not after it",
+            CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.INCOMING, 3, 60), call(RAVI, CallsRules.MISSED, 3, 0)), Arrays.asList(RAVI), NOW).missedSince, 0);
 
         Harness.suite("nothing spoken, only unanswered calls");
         List<CallsRules.Call> onlyMissed = Arrays.asList(call(RAVI, CallsRules.MISSED, 40, 0), call(RAVI, CallsRules.MISSED, 2, 0));
@@ -127,6 +131,7 @@ final class CallsRulesTest {
         Harness.equal("a day this year", CallsRules.day(NOW - 4 * DAY, NOW, utc, Locale.ENGLISH), "Tue 29 Sep");
         Harness.equal("a day in another year carries it", CallsRules.day(NOW - 300 * DAY, NOW, utc, Locale.ENGLISH), "Sun 7 Dec 2025");
         Harness.equal("the person's own time zone decides the day: 20:00 UTC on the 2nd is the 3rd in Kolkata", CallsRules.day(1790971200000L, NOW, kolkata, Locale.ENGLISH), "today");
+        Harness.equal("and an older day is named in the person's zone too: Fri in UTC, Sat in Kolkata", CallsRules.day(1790971200000L, NOW + 5 * DAY, utc, Locale.ENGLISH) + "|" + CallsRules.day(1790971200000L, NOW + 5 * DAY, kolkata, Locale.ENGLISH), "Fri 2 Oct|Sat 3 Oct");
         Harness.equal("while in UTC it was yesterday", CallsRules.day(1790971200000L, NOW, utc, Locale.ENGLISH), "yesterday");
 
         CallsRules.Summary s = CallsRules.summarize(Arrays.asList(call(RAVI, CallsRules.INCOMING, 3, 280), call(RAVI, CallsRules.OUTGOING, 10, 40), call(RAVI, CallsRules.MISSED, 1, 0), call(RAVI, CallsRules.MISSED, 2, 0)),
@@ -185,6 +190,8 @@ final class CallsRulesTest {
         }
         Harness.check("it reads five columns: the number, the log's normalised form, the kind, the time and the length",
             reader.contains("new String[] {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NORMALIZED_NUMBER, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION}"));
+        Harness.check("each row is the normalised number, the kind, the time and then the length, in that order",
+            reader.contains("new CallsRules.Call(CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(3), c.getLong(4))"));
         Harness.check("only the last year, newest first, at most the cap",
             reader.contains("CallLog.Calls.DATE + \" >= ?\"") && reader.contains("CallLog.Calls.DATE + \" DESC LIMIT \" + CallsRules.MAX_CALLS") && reader.contains("nowMs - CallsRules.WINDOW_DAYS * 86_400_000L"));
         Harness.check("nothing is read without Android's permission, and a failure is null, not an empty log",
@@ -199,6 +206,10 @@ final class CallsRulesTest {
         Harness.check("the grant is recorded before the flag", grant.indexOf("record(journal, PackageGrants.GRANTED") > 0 && grant.indexOf("record(journal, PackageGrants.GRANTED") < grant.indexOf("\"rws\""));
         Harness.check("a revocation removes the flag, then says so", revoke.indexOf(".delete()") > 0 && revoke.indexOf(".delete()") < revoke.indexOf("record(journal, PackageGrants.REVOKED"));
         Harness.check("a grant needs the flag and Android's permission together", access.contains("return new File(context.getFilesDir(), FILE).exists() && permitted(context);"));
+        Harness.check("turning on twice records once, and a missing journal records nothing", grant.contains("if (new File(context.getFilesDir(), FILE).exists()) return;") && access.substring(reconcileAt, access.indexOf("private static void record(")).contains("if (journal == null) return;")
+            && access.substring(reconcileAt, access.indexOf("private static void record(")).contains("if (flag.exists()) return;"));
+        Harness.check("a build has the permission only if its own package list says so",
+            access.contains("if (info.requestedPermissions == null) return false;") && access.contains("for (String p : info.requestedPermissions) if (PERMISSION.equals(p)) return true;"));
         Harness.check("a permission withdrawn in Settings, or a restore, is brought into the history",
             access.substring(reconcileAt).contains("if (flag.exists() && !permitted(context)) flag.delete();") && access.substring(reconcileAt).contains("lastIsGrant(journal.readLines(), Capabilities.CALLS)"));
         Harness.check("this build asks only its own package whether it declared the permission", access.contains("getPackageInfo(context.getPackageName(), PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS))"));
@@ -215,6 +226,8 @@ final class CallsRulesTest {
         String confirm = screen.substring(screen.indexOf("private void confirmCalls("), screen.indexOf("private void finishCalls("));
         Harness.check("the card says what is read and kept, Cancel is the default, the window is secure",
             confirm.contains("Phone calls only") && confirm.contains("Nothing is kept") && confirm.contains("BUTTON_NEGATIVE).requestFocus()") && confirm.contains("FLAG_SECURE"));
+        Harness.check("Allow asks Android unless it has already said yes, and the page reopens on the same person",
+            confirm.contains("if (CallsAccess.permitted(PeopleActivity.this)) finishCalls();\n                    else requestPermissions(") && screen.contains("if (callsFor != null) reopenName = callsFor.names.get(0);"));
         Harness.check("Android is asked only after Allow, and the decision is recorded only after Android says yes", confirm.contains("requestPermissions(new String[] {CallsAccess.PERMISSION}, REQUEST_CALLS)")
             && screen.contains("if (allowed) finishCalls();") && screen.substring(screen.indexOf("private void finishCalls(")).contains("CallsAccess.grant(this, journal)"));
 
