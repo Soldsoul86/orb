@@ -6989,7 +6989,7 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 
 ### 7b78. Sources — PDFs you point Orb at (DR-33, slice 2a of the operator's flow) — 2026-10-02
 
-**Status: built, awaiting the device.** `orb-app-v42-sources.apk`. v41 is §7b77 (verified). Design: `docs/SOURCES_PHONE.md`; decision `DECISIONS.md` DR-33; limits `ARCHITECTURAL_DEBT.md` AD-28.
+**Status: verified on the device — the operator: "Working as intended." The export (`664b78af`, 592 events) shows, for v42 (versionCode 29849268): the source granted; four PDFs kept one look at a time, their text read by Android's reader (**43,119, 14,817, 3,296 and 2,803 characters**), each an `orb.shared` with `referrer: orb-source://documents` and no name or word; `orb.source.looked` / `orb.source.kept` as counts; a switch-off and a re-grant; one look with `unreadable: 1`; and an erase followed by a look (P214–P218, P220–P222 on the export; P223, the quality, is the operator's word). **Not exercised: the folder path** — there is no `orb.source.chosen` in the file, so P219 (Android refusing Downloads; a chosen folder listing its PDFs) is still open.** `orb-app-v42-sources.apk`. v41 is §7b77 (verified). Design: `docs/SOURCES_PHONE.md`; decision `DECISIONS.md` DR-33; limits `ARCHITECTURAL_DEBT.md` AD-28.
 
 **Why:** your invoices, tickets and letters are PDFs. Until now Orb knew only what you shared one at a time. This lets you point Orb at PDFs, see what is in them, and keep the ones you tick — so what is in them can be found, tied to the right person and turned into dates and commitments. **Nothing is kept that you did not tick, and the file itself is not copied — only its words, sealed.**
 
