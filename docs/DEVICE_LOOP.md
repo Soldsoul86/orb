@@ -7401,3 +7401,7 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 **Found in reading it, fixed in code, not in the v49 APK:** the share record of a month kept from a JSON file would have said `mimeType: text/xml` (the constant was written when only XML existed). It now names the backup's format (`application/json` for JSON); three mutants, all caught. It ships with the next build; v49 is otherwise correct. The mutation harness was also corrected (it was blind to survivors when test names contained "error:"), and the JSON round re-run with it: **23 of 23 caught**.
 
+#### Operator's answers (2026-10-03, after the export)
+
+**P279 confirmed:** v49 installed with **no Play Protect warning**. **P278 confirmed:** reading the real file (25,552 messages) took **about a second**. **P276 confirmed:** each row reads *number (name)*. **Keep one conversation from the real file → Recall → search** ("Behaves"): worked as designed. **§7b85 and §7b86 are verified on the device.** The one open item is the `application/json` record fix (code, tests and mutation checks done; ships with the next build).
+

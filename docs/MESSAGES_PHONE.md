@@ -1,6 +1,6 @@
 # Messages — from an export file you make, read the way PDFs are (stage 2c, redesigned after the SMS probe; proposed)
 
-> Status: **built 2026-10-03 (DR-37, AD-32) — awaiting the device (`DEVICE_LOOP.md` §7b85 and §7b86; v48 reads XML, v49 reads XML and JSON, `orb-app-v49-messages-json.apk`).** The operator approved the design and the build ("Yes, go ahead with the messages build").
+> Status: **built and verified on the device 2026-10-03 (DR-37, AD-32; `DEVICE_LOOP.md` §7b85 and §7b86; v48 reads XML, v49 reads XML and JSON, `orb-app-v49-messages-json.apk`).** The operator approved the design and the build ("Yes, go ahead with the messages build").
 > **Why this and not the permission:** an app declaring `READ_SMS` is **blocked by Play Protect on the operator's phone with no override** (`DEVICE_LOOP.md` §7b83). Orb will never hold an SMS permission. The route left is the one already proved with PDFs: **you hand Orb a file, you see what is in it, you tick what to keep.** Here the file is a **message export made by another app**.
 > Builds on: Sources (`SOURCES_PHONE.md`, DR-33), documents in Coming up (`DOCUMENT_USE_PHONE.md`, DR-34), People (DR-24/25), person links (DR-29). Written together with the **scale and time** questions that `Is the system equipped…` (2026-10-03) found open — they are §4–5 here.
 
