@@ -7176,3 +7176,44 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 7. *(Optional, to try the sample invoice:)* add a contact named exactly **ACME Telecom Pvt Ltd**, then open the sample invoice's choose screen — it should list that contact (*their full name is written*). Delete the test contact afterwards.
 8. **Export and share journal**. *(P247)*
 9. Tell me: **did it list the right people, anyone wrong, anyone you expected that was missing?**
+
+### 7b82. The Calls Probe — can an app like Orb be given the call-history permission here? (`CALLS_PHONE.md` §0) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-calls-probe.apk` (package `dev.orb.probecalls`, **a separate app; Orb v45 is not touched**). Source `apps/pixel/probe-calls`. Design/decision: `docs/CALLS_PHONE.md` §0 and §10 (the operator: "Yes, go ahead with the probe").
+
+**Why:** reading calls one person at a time does not change what the app *declares*, and Play Protect weighs the declaration at install. Before building anything — an opt-in Orb build, or a companion app — this finds out two things on **your phone, installed your way**: (a) does Android or Play Protect block or warn about installing an app that declares `READ_CALL_LOG`? (b) can the permission be granted, or does Android refuse silently (a hard-restricted permission for a hand-installed app)?
+
+#### What it is
+
+One screen, four buttons, and a report. It declares **exactly one permission and nothing else**, contains nothing of Orb, and shows **counts and one date only** — never a number, a name or a time of day; it writes nothing. A check script (`tests/check.sh`) holds that to its source and its built APK.
+
+1. **Ask for the call-history permission** — and the report says what Android answered and how fast (a "no" in a fraction of a second means no prompt was shown).
+2. **Count my calls** — how many calls the log holds and the date of the newest.
+3. **Open this app's settings page** — to look for the *Restricted setting* message, ⋮ → *Allow restricted settings*, or the permission screen.
+4. **Share this report as text** — the report holds nothing personal.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P248** | **Installing the probe is silent or a warning with *Install anyway*, not a hard block** — `READ_CALL_LOG` is not on Play Protect's published list of sideload-blocking permissions | **blocked with no way past it**: the permission cannot ride in an app installed here — **record the exact words** |
+| **P249** | The report says **how it was installed** (the app that installed it, the app that started it, the package source) and lists `READ_CALL_LOG (not granted)` | the report is empty or wrong |
+| **P250** | **Ask for the permission** shows Android's own prompt (*Allow / Don't allow*); **Allow** → report says **GRANTED** | **no prompt** and *NOT granted* within a fraction of a second: Android refuses a hard-restricted permission for this install route — **say whether you saw anything, and the exact words** |
+| **P251** | After it is granted, **Count my calls** shows **N calls in the log and the newest date**, and the date is right | zero, an error, or a wrong date |
+| **P252** | *(Only if P250 failed)* **Open this app's settings page** → look under ⋮ for **Allow restricted settings**, and under **Permissions → Call logs** for what it says; if the switch exists, allow, then **ask again** | there is no switch, or asking again still says no: **the permission cannot be had on this install route** |
+
+#### What happens next, by the answer
+
+- **P248 holds and P250 granted** → the calls feature is possible. I propose the shape (an opt-in Orb build, or a companion app) and you decide.
+- **P248 blocked, or P250 refused and P252 finds no way** → calls stop here, costing only this probe; the reason is recorded.
+- **Anything in between** → I tell you plainly what it means before we decide.
+
+#### The operator's protocol
+
+1. Install `orb-calls-probe.apk` **the same way you install Orb** (from Downloads, with the Android installer). **Screenshot or copy the exact words of anything Android or Play Protect says**, even a warning you can dismiss. *(P248)*
+2. Open **Orb Calls Probe**. Read the report. *(P249)*
+3. Tap **1. Ask for the call-history permission**. Note whether a prompt appeared, tap **Allow** if it did, and read the line *asking:*. *(P250)*
+4. If it says GRANTED, tap **2. Count my calls**. *(P251)*
+5. If it said NOT granted, tap **3. Open this app's settings page**, look at the ⋮ menu and **Permissions → Call logs**, try **Allow restricted settings** if you see it, come back and tap **1** again. *(P252)*
+6. Paste the whole report here (tap **4. Share**, choose a messaging app or Notes, copy it), plus anything Android said at install.
+7. Afterwards you can uninstall the probe; it holds nothing.

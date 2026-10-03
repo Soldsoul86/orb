@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Orb Calls Probe — DEVICE_LOOP.md §7b82, CALLS_PHONE.md §0.
+
+  Declares exactly one permission, READ_CALL_LOG, and nothing else: no service, no receiver, no
+  other permission, no query. The experiment is "what do Android and Play Protect do with an
+  app that declares this one permission, installed the way the operator installs?", so a second
+  line here would answer a different question. It contains nothing of Orb; Orb v45 is untouched.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@PKG@"
+    android:versionCode="@VERSION_CODE@"
+    android:versionName="0.1-probecalls">
+
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+
+    <application
+        android:label="@LABEL@"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

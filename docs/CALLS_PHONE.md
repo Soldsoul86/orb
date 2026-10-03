@@ -1,6 +1,6 @@
 # Calls — when you last spoke with someone, on their page (stage 2b of the operator's flow; proposed)
 
-> Status: **proposed 2026-10-03, revised the same day after the operator's question (§0): the next step is a small probe app, not the feature. Awaiting the operator's go-ahead.** ("Yes, go ahead with the design for calls first" asked for this write-up; building waits for the next "yes"). Nothing here is built.
+> Status: **proposed 2026-10-03, revised the same day after the operator's question (§0): the next step is a small probe app, not the feature. The probe is built (`DEVICE_LOOP.md` §7b82, `orb-calls-probe.apk`) and awaits the device; the feature is not built.** ("Yes, go ahead with the design for calls first" asked for this write-up; building waits for the next "yes"). Nothing here is built.
 > Builds on: People (`PEOPLE_PHONE.md`, DR-24/25), the Contacts read it copies the shape of (`orb.read.contacts`), Sources (`SOURCES_PHONE.md` §4 sketched this slice), the Safety check's grant pattern (DR-32). **This slice changes the manifest permission guard (three → four) and carries a Play Protect risk — both need your decision (§6).**
 
 ## 0. Revised 2026-10-03 — the operator's question, and what the research found
