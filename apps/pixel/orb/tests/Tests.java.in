@@ -34,6 +34,7 @@ public final class Tests {
         MessagesTest.run();
         UnderstandingTest.run();
         PersonNoteTest.run();
+        FaultsTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

@@ -50,6 +50,8 @@ public final class Orb extends Application {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        // First of all, so a crash anywhere after this leaves a note of what kind and where (never a message).
+        Faults.install(this);
 
         // A restore that was verified and not finished is finished first — before the identity or the journal
         // is opened, so Orb never opens a lane that is not the one it is about to become.
@@ -78,6 +80,9 @@ public final class Orb extends Application {
         }
 
         recordStart();
+
+        // If the last run ended in a crash, say what kind and where — once.
+        Faults.recordLast(this, journal);
 
         // If this start follows a restore, the history says so.
         Backup.noteRestored(this, journal);

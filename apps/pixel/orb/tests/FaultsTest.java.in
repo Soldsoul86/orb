@@ -1,0 +1,135 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+
+/** *Orb says why it crashed* (`docs/DEVICE_LOOP.md` §7b89): the error's kind and where in Orb's own code — never its message. */
+final class FaultsTest {
+    private FaultsTest() {}
+
+    private static final String PKG = Faults.class.getPackage().getName();
+
+    private static Throwable error(String message, Throwable cause, String... frames) {
+        Throwable t = cause == null ? new IllegalStateException(message) : new IllegalStateException(message, cause);
+        StackTraceElement[] trace = new StackTraceElement[frames.length];
+        for (int i = 0; i < frames.length; i++) {
+            String[] parts = frames[i].split("#");
+            trace[i] = new StackTraceElement(parts[0], parts[1], "File.java", Integer.parseInt(parts[2]));
+        }
+        t.setStackTrace(trace);
+        return t;
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        Harness.suite("what kind of error, and where in Orb");
+        Throwable root = new ArithmeticException("root words");
+        root.setStackTrace(new StackTraceElement[0]);
+        Throwable chain = error("outer secret", error("middle secret", root));
+        Harness.equal("the error and its causes, by class name", Faults.kinds(chain), "IllegalStateException<-IllegalStateException<-ArithmeticException");
+        Throwable deep = new RuntimeException();
+        for (int i = 0; i < 8; i++) deep = new RuntimeException(deep);
+        Harness.equal("at most four are named", Faults.kinds(deep).split("<-").length, 4);
+        Harness.equal("a single error", Faults.kinds(new NullPointerException()), "NullPointerException");
+
+        Throwable e = error("Ravi +919876543210 said hello", null,
+            "android.widget.TextView#setText#940", PKG + ".PeopleActivity#show#512", "android.os.Handler#dispatch#10", PKG + ".PeopleActivity$3#run#301", "java.lang.Thread#run#1");
+        Harness.equal("Orb's own frames, with the package taken off, and the first frame whoever owns it", Faults.frames(e, PKG),
+            "android.widget.TextView.setText:940 < PeopleActivity.show:512 < PeopleActivity$3.run:301");
+        Throwable ours = error("x", null, PKG + ".A#a#1", PKG + ".B#b#2");
+        Harness.equal("when the first frame is Orb's own it is not repeated", Faults.frames(ours, PKG), "A.a:1 < B.b:2");
+        String[] many = new String[12];
+        for (int i = 0; i < many.length; i++) many[i] = PKG + ".C#m" + i + "#" + i;
+        Harness.equal("at most eight frames from one error", Faults.frames(error("x", null, many), PKG).split(" < ").length, 8);
+        Throwable withCause = error("a", error("b", null, PKG + ".Inner#go#9"), PKG + ".Outer#run#7");
+        Harness.equal("a cause's frames follow, set apart", Faults.frames(withCause, PKG), "Outer.run:7 || Inner.go:9");
+        Harness.equal("no trace, no frames", Faults.frames(error("x", null), PKG), "");
+
+        Harness.suite("a message is never read");
+        Map<String, Object> payload = Faults.payload(e, "main", "People.show");
+        String shown = payload.toString();
+        Harness.check("the payload holds kinds, frames, thread and where — and nothing the error said", payload.get("exception").equals("IllegalStateException") && payload.get("thread").equals("main") && payload.get("where").equals("People.show")
+            && !shown.contains("Ravi") && !shown.contains("9198") && !shown.contains("hello"));
+        Harness.equal("and its fields", new java.util.TreeSet<>(payload.keySet()).toString(), "[exception, frames, thread, where]");
+        Harness.equal("a caught fault has no thread", new java.util.TreeSet<>(Faults.payload(e, null, "People.show").keySet()).toString(), "[exception, frames, where]");
+
+        Harness.suite("a crash is written as the process dies and recorded at the next start");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-faults").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.check("with nothing written, nothing is recorded", !Faults.recordLast(context, journal) && journal.readLines().isEmpty());
+        Faults.write(context, e, "Thread-5");
+        String file = new String(Files.readAllBytes(new File(dir, Faults.FILE).toPath()), StandardCharsets.UTF_8);
+        Harness.check("the file holds the thread, the kinds and the frames — not the words", file.startsWith("Thread-5\nIllegalStateException\n") && file.contains("PeopleActivity.show:512") && !file.contains("Ravi") && !file.contains("9198"));
+        Harness.check("recorded once", Faults.recordLast(context, journal) && journal.readLines().size() == 1 && Faults.CRASHED.equals(Journal.typeOf(journal.readLines().get(0))));
+        String line = journal.readLines().get(0);
+        Harness.check("the event names the kind, the place and the thread", line.contains("\"exception\":\"IllegalStateException\"") && line.contains("PeopleActivity.show:512") && line.contains("\"thread\":\"Thread-5\"") && !line.contains("Ravi"));
+        Harness.check("and the file is gone, so it is not recorded twice", !new File(dir, Faults.FILE).exists() && !Faults.recordLast(context, journal) && journal.readLines().size() == 1);
+        Harness.check("without a journal, the file waits", writeAndTry(context));
+        Faults.write(context, new RuntimeException("x"), null);
+        Faults.recordLast(context, journal);
+        Harness.check("a crash on a thread with no name records no thread", !journal.readLines().get(1).contains("\"thread\""));
+
+        Harness.suite("a fault that was caught");
+        Faults.caught(journal, e, "People.save");
+        String caught = journal.readLines().get(2);
+        Harness.check("is one event saying where it was caught", Faults.CAUGHT.equals(Journal.typeOf(caught)) && caught.contains("\"where\":\"People.save\"") && caught.contains("PeopleActivity.show:512") && !caught.contains("Ravi"));
+        Faults.caught(null, e, "x");
+        Harness.equal("with no journal, nothing happens", journal.readLines().size(), 3);
+
+        Harness.suite("the handler writes, then lets the platform carry on");
+        final Throwable[] passedOn = new Throwable[1];
+        Thread.UncaughtExceptionHandler before = Thread.getDefaultUncaughtExceptionHandler();
+        try {
+            Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                @Override public void uncaughtException(Thread t, Throwable error) { passedOn[0] = error; }
+            });
+            Faults.install(context);
+            Thread.getDefaultUncaughtExceptionHandler().uncaughtException(Thread.currentThread(), e);
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(before);
+        }
+        Harness.check("the crash note is written and the earlier handler still gets the error", new File(dir, Faults.FILE).exists() && passedOn[0] == e);
+
+        Harness.suite("it is held in code");
+        Path root2 = java.nio.file.Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root2.resolve("src"))) {
+            for (Path p : (Iterable<Path>) files::iterator) {
+                String name = p.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)));
+            }
+        }
+        String faults = source.get("Faults");
+        Harness.check("Faults never reads a message, prints a trace or logs", !faults.contains("getMessage") && !faults.contains("getLocalizedMessage") && !faults.contains("printStackTrace") && !faults.contains("Log.")
+            && !faults.contains("System.out"));
+        Harness.check("the handler is installed before anything else at start, and last start's crash is recorded after the journal opens", source.get("Orb").indexOf("Faults.install(this)") < source.get("Orb").indexOf("Backup.finishRestore(this)")
+            && source.get("Orb").indexOf("recordStart();") < source.get("Orb").indexOf("Faults.recordLast(this, journal)"));
+        String screen = source.get("PeopleActivity");
+        Harness.check("People catches an unexpected error where it computes, draws, saves and removes, and says it could not rather than closing",
+            screen.contains("Faults.caught(journal, unexpected, \"People.render\")") && screen.contains("Faults.caught(journal, unexpected, \"People.show\")")
+            && screen.contains("Faults.caught(journal, unexpected, \"People.save\")") && screen.contains("Faults.caught(journal, unexpected, \"People.remove\")"));
+    }
+
+    private static boolean writeAndTry(Context context) throws Exception {
+        Faults.write(context, new RuntimeException("x"), "t");
+        boolean recorded = Faults.recordLast(context, null);
+        boolean waiting = new File(context.getFilesDir(), Faults.FILE).exists();
+        new File(context.getFilesDir(), Faults.FILE).delete();
+        return !recorded && waiting;
+    }
+}

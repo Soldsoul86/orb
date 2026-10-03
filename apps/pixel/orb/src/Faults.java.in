@@ -1,0 +1,121 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Map;
+
+/**
+ * *Orb says why it crashed* (`docs/DEVICE_LOOP.md` §7b89). Android tells the journal only that the app crashed and when; this adds **what kind of error it
+ * was and where in Orb's own code**, so the next crash explains itself without anyone reading a phone's log.
+ *
+ * **Code locations only, never a message.** An error's message can hold what the code was handling — a name, a number, a few words — so it is never read: the
+ * record is the error's *class names* (the error and its causes) and the *class, method and line* of Orb's own frames. A crash writes one small file before
+ * the process dies; the next start turns it into one `orb.process.crashed` event and deletes it. A fault that was caught (so the app did not crash) is one
+ * `orb.fault.caught` event, with where it was caught. Nothing here changes what a screen does except to stop an unexpected error from closing the app.
+ */
+final class Faults {
+    private Faults() {}
+
+    static final String CRASHED = "orb.process.crashed";
+    static final String CAUGHT = "orb.fault.caught";
+    static final String FILE = "crash.last";
+    private static final int MAX_FRAMES = 8;
+    private static final int MAX_CAUSES = 4;
+
+    /** The error's class names, its cause chain: `IllegalStateException<-NullPointerException`. */
+    static String kinds(Throwable error) {
+        StringBuilder out = new StringBuilder();
+        Throwable t = error;
+        for (int i = 0; t != null && i < MAX_CAUSES; i++, t = t.getCause()) {
+            if (i > 0) out.append("<-");
+            out.append(t.getClass().getSimpleName());
+        }
+        return out.toString();
+    }
+
+    /** Orb's own frames, `Class.method:line`, innermost first — and the very first frame whoever owns it. Class and method names only. */
+    static String frames(Throwable error, String appPackage) {
+        StringBuilder out = new StringBuilder();
+        Throwable t = error;
+        for (int c = 0; t != null && c < MAX_CAUSES; c++, t = t.getCause()) {
+            StackTraceElement[] trace = t.getStackTrace();
+            int kept = 0;
+            for (int i = 0; i < trace.length && kept < MAX_FRAMES; i++) {
+                String cls = trace[i].getClassName();
+                boolean ours = cls.startsWith(appPackage + ".");
+                if (!ours && i != 0) continue;
+                if (out.length() > 0) out.append(c > 0 && kept == 0 ? " || " : " < ");
+                out.append(ours ? cls.substring(appPackage.length() + 1) : cls).append('.').append(trace[i].getMethodName()).append(':').append(trace[i].getLineNumber());
+                kept++;
+            }
+        }
+        return out.toString();
+    }
+
+    static Map<String, Object> payload(Throwable error, String thread, String where) {
+        Map<String, Object> p = Json.obj();
+        p.put("exception", kinds(error));
+        p.put("frames", frames(error, Faults.class.getPackage().getName()));
+        if (thread != null) p.put("thread", thread);
+        if (where != null) p.put("where", where);
+        return p;
+    }
+
+    // ---- a crash: written as the process dies, recorded at the next start
+
+    /** Installs the handler: write what is known to a file, then let the platform carry on exactly as it would have. Call first thing at start. */
+    static void install(final Context context) {
+        final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override public void uncaughtException(Thread thread, Throwable error) {
+                try {
+                    write(context, error, thread == null ? null : thread.getName());
+                } catch (Throwable cannotWrite) {
+                    // Nothing more can be done as the process dies.
+                }
+                if (previous != null) previous.uncaughtException(thread, error);
+            }
+        });
+    }
+
+    /** One line per field: thread, the kinds, the frames. Never the message. */
+    static void write(Context context, Throwable error, String thread) throws IOException {
+        String text = (thread == null ? "" : thread.replace('\n', ' ')) + "\n" + kinds(error) + "\n" + frames(error, Faults.class.getPackage().getName()) + "\n";
+        try (FileOutputStream out = new FileOutputStream(new File(context.getFilesDir(), FILE))) {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.getFD().sync();
+        }
+    }
+
+    /** At the next start: if a crash left its file, record it as one event and remove the file. Returns whether one was recorded. */
+    static boolean recordLast(Context context, Journal journal) {
+        File file = new File(context.getFilesDir(), FILE);
+        if (journal == null || !file.exists()) return false;
+        try {
+            String[] lines = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).split("\n", -1);
+            Map<String, Object> p = Json.obj();
+            p.put("exception", lines.length > 1 ? lines[1] : "");
+            p.put("frames", lines.length > 2 ? lines[2] : "");
+            if (lines.length > 0 && !lines[0].isEmpty()) p.put("thread", lines[0]);
+            if (journal.append(CRASHED, p) == null) return false;
+            return file.delete();
+        } catch (IOException | RuntimeException unreadable) {
+            return false;   // Left for the next start; never blocks launching.
+        }
+    }
+
+    // ---- a fault that was caught: the app did not crash, and the journal says what happened and where
+
+    static void caught(Journal journal, Throwable error, String where) {
+        if (journal == null) return;
+        try {
+            journal.append(CAUGHT, payload(error, null, where));
+        } catch (RuntimeException cannotRecord) {
+            // The record is a courtesy to the next reader; it must never become a second fault.
+        }
+    }
+}

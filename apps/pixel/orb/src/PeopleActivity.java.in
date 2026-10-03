@@ -146,6 +146,10 @@ public final class PeopleActivity extends Activity {
                         dates = ComingUp.compute(context, journal, System.currentTimeMillis(), java.util.TimeZone.getDefault().getID());
                     } catch (IOException unreadable) {
                         computed = null;
+                    } catch (RuntimeException unexpected) {
+                        // Not a crash: the journal says what happened and where, and the screen says it could not read.
+                        Faults.caught(journal, unexpected, "People.render");
+                        computed = null;
                     }
                 }
                 ahead = dates;
@@ -153,7 +157,16 @@ public final class PeopleActivity extends Activity {
                 final People.Result result = computed;
                 final boolean readable = book != null;
                 runOnUiThread(new Runnable() {
-                    @Override public void run() { show(journal, readable, result); }
+                    @Override public void run() {
+                        try {
+                            show(journal, readable, result);
+                        } catch (RuntimeException unexpected) {
+                            Faults.caught(journal, unexpected, "People.show");
+                            list.removeAllViews();
+                            list.addView(text("People", 17, true));
+                            list.addView(text("Orb could not draw this screen, so it shows nothing rather than a guess. What went wrong is on record.", 13, false));
+                        }
+                    }
                 });
             }
         }).start();
@@ -806,6 +819,10 @@ public final class PeopleActivity extends Activity {
         } catch (IOException unreadable) {
             say("Orb could not read its history, so it saved nothing.", null);
             return;
+        } catch (RuntimeException unexpected) {
+            Faults.caught(journal, unexpected, "People.save");
+            say("Orb could not save this, so nothing changed. What went wrong is on record.", null);
+            return;
         }
         if (PersonNote.NOTE_FAILED.equals(outcome) || PersonNote.JOURNAL_FAILED.equals(outcome)) {
             say("Orb could not record this, so nothing changed.", null);
@@ -829,6 +846,10 @@ public final class PeopleActivity extends Activity {
                         PersonNote.remove(PeopleActivity.this, journal, person);
                     } catch (IOException unreadable) {
                         say("Orb could not read its history, so it removed nothing.", null);
+                        return;
+                    } catch (RuntimeException unexpected) {
+                        Faults.caught(journal, unexpected, "People.remove");
+                        say("Orb could not remove this, so nothing changed. What went wrong is on record.", null);
                         return;
                     }
                     reopenName = person.names.get(0);
