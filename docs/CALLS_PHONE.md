@@ -1,7 +1,32 @@
 # Calls — when you last spoke with someone, on their page (stage 2b of the operator's flow; proposed)
 
-> Status: **proposed 2026-10-03, awaiting the operator's go-ahead** ("Yes, go ahead with the design for calls first" asked for this write-up; building waits for the next "yes"). Nothing here is built.
+> Status: **proposed 2026-10-03, revised the same day after the operator's question (§0): the next step is a small probe app, not the feature. Awaiting the operator's go-ahead.** ("Yes, go ahead with the design for calls first" asked for this write-up; building waits for the next "yes"). Nothing here is built.
 > Builds on: People (`PEOPLE_PHONE.md`, DR-24/25), the Contacts read it copies the shape of (`orb.read.contacts`), Sources (`SOURCES_PHONE.md` §4 sketched this slice), the Safety check's grant pattern (DR-32). **This slice changes the manifest permission guard (three → four) and carries a Play Protect risk — both need your decision (§6).**
+
+## 0. Revised 2026-10-03 — the operator's question, and what the research found
+
+> *"If I chose one person at a time then also Play Protect issue comes — check for the best way to do it."*
+
+**You are right, and my design under-weighted it.** Reading one person at a time changes what Orb *does*; it does not change what the **APK declares**. `READ_CALL_LOG` sits in the manifest, so Android and Play Protect weigh it at **install time**, for everyone who installs that build, whether or not they ever turn calls on. §6's first row said so; the design then still asked you to approve the build. This section replaces that ask.
+
+**What I could establish (public sources, July–October 2024 onward; I could not open Android's own documentation page from here, so items 2–3 are from reports of it):**
+
+1. **Play Protect's *documented* sideload block names four permissions — `RECEIVE_SMS`, `READ_SMS`, notification listener, accessibility** — and it is running in **India** (a pilot in nine countries). **`READ_CALL_LOG` is not on that list.** So calls are *less* likely to be blocked outright than SMS would be — but Play Protect also has unpublished heuristics, and the one block Orb has had so far (`QUERY_ALL_PACKAGES`, `DEVICE_LOOP.md` §7b38) was one of those, not the named four. It is a lower risk, not no risk.
+2. **`READ_CALL_LOG` is *hard-restricted*.** For an app that is not from a store, the permission can be granted only if the thing that installed it **allowlisted** it (an installer does this through the install session); **the "Allow restricted settings" switch I wrote into §6 is for accessibility, notification access and device admin and, as reported, does *not* unlock hard-restricted permissions.** So that fallback may not exist. Whether Orb's own install route (the system installer, from Downloads) allowlists it on your phone cannot be known from here.
+3. **There is no way to read the call history without the permission.** `LAST_TIME_CONTACTED` in Contacts is no longer maintained for current apps; a call-screening role sees only *new* calls and replaces your spam blocker; notification listening is on Play Protect's own list. Nothing else carries the history.
+
+**The consequence for SMS (`SOURCES_PHONE.md` §5):** `READ_SMS` and `RECEIVE_SMS` are exactly the permissions Play Protect's sideload block names, in India. A sideloaded Orb that declares them would be **blocked at install**, not warned. **The SMS route through the permission is very probably closed for this distribution**, and slice 2c needs a different route (what you *share*, which already works) before it is designed further.
+
+**What I now propose instead of building calls straight into Orb: measure first, with a tiny separate app.**
+
+- **A probe, not a feature**: `Orb Calls Probe`, its own package, nothing of Orb in it. One screen, three buttons: *Ask for the permission*, *Count my calls* (shows only **how many calls are in the log and the date of the newest** — no number, no name), and a line that says how it was installed and what Android said. It exists to answer **two questions on your phone, in one afternoon**: **(a) does Android or Play Protect block or warn about installing an app that declares `READ_CALL_LOG`? (b) when installed the way you install, can the permission actually be granted — and does the "restricted setting" appear?** The same measure-before-building step the repository used for `QUERY_ALL_PACKAGES`.
+- **Orb v45 is not touched.** Nothing about Orb changes until the probe has answered.
+- **If the answer is *installs, and the permission can be granted***, there are two honest shapes for the feature, and I would choose between them with you then:
+  - **An opt-in build of Orb** (the same code, built with a flag — exactly how `ORB_PACKAGE_SCAN=0` already works): the default Orb stays free of the permission; the call-aware Orb is a build you choose to install. Simplest; if Play Protect ever blocks it you keep the default build.
+  - **A companion app** that holds the permission and answers Orb's question (*last call with these numbers?*) over a bound service guarded by a signature-level permission, so **Orb's own APK never declares it**. Cleaner isolation; two apps to install; more to build and to keep correct.
+- **If the answer is *blocked*, or *installs but cannot be granted***, the calls slice stops there, with the reason recorded, and costs nothing but the probe.
+
+**What stays from the rest of this document:** the screen (§2), what is read and kept (§3–4) and the tests (§7) are unchanged and apply to whichever shape is chosen. §5's *new permission in Orb's manifest* and §9's items 1–2 are **withdrawn**; the asks are now in §10.
 
 ## 1. Why, in plain words
 
@@ -69,3 +94,9 @@ Words, not a list. Each is computed when the window opens from the call log and 
 3. **A person's page only**, computed when it opens and let go when it closes; **nothing about any call is kept**; one counts-only record per read.
 4. **The last 365 days, the newest 5,000 calls, phone calls only**, said plainly on the line.
 5. **Turning it on is a recorded decision of yours**, with Android's prompt after it and the restricted-settings help if Android asks for it.
+
+## 10. For the operator to approve (replaces §9's items 1–2)
+
+1. **Build the probe first** — a separate tiny app, `Orb Calls Probe`, that declares `READ_CALL_LOG` and reports only (a) whether it installs, (b) whether the permission can be granted, (c) how many calls are in the log and the date of the newest. **Orb v45 is not changed.**
+2. **Decide the shape after the answer** — an opt-in build of Orb, or a companion app — or stop if it is blocked or cannot be granted.
+3. **Everything else in this design stands** (§2–4, §7) for whichever shape follows.
