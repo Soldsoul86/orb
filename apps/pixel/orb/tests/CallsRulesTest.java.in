@@ -192,10 +192,15 @@ final class CallsRulesTest {
             reader.contains("new String[] {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NORMALIZED_NUMBER, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION}"));
         Harness.check("each row is the normalised number, the kind, the time and then the length, in that order",
             reader.contains("new CallsRules.Call(CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(3), c.getLong(4))"));
-        Harness.check("only the last year, newest first, at most the cap",
-            reader.contains("CallLog.Calls.DATE + \" >= ?\"") && reader.contains("CallLog.Calls.DATE + \" DESC LIMIT \" + CallsRules.MAX_CALLS") && reader.contains("nowMs - CallsRules.WINDOW_DAYS * 86_400_000L"));
-        Harness.check("nothing is read without Android's permission, and a failure is null, not an empty log",
-            reader.contains("if (!CallsAccess.permitted(context)) return null;") && reader.contains("if (c == null) return null;") && reader.contains("catch (RuntimeException unreadable) {\n            return null;"));
+        Harness.check("only the last year, newest first",
+            reader.contains("CallLog.Calls.DATE + \" >= ?\"") && reader.contains("CallLog.Calls.DATE + \" DESC\")") && reader.contains("nowMs - CallsRules.WINDOW_DAYS * 86_400_000L"));
+        Harness.check("the sort order is a column and a direction only: Android refuses SQL in it (the first calls build failed on a LIMIT there), so the cap is applied while reading",
+            !reader.contains("LIMIT") && reader.contains("while (c.moveToNext() && out.size() < CallsRules.MAX_CALLS) {"));
+        Harness.check("a failed read says what kind of failure, never a number or a name", reader.contains("return new Read(null, unreadable.getClass().getSimpleName());")
+            && reader.contains("new Read(null, \"Android's permission is not there\")") && reader.contains("new Read(null, \"the call log gave no answer\")"));
+        Harness.check("nothing is read without Android's permission, and a failure is a failure, not an empty log",
+            reader.contains("if (!CallsAccess.permitted(context)) return new Read(null,") && reader.contains("if (c == null) return new Read(null,") && reader.contains("catch (RuntimeException unreadable) {\n            return new Read(null,"));
+        Harness.check("a good read carries the calls and no failure", reader.contains("return new Read(out, null);"));
         Harness.check("the rules import no Android class and keep nothing", !source.get("CallsRules").contains("import android.") && !source.get("CallsRules").contains("Journal") && !source.get("CallsRules").contains("Attachments."));
         String facts = source.get("CallsFacts").replaceFirst("(?m)^package .*$", "");
         Harness.check("the record takes no number, name, time or length", !facts.contains("number") && !facts.contains("name") && !facts.contains("duration") && !facts.contains("date"));
@@ -221,7 +226,8 @@ final class CallsRulesTest {
         Harness.check("a build without the permission says so and reads nothing", add.indexOf("if (!CallsAccess.available(this)) {") > 0 && add.indexOf("if (!CallsAccess.available(this)) {") < add.indexOf("CallsReader.read("));
         Harness.check("a person with no number is not looked up", add.contains("if (person.phones.isEmpty()) return;"));
         Harness.check("nothing is read before the grant is checked", add.indexOf("if (!CallsAccess.granted(this)) {") > 0 && add.indexOf("if (!CallsAccess.granted(this)) {") < add.indexOf("CallsReader.read("));
-        Harness.check("the read is off the main thread and matched to this person's numbers only", add.contains("new Thread(new Runnable()") && add.contains("CallsRules.summarize(calls, numbers, now)") && add.contains("new java.util.ArrayList<>(person.phones)"));
+        Harness.check("the read is off the main thread and matched to this person's numbers only", add.contains("new Thread(new Runnable()") && add.contains("CallsRules.summarize(read.calls, numbers, now)") && add.contains("new java.util.ArrayList<>(person.phones)"));
+        Harness.check("a failed read is said with its kind, and nothing is recorded for it", add.contains("\"Calls: could not be read (\" + read.failure + \"), so nothing is shown rather than a guess.\"") && add.contains("read.calls == null ? null : CallsRules.summarize(read.calls, numbers, now)"));
         Harness.check("only two counts are recorded, from the read that happened", add.contains("journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched))") && add.contains("summary != null && journal != null"));
         String confirm = screen.substring(screen.indexOf("private void confirmCalls("), screen.indexOf("private void finishCalls("));
         Harness.check("the card says what is read and kept, Cancel is the default, the window is secure",

@@ -795,6 +795,7 @@ a second source for the compiler's checksum exists (item 1).
 6. **A year, 5,000 calls.** A busier log is cut at the newest 5,000 and the line says so.
 7. **"Spoken" is a duration over zero.** A call answered by voicemail that lasted is counted; a very short real call is too. No attempt is made to read intent.
 8. **Time zone.** The day is the phone's current zone; a call made abroad in another zone is shown in today's.
+9. **The reader cannot be run off the phone.** `CallsReader` talks to Android's call-log provider, which the test shim does not have; v46's first read failed on a provider rule (no SQL in the sort order) that no off-phone test could see, though the probe's simpler query had worked. The failure is now named on the screen and a source guard forbids the known cause; the first device round of any new provider query is still the real test.
 
 ---
 

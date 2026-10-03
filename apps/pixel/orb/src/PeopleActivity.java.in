@@ -345,10 +345,10 @@ public final class PeopleActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 final long now = System.currentTimeMillis();
-                List<CallsRules.Call> calls = CallsReader.read(context, now);
-                final CallsRules.Summary summary = calls == null ? null : CallsRules.summarize(calls, numbers, now);
+                CallsReader.Read read = CallsReader.read(context, now);
+                final CallsRules.Summary summary = read.calls == null ? null : CallsRules.summarize(read.calls, numbers, now);
                 final List<String> said = summary == null
-                    ? java.util.Collections.singletonList("Calls: could not be read, so nothing is shown rather than a guess.")
+                    ? java.util.Collections.singletonList("Calls: could not be read (" + read.failure + "), so nothing is shown rather than a guess.")
                     : CallsRules.lines(summary, now, java.util.TimeZone.getDefault(), Locale.getDefault());
                 runOnUiThread(new Runnable() {
                     @Override public void run() {

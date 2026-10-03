@@ -18,23 +18,36 @@ import java.util.List;
 final class CallsReader {
     private CallsReader() {}
 
-    /** The calls of the last year (newest first, at most the cap), or null if they cannot be read. */
-    static List<CallsRules.Call> read(Context context, long nowMs) {
-        if (!CallsAccess.permitted(context)) return null;
+    /** What a read came to: the calls (newest first, at most the cap), or why there are none to show. Never both. */
+    static final class Read {
+        final List<CallsRules.Call> calls;
+        /** For a failed read: a short, content-free reason (a kind of failure, never a number or a name). */
+        final String failure;
+
+        private Read(List<CallsRules.Call> calls, String failure) {
+            this.calls = calls;
+            this.failure = failure;
+        }
+    }
+
+    /** The calls of the last year, or the kind of failure. */
+    static Read read(Context context, long nowMs) {
+        if (!CallsAccess.permitted(context)) return new Read(null, "Android's permission is not there");
         ContentResolver resolver = context.getContentResolver();
         long since = nowMs - CallsRules.WINDOW_DAYS * 86_400_000L;
         List<CallsRules.Call> out = new ArrayList<>();
+        // The sort order is only a column and a direction: Android refuses SQL in it (a LIMIT there fails), so the cap is applied here, on the newest first.
         try (Cursor c = resolver.query(CallLog.Calls.CONTENT_URI,
                 new String[] {CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NORMALIZED_NUMBER, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION},
                 CallLog.Calls.DATE + " >= ?", new String[] {String.valueOf(since)},
-                CallLog.Calls.DATE + " DESC LIMIT " + CallsRules.MAX_CALLS)) {
-            if (c == null) return null;
-            while (c.moveToNext()) {
+                CallLog.Calls.DATE + " DESC")) {
+            if (c == null) return new Read(null, "the call log gave no answer");
+            while (c.moveToNext() && out.size() < CallsRules.MAX_CALLS) {
                 out.add(new CallsRules.Call(CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(3), c.getLong(4)));
             }
         } catch (RuntimeException unreadable) {
-            return null;
+            return new Read(null, unreadable.getClass().getSimpleName());
         }
-        return out;
+        return new Read(out, null);
     }
 }

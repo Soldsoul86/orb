@@ -7250,7 +7250,7 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 
 ### 7b84. Calls — when you last spoke, on a person's page (DR-36) — the calls build, 2026-10-03
 
-**Status: built, awaiting the device.** `orb-app-v46-calls.apk` — **the calls build** (made with `ORB_CALL_LOG=1`; it declares `READ_CALL_LOG`, so it has four permissions; the default build, which is v45's shape, has three). v45 is the safe build and the rollback. Design: `docs/CALLS_PHONE.md` (§12–13); decision `DECISIONS.md` DR-36; limits `ARCHITECTURAL_DEBT.md` AD-31.
+**Status: first round done (v46): installed, granted, but the read failed — fixed in v47 (`orb-app-v47-calls.apk`), awaiting the device.** The export (`7f3ce70d`, 649 events) shows v46 installed with no block (**P256 held**), the card and Android's prompt accepted and `orb.read.calls` **granted** (**P258 in part**), and then the page said ***Calls: could not be read, so nothing is shown rather than a guess*** — no `orb.calls.read` was recorded, so the call log was not read. **Cause (not confirmed on the device): the reader asked Android for the newest 5,000 calls by putting `LIMIT 5000` in the sort order; Android refuses SQL in a provider's sort order (the probe, which sorted by date alone, read 1,510 calls fine).** v47 sorts by date only and applies the cap while reading, **and a failed read now says its kind** (*could not be read (IllegalArgumentException)* — a kind of failure, never a number or a name), so if this was not the cause, the next export names it. A source guard now fails the build if a `LIMIT` returns. `orb-app-v46-calls.apk` — **the calls build** (made with `ORB_CALL_LOG=1`; it declares `READ_CALL_LOG`, so it has four permissions; the default build, which is v45's shape, has three). v45 is the safe build and the rollback. Design: `docs/CALLS_PHONE.md` (§12–13); decision `DECISIONS.md` DR-36; limits `ARCHITECTURAL_DEBT.md` AD-31.
 
 **Why:** before you message or chase someone, the simplest thing to know is when you last spoke. Your call log has it. Orb reads it **for one person at a time, only while their page is open**, says it in a line, and keeps nothing.
 
@@ -7265,7 +7265,7 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 
 #### Checked before the device
 
-- Phone-side suite: 1909 checks; brain, TypeScript, lint and type-check unchanged and clean. **Both builds were built:** the default declares three permissions, the calls build four.
+- Phone-side suite: 1913 checks; brain, TypeScript, lint and type-check unchanged and clean. **Both builds were built:** the default declares three permissions, the calls build four.
 - **Mutation checks** on the kinds of call, the summary and its edges (a year, 90 days, the future, 5,000), the words, the record, the access (grant before flag, both conditions, revoke order, reconcile), the reader (the query, the columns, the null on failure) and the screen (the order of asking and recording, the card's default): **86 deliberate breakages. 74 were caught at once; 11 survived and became tests — a log form that differs from the number as written, a missed call at the very instant of the last spoken one, the person's time zone on an older day, turning on twice, the reconcile guards, whether this build declared the permission, the order of the columns read, and the card's Allow and reopen — then were caught; 1 is equivalent and documented** (an unmatched null number is also not found in a set of real numbers).
 - **Not testable off the phone:** that Android's call-log provider returns what it returned to the probe for the whole of Orb, and that Play Protect lets the whole of Orb through with this permission.
 
@@ -7293,3 +7293,7 @@ One screen, four buttons, and a report. It declares **exactly one permission and
 6. **What Orb may do** → read the line → **Switch off** → back in People. *(P262)*
 7. **Export and share journal**. *(P263)*
 8. Tell me: **was the last-spoke line right, and did anything look wrong or missing?**
+
+#### Round 2 (v47, the calls build again)
+
+Same install and steps as above (install over v46 or v45; **Show when we last spoke** is already on after v46's grant — open a person with a saved number who you have called). New in v47: the sort order is a column and a direction only; the cap is applied while reading; a failed read names its kind. **If the line still says it could not be read, copy the words in the brackets** — they are the answer. P259–P263 are unchanged.
