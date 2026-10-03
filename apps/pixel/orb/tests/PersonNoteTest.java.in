@@ -70,6 +70,8 @@ final class PersonNoteTest {
         Harness.equal("and at most sixty characters", PersonNote.cleanRole(longRole.toString()).length(), 60);
         Harness.equal("a role of nothing is nothing", PersonNote.cleanRole(" \n ") + "|" + PersonNote.cleanRole(null), "|");
         Harness.equal("a note keeps its line breaks and loses control characters", PersonNote.cleanText("  line one\r\nline two\u0007\n\n  "), "line one\nline two");
+        Harness.equal("a lone carriage return is a line break", PersonNote.cleanText("a\rb"), "a\nb");
+        Harness.equal("a control character inside a note is dropped", PersonNote.cleanText("li\u0007ne"), "line");
         StringBuilder longNote = new StringBuilder();
         for (int i = 0; i < 1200; i++) longNote.append('b');
         Harness.equal("and at most a thousand", PersonNote.cleanText(longNote.toString()).length(), 1000);
@@ -125,6 +127,13 @@ final class PersonNoteTest {
             && !onDisk(context.getFilesDir(), "electrician".getBytes(StandardCharsets.UTF_8)) && !onDisk(context.getFilesDir(), "evenings".getBytes(StandardCharsets.UTF_8)));
         Harness.check("the old note's erasure is on record", count(journal, Erasure.TYPE) >= 1);
         Harness.equal("a note with only a role is fine", r3.note, null);
+        People.Person textOnly = person("Text Only", new String[] {"+919000000077"});
+        PersonNote.save(context, journal, textOnly, "", "just a note");
+        List<People.Contact> textBook = new ArrayList<>();
+        textBook.add(contact("9", "Text Only", new String[] {"+919000000077"}));
+        People.Person textOnlyBack = find(People.compute(context, journal, textBook), "Text Only");
+        Harness.check("a note with no role leaves the role empty, not blank, and the name unchanged", textOnlyBack.role == null && "just a note".equals(textOnlyBack.note) && textOnlyBack.display().equals("Text Only"));
+        PersonNote.remove(context, journal, textOnlyBack);
         Harness.equal("changing back to the first words seals them again", PersonNote.save(context, journal, r3, "electrician", "Prefers evenings"), PersonNote.SAVED);
         Harness.equal("and still one live note", PersonNote.all(context, journal).size(), 1);
 
@@ -142,6 +151,22 @@ final class PersonNoteTest {
         twin.add(contact("3", "Ravi Kumar", new String[] {"+919222222222"}));
         Harness.equal("and a different person with the same name is found by name", find(People.compute(context, journal, twin), "Ravi Kumar").role, "electrician");
 
+        Harness.suite("one person's words never touch another's");
+        People.Person anna = person("Anna Roy", new String[] {"+919000000041"});
+        People.Person bhim = person("Bhim Das", new String[] {"+919000000042"});
+        PersonNote.save(context, journal, anna, "tutor", "");
+        PersonNote.save(context, journal, bhim, "barber", "");
+        PersonNote.save(context, journal, bhim, "driver", "");
+        Harness.equal("changing Bhim's leaves Anna's", PersonNote.latestFor(PersonNote.all(context, journal), anna).role + "|" + PersonNote.latestFor(PersonNote.all(context, journal), bhim).role, "tutor|driver");
+        Harness.equal("removing Bhim's erases one and leaves Anna's", PersonNote.remove(context, journal, bhim) + "|" + PersonNote.latestFor(PersonNote.all(context, journal), anna).role, "1|tutor");
+        PersonNote.remove(context, journal, anna);
+        PersonNote.save(context, journal, anna, "tutor", "");
+        PersonNote.save(context, journal, bhim, "barber", "");
+        People.Person both = person("Merged", new String[] {"+919000000041", "+919000000042"});
+        Harness.equal("a person who matches two notes gets the newer", PersonNote.latestFor(PersonNote.all(context, journal), both).role, "barber");
+        PersonNote.remove(context, journal, anna);
+        PersonNote.remove(context, journal, bhim);
+
         Harness.suite("finding someone by what they are to you");
         People.Result found = People.compute(context, journal, book);
         Harness.equal("the role finds them", People.find(found.all, "electri").size() + "|" + People.find(found.all, "electri").get(0).names.get(0), "1|Ravi Kumar");
@@ -155,6 +180,14 @@ final class PersonNoteTest {
         ranked.add(byRole);
         ranked.add(byName);
         Harness.equal("a name that starts the same way comes first, then the role", People.find(ranked, "electr").get(0).names.get(0) + "|" + People.find(ranked, "electr").get(1).names.get(0), "Electra Jones|Zed");
+        People.Person abe = person("Abe", new String[] {"+919000000007"});
+        abe.role = "electrician";
+        List<People.Person> early = new ArrayList<>(Arrays.asList(abe, byName));
+        Harness.equal("even when the role's owner sorts first by name", People.find(early, "electr").get(0).names.get(0), "Electra Jones");
+        People.Person word = person("Zed", new String[] {"+919000000006"});
+        word.role = "head electrician";
+        People.Person inside = person("Belectra", new String[] {"+919000000005"});
+        Harness.equal("a role word that starts with it comes before a name that merely contains it", People.find(new ArrayList<>(Arrays.asList(inside, word)), "electr").get(0).names.get(0), "Zed");
 
         Harness.suite("what Orb has noticed says it as you did");
         People.Person withRole = find(found, "Ravi Kumar");
@@ -181,6 +214,11 @@ final class PersonNoteTest {
         String outcome = PersonNote.save(c2[0], j2, p2, "colleague", "", new PersonNote.Recorder() {
             @Override public Map<String, Object> record(Map<String, Object> payload) { return null; }
         });
+        long sealedBefore = Attachments.counts(c2[0])[0];
+        String refused = PersonNote.save(c2[0], j2, p2, "boss", "", new PersonNote.Recorder() {
+            @Override public Map<String, Object> record(Map<String, Object> payload) { return null; }
+        });
+        Harness.equal("a refused save seals nothing that stays: the sealed count is what it was", refused + "|" + (Attachments.counts(c2[0])[0] - sealedBefore), "journalFailed|0");
         Harness.equal("the journal refuses: said so", outcome, PersonNote.JOURNAL_FAILED);
         Harness.equal("the person keeps what they had", PersonNote.latestFor(PersonNote.all(c2[0], j2), p2).role, "sister");
         Harness.check("and the sealed new words went back", !onDisk(c2[0].getFilesDir(), "colleague".getBytes(StandardCharsets.UTF_8)));

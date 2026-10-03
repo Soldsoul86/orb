@@ -7475,8 +7475,8 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 #### Checked before the device
 
-- Phone-side suite: 2395 checks before the mutation additions; brain (378), TypeScript (600), lint and type-check clean.
-- **Mutation checks** on the words (their limits, tidying and line breaks), the note's format and reading, which notes are live, which is newest, saving, changing, removing, a failure, the name and the search: @@MUT@@
+- Phone-side suite: 2404 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the words (their limits, tidying and line breaks), the note's format and reading, which notes are live, which is newest, saving, changing, removing, a failure, the name and the search: **42 mutants; 28 caught by the first suite, 1 crashed it (also caught), 14 survived**: a lone carriage return and a control character inside a note, which note is newest when two match, a note with no role, a failed save leaving a sealed note behind, changing or removing one person's words touching another's, and the two ways a role ranks in search. **Nine became tests and are caught; five are equivalent** — the erased-or-not check in reading live notes (an erased note cannot be opened anyway), the two overlapping type filters (each makes the other redundant), the empty-list shortcut in attaching words, and the sealed-identity null check that the store never returns.
 - **Not testable off the phone:** how the form looks and feels, and whether a role you type is found as you expect.
 
 #### Predictions
