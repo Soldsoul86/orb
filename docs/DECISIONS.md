@@ -1349,6 +1349,18 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** *people in a document* (named contacts, full-name/number/email only, one tap to link — its own step); amounts; a model proposing commitments (DR-9); document kinds; languages other than English for cues.
 
+## DR-35 — People in a document: the contacts it names firmly, offered when you choose who it is about
+
+- **Status:** Decided and built · **Decided:** 2026-10-03, operator ("Yes, go ahead with the design for option 2", then "Yes, go ahead with the build" on `DOCUMENT_PEOPLE_PHONE.md`) · **Bears on:** DR-29 (person links), DR-24/25 (People), DR-34 (documents in Coming up)
+
+**The ruling.** When you choose who a kept **PDF** is about, the choose screen opens with ***This document names:*** — the contacts the document names by **a number, an email address or the whole name**, strongest first, at most ten, each with how Orb knows (so a coincidence can be judged). **A first name alone is never offered for a document.** A tap opens the existing card (Cancel first) and makes the existing link; **nothing is ever linked without the tap.** For anything that is not a document nothing changes.
+
+**No new read, record, capability or permission.** The suggestions are the matches People had already found for that one item (computed in memory when the screen opens, never stored); contacts are still read only by the People screen, only while it is open, and the capability's published words are unchanged. The one new fact kept in memory is **how** a name matched (`named`), which the name matcher already returned. The only record is DR-29's link.
+
+**One change to People's matching:** when the same person is named in one item both by a first name and by their whole name, **the whole name is kept** (the first match found used to win).
+
+**Not in this ruling:** automatic linking; the same list for short items; organisations that are not contacts; a model reading the document (DR-9).
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

@@ -1,0 +1,91 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+/**
+ * The people a kept **document** names, offered when the person is choosing who it is about (`docs/DOCUMENT_PEOPLE_PHONE.md`, DR-35).
+ *
+ * **A suggestion, never a decision.** Each person here is one `People.compute` already found in this one item — by a number, an address,
+ * or the **whole name** — and nothing is linked unless the person taps and confirms the usual card (`PersonLink`). **A first name alone is
+ * never offered**: over thousands of characters it is a word (*Mark*, *Rose*, *Will*), not a person. Strongest first: number, address, whole
+ * name. At most `MAX_SUGGESTED`; the rest are counted.
+ *
+ * **Pure and in memory**: no Android, no contacts read here (`PeopleActivity` is the one screen that reads them), nothing stored — the list
+ * lives and dies with the screen. The only thing ever recorded is the link, by `PersonLink`, exactly as when the person searches.
+ */
+final class DocumentPeople {
+    private DocumentPeople() {}
+
+    static final int MAX_SUGGESTED = 10;
+
+    static final class Suggestion {
+        final People.Person person;
+        /** `number`, `email` or `full`. */
+        final String named;
+        /** The person has already linked this document to them. */
+        final boolean linked;
+
+        Suggestion(People.Person person, String named, boolean linked) {
+            this.person = person;
+            this.named = named;
+            this.linked = linked;
+        }
+
+        /** How Orb knows, in plain words — so a coincidence can be judged. */
+        String how() {
+            if ("number".equals(named)) return "has their number";
+            if ("email".equals(named)) return "has their email";
+            return "their full name is written";
+        }
+    }
+
+    static final class Result {
+        final List<Suggestion> list = new ArrayList<>();
+        /** Named people beyond `MAX_SUGGESTED`, not listed (the search finds them). */
+        int more;
+    }
+
+    private static int rank(String named) {
+        return "number".equals(named) ? 0 : "email".equals(named) ? 1 : 2;
+    }
+
+    /** The people item `itemId` names firmly, strongest first. */
+    static Result of(List<People.Person> everyone, String itemId) {
+        final List<Suggestion> found = new ArrayList<>();
+        if (itemId != null) {
+            for (People.Person p : everyone) {
+                for (People.Evidence e : p.items) {
+                    if (!itemId.equals(e.entry.id)) continue;
+                    if ("number".equals(e.named) || "email".equals(e.named) || "full".equals(e.named)) {
+                        found.add(new Suggestion(p, e.named, People.BY_LINK.equals(e.by)));
+                    }
+                    break;
+                }
+            }
+        }
+        Collections.sort(found, new Comparator<Suggestion>() {
+            @Override public int compare(Suggestion a, Suggestion b) {
+                int byRank = rank(a.named) - rank(b.named);
+                return byRank != 0 ? byRank : a.person.display().compareToIgnoreCase(b.person.display());
+            }
+        });
+        Result result = new Result();
+        for (int i = 0; i < found.size(); i++) {
+            if (i < MAX_SUGGESTED) result.list.add(found.get(i)); else result.more++;
+        }
+        return result;
+    }
+
+    /** Whether the kept item with this event id came from the Documents source — the clear record says so, nothing else is read. */
+    static boolean isDocument(List<String> lines, String itemId) {
+        if (itemId == null) return false;
+        java.util.Set<String> documents = DocumentsFacts.documentHashes(lines);
+        for (Erasure.Item item : Erasure.items(lines)) {
+            if (itemId.equals(item.id)) return !item.erased && documents.contains(item.hash);
+        }
+        return false;
+    }
+}

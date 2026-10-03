@@ -1,0 +1,173 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** People in a document (`docs/DOCUMENT_PEOPLE_PHONE.md`, DR-35): who a PDF names firmly, offered when choosing who it is about. */
+final class DocumentPeopleTest {
+    private DocumentPeopleTest() {}
+
+    private static People.Contact contact(String id, String name, String[] phones, String... emails) {
+        People.Contact c = new People.Contact(id, name);
+        c.phones.addAll(Arrays.asList(phones));
+        c.emails.addAll(Arrays.asList(emails));
+        return c;
+    }
+
+    private static final class Fixed implements DocumentsRules.Reader {
+        final String text;
+
+        Fixed(String text) { this.text = text; }
+
+        @Override public DocumentsRules.Reading read(DocumentsRules.Doc doc) { return DocumentsRules.Reading.text(text, 1); }
+    }
+
+    private static String keepDocument(Context context, Journal journal, String text, String name) throws Exception {
+        int before = journal.readLines().size();
+        int kept = DocumentsFlow.keep(context, journal, Arrays.asList(new DocumentsRules.Doc("content://x/" + name, name + ".pdf", "application/pdf", 10L, 1L)), new Fixed(text), 1L);
+        if (kept != 1) throw new IllegalStateException("not kept: " + name);
+        String id = null;
+        List<String> lines = journal.readLines();
+        for (int i = before; i < lines.size(); i++) if (Shares.TYPE.equals(Journal.typeOf(lines.get(i)))) id = Erasure.items(lines).get(Erasure.items(lines).size() - 1).id;
+        return id;
+    }
+
+    private static List<String> names(DocumentPeople.Result r) {
+        List<String> out = new ArrayList<>();
+        for (DocumentPeople.Suggestion s : r.list) out.add(s.person.display() + ":" + s.named + (s.linked ? ":linked" : ""));
+        return out;
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-docpeople").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        List<People.Contact> book = new ArrayList<>();
+        book.add(contact("1", "ACME Telecom", new String[] {}));
+        book.add(contact("2", "Ravi Kumar", new String[] {"+919876543210"}));
+        book.add(contact("3", "Priya Shah", new String[] {}, "priya@shah.example"));
+        book.add(contact("4", "Mark Stone", new String[] {}));
+        book.add(contact("5", "Mark Lee", new String[] {}));
+        book.add(contact("6", "Rose", new String[] {}));
+        book.add(contact("7", "Anil Rao", new String[] {}));
+        book.add(contact("8", "Dev Patel", new String[] {}));
+        book.add(contact("9", "Zoya Khan", new String[] {}));
+
+        Harness.suite("who a document names firmly");
+        String id = keepDocument(context, journal,
+            "ACME Telecom invoice 4471\nContact Ravi Kumar on 98765 43210 or Ravi Kumar again.\nBilling email priya@shah.example\nThanks Anil, Rose will call.\nApproved by Mark Stone",
+            "invoice");
+        People.Result r = People.compute(context, journal, book);
+        DocumentPeople.Result s = DocumentPeople.of(r.all, id);
+        Harness.equal("number, then email, then whole name; ties by name", names(s), Arrays.asList("Ravi Kumar:number", "Priya Shah:email", "ACME Telecom:full", "Mark Stone:full"));
+        Harness.check("a first name alone is never offered: Anil, Rose, and a shared Mark", !names(s).toString().contains("Anil") && !names(s).toString().contains("Rose") && !names(s).toString().contains("Mark Lee"));
+        Harness.equal("in plain words", Arrays.asList(s.list.get(0).how(), s.list.get(1).how(), s.list.get(2).how()),
+            Arrays.asList("has their number", "has their email", "their full name is written"));
+        Harness.equal("nothing was left out", s.more, 0);
+        Harness.check("the document is recognised as one", DocumentPeople.isDocument(journal.readLines(), id));
+        Harness.check("a person only a first name ties to has the item as evidence, but is not a suggestion",
+            r.all.get(6).items.size() == 1 && "first".equals(r.all.get(6).items.get(0).named));
+        Harness.check("nothing is linked yet", !s.list.get(0).linked && !s.list.get(1).linked);
+
+        Harness.suite("the whole name outranks a first name, whichever comes first");
+        String a = keepDocument(context, journal, "Dev called us. Then Dev Patel signed.", "a");
+        String b = keepDocument(context, journal, "Dev Patel signed. Then Dev called us.", "b");
+        People.Result r2 = People.compute(context, journal, book);
+        Harness.equal("first name first", names(DocumentPeople.of(r2.all, a)), Arrays.asList("Dev Patel:full"));
+        Harness.equal("whole name first", names(DocumentPeople.of(r2.all, b)), Arrays.asList("Dev Patel:full"));
+        String onlyFirst = keepDocument(context, journal, "Dev called us. Dev will send it.", "c");
+        Harness.equal("a first name alone, however often, offers nobody", names(DocumentPeople.of(People.compute(context, journal, book).all, onlyFirst)).size(), 0);
+
+        Harness.suite("only this item's people");
+        String other = keepDocument(context, journal, "Zoya Khan has the keys", "d");
+        People.Result r3 = People.compute(context, journal, book);
+        Harness.equal("Zoya is in the other document and not in the invoice", names(DocumentPeople.of(r3.all, other)), Arrays.asList("Zoya Khan:full"));
+        Harness.check("and the invoice does not gain her", !names(DocumentPeople.of(r3.all, id)).toString().contains("Zoya"));
+        Harness.equal("an unknown item offers nobody", DocumentPeople.of(r3.all, "no-such-id").list.size(), 0);
+        Harness.equal("no item offers nobody", DocumentPeople.of(r3.all, null).list.size(), 0);
+
+        Harness.suite("a link you made shows as linked, and still says how it is named");
+        Harness.equal("link the invoice to Ravi", PersonLink.link(context, journal, id, r3.all.get(1)), PersonLink.LINKED);
+        People.Result r4 = People.compute(context, journal, book);
+        List<String> afterLink = names(DocumentPeople.of(r4.all, id));
+        Harness.equal("Ravi is linked and still named by his number", afterLink.get(0), "Ravi Kumar:number:linked");
+        Harness.equal("the others are not", afterLink.subList(1, afterLink.size()), Arrays.asList("Priya Shah:email", "ACME Telecom:full", "Mark Stone:full"));
+        Harness.equal("a person linked but not named is not offered", PersonLink.link(context, journal, other, r4.all.get(1)), PersonLink.LINKED);
+        Harness.check("Ravi is not suggested for the other document just because it is linked to him", !names(DocumentPeople.of(People.compute(context, journal, book).all, other)).toString().contains("Ravi"));
+
+        Harness.suite("at most ten");
+        List<People.Contact> crowd = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        String[] given = {"Alma", "Boris", "Carla", "Dinesh", "Elena", "Farid", "Gita", "Hugo", "Ines", "Jorge", "Kavya", "Liam"};
+        for (int i = 0; i < given.length; i++) {
+            crowd.add(contact("c" + i, given[i] + " Zed", new String[] {}));
+            text.append(given[i]).append(" Zed attended.\n");
+        }
+        String wide = keepDocument(context, journal, text.toString(), "e");
+        DocumentPeople.Result wideResult = DocumentPeople.of(People.compute(context, journal, crowd).all, wide);
+        Harness.equal("ten listed", wideResult.list.size(), DocumentPeople.MAX_SUGGESTED);
+        Harness.equal("and two counted", wideResult.more, 2);
+        Harness.equal("by name within a strength", wideResult.list.get(0).person.display() + "|" + wideResult.list.get(9).person.display(), "Alma Zed|Jorge Zed");
+
+        Harness.suite("only documents");
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 20L);
+        SharedText.record(journal, context, payload, SharedText.seal(context, "Note: Ravi Kumar said hello", null), null);
+        List<String> lines = journal.readLines();
+        String noteId = Erasure.items(lines).get(Erasure.items(lines).size() - 1).id;
+        Harness.check("a shared note is not a document", !DocumentPeople.isDocument(lines, noteId));
+        Harness.check("an unknown id and none are not", !DocumentPeople.isDocument(lines, "nope") && !DocumentPeople.isDocument(lines, null));
+        String hash = null;
+        for (String line : lines) if (id.equals(idOf(line))) hash = Erasure.envelopeHash(line);
+        Harness.equal("erased", Erase.execute(context, journal, hash).outcome, Erase.DESTROYED);
+        Harness.check("an erased document is not offered", !DocumentPeople.isDocument(journal.readLines(), id));
+
+        guards();
+    }
+
+    private static String idOf(String line) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"id\":\"([^\"]+)\"").matcher(line);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("a suggestion only: pure, in memory, and the same card as a search result");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String people = code(new String(Files.readAllBytes(root.resolve("src/DocumentPeople.java.in")), StandardCharsets.UTF_8));
+        Harness.check("the rules import no Android class, read no contacts, keep and write nothing", !people.contains("import android.") && !people.contains("ContactsReader") && !people.contains("Journal")
+            && !people.contains("Attachments.") && !people.contains("PersonLink") && !people.contains("FileOutputStream") && !people.contains("Log."));
+        Harness.check("only numbers, addresses and whole names are offered", people.contains("\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named)") && !people.contains("\"first\""));
+        Harness.check("the list is capped at ten and counts the rest", people.contains("MAX_SUGGESTED = 10") && people.contains("if (i < MAX_SUGGESTED) result.list.add(found.get(i)); else result.more++;"));
+        Harness.check("strongest first: number, address, name", people.contains("\"number\".equals(named) ? 0 : \"email\".equals(named) ? 1 : 2"));
+        Harness.check("a document is recognised from the clear record and not when erased", people.contains("documents.contains(item.hash)") && people.contains("!item.erased"));
+        String screen = code(new String(Files.readAllBytes(root.resolve("src/PeopleActivity.java.in")), StandardCharsets.UTF_8));
+        Harness.check("suggestions appear only in choose mode, only for a document, and only if there is anyone",
+            screen.contains("if (linkItem != null) suggestFor(journal, result);") && screen.contains("if (!document) return;") && screen.contains("if (named.list.isEmpty()) return;"));
+        Harness.check("a suggestion opens the same card as a search result, and a linked one is not tappable",
+            screen.contains("confirmLink(s.person, linkItem, null)") && screen.contains("if (!s.linked) {"));
+        Harness.check("they sit above the search", screen.indexOf("suggestFor(journal, result);") < screen.indexOf("search.setHint("));
+        Harness.check("the history is unreadable: nothing is suggested on a guess", screen.contains("return;   // The history cannot say what this item is, so nothing is suggested on a guess."));
+        Harness.check("a suggestion writes nothing: the only link is the existing one", screen.split("PersonLink\\.link\\(", -1).length - 1 == 1);
+        String model = code(new String(Files.readAllBytes(root.resolve("src/People.java.in")), StandardCharsets.UTF_8));
+        Harness.check("the whole name outranks a first name when the same person is named both ways", model.contains("(have.by.equals(\"first\") && m.by.equals(\"full\"))"));
+        Harness.check("how a person is named is kept beside the evidence, whatever else ties them", model.contains("new Evidence(entry, by, word, linkHash, named)"));
+    }
+}

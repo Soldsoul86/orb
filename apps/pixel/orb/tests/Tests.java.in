@@ -29,6 +29,7 @@ public final class Tests {
         SafetyRulesTest.run();
         DocumentsRulesTest.run();
         DocumentDatesTest.run();
+        DocumentPeopleTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

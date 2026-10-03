@@ -769,6 +769,20 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-30 — what *People in a document* does not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-35). Debts, stated.
+
+1. **A name is a name only if the contact is saved that way.** A contact saved as *Mom*, *Dr Rao Dentist* or a nickname is not named by a PDF that writes *Sunita Rao*. Organisations that are not in the contacts are not offered at all.
+2. **A coincidence is possible.** A ten-digit order or account number can equal a contact's number; a contact called *Delta* can be a word in boilerplate. The line says how it matched; Cancel is the default; Unlink undoes it.
+3. **Whole-name matching is the name matcher's, with its rules** (whole words, the sentence-start rule of DR-25). Misspellings, initials (*R. Kumar*) and transliterations are not matched.
+4. **Documents only.** A shared note or a screen gets the search alone, though its names are *possible* people on People's own page.
+5. **One list per item.** If a document names forty people, ten are offered and the rest found by search.
+6. **The suggestions are not remembered.** Decline one and it is offered again next time; there is no *not this one*.
+7. **Linking is still one person per tap.** Two parties to an invoice are two taps.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

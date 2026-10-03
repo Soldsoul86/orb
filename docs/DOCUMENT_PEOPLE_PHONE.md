@@ -1,6 +1,6 @@
 # People in a document — who a PDF names, one tap to say who it is about (option 2; proposed)
 
-> Status: **proposed 2026-10-03, awaiting the operator's go-ahead** ("Yes, go ahead with the design for option 2" asked for this write-up; building waits for the next "yes"). Nothing here is built.
+> Status: **built 2026-10-03 (DR-35, AD-30) — awaiting the device (`DEVICE_LOOP.md` §7b81, `orb-app-v45-document-people.apk`).** The operator approved the design and the build ("Yes, go ahead with the build").
 > Builds on: person links (`PERSON_LINK_PHONE.md`, DR-29), People and its sure/possible split (`PEOPLE_PHONE.md`, DR-24/25), documents (`SOURCES_PHONE.md` DR-33, `DOCUMENT_USE_PHONE.md` DR-34). It was named in `DOCUMENT_USE_PHONE.md` §5 as the next step. **No new capability, permission or record.**
 
 ## 1. Why, in plain words
@@ -57,3 +57,11 @@ Without this, a document is on a person's page only if its words happen to name 
 2. **A first name alone is never suggested for a document.**
 3. **Tapping uses the existing card (Cancel first) and the existing link**; nothing is linked without a tap; nothing new is recorded.
 4. **Documents only** for now.
+
+## 8. As built
+
+- **`DocumentPeople`** (new, pure): the people one item names firmly — a number, an address or the whole name — strongest first (number, address, name; ties by name), at most ten with the rest counted; `isDocument` from the clear record (and not when erased). It imports no Android class, reads no contacts, writes nothing.
+- **`People`**: each `Evidence` now also carries **`named`** — how the item's own words name the person (`number`, `email`, `full`, `first`, or none), **whatever else ties them** (so a person you linked is still known to be named by their number). When the same person is named both ways in one item, **the whole name wins over a first name**, whichever the text wrote first (before, the first match found was kept).
+- **`PeopleActivity`**: in choose mode for a document, **above the search**, *This document names:* — each person with how (*has their number / has their email / their full name is written*) and *tap to link*; a person you already linked says *You linked this to them* and is not tappable; *and N more — search to find them*. A tap opens **the same card** as a search result (Cancel first) and the same link. For anything that is not a document nothing changes.
+- **Nothing new is read, stored or recorded.** The suggestions are what the People screen had already found for that one item, filtered; the only thing recorded is the link you confirm (`orb.person.linked`, DR-29).
+- **Tests.** Number/email/whole-name order and ties; first names never offered (unique, shared, or alone however often); the whole name beating a first name in either order; only this item's people; linked shows as linked and still says how it is named; a person linked but not named is not offered; the cap of ten and the count; only documents (a shared note, an unknown id, an erased document); and source guards (rules pure; choose mode only; the same card; suggestions above the search; one link call).

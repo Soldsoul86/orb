@@ -203,6 +203,7 @@ public final class PeopleActivity extends Activity {
         }
         // You choose the person: type a few letters of a contact's name. Nothing is listed until you do.
         list.addView(text(linkItem != null ? "Choose who this is about. Orb will list it on their page." : "Find a person in your contacts, then set a reminder about them.", 13, false));
+        if (linkItem != null) suggestFor(journal, result);
         final EditText search = new EditText(this);
         search.setHint("A name, two letters or more");
         search.setSingleLine(true);
@@ -272,6 +273,38 @@ public final class PeopleActivity extends Activity {
             reopenName = null;
             for (People.Person p : result.all) if (p.names.contains(name)) { showPerson(p); break; }
         }
+    }
+
+    /**
+     * Choose mode for a **document**: the people it names firmly — a number, an address or the whole name — each with how Orb knows, above the
+     * search (`DOCUMENT_PEOPLE_PHONE.md`). A tap opens the same card as a search result. Nothing is stored or linked here.
+     */
+    private void suggestFor(Journal journal, People.Result result) {
+        boolean document;
+        try {
+            document = DocumentPeople.isDocument(journal.readLines(), linkItem);
+        } catch (IOException unreadable) {
+            return;   // The history cannot say what this item is, so nothing is suggested on a guess.
+        }
+        if (!document) return;
+        DocumentPeople.Result named = DocumentPeople.of(result.all, linkItem);
+        if (named.list.isEmpty()) return;
+        list.addView(text("This document names:", 14, true));
+        for (final DocumentPeople.Suggestion s : named.list) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, 12, 0, 12);
+            row.addView(text(s.person.display(), 15, true));
+            row.addView(text(s.linked ? "You linked this to them. (" + s.how() + ")" : s.how() + " \u00b7 tap to link", 12, false));
+            if (!s.linked) {
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View view) { confirmLink(s.person, linkItem, null); }
+                });
+            }
+            list.addView(row);
+        }
+        if (named.more > 0) list.addView(text("and " + named.more + " more \u2014 search to find them", 12, false));
+        list.addView(text("Or search for someone else:", 12, false));
     }
 
     private View row(final People.Person person) {

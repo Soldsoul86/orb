@@ -7131,3 +7131,48 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 5. Tap **Check again**. *(P238)*
 6. **Export and share journal**. *(P239)*
 7. Tell me: **does the order feel right, and which group would you move?**
+
+### 7b81. People in a document — the contacts a PDF names, one tap to link (DR-35) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v45-document-people.apk`. v44 is §7b80 (verified). Design: `docs/DOCUMENT_PEOPLE_PHONE.md`; decision `DECISIONS.md` DR-35; limits `ARCHITECTURAL_DEBT.md` AD-30.
+
+**Why:** a PDF names its parties in plain sight — the telecom on the invoice, the doctor on the report. Telling Orb who a document is about meant searching your contacts from nothing. Now Orb offers the contacts the document names, and you tap.
+
+#### What changed
+
+1. In **Recall**, open a kept PDF → **This is about a person…** (as before) → People opens in choose mode. **New: for a PDF, a list at the top — *This document names:*** — the contacts it names **by their number, their email or their full name**, strongest first, at most ten, each saying how (*has their number* / *has their email* / *their full name is written*).
+2. **Tap a name** → the same card as a search result (*Link this to (name)?*, **Cancel is the default**) → **Link**. A contact you already linked says ***You linked this to them*** and cannot be tapped.
+3. **A first name alone is never offered** for a document.
+4. After linking, the document is on that person's page as ***you linked it***, and its dates ahead (deadlines and the folded ones) are in their dates ahead.
+5. **For anything that is not a PDF nothing changes** — just the search. **Nothing is ever linked without your tap**; nothing new is recorded beyond the link.
+
+#### Checked before the device
+
+- Phone-side suite: 1793 checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the suggestion rules (which names count, the order, the cap and the count, linked-or-not, document-or-not), the change to People's matching (whole name over first name; how a person is named) and the screen (choose mode only, documents only, the same card, linked rows not tappable): @@MUT@@
+- **Not testable off the phone:** how often your real PDFs name your contacts.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P240** | **v45 installs over v44 without a warning** and Orb opens | flagged — say what it said |
+| **P241** | In **Recall**, open one of your kept PDFs → **This is about a person…** → People opens. **If the PDF names any of your contacts** by number, email or full name, ***This document names:*** is at the top with each person and **how**, strongest first; the search box is below it | the list is missing for a PDF that names a contact, or the order is wrong |
+| **P242** | **Nobody is listed by a first name alone** (a contact the PDF only mentions by first name is absent from the list — search finds them) | a first-name-only person is offered |
+| **P243** | Tap one → the card says ***Link this to (name)?*** with **Cancel** as the default → **Link** → *Linked. It is on their page now.* | the card, the default or the link differs |
+| **P244** | On **that person's page** the PDF is listed ***you linked it***, and the PDF's dates ahead (if any) appear in their dates ahead | the document is not on their page |
+| **P245** | Open the **same PDF's** choose screen again: that person says ***You linked this to them*** and **cannot be tapped** | it can be linked twice |
+| **P246** | For a **shared note** (not a PDF), This is about a person… opens **just the search**, as before | a list appears for a note |
+| **P247** | **Export and share journal**: an `orb.person.linked` for each link you made, **no name, number or email anywhere in the file**, no new event type | something about a person was recorded in the clear |
+
+#### The operator's protocol
+
+1. Install `orb-app-v45-document-people.apk` over v44; open Orb once. *(P240)*
+2. **Recall** → open each of your four kept PDFs in turn → **This is about a person…**. Note **which PDFs list anyone, and who, and how**. *(P241, P242)*
+3. On one that lists someone right, tap them → read the card → **Cancel**; then again and **Link**. *(P243)*
+4. **People** → that person → find the PDF *you linked*, and any dates ahead. *(P244)*
+5. Back in that PDF's choose screen, look at the person you linked. *(P245)*
+6. Try **This is about a person…** on a shared note. *(P246)*
+7. *(Optional, to try the sample invoice:)* add a contact named exactly **ACME Telecom Pvt Ltd**, then open the sample invoice's choose screen — it should list that contact (*their full name is written*). Delete the test contact afterwards.
+8. **Export and share journal**. *(P247)*
+9. Tell me: **did it list the right people, anyone wrong, anyone you expected that was missing?**

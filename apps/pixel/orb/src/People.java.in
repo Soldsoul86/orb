@@ -59,16 +59,26 @@ final class People {
 
         /** For `link`: the link's event hash, so the person can unlink it. Null otherwise. */
         final String linkHash;
+        /**
+         * How the item's own words name this person, whatever else ties them (`by` may be your link): `number`, `email`, `full` (the whole name)
+         * or `first` (a first name alone); null when the words do not name them. A first name is a word, not a person, over a long document.
+         */
+        final String named;
 
         Evidence(Recall.Entry entry, String by, String word) {
-            this(entry, by, word, null);
+            this(entry, by, word, null, null);
         }
 
         Evidence(Recall.Entry entry, String by, String word, String linkHash) {
+            this(entry, by, word, linkHash, null);
+        }
+
+        Evidence(Recall.Entry entry, String by, String word, String linkHash, String named) {
             this.entry = entry;
             this.by = by;
             this.word = word;
             this.linkHash = linkHash;
+            this.named = named;
         }
     }
 
@@ -196,7 +206,10 @@ final class People {
                 Map<Integer, Mentions.NameMatch> byName = new HashMap<>();
                 for (Mentions.NameMatch m : Mentions.names(doc.body, ids, names)) {
                     Integer g = groupOf.get(m.contactId);
-                    if (g != null && !byName.containsKey(g)) byName.put(g, m);
+                    if (g == null) continue;
+                    Mentions.NameMatch have = byName.get(g);
+                    // The whole name outranks a first name alone, whichever the text wrote first.
+                    if (have == null || (have.by.equals("first") && m.by.equals("full"))) byName.put(g, m);
                 }
                 Recall.Entry entry = null;
                 Map<Integer, String> linkedHere = linked.get(item.id);
@@ -204,13 +217,17 @@ final class People {
                     String by = null;
                     String word = null;
                     String linkHash = null;
+                    String named = null;
+                    for (String ph : people.get(g).phones) if (inItem.contains("phone:" + ph)) { named = "number"; break; }
+                    if (named == null) for (String em : people.get(g).emails) if (inItem.contains("email:" + em)) { named = "email"; break; }
+                    if (named == null && byName.containsKey(g)) named = byName.get(g).by;
                     if (linkedHere != null && linkedHere.containsKey(g)) { by = BY_LINK; linkHash = linkedHere.get(g); }
                     if (by == null) for (String ph : people.get(g).phones) if (inItem.contains("phone:" + ph)) { by = BY_NUMBER; break; }
                     if (by == null) for (String em : people.get(g).emails) if (inItem.contains("email:" + em)) { by = BY_EMAIL; break; }
                     if (by == null && byName.containsKey(g)) { by = BY_NAME; word = byName.get(g).word; }
                     if (by == null) continue;
                     if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);
-                    people.get(g).items.add(new Evidence(entry, by, word, linkHash));
+                    people.get(g).items.add(new Evidence(entry, by, word, linkHash, named));
                     for (Mentions.Handle h : handles) {
                         if (own.get(g).contains(h.kind + ":" + h.value)) continue;
                         Integer n = beside.get(g).get(h);
