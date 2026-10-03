@@ -100,3 +100,22 @@ Words, not a list. Each is computed when the window opens from the call log and 
 1. **Build the probe first** — a separate tiny app, `Orb Calls Probe`, that declares `READ_CALL_LOG` and reports only (a) whether it installs, (b) whether the permission can be granted, (c) how many calls are in the log and the date of the newest. **Orb v45 is not changed.**
 2. **Decide the shape after the answer** — an opt-in build of Orb, or a companion app — or stop if it is blocked or cannot be granted.
 3. **Everything else in this design stands** (§2–4, §7) for whichever shape follows.
+
+## 11. The probe's answer (2026-10-03) and the proposed shape
+
+**Measured on the operator's phone** (Pixel 10a, Android 16, installed from a downloaded file by Google Files — Orb's own route): the app **installed and ran**, the permission **was asked for with a prompt and granted** (1,472 ms, no restricted-setting refusal), and the call log **read: 1,510 calls, newest today** (`DEVICE_LOOP.md` §7b82). So the hard-restricted worry (§0 item 2) **does not bite on this install route**, and the feature is possible here.
+
+**Not measured:** how Play Protect treats the *whole of Orb* with that permission added (the probe was a 13 KB app; Orb is larger and holds more), and any phone other than this one. 1,510 calls is well inside the 5,000 the design reads per page.
+
+**The two shapes, now that the choice is real:**
+
+| | **An opt-in build of Orb (recommended)** | **A companion app** |
+| --- | --- | --- |
+| What it is | The same code, built with `ORB_CALL_LOG=1` (exactly how `ORB_PACKAGE_SCAN=0` already works) adds the one permission to the manifest. The default build keeps three permissions. | A second app holds the permission and answers Orb over a bound service guarded by a signature-level permission. Orb's APK never declares it. |
+| Cost | Small: a placeholder in the manifest, the guard test made to accept either build, `CallsReader` and the rest as in §3–7. | Large: a service, a protocol, versioning, two installs, and Orb must work when the companion is absent. |
+| Benefit | Simple; the permission is in the build you choose to install; the default build is untouched; if Play Protect ever objects to the calls build, the default one remains. | Least privilege: a compromised Orb cannot read the call log; the sensitive permission lives in an app that holds none of Orb's data. |
+| Weakness | The build you use daily holds the permission. | More to build and keep correct for one line of text. |
+
+**Recommendation: the opt-in build now.** It is the simplest correct implementation that keeps the long-term architecture (the reader is one file behind one capability, so moving it into a companion later changes the reader, not the screens). The companion is the hardening to revisit if a second sensitive permission arrives.
+
+**Still to approve (replaces §10):** (1) the opt-in build `ORB_CALL_LOG=1` (v46 is the calls build; the default build stays at three permissions); (2) the screen and reading of §2–4 unchanged; (3) the manifest guard accepts exactly three permissions in the default build and exactly four, named, in the calls build; (4) your word on what Android or Play Protect said at install.
