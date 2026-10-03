@@ -7036,3 +7036,51 @@ Pick **one real contact with a number saved** whom you are happy to open a chat 
 8. In **Recall**, **erase** one kept PDF. **Sources → Turn on PDF files → Pick files** → choose that same PDF. *(P221)*
 9. **Export and share journal**. *(P222)*
 10. Tell me: **how the PDFs read (P223)**, which ones were wrong or empty, and anything confusing.
+
+### 7b79. Dates in your documents — the line they are on, deadlines first (DR-34) — 2026-10-03
+
+**Status: built, awaiting the device.** `orb-app-v43-documents-ahead.apk`. v42 is §7b78 (verified). Design: `docs/DOCUMENT_USE_PHONE.md`; decision `DECISIONS.md` DR-34; limits `ARCHITECTURAL_DEBT.md` AD-29.
+
+**Why:** the PDFs you kept are long, and their first words are a letterhead. Before this, a PDF with a due date, a statement date and a renewal clause would have shown up in Coming up as unlabelled rows all saying the company's name — and with *Friday*-style guesses read from the day you kept it, which means nothing for a document. Now each date shows **the line it is on**, the ones that look like deadlines come first, the rest wait in a fold, and **Track this…** starts a commitment from that line.
+
+#### What changed
+
+1. **Coming up shows the line under each date** for a document — *"Payment due by 12/12/2026"* — instead of the top of the document. Today and a person's page show it too.
+2. **Dates that look like a deadline come first** (due, pay, payable, before, deadline, expires, expiry, renew(s), renewal, appointment, check-in, departure, arrival, delivery, interview, exam, last date, valid until/till, and *by* right before a date). **Every other future date in the document is folded**, at the end, under ***Other dates in your documents*** — one button per document, tap to show or hide. **Nothing is hidden for lacking a cue; it is listed second.**
+3. **No guesses from a document**: no *Friday* or *tomorrow* rows from a PDF.
+4. **At most 12 dates per document**; the rest are counted (*and N more not listed*).
+5. **Track this…** on a document's date opens the commitment card with **that line** as the words (you can edit), that date as the date, and you choose *I owe it / I'm waiting for them* and who; **nothing is filed until Keep** — the same card as before.
+6. **The quiet dot** still only counts dates you wrote down that are near; a document's folded dates never count.
+7. **Nothing new is recorded, asked or permitted**: no new permission, capability or record type. It is a view computed each time the screen opens.
+
+#### Checked before the device
+
+- Phone-side suite: @@COUNT@@ checks; brain, TypeScript, lint and type-check unchanged and clean.
+- **Mutation checks** on the cue list, the *by* rule, the line cutting, the date rules (today, one per date, the deadline line wins, ordering), the cap and the counts, the document branch in Coming up, the fold, the dot, the person's page and the three screens: @@MUT@@
+- **Not testable off the phone:** how your PDFs' lines actually come out of Android's reader (AD-29 item 1).
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P224** | **v43 installs over v42 without a Play Protect warning** (nothing new in the manifest) and Orb opens | flagged — **say what it said** |
+| **P225** | **With the sample invoice** (below): **Coming up** shows, under **Sat 12 Dec 2026**, the line ***Payment due by 12/12/2026*** and, under **Sat 2 Jan 2027**, ***Your plan renews on 02/01/2027*** — not *ACME Telecom* | the top of the document is shown, or the dates are missing |
+| **P226** | At the end, **Other dates in your documents** has a button ***Show 2 other dates — ACME Telecom…***; tapping it shows **Sun 1 Nov 2026 — *Statement date 01/11/2026*** and **Sun 20 Dec 2026 — *Late fee applies after 20/12/2026***; tapping again hides them | the fold is missing, or a date is lost |
+| **P227** | **No row anywhere says *A guess* for the invoice** | a guess appears under a document |
+| **P228** | **Track this…** on the 12 Dec row opens the card with ***Payment due by 12/12/2026*** as the words (editable) and the date 12 Dec; **Cancel** files nothing; if you choose a direction and **Keep**, it appears in **Today** | the words are the letterhead, or something is filed early |
+| **P229** | **Remind me on 12 Dec** works as before, and the row then says *A reminder is set.* | the reminder path broke |
+| **P230** | **Your own PDFs** (the four kept): **Coming up** lists only dates that are still ahead, each with a line; **tell me** whether the lines read sensibly, which dates you expected that are missing, and whether anything feels like noise | not pass/fail — it decides whether the cue list and the line cutting need work |
+| **P231** | **The main screen's Coming up dot** does not light for the invoice's *other* dates | the dot counts a folded date |
+| **P232** | **Export and share journal**: nothing new — no line of any document, and no new event type; a commitment you kept appears exactly as before | something new was recorded |
+
+#### The operator's protocol
+
+1. Install `orb-app-v43-documents-ahead.apk` over v42; open Orb once. *(P224)*
+2. Save **`orb-sample-invoice.pdf`** (sent with the APK) to your phone's Downloads. **Sources → Pick files** → choose it → tick it → **Keep the ticked ones**.
+3. **Coming up.** Read the 12 Dec and 2 Jan rows. *(P225)*
+4. Scroll to the end; open and close **Other dates in your documents**. *(P226, P227)*
+5. On the 12 Dec row tap **Track this…**; read the card; **Cancel**; then do it again and **Keep** one (e.g. *I owe it*), and look in **Today**. *(P228)*
+6. On the same row tap **Remind me on 12 Dec** and confirm (or cancel). *(P229)*
+7. Now look at **Coming up** with **your own four PDFs** kept earlier and tell me what you see. *(P230)*
+8. Look at the main screen's Coming up button. *(P231)*
+9. **Export and share journal**. *(P232)*

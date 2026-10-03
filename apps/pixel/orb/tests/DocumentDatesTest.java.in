@@ -1,0 +1,213 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/** Dates ahead in a kept document, with their lines (`docs/DOCUMENT_USE_PHONE.md`): the cue rule, the lines, the ranking and cap, and Coming up with documents. */
+final class DocumentDatesTest {
+    private DocumentDatesTest() {}
+
+    private static final String TODAY = "2026-10-03";
+    /** 2026-10-02 20:00 UTC. */
+    private static final long NOW = 1790971200000L;
+
+    private static List<String> dates(List<DocumentDates.Found> found) {
+        List<String> out = new ArrayList<>();
+        for (DocumentDates.Found f : found) out.add(f.date);
+        return out;
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    private static final class Fixed implements DocumentsRules.Reader {
+        final String text;
+
+        Fixed(String text) { this.text = text; }
+
+        @Override public DocumentsRules.Reading read(DocumentsRules.Doc doc) { return DocumentsRules.Reading.text(text, 1); }
+    }
+
+    static void run() throws Exception {
+        cues();
+        lines();
+        ranking();
+        comingUp();
+        guards();
+    }
+
+    private static void cues() {
+        Harness.suite("which lines say their date matters");
+        for (String line : Arrays.asList("Payment due 12/10/2026", "Pay before 12/10/2026", "Payable on receipt 12/10/2026", "Deadline: 12/10/2026", "Offer expires 12/10/2026", "Expiry 12/10/2026",
+                "Plan renews 12/10/2026", "Renewal date 12/10/2026", "Renew by 12/10/2026", "Appointment 12/10/2026", "Check-in 12/10/2026", "Check in 12/10/2026", "Departure 12/10/2026",
+                "Arrival 12/10/2026", "Delivery 12/10/2026", "Interview on 12/10/2026", "Exam 12/10/2026", "Last date 12/10/2026", "Valid until 12/10/2026", "valid till 12/10/2026",
+                "PAY BY 12/10/2026", "on or before 12/10/2026")) {
+            Harness.check("a cue: " + line, DocumentDates.deadline(line));
+        }
+        for (String line : Arrays.asList("Statement date 12/10/2026", "Issued 12/10/2026", "Prepared by Priya on 12/10/2026", "Payroll 12/10/2026", "Duet at 12/10/2026", "Beforehand 12/10/2026",
+                "Baby shower 12/10/2026", "Examiner 12/10/2026", "Priya Nair 12/10/2026", "Delivered 12/10/2026", "Valid for 30 days from 12/10/2026")) {
+            Harness.check("no cue: " + line, !DocumentDates.deadline(line));
+        }
+        for (String line : Arrays.asList("send by 12 Oct", "done by the 5th", "by Oct 5", "by October", "by 2026-10-12")) {
+            Harness.check("by, right before a date, is a cue: " + line, DocumentDates.deadline(line));
+        }
+        Harness.check("by before a name is not", !DocumentDates.deadline("signed by Priya 12/10/2026") && !DocumentDates.deadline("approved by management"));
+        Harness.check("a word that only ends like a cue is not one", !DocumentDates.deadline("overdue 12/10/2026") && !DocumentDates.deadline("undue 12/10/2026"));
+    }
+
+    private static void lines() {
+        Harness.suite("the lines of a document");
+        Harness.equal("blank lines go; spaces inside a line are one", DocumentDates.segments("a  b\n\n   \n  c\t d  "), Arrays.asList("a b", "c d"));
+        Harness.equal("null and empty are nothing", DocumentDates.segments(null).size() + DocumentDates.segments("").size(), 0);
+        Harness.equal("a line of exactly the limit is kept whole", DocumentDates.segments(new String(new char[DocumentDates.MAX_LINE]).replace('\0', 'x')).size(), 1);
+        StringBuilder sentences = new StringBuilder();
+        for (int i = 0; i < 12; i++) sentences.append("Sentence number ").append(i).append(" is here. ");
+        List<String> cut = DocumentDates.segments(sentences.toString().trim());
+        boolean allShort = true, endsAtSentence = true;
+        for (String s : cut) {
+            allShort &= s.length() <= DocumentDates.MAX_LINE;
+            endsAtSentence &= s.endsWith(".");
+        }
+        Harness.check("a long line is cut at sentence ends, each short enough", cut.size() == 12 && allShort && endsAtSentence);
+        StringBuilder words = new StringBuilder();
+        for (int i = 0; i < 100; i++) words.append("word").append(i).append(' ');
+        List<String> chunks = DocumentDates.segments(words.toString().trim());
+        boolean ok = true;
+        for (String s : chunks) ok &= s.length() <= DocumentDates.MAX_LINE;
+        Harness.check("a long sentence is cut at words, each short enough, and nothing is lost", chunks.size() > 1 && ok && String.join(" ", chunks).equals(words.toString().trim()));
+        List<String> one = DocumentDates.segments(new String(new char[500]).replace('\0', 'z'));
+        Harness.check("one unbroken run is cut to the limit, not dropped", one.size() == 1 && one.get(0).length() == DocumentDates.MAX_LINE);
+        StringBuilder many = new StringBuilder();
+        for (int i = 0; i < DocumentDates.MAX_SEGMENTS + 500; i++) many.append("line ").append(i).append('\n');
+        Harness.equal("a document is read to a fixed number of lines", DocumentDates.segments(many.toString()).size(), DocumentDates.MAX_SEGMENTS);
+    }
+
+    private static void ranking() {
+        Harness.suite("the dates ahead: only written ones, soonest first, deadlines before the rest");
+        String text = "ACME Telecom\nInvoice 4471\nStatement date 01/10/2026\nIssued 03/10/2026\nPlan renews 02/11/2026\nPayment due by 12/10/2026\nLate fee applies after 20/10/2026\nI will send it Friday";
+        DocumentDates.Result r = DocumentDates.of(text, TODAY);
+        Harness.equal("deadlines, soonest first", dates(r.deadlines), Arrays.asList("2026-10-12", "2026-11-02"));
+        Harness.equal("the others, soonest first; today counts, yesterday does not", dates(r.others), Arrays.asList("2026-10-03", "2026-10-20"));
+        Harness.equal("each date carries the line it was written on", r.deadlines.get(0).line, "Payment due by 12/10/2026");
+        Harness.check("the flags agree with the groups", r.deadlines.get(0).deadline && r.deadlines.get(1).deadline && !r.others.get(0).deadline && !r.others.get(1).deadline);
+        Harness.equal("a weekday word is not a date in a document", r.deadlines.size() + r.others.size(), 4);
+        Harness.equal("nothing was left out", r.more, 0);
+        Harness.check("the past is dropped", !dates(r.others).contains("2026-10-01"));
+        Harness.equal("nothing in, nothing out", DocumentDates.of("", TODAY).deadlines.size() + DocumentDates.of(null, TODAY).others.size(), 0);
+        Harness.equal("a document with no dates has none", DocumentDates.of("Dear sir,\nThank you for your letter.", TODAY).others.size(), 0);
+
+        DocumentDates.Result twice = DocumentDates.of("Statement 20/10/2026\nPay by 20/10/2026\nAlso 20/10/2026", TODAY);
+        Harness.check("a date written on several lines is one date, with its deadline line", twice.deadlines.size() == 1 && twice.others.isEmpty() && twice.deadlines.get(0).line.equals("Pay by 20/10/2026"));
+        DocumentDates.Result firstLine = DocumentDates.of("Statement 20/10/2026\nAlso 20/10/2026", TODAY);
+        Harness.check("with no deadline line, the first line it was written on", firstLine.others.size() == 1 && firstLine.others.get(0).line.equals("Statement 20/10/2026"));
+        DocumentDates.Result both = DocumentDates.of("Due 12/10/2026 and renewal 02/11/2026", TODAY);
+        Harness.check("two dates on one line share that line", both.deadlines.size() == 2 && both.deadlines.get(0).line.equals(both.deadlines.get(1).line));
+
+        StringBuilder wide = new StringBuilder();
+        for (int d = 10; d <= 25; d++) wide.append("Row ").append(d).append("/10/2026 amount\n");
+        DocumentDates.Result capped = DocumentDates.of(wide.toString(), TODAY);
+        Harness.equal("at most twelve are returned", capped.others.size() + capped.deadlines.size(), DocumentDates.MAX_LISTED);
+        Harness.equal("and the rest are counted", capped.more, 4);
+        Harness.equal("the soonest are the ones kept", capped.others.get(0).date, "2026-10-10");
+        StringBuilder mix = new StringBuilder();
+        for (int d = 10; d <= 20; d++) mix.append("Row ").append(d).append("/10/2026 amount\n");
+        for (int d = 21; d <= 25; d++) mix.append("Pay by ").append(d).append("/10/2026\n");
+        DocumentDates.Result prefer = DocumentDates.of(mix.toString(), TODAY);
+        Harness.check("deadlines take the room first", prefer.deadlines.size() == 5 && prefer.others.size() == 7 && prefer.more == 4);
+        StringBuilder only = new StringBuilder();
+        for (int d = 10; d <= 25; d++) only.append("Pay by ").append(d).append("/10/2026\n");
+        DocumentDates.Result deadlinesOnly = DocumentDates.of(only.toString(), TODAY);
+        Harness.check("sixteen deadlines: twelve listed, four counted, no others", deadlinesOnly.deadlines.size() == 12 && deadlinesOnly.others.isEmpty() && deadlinesOnly.more == 4);
+        Harness.equal("a date is a date: the line stays as written", DocumentDates.of("  Payment   due by   12/10/2026  ", TODAY).deadlines.get(0).line, "Payment due by 12/10/2026");
+    }
+
+    private static void comingUp() throws Exception {
+        Harness.suite("Coming up with a kept document");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-docdates").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        String text = "ACME Telecom\nInvoice 4471\nStatement date 01/10/2026\nPlan renews 02/11/2026\nPayment due by 12/10/2026\nLate fee applies after 20/10/2026\nI will send it Friday and tomorrow";
+        int kept = DocumentsFlow.keep(context, journal, Arrays.asList(new DocumentsRules.Doc("content://x/a", "a.pdf", "application/pdf", 10L, 1L)), new Fixed(text), 1L);
+        Harness.equal("a document is kept through the Documents source", kept, 1);
+        Harness.equal("it is recognised by its clear record", DocumentsFacts.documentHashes(journal.readLines()).size(), 1);
+        ComingUp.Result r = ComingUp.compute(context, journal, NOW, "UTC");
+        List<String> shape = new ArrayList<>();
+        for (ComingUp.Day d : r.days) shape.add(d.date + "x" + d.items.size());
+        Harness.equal("its deadlines are in the days, soonest first", shape, Arrays.asList("2026-10-12x1", "2026-11-02x1"));
+        ComingUp.Item due = r.days.get(0).items.get(0);
+        Harness.equal("each shows the line it is on", due.shown(), "Payment due by 12/10/2026");
+        Harness.check("and not the guess kind", !due.guess && due.phrase == null && due.line != null);
+        Harness.check("the item's own first words are the top of the document, not the line", due.entry.snippet.startsWith("ACME Telecom") && !due.entry.snippet.equals(due.shown()));
+        Harness.equal("no weekday or tomorrow guess is made from a document", r.days.size(), 2);
+        Harness.equal("the other future date is folded, with its line", r.folds.size() == 1 ? r.folds.get(0).dates.size() : -1, 1);
+        Harness.check("its date and line", r.folds.get(0).dates.get(0).date.equals("2026-10-20") && r.folds.get(0).dates.get(0).item.shown().equals("Late fee applies after 20/10/2026"));
+        Harness.equal("nothing is left out of the count", r.folds.get(0).more, 0);
+        Harness.equal("the quiet dot counts a document's deadlines only", ComingUp.soon(r, NOW, "UTC", 365), 2);
+        Harness.equal("within ten days: the due date", ComingUp.soon(r, NOW, "UTC", 10), 1);
+        Harness.equal("the folded date is never counted, however near", ComingUp.soon(r, NOW, "UTC", 18), 1);
+        ComingUp.Result mine = ComingUp.restrict(r, new java.util.HashSet<>(Arrays.asList(due.entry.id)));
+        Harness.check("a person's page keeps this document's days and fold", mine.days.size() == 2 && mine.folds.size() == 1);
+        ComingUp.Result none = ComingUp.restrict(r, new java.util.HashSet<>(Arrays.asList("someone-else")));
+        Harness.check("and not another's", none.days.isEmpty() && none.folds.isEmpty());
+
+        List<String> before = journal.readLines();
+        Map<String, Object> shared = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", 10L);
+        Harness.check("ComingUp changed nothing in the journal", ComingUp.compute(context, journal, NOW, "UTC") != null && journal.readLines().equals(before) && shared != null);
+
+        Harness.suite("an ordinary share is read as before");
+        Install.forget();
+        File dir2 = Files.createTempDirectory("orb-docdates-share").toFile();
+        Context c2 = new Context(dir2);
+        Journal j2 = Journal.open(c2, Install.lane(c2), Install.id(c2));
+        Map<String, Object> payload = Shares.declaredText("android.intent.action.SEND", "text/plain", "android-app://com.example.notes", text.length());
+        SharedText.record(j2, c2, payload, SharedText.seal(c2, text, null), null);
+        ComingUp.Result plain = ComingUp.compute(c2, j2, NOW, "UTC");
+        boolean anyLine = false;
+        for (ComingUp.Day d : plain.days) for (ComingUp.Item i : d.items) anyLine |= i.line != null;
+        Harness.check("a shared note keeps every date, the item's first words and its guesses, and has no folds", plain.folds.isEmpty() && !anyLine && plain.days.size() >= 4);
+        Harness.equal("and is not a document", DocumentsFacts.documentHashes(j2.readLines()).size(), 0);
+
+        Harness.suite("an erased document is gone from the next answer");
+        String hash = null;
+        for (String line : journal.readLines()) if (Shares.TYPE.equals(Journal.typeOf(line))) hash = Erasure.envelopeHash(line);
+        Harness.equal("erased", Erase.execute(context, journal, hash).outcome, Erase.DESTROYED);
+        ComingUp.Result gone = ComingUp.compute(context, journal, NOW, "UTC");
+        Harness.check("no days and no fold", gone.days.isEmpty() && gone.folds.isEmpty());
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("a view that writes nothing, and a screen that only offers what it already offered");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String dates = code(new String(Files.readAllBytes(root.resolve("src/DocumentDates.java.in")), StandardCharsets.UTF_8));
+        Harness.check("the rules import no Android class and keep nothing", !dates.contains("import android.") && !dates.contains("Journal") && !dates.contains("Attachments.") && !dates.contains("Json.obj") && !dates.contains("FileOutputStream")
+            && !dates.contains("Log.") && !dates.contains("System.out"));
+        String model = code(new String(Files.readAllBytes(root.resolve("src/ComingUp.java.in")), StandardCharsets.UTF_8));
+        Harness.check("Coming up asks the document rules only for documents it recognised from the clear record",
+            model.contains("DocumentsFacts.documentHashes(lines)") && model.contains("if (documents.contains(item.hash)) {") && model.contains("DocumentDates.of(doc.body, today)"));
+        Harness.check("a document gets no relative-day guesses: its branch returns before they are read",
+            model.indexOf("return;", model.indexOf("if (documents.contains(item.hash))")) < model.indexOf("Mentions.relative(doc, anchor)"));
+        String screen = code(new String(Files.readAllBytes(root.resolve("src/ComingUpActivity.java.in")), StandardCharsets.UTF_8));
+        Harness.check("the folded dates are opened by a tap and can be closed again", screen.contains("if (!open.remove(key)) open.add(key);") && screen.contains("Show") && screen.contains("Hide"));
+        Harness.check("a folded date offers the same two things as any other", screen.contains("list.addView(itemRow(d.item, ymd, c, kept));"));
+        Harness.check("the commitment starts from the line for a document", screen.contains("item.line != null ? item.line : TodayActivity.firstWords(item.entry.snippet)"));
+        Harness.check("the other screens show the line too", code(new String(Files.readAllBytes(root.resolve("src/TodayActivity.java.in")), StandardCharsets.UTF_8)).contains("item.shown()")
+            && code(new String(Files.readAllBytes(root.resolve("src/PeopleActivity.java.in")), StandardCharsets.UTF_8)).contains("item.shown()"));
+        Harness.check("the screen holds no text of a document beyond what it is shown: nothing is stored", !screen.contains("getSharedPreferences") && !screen.contains("FileOutputStream"));
+    }
+}

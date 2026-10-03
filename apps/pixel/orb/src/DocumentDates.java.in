@@ -1,0 +1,135 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+/**
+ * The dates ahead in a kept **document**, each with the line it is on (`docs/DOCUMENT_USE_PHONE.md`). A PDF is not a short note: it names
+ * many dates and its top is a letterhead. So for documents Coming up reads **only dates written down** (no *Friday* guesses — the day it was
+ * kept says nothing about when a document was written), shows **the line the date is on**, puts the dates that look like a **deadline** first,
+ * and folds the rest.
+ *
+ * **A sort, never a filter**: no date is dropped for lacking a cue, only listed second; at most `MAX_LISTED` are returned and the rest are
+ * counted. **A view, not a record**: it reads the words handed to it, in memory, and keeps nothing. It touches no Android class — dates are read
+ * by `Mentions`, the one reader every other view uses.
+ */
+final class DocumentDates {
+    private DocumentDates() {}
+
+    /** At most this many dates are returned for one document; the rest are counted. */
+    static final int MAX_LISTED = 12;
+    /** A line is shown at most this long, cut at a word. */
+    static final int MAX_LINE = 140;
+    /** At most this many lines of one document are read (a document is cut at 200,000 characters when kept, which is far fewer). */
+    static final int MAX_SEGMENTS = 4000;
+
+    /** One date, and the line it was written on. */
+    static final class Found {
+        /** `YYYY-MM-DD`. */
+        final String date;
+        final String line;
+        /** The line has a word that says this date matters: due, pay, expires… */
+        final boolean deadline;
+
+        Found(String date, String line, boolean deadline) {
+            this.date = date;
+            this.line = line;
+            this.deadline = deadline;
+        }
+    }
+
+    static final class Result {
+        /** Dates whose line looks like a deadline, soonest first. */
+        final List<Found> deadlines = new ArrayList<>();
+        /** Every other date ahead, soonest first. */
+        final List<Found> others = new ArrayList<>();
+        /** Dates found beyond `MAX_LISTED`, not returned. */
+        int more;
+    }
+
+    // Whole words only, any case. A fixed English list, held by tests — a sort, never a filter.
+    private static final Pattern CUE = Pattern.compile("(?i)(?<![\\p{L}\\p{N}])(?:due|pay|payable|before|deadline|expires|expiry|renews?|renewal|appointment|check[- ]in|departure|arrival|delivery|interview|exam|last date|valid (?:until|till))(?![\\p{L}\\p{N}])");
+    // *by* counts only right before a date (a day number, or a month name): *prepared by Priya* is not a deadline.
+    private static final Pattern BY_DATE = Pattern.compile("(?i)(?<![\\p{L}\\p{N}])by\\s+(?:the\\s+)?(?:\\d|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?![\\p{L}]))");
+
+    /** Whether a line says its date matters. */
+    static boolean deadline(String line) {
+        return CUE.matcher(line).find() || BY_DATE.matcher(line).find();
+    }
+
+    /**
+     * The lines of a document, each at most `MAX_LINE` long: its own lines, a long line cut at sentence ends, and a long sentence cut at
+     * words. Whitespace inside a line is one space; blank lines are dropped.
+     */
+    static List<String> segments(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null) return out;
+        for (String line : text.split("\n")) {
+            String flat = line.replaceAll("\\s+", " ").trim();
+            if (flat.isEmpty()) continue;
+            if (flat.length() <= MAX_LINE) {
+                out.add(flat);
+            } else {
+                for (String sentence : flat.split("(?<=[.;!?])\\s+")) {
+                    if (sentence.length() <= MAX_LINE) {
+                        out.add(sentence);
+                    } else {
+                        StringBuilder chunk = new StringBuilder();
+                        for (String word : sentence.split(" ")) {
+                            if (chunk.length() > 0 && chunk.length() + 1 + word.length() > MAX_LINE) {
+                                out.add(chunk.toString());
+                                chunk.setLength(0);
+                            }
+                            if (chunk.length() > 0) chunk.append(' ');
+                            chunk.append(word.length() > MAX_LINE ? word.substring(0, MAX_LINE) : word);
+                        }
+                        if (chunk.length() > 0) out.add(chunk.toString());
+                    }
+                }
+            }
+            if (out.size() >= MAX_SEGMENTS) return new ArrayList<>(out.subList(0, MAX_SEGMENTS));
+        }
+        return out;
+    }
+
+    /**
+     * The dates ahead — today (`YYYY-MM-DD`) or later — in a document's words. A date written on several lines is one date, shown with its
+     * deadline-looking line if it has one, else the first line it was written on.
+     */
+    static Result of(String text, String today) {
+        Map<String, Found> best = new TreeMap<>();
+        for (String segment : segments(text)) {
+            if (!hasDigit(segment)) continue;   // a date has a digit; most lines of a document do not
+            boolean cue = deadline(segment);
+            for (Mentions.Handle h : Mentions.in(new Recall.Doc("", segment))) {
+                if (!h.kind.equals("date") || h.value.compareTo(today) < 0) continue;
+                Found have = best.get(h.value);
+                if (have == null || (!have.deadline && cue)) best.put(h.value, new Found(h.value, segment, cue));
+            }
+        }
+        List<Found> all = new ArrayList<>(best.values());   // a TreeMap: soonest first
+        Result result = new Result();
+        List<Found> second = new ArrayList<>();
+        for (Found f : all) (f.deadline ? result.deadlines : second).add(f);
+        int room = MAX_LISTED;
+        if (result.deadlines.size() > room) {
+            result.more += result.deadlines.size() - room;
+            result.deadlines.subList(room, result.deadlines.size()).clear();
+        }
+        room -= result.deadlines.size();
+        for (Found f : second) {
+            if (room > 0) { result.others.add(f); room--; } else { result.more++; }
+        }
+        return result;
+    }
+
+    private static boolean hasDigit(String s) {
+        for (int i = 0; i < s.length(); i++) if (Character.isDigit(s.charAt(i))) return true;
+        return false;
+    }
+}

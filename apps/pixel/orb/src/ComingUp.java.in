@@ -35,13 +35,48 @@ final class ComingUp {
         /** For a guess: what was found (`friday`, `tomorrow`), and the day it was read from (`YYYY-MM-DD`, when the item was kept). */
         final String phrase;
         final String anchor;
+        /** For a date in a document: the line it was written on (`DocumentDates`). Null for everything else, which shows `entry.snippet`. */
+        final String line;
 
         Item(Recall.Entry entry, boolean reminded, boolean guess, String phrase, String anchor) {
+            this(entry, reminded, guess, phrase, anchor, null);
+        }
+
+        Item(Recall.Entry entry, boolean reminded, boolean guess, String phrase, String anchor, String line) {
             this.entry = entry;
             this.reminded = reminded;
             this.guess = guess;
             this.phrase = phrase;
             this.anchor = anchor;
+            this.line = line;
+        }
+
+        /** What to show under the date: the line it is on, or the item's first words. */
+        String shown() { return line != null ? line : entry.snippet; }
+    }
+
+    /** One folded date and what to show for it. */
+    static final class Dated {
+        /** `YYYY-MM-DD`. */
+        final String date;
+        final Item item;
+
+        Dated(String date, Item item) {
+            this.date = date;
+            this.item = item;
+        }
+    }
+
+    /** The dates of one document that do not look like a deadline — folded under *Other dates in this document*, never hidden. */
+    static final class Fold {
+        final Recall.Entry entry;
+        final List<Dated> dates = new ArrayList<>();
+        /** Dates in the document beyond `DocumentDates.MAX_LISTED`, not listed. */
+        final int more;
+
+        Fold(Recall.Entry entry, int more) {
+            this.entry = entry;
+            this.more = more;
         }
     }
 
@@ -59,6 +94,8 @@ final class ComingUp {
     static final class Result {
         /** Soonest first. */
         final List<Day> days = new ArrayList<>();
+        /** One per document that has dates beyond its deadlines (or more than could be listed). */
+        final List<Fold> folds = new ArrayList<>();
         final Recall.Results looked = new Recall.Results();
     }
 
@@ -89,8 +126,26 @@ final class ComingUp {
         final List<Reminders.Reminder> waiting = Reminders.pending(lines);
         final Result result = new Result();
         final java.util.Map<String, Day> byDate = new java.util.TreeMap<>();
+        final java.util.Set<String> documents = DocumentsFacts.documentHashes(lines);
         Recall.walk(context, journal, null, result.looked, new Recall.Visitor() {
             @Override public void kept(Erasure.Item item, String app, boolean screen, Recall.Doc doc) {
+                if (documents.contains(item.hash)) {
+                    // A document: written dates only, each with its own line, deadlines first, the rest folded (`DocumentDates`).
+                    DocumentDates.Result found = DocumentDates.of(doc.body, today);
+                    if (found.deadlines.isEmpty() && found.others.isEmpty()) return;
+                    Recall.Entry docEntry = Recall.entryFor(item, app, screen, doc, null);
+                    for (DocumentDates.Found f : found.deadlines) {
+                        place(byDate, docEntry, f.date, new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line));
+                    }
+                    if (!found.others.isEmpty() || found.more > 0) {
+                        Fold fold = new Fold(docEntry, found.more);
+                        for (DocumentDates.Found f : found.others) {
+                            fold.dates.add(new Dated(f.date, new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line)));
+                        }
+                        result.folds.add(fold);
+                    }
+                    return;
+                }
                 Recall.Entry entry = null;
                 java.util.Set<String> written = new java.util.HashSet<>();
                 // `Handles` returns each (kind, value) once, so a date an item names twice is one proposal.
@@ -132,6 +187,7 @@ final class ComingUp {
             for (Item item : day.items) if (item.entry.id != null && entryIds.contains(item.entry.id)) kept.items.add(item);
             if (!kept.items.isEmpty()) out.days.add(kept);
         }
+        for (Fold fold : all.folds) if (fold.entry.id != null && entryIds.contains(fold.entry.id)) out.folds.add(fold);
         return out;
     }
 

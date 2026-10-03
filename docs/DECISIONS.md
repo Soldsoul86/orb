@@ -1337,6 +1337,16 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** the call log and messages (slices 2b/2c: each adds a hard-restricted permission and changes the manifest guard — their own decisions); keeping the original file or a PDF viewer; text recognition; sub-folders; other file types; a model reading the text (DR-9).
 
+## DR-34 — Documents in Coming up: written dates with their lines, deadlines first, the rest folded
+
+- **Status:** Decided and built · **Decided:** 2026-10-03, operator ("Yes, go ahead with the design for option 1", then "Yes, go ahead with the build" on `DOCUMENT_USE_PHONE.md`) · **Bears on:** DR-21 (Coming up), DR-23 (relative days), DR-30 (commitments), DR-33 (Sources)
+
+**The ruling.** Items kept from the Documents source are read by **their own rules** in Coming up: **only dates written down** (a relative phrase read from the day a document was *kept* says nothing about when it was written, so no guesses are made from documents); each date shows **the line it is on**, in the document's own words; dates whose line carries a **deadline cue** (a short fixed English list, whole words, plus *by* right before a date) are listed with the other days, and **every other future date is folded** under *Other dates in your documents* — **a sort, never a filter**: no date is dropped for lacking a cue. **At most 12 dates per document** are listed; the rest are counted. The existing *Track this…* starts the existing commitment card from that line.
+
+**Nothing new is recorded or permitted.** A computed view (DR-19/21): written from words in memory, never stored; recognised from the clear `referrer` already on the record; the commitment record, note and state rules are DR-30's, unchanged; **no capability, no permission, no event type, no importer change**. The quiet dot ignores folded dates.
+
+**Not in this ruling:** *people in a document* (named contacts, full-name/number/email only, one tap to link — its own step); amounts; a model proposing commitments (DR-9); document kinds; languages other than English for cues.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

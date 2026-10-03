@@ -330,7 +330,7 @@ final class CommitmentsTest {
         Harness.check("the screens that offer it: Today, a person's page, Recall, Coming up",
             source.get("TodayActivity").contains("commitments.start(null, \"\", null, null, refresh)") && source.get("PeopleActivity").contains("commitmentFlow.start(null, \"\", null, person,")
             && source.get("RecallActivity").contains("commitments.start(entry.id, TodayActivity.firstWords(entry.snippet), null, null, null)")
-            && source.get("ComingUpActivity").contains("commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), when, null, null)"));
+            && source.get("ComingUpActivity").contains("commitments.start(item.entry.id, item.line != null ? item.line : TodayActivity.firstWords(item.entry.snippet), when, null, null)"));
         Harness.check("erasing the source item does not touch a commitment: Recall's erase never mentions them", !source.get("RecallActivity").contains("Commitments.delete") && !source.get("RecallActivity").contains("Commitments.all"));
         Harness.check("Today is secure and computes nothing it keeps", source.get("TodayActivity").contains("FLAG_SECURE") && !source.get("TodayActivity").contains("getSharedPreferences") && !source.get("TodayActivity").contains("FileOutputStream"));
         Harness.check("a person's page lists what is open with them, through the same rows", source.get("PeopleActivity").contains("Open with them") && source.get("PeopleActivity").contains("Commitments.forPerson(commitments, person)"));

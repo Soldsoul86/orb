@@ -465,7 +465,7 @@ public final class PeopleActivity extends Activity {
                 row.setOrientation(LinearLayout.VERTICAL);
                 row.setPadding(0, 8, 0, 8);
                 row.addView(text(nice.format(c.getTime()) + (item.guess ? "  \u00b7  a guess: \u201c" + item.phrase + "\u201d" : ""), 13, !item.guess));
-                row.addView(text(item.entry.snippet, 12, false));
+                row.addView(text(item.shown(), 12, false));
                 if (item.reminded) {
                     row.addView(text("A reminder is set.", 12, true));
                 } else {

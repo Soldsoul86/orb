@@ -54,6 +54,17 @@ final class DocumentsFacts {
         return Shares.declaredText(ACTION, MIME, REFERRER, textChars);
     }
 
+    /** Envelope hashes of the kept items that came from the Documents source — read from the clear record's `referrer`, nothing else. */
+    static java.util.Set<String> documentHashes(java.util.List<String> lines) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String line : lines) {
+            if (!Shares.TYPE.equals(Journal.typeOf(line)) || !line.contains("\"referrer\":\"" + REFERRER + "\"")) continue;
+            String hash = Erasure.envelopeHash(line);
+            if (hash != null) out.add(hash);
+        }
+        return out;
+    }
+
     /** The person-facing name of where kept words came from, or null when the referrer is not a source. */
     static String fromLabel(String referrer) {
         return REFERRER.equals(referrer) ? "a PDF you chose" : null;

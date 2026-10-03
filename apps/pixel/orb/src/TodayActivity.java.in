@@ -153,11 +153,11 @@ public final class TodayActivity extends Activity {
                 row.setOrientation(LinearLayout.VERTICAL);
                 row.setPadding(0, 8, 0, 8);
                 row.addView(text(nice.format(c.getTime()) + (item.guess ? "  ·  a guess: “" + item.phrase + "”" : ""), 13, !item.guess));
-                row.addView(text(item.entry.snippet, 12, false));
+                row.addView(text(item.shown(), 12, false));
                 Button track = new Button(this);
                 track.setText("Track this…");
                 final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
-                final String preset = firstWords(item.entry.snippet);
+                final String preset = item.line != null ? item.line : firstWords(item.entry.snippet);
                 track.setOnClickListener(new View.OnClickListener() {
                     @Override public void onClick(View view) { commitments.start(item.entry.id, preset, picked, null, refresh); }
                 });

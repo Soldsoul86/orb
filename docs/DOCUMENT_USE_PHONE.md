@@ -1,6 +1,6 @@
 # Using what Orb now holds — the dates in a document, the line they are on, and a commitment from it (option 1; proposed)
 
-> Status: **proposed 2026-10-03, awaiting the operator's go-ahead** ("Yes, go ahead with the design for option 1" asked for this write-up; building waits for the next "yes"). Nothing here is built.
+> Status: **built 2026-10-03 (DR-34, AD-29) — awaiting the device (`DEVICE_LOOP.md` §7b79, `orb-app-v43-documents-ahead.apk`).** The operator approved the design and the build ("Yes, go ahead with the build"). "People in this document" (§5) is **not** built.
 > Builds on: Sources (`SOURCES_PHONE.md`, DR-33 — four PDFs are kept on the operator's phone), Coming up (`COMING_UP_PHONE.md`, DR-21), relative days (`RELATIVE_DAYS_PHONE.md`, DR-23), Commitments (`COMMITMENTS_PHONE.md`, DR-30), person links (`PERSON_LINK_PHONE.md`, DR-29). **No new capability, no new permission, no new record.**
 
 ## 1. Why, in plain words
@@ -62,3 +62,13 @@ This slice fixes the first three. The fourth is a smaller, separate step (§5).
 5. **People in a document is a separate step** (§5), not in this build.
 
 *One thing you can do now, if you like, with no new build:* open **Coming up** on v42 and tell me what the four PDFs show there. It would show me the real problem before I fix an imagined one.
+
+## 7. As built
+
+- **`DocumentDates`** (new, pure): the lines of a document (its own lines; a long line cut at sentence ends; a long sentence cut at words; each at most 140 characters; at most 4,000 lines), the cue test (a fixed English list as whole words, plus *by* only right before a day number or a month name), and `of(text, today)` — the dates written down, today or later, **one per date** (its deadline-looking line if it has one, else the first line it appeared on), deadlines first, **at most 12 returned**, the rest counted.
+- **`DocumentsFacts.documentHashes`** recognises a document from the clear record's `referrer` — no new field.
+- **`ComingUp`**: for a document, the deadline-looking dates go into the days (each `Item` now carries its `line`, shown instead of the item's first words); the others become a **`Fold`** (one per document, with the count not listed); **no relative-day guess is made** from a document (its branch returns before they are read). Everything else — screens, shared notes — takes exactly the road it did. The quiet dot counts days only, so a document's folded dates never count. A person's page keeps the days and the fold of the documents that mention them.
+- **Screens.** Coming up shows the line under each date, and, at the end, ***Other dates in your documents***: one button per document (*Show 3 other dates — (first words)*, with *and N more not listed* when the cap cut), opening to the same two actions as any date. Today and a person's page show the line too. **The button is *Track this…*** (the existing one) — it starts the commitment card with the line as the words, the date as the date, and nothing filed until *Keep*.
+- **Cue list as built:** due, pay, payable, before (so *on or before*), deadline, expires, expiry, renew/renews, renewal, appointment, check-in/check in, departure, arrival, delivery, interview, exam, last date, valid until/till — and *by* before a date. Whole words only: *payroll*, *duet*, *overdue* and *prepared by Priya* are not cues.
+- **Also:** `docs/fixtures/orb-sample-invoice.pdf`, a made-up one-page invoice with deadline-looking and other dates in late 2026 and early 2027, to try on the phone if your own PDFs have nothing ahead.
+- **Tests.** Every cue and near-miss; the lines (limits, cuts, nothing lost); the ranking, dedupe, cap and counts; Coming up end to end through the Documents source (days, folds, the dot, restrict, erase, no guesses, an ordinary share unchanged, nothing written); and source guards (rules pure; documents recognised from the clear record only; the document branch returns before guesses; the fold opens and closes; the commitment starts from the line; other screens show it).

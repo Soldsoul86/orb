@@ -100,7 +100,7 @@ public final class ComingUpActivity extends Activity {
             said.append("looked at the newest ").append(Recall.SCAN_LIMIT).append(", ").append(result.looked.skipped).append(" not looked at");
         }
         if (said.length() > 0) list.addView(text(said.toString(), 12, false));
-        if (result.days.isEmpty()) {
+        if (result.days.isEmpty() && result.folds.isEmpty()) {
             list.addView(text("Nothing ahead. When something you keep names a date that is still to come, it will be here.", 14, false));
             return;
         }
@@ -118,34 +118,75 @@ public final class ComingUpActivity extends Activity {
             c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
             list.addView(text(nice.format(c.getTime()), 15, true));
             for (final ComingUp.Item item : day.items) {
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.VERTICAL);
-                row.setPadding(0, 8, 0, 16);
-                row.addView(text((item.entry.packageName == null ? "" : item.entry.packageName + " · ") + "kept " + kept.format(new Date(item.entry.wallClock)), 11, false));
-                row.addView(text(item.entry.snippet, 14, false));
-                if (item.guess) {
-                    // Said plainly: this was read, not written. The review card shows the exact date, and the person can move it.
-                    row.addView(text("A guess: \u201c" + item.phrase + "\u201d, read from when you kept it (" + keptOn(item.anchor) + ").", 12, true));
+                list.addView(itemRow(item, ymd, c, kept));
+            }
+        }
+        folds(result, kept);
+    }
+
+    /** One date's row: where it is from, the line (or first words), and the two things you may do with it. */
+    private LinearLayout itemRow(final ComingUp.Item item, final String[] ymd, java.util.Calendar c, SimpleDateFormat kept) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, 8, 0, 16);
+        row.addView(text((item.entry.packageName == null ? "" : item.entry.packageName + " · ") + "kept " + kept.format(new Date(item.entry.wallClock)), 11, false));
+        row.addView(text(item.shown(), 14, false));
+        if (item.guess) {
+            // Said plainly: this was read, not written. The review card shows the exact date, and the person can move it.
+            row.addView(text("A guess: \u201c" + item.phrase + "\u201d, read from when you kept it (" + keptOn(item.anchor) + ").", 12, true));
+        }
+        if (item.reminded) {
+            row.addView(text("A reminder is set.", 12, true));
+        } else {
+            Button remind = new Button(this);
+            remind.setText("Remind me on " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(c.getTime()));
+            final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+            remind.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { flow.start(item.entry.id, picked); }
+            });
+            row.addView(remind);
+        }
+        Button track = new Button(this);
+        track.setText("Track this\u2026");
+        final int[] when = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
+        track.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { commitments.start(item.entry.id, item.line != null ? item.line : TodayActivity.firstWords(item.entry.snippet), when, null, null); }
+        });
+        row.addView(track);
+        return row;
+    }
+
+    /** Expanded folds, by event id of the document; memory only. */
+    private final java.util.Set<String> open = new java.util.HashSet<>();
+
+    /** *Other dates in this document (N)* — every future date a document names that does not look like a deadline, one tap to open. */
+    private void folds(ComingUp.Result result, SimpleDateFormat kept) {
+        if (result.folds.isEmpty()) return;
+        list.addView(text("Other dates in your documents", 15, true));
+        for (final ComingUp.Fold fold : result.folds) {
+            final String key = fold.entry.id == null ? fold.entry.hash : fold.entry.id;
+            boolean showing = open.contains(key);
+            int n = fold.dates.size();
+            String label = fold.entry.snippet.length() > 60 ? fold.entry.snippet.substring(0, 60) + "\u2026" : fold.entry.snippet;
+            Button header = new Button(this);
+            header.setText((showing ? "Hide" : "Show") + " " + n + (n == 1 ? " other date" : " other dates") + " \u2014 " + label
+                + (fold.more > 0 ? "  (and " + fold.more + " more not listed)" : ""));
+            header.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (!open.remove(key)) open.add(key);
+                    render();
                 }
-                if (item.reminded) {
-                    row.addView(text("A reminder is set.", 12, true));
-                } else {
-                    Button remind = new Button(this);
-                    remind.setText("Remind me on " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(c.getTime()));
-                    final int[] picked = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
-                    remind.setOnClickListener(new View.OnClickListener() {
-                        @Override public void onClick(View view) { flow.start(item.entry.id, picked); }
-                    });
-                    row.addView(remind);
-                }
-                Button track = new Button(this);
-                track.setText("Track this\u2026");
-                final int[] when = {Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]), Integer.parseInt(ymd[2])};
-                track.setOnClickListener(new View.OnClickListener() {
-                    @Override public void onClick(View view) { commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), when, null, null); }
-                });
-                row.addView(track);
-                list.addView(row);
+            });
+            list.addView(header);
+            if (!showing) continue;
+            SimpleDateFormat nice = new SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault());
+            for (ComingUp.Dated d : fold.dates) {
+                String[] ymd = d.date.split("-");
+                java.util.Calendar c = java.util.Calendar.getInstance();
+                c.clear();
+                c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
+                list.addView(text(nice.format(c.getTime()), 14, true));
+                list.addView(itemRow(d.item, ymd, c, kept));
             }
         }
     }

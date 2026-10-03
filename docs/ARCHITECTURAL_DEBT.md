@@ -754,6 +754,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-29 — what dates in documents do not know
+
+**Opened 2026-10-03** (`DECISIONS.md` DR-34). Debts, stated.
+
+1. **A line is whatever the PDF reader returned.** Columns can interleave, so the line a date is on may be a fragment, or two things joined (AD-28 item 1). The line is editable on the commitment card; the first device round decides whether it is good enough.
+2. **The cue list is a guess at what matters, in English.** A deadline in Hindi or Tamil, or one worded outside the list (*settle by*, *no later than*), is listed second, not missed. The list is short on purpose and held by tests.
+3. **Long lines are cut at 140 characters by sentence and word.** A date near a cut keeps its own piece, but a cue in the neighbouring piece is not seen with it.
+4. **Date forms are those Orb reads everywhere** (day-first numeric; *12 Oct 2026*). Others, such as *October 12th* or ISO dates written without separators, may be missed.
+5. **One line per date.** A date that appears on several lines shows its deadline-looking line, else the first; the other lines are not shown.
+6. **Twelve per document.** A long statement's later dates are counted, not shown.
+7. **The fold lives in memory.** Leaving Coming up closes every fold.
+8. **A document is a document only by its clear record.** An item kept before Sources existed, or shared by hand, takes the old road with the guesses.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.
