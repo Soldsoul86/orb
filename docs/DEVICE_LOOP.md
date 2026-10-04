@@ -7650,3 +7650,52 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 6. Optional: turn it on again for a time **after** now by an hour or so to see the "at once" rule; and on a day with nothing open, see that nothing arrives. *(P315, P318)*
 7. **What Orb may do** → the new line; **Switch off the morning brief**. *(P320)*
 8. **Export and share journal** and send it. *(P319)*
+
+#### Result — export `orb-20261004-122722` (operator, 2026-10-04): "I set twice, 2 min from current time, it didn't fire"
+
+868 events; v54 (`29851588`) started once. **Nothing in the journal names a person or holds a word.** The operator's screenshot (12:21) shows **Show me today's brief** reading *1 waiting for · 3 dates this week* — **P314 confirmed in form** (a counts line, and the preview wrote nothing).
+
+The journal, in the phone's own clock:
+
+| Time | Event |
+| --- | --- |
+| 12:21:40 | brief **turned on at 08:00** (words ticked) → **`orb.brief.skipped`, reason `late`** — correct by the rule (08:00 was more than three hours ago) |
+| 12:22:03 | turned off |
+| 12:22:37 | turned on for **12:23** — no record at 12:23 or after |
+| 12:24:24 | turned off |
+| 12:24:51 | turned on for **12:26** — no record by the export at 12:27:22 |
+
+**P317 failed, and the cause is a bug of mine, not the phone.** The *late* skip written at 12:21 marked the day as **handled** — and it was never reset when the time was changed. So when each later alarm was due, `Brief.rearm` found the day "done", released nothing and — by design for an already-handled day — **wrote nothing**, which is why the journal is silent. (The same phone's reminders, on the same kind of alarm, have run 31 to 74 seconds late — so Doze was not the explanation.) The unit tests covered *skip, then the next day* but not *skip, then a new time the same day*, which is exactly what a person testing with two-minute times does.
+
+Open in this round: P311 (Play Protect), P312, P313 (shown in the sequence of events, so on in form), P315, P316, P318–P320 — nothing in the journal says. **The fix and a way to see the alarm itself are in §7b92.**
+
+### 7b92. The morning brief — a new time starts afresh; the alarm says it fired (v55) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v55-brief-fix.apk`. Same design (`MORNING_BRIEF_PHONE.md`); limits `ARCHITECTURAL_DEBT.md` AD-35.
+
+#### What changed
+
+1. **A skip now belongs to the time that was set when it was made.** Choosing a new time (turning on again, or **Change…**) starts a fresh decision for the day; a *late* or *nothing* skip written under an earlier time no longer hides the brief. The "same refusal is not written twice" rule resets the same way.
+2. **The alarm leaves a record when it fires:** `orb.brief.alarm` {the day, minutes after the chosen time}, once a day under each time chosen. From the next export it is possible to say whether Android delivered the alarm at all, and how late — separate from whether the brief was shown.
+
+#### Checked before the device
+
+- Phone-side suite: 2555 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **The exact sequence that failed is now a test:** turn on at 12:21 for 08:00 → skipped late; turn off; turn on for 12:23; at 12:22 it waits; at 12:23:40 it is shown.
+- **Mutation checks** on the fix and the new record: **9 targeted mutants; 8 caught** — including the one that puts back the bug (a skip no longer tied to the time it was made under), the reset of the "already written" rule, the new alarm record and its day, its lateness and its fields. **One is equivalent** (`skip >= configured` differs from `skip > configured` only when there is no skip at all, which the caller has already ruled out). The earlier 74-mutant run still holds for the rest of the brief.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P321** | **Turn on for a time 3 minutes ahead** (even after an earlier turn-on today): the notification appears within about two minutes of that time | nothing arrives; then the export's `orb.brief.alarm` says whether Android delivered the alarm |
+| **P322** | **Export:** an `orb.brief.alarm` (the day, minutes late — a minute or two, as reminders) then an `orb.brief.shown` | an alarm record with no brief, or neither |
+| **P323** | **Change…** the time to 3 minutes ahead after one has fired: it fires again at the new time, with its own `orb.brief.alarm` | it does not |
+
+#### Protocol
+
+1. Install `orb-app-v55-brief-fix.apk` over v54.
+2. **Today → Morning brief**: if it is on, **Change…** the time to **three minutes ahead**; otherwise **Turn on** at three minutes ahead. Leave the phone alone (screen on or off). *(P321)*
+3. When it arrives, tap it (opens Today). Then **Change…** to three minutes ahead once more and wait. *(P323)*
+4. **Export and share journal** and send it. *(P322)*
+

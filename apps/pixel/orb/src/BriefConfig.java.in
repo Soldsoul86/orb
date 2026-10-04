@@ -61,15 +61,42 @@ final class BriefConfig {
         return day == null || reason == null ? null : day + "|" + reason;
     }
 
-    /** The brief for this day is done: shown, or skipped because there was nothing or it was too late. A skip for no permission is not done — the person may allow it. */
+    /** Whether the last skip on record came after the person's last choice of time: a skip belongs to the time that was set when it was made, so a new choice starts a fresh decision. */
+    private static boolean skipIsCurrent(List<String> lines) {
+        int skip = -1;
+        int configured = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            String type = Journal.typeOf(lines.get(i));
+            if (BriefFacts.SKIPPED.equals(type)) skip = i;
+            else if (BriefFacts.CONFIGURED.equals(type)) configured = i;
+        }
+        return skip > configured;
+    }
+
+    /**
+     * The brief for this day is done: shown, or skipped — **under the time now set** — because there was nothing or it was too late. A skip for no permission is not
+     * done (the person may allow it), and a skip made under an earlier time does not count: choosing a new time starts a fresh decision.
+     */
     static boolean handledToday(List<String> lines, String day) {
         if (day.equals(lastShownDay(lines))) return true;
         String skip = lastSkip(lines);
-        return skip != null && (skip.equals(day + "|" + BriefRules.NOTHING) || skip.equals(day + "|" + BriefRules.LATE));
+        return skip != null && skipIsCurrent(lines) && (skip.equals(day + "|" + BriefRules.NOTHING) || skip.equals(day + "|" + BriefRules.LATE));
     }
 
-    /** This exact skip is already the last one on record: it is not written again. */
+    /** The alarm already left a record for this day under the time now set: a second firing is not written again, but a new time gets its own. */
+    static boolean alarmRecorded(List<String> lines, String day) {
+        int alarm = -1;
+        int configured = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            String type = Journal.typeOf(lines.get(i));
+            if (BriefFacts.ALARM.equals(type) && lines.get(i).contains("\"day\":\"" + day + "\"")) alarm = i;
+            else if (BriefFacts.CONFIGURED.equals(type)) configured = i;
+        }
+        return alarm > configured;
+    }
+
+    /** This exact skip is already the last one on record, under the time now set: it is not written again. */
     static boolean skipRecorded(List<String> lines, String day, String reason) {
-        return (day + "|" + reason).equals(lastSkip(lines));
+        return skipIsCurrent(lines) && (day + "|" + reason).equals(lastSkip(lines));
     }
 }

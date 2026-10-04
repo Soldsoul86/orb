@@ -261,6 +261,37 @@ final class BriefTest {
         Harness.check("lateness is measured from the time that was chosen (08:30), not from the default", wordsRecord.contains("\"minutesLate\":10"));
         Harness.check("the record says words were asked for, and holds none", wordsRecord.contains("\"withWords\":true") && !wordsRecord.contains("GST certificate"));
 
+        Harness.suite("a new time starts a fresh decision (the morning a skip hid the brief)");
+        Install.forget();
+        File dir3 = Files.createTempDirectory("orb-brief3").toFile();
+        Context ctx3 = new Context(dir3);
+        Journal j3 = Journal.open(ctx3, Install.lane(ctx3), Install.id(ctx3));
+        Commitments.open(ctx3, j3, null, "Call the bank", "owe", "2026-10-01", null);
+        Alarm alarm3 = new Alarm();
+        List<String> out3 = new ArrayList<>();
+        Brief.turnOn(j3, 480, true);
+        Harness.equal("turned on at 12:21 for 08:00: too late, skipped and written", Brief.rearm(ctx3, j3, at("2026-10-04T12:21:40", IST), IST, true, recorder(out3), alarm3) + "|" + BriefConfig.lastSkip(j3.readLines()), "skipped:late|2026-10-04|late");
+        Harness.check("and that late skip finishes the day under that time", BriefConfig.handledToday(j3.readLines(), "2026-10-04"));
+        Brief.turnOff(j3, alarm3);
+        Brief.turnOn(j3, 12 * 60 + 23, false);
+        Harness.check("a new time starts afresh: the day is not handled, and the old skip is not the one to avoid repeating", !BriefConfig.handledToday(j3.readLines(), "2026-10-04") && !BriefConfig.skipRecorded(j3.readLines(), "2026-10-04", "late"));
+        Harness.equal("at 12:22 it waits and sets the alarm for 12:23", Brief.rearm(ctx3, j3, at("2026-10-04T12:22:37", IST), IST, true, recorder(out3), alarm3) + "|" + alarm3.at, "waiting|" + at("2026-10-04T12:23:00", IST));
+        Harness.equal("the alarm fires a little after 12:23: the brief is shown", Brief.rearm(ctx3, j3, at("2026-10-04T12:23:40", IST), IST, true, recorder(out3), alarm3) + "|" + out3.size(), "shown|1");
+
+        Harness.suite("the alarm says that it fired");
+        Install.forget();
+        File dir4 = Files.createTempDirectory("orb-brief4").toFile();
+        Context ctx4 = new Context(dir4);
+        Journal j4 = Journal.open(ctx4, Install.lane(ctx4), Install.id(ctx4));
+        Brief.turnOn(j4, 480, false);
+        Harness.check("the firing is written, once a day", Brief.fired(j4, at("2026-10-05T08:01:10", IST), IST) && !Brief.fired(j4, at("2026-10-05T08:05:00", IST), IST) && count(j4, BriefFacts.ALARM) == 1);
+        String alarmLine = lastOf(j4, BriefFacts.ALARM);
+        Harness.check("with the day and how many minutes after the chosen time, and nothing else of the person's", alarmLine.contains("\"day\":\"2026-10-05\"") && alarmLine.contains("\"minutesLate\":1") && !alarmLine.contains("overdue"));
+        Brief.configure(j4, 8 * 60 + 30, false);
+        Harness.check("a new time gets its own record the same day, measured from the new time", Brief.fired(j4, at("2026-10-05T08:34:00", IST), IST) && lastOf(j4, BriefFacts.ALARM).contains("\"minutesLate\":4"));
+        Harness.check("the next day is written again", Brief.fired(j4, at("2026-10-06T08:31:00", IST), IST) && count(j4, BriefFacts.ALARM) == 3);
+        Harness.equal("its fields", new TreeMap<>(BriefFacts.alarm("2026-10-05", 4L)).toString(), "{capability=orb.brief.daily, day=2026-10-05, minutesLate=4, version=1}");
+
         Harness.suite("one entry point: due and not done is shown, then tomorrow's alarm is set");
         Install.forget();
         File dir2 = Files.createTempDirectory("orb-brief2").toFile();
@@ -311,7 +342,7 @@ final class BriefTest {
             && notifier.contains("setContentText(\"Your morning brief is ready\")") && notifier.contains("TodayActivity.class"));
         Harness.check("the notifier names no one: it is given text, never a commitment", !notifier.contains("Commitments") && !notifier.contains("People"));
         String receiver = source.get("BriefReceiver");
-        Harness.check("the receiver decides nothing: it hands over to the one entry point", receiver.contains("Brief.rearm(") && !receiver.contains("BriefRules."));
+        Harness.check("the receiver decides nothing: it says the alarm fired, then hands over to the one entry point", receiver.indexOf("Brief.fired(") > 0 && receiver.indexOf("Brief.fired(") < receiver.indexOf("Brief.rearm(") && !receiver.contains("BriefRules."));
         String alarms = source.get("BriefAlarms");
         Harness.check("the alarm needs no exact-alarm permission", alarms.contains("setAndAllowWhileIdle") && !alarms.contains("setExact"));
         String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");

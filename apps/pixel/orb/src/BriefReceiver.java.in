@@ -18,6 +18,7 @@ public final class BriefReceiver extends BroadcastReceiver {
         Journal journal = orb == null ? null : orb.journal();
         if (journal == null) return;
         try {
+            Brief.fired(journal, System.currentTimeMillis(), TimeZone.getDefault());
             Brief.rearm(context, journal, System.currentTimeMillis(), TimeZone.getDefault(), BriefNotifier.permitted(context), new BriefNotifier(context), new BriefAlarms(context));
         } catch (IOException unreadable) {
             // History that cannot be read is not history that says "go ahead": nothing is shown. The next start tries again.

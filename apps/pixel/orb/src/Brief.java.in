@@ -75,6 +75,15 @@ final class Brief {
         return SHOWN;
     }
 
+    /** The alarm fired: say so, with how late it was. One record a day under each time chosen (a second firing is not written again). */
+    static boolean fired(Journal journal, long nowMs, TimeZone zone) throws IOException {
+        List<String> lines = journal.readLines();
+        String day = BriefRules.dayOf(nowMs, zone);
+        if (BriefConfig.alarmRecorded(lines, day)) return false;
+        long late = BriefRules.minutesLate(nowMs, BriefRules.scheduledAt(day, BriefConfig.minute(lines), zone));
+        return journal.append(BriefFacts.ALARM, BriefFacts.alarm(day, late)) != null;
+    }
+
     /**
      * The one entry point: if the brief is on and due today and not done, release it (the gate decides, including how late is too late); then set the next alarm.
      * If it is off, the alarm is cleared.

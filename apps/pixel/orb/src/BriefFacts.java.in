@@ -13,6 +13,7 @@ final class BriefFacts {
     static final String SHOWN = "orb.brief.shown";
     static final String SKIPPED = "orb.brief.skipped";
     static final String CONFIGURED = "orb.brief.configured";
+    static final String ALARM = "orb.brief.alarm";
 
     private static Map<String, Object> base() {
         Map<String, Object> p = Json.obj();
@@ -37,6 +38,14 @@ final class BriefFacts {
         Map<String, Object> p = base();
         p.put("day", day);
         p.put("reason", reason);
+        return p;
+    }
+
+    /** The alarm fired: the day, and how many minutes after the chosen time. Written by the receiver so an export can say whether Android delivered it. */
+    static Map<String, Object> alarm(String day, long minutesLate) {
+        Map<String, Object> p = base();
+        p.put("day", day);
+        p.put("minutesLate", minutesLate);
         return p;
     }
 
