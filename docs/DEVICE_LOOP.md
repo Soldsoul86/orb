@@ -7906,3 +7906,19 @@ After **Look** on the Messages screen there is a new button, **Senders…**. It 
 4. Open **Today** and the morning brief card. *(P338)*
 5. **What Orb may do**. *(P340)*
 6. **Export and share journal** and send it. *(P339)* Delete the backup file when you are done, as always.
+
+#### Result — export `orb-20261004-160004` (operator, 2026-10-04): the first marks
+
+910 events; v58 (`29851822`) started once, at 10:26:38; **no crash, no fault**. One `orb.source.looked` (10:27:00) — the Messages screen was redrawn several times afterwards and **recorded no second look**. The fit report was not recorded (the button was not tapped).
+
+| Time | Event |
+| --- | --- |
+| 10:27:36 | **`grants.capability.granted` for `orb.messages.senders`**, then **`orb.sender.judged` — quiet**, key `d47f…`, **203 messages, 202 unread** |
+| 10:27:51 | a second sender quiet: key `055a…`, **200 messages, 187 unread** |
+| 10:28:19 | **the same key, `clear`** — taken back after 28 seconds |
+| 10:28:30 | a third sender quiet: key `5f4b…`, **5,096 messages, 107 unread** |
+| 10:28:31 | **the same key, `clear`** — taken back one second later |
+
+**What it confirms.** P339: one grant at the first mark, then one record per tap — a 16-hex key, the verdict, two counts; **no sender name, number or word anywhere**; the same sender has the same key every time. The counts equal the container's for the same file (203/202 and 200/187 are the housing site and the property broker; the 5,096-message sender is a bank, 2 % unread). Nothing opened, closed or changed a commitment or a loop (P338, as far as a journal can show: no `orb.commitment.*` or `orb.loop.*` event was written). Marking and taking back both worked, including **marking the bank and undoing it within a second** — the case the cost line is there for.
+
+**Not visible in a journal** (needs the operator's eyes): P334 (the six under *Mostly not read*), P335–P337 (the paragraph's figure falling and returning at once), P340 (thirteen capabilities). **Left quiet at the end: one sender** (the 203-message one).
