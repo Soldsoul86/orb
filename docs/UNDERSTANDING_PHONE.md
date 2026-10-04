@@ -117,3 +117,13 @@ Approved 2026-10-03 ("Yes, go ahead with the build for step 1").
 - **Where it shows.** The page; the name wherever it is shown (*Ravi Kumar (electrician)*), including in the sentences of *What Orb has noticed*; and **People's search finds it** — typing *electri* finds the person, ranked just after a name that starts the same way.
 - **Not built:** step 2 (the shape: who starts the calls, usual times, what is between you), step 3 (anything inferred from words), the Messages marks, and any use of the role to decide anything.
 
+## 12. As built — the Messages list marks the people you are in touch with (step 2c, v53)
+
+Taken from "go ahead with the next feature" (2026-10-04), the option recommended in §10. The device had shown why: eleven people confirmed as in regular touch, every one **by calls alone** (`months: 0`), because only one conversation had been kept.
+
+- **What you see.** In **Sources → Text messages**, after picking the backup file, if **What Orb has noticed** is on: the conversations with people you said you are in regular touch with are **listed first** — even when they are not among the fifty most recent — and each carries **you said: in regular touch**. A line says how many, and a button **Tick those N** ticks exactly them. **Nothing is ticked for you**; you still press **Keep the ticked ones**.
+- **How it knows without reading your contacts.** Contacts are read only on the People screen, so the Messages list does not read them. It uses the **blinded key of each conversation's number** (the same keyed hash an answer is recorded under) and looks for a confirmed *regular touch* answer with that key. No name or number is read from the journal, and nothing new is recorded.
+- **Off means off.** With What Orb has noticed switched off, nothing is marked and the list is as before. If the answers cannot be read, nothing is marked rather than guessed.
+- **Limit (AD-33).** An answer is keyed on a person's **smallest** number, so a conversation on their other number is not marked; and only the fifty listed rows can be ticked. Both are visible, neither is guessed around.
+- **After keeping:** next time **What Orb has noticed** is opened, *Because* lines for those people can include *messages kept from N of the last 6 months*.
+

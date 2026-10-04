@@ -7555,3 +7555,42 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 - Not in the journal, so not known: P300 (Play Protect), P301.
 - Noticed in passing: `grants.packages` records a newly installed package, `all.backup.restore` — the operator's backup app — as a change in what is installed, as designed.
 
+### 7b90. Messages marks the people you are in touch with (DR-38, step 2c) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v53-marks.apk` — the calls build, as v46–v52. Design: `docs/UNDERSTANDING_PHONE.md` §10 and §12 (as built); limits `ARCHITECTURAL_DEBT.md` AD-33 item 13.
+
+**Why:** the eleven people you confirmed as in regular touch rested on calls alone (`months: 0`) because only one conversation had been kept. The Messages list should help you tick the right ones — without reading your contacts and without ticking anything for you.
+
+#### What changed
+
+1. In **Sources → Text messages**, with **What Orb has noticed** on, the conversations with people you said you are in regular touch with are **listed first** (even beyond the fifty newest) and marked **you said: in regular touch**.
+2. A line counts them and **Tick those N** ticks exactly them. **Nothing is ticked until you press it**, and nothing is kept until you press **Keep the ticked ones**.
+3. **No contact is read** (the match is by the blinded key of the number), **nothing new is recorded**, and with What Orb has noticed off nothing is marked.
+
+#### Checked before the device
+
+- Phone-side suite: 2441 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the order of the list (marked first, each group newest first, still fifty), the label, and the matching (only a confirmed *regular touch*, by the number's own key): **19 mutants; 13 caught by the first suite, 6 survived** — all six in the screen's own wiring (which rows are labelled, counted and ticked, and what happens when the answers cannot be read), which cannot run off the phone. They are now held by guard checks on the screen's code, like the other screens', and **all are caught**; none is equivalent.
+- **Not testable off the phone:** which of your eleven have a conversation in the last twelve finished months of your backup, and how the list reads.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P304** | v53 installs over v52 with **no Play Protect warning** (manifest unchanged since v46) | flagged — record the exact words |
+| **P305** | **Sources → Text messages → Pick the backup file** (the JSON): the rows for people you said you are in regular touch with are **first**, each ending ***you said: in regular touch***; a line says how many | none marked though you confirmed people with a number in the file |
+| **P306** | The count is **at most eleven** and may be fewer: a person is marked only if their conversation is on **their smallest number** and has messages in the last twelve finished months | more than the people you confirmed, or someone you did not confirm |
+| **P307** | **Tick those N** ticks exactly the marked rows; **nothing is ticked before you press it** | other rows ticked, or ticked on opening |
+| **P308** | Switch **What Orb has noticed off** (What Orb may do) → pick the file again: **no marks**, the list as in v49 | marks remain |
+| **P309** | **Keep** those → open **What Orb has noticed**: the *Because* lines for those people now include ***messages kept from N of the last 6 months*** (if their messages fall in those months) | no change in the evidence |
+| **P310** | **Export and share journal:** the usual `orb.source.looked` / `orb.source.kept` / `orb.shared`; **nothing records who was marked** | a name or number, or a new record about marks |
+
+#### Protocol
+
+1. Install `orb-app-v53-marks.apk` over v52; open Orb once. *(P304)*
+2. **Sources → Text messages → Pick the backup file** → your `.sms` file (the same file, or a fresh backup). Read the top of the list. *(P305, P306)*
+3. Press **Tick those N**; look at what is ticked. Then untick a few you do not want and press **Keep the ticked ones**. *(P307)*
+4. **People → What Orb has noticed**: look at the *Because* lines. *(P309)*
+5. Optional: switch What Orb has noticed off, pick the file again, and look. Switch it back on. *(P308)*
+6. **Export and share journal** and send it. Delete the backup file when you are done. *(P310)*
+

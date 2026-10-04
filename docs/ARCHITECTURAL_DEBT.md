@@ -833,6 +833,7 @@ a second source for the compiler's checksum exists (item 1).
 10. **A note is found again by number, address or name.** A contact who changes every number and the name loses their note (dormant, not lost: it returns if one matches again); two contacts sharing a name share a note until the first is told apart. Merging and splitting persons is still unbuilt (AD-17).
 11. **One note per person, the newest.** An older note is erased when a newer one is saved; there is no history of what you used to say. (Erasing is the only way a sealed note is ever removed.)
 12. **The note is on this phone only.** It is carried by a backup, as words, but nothing syncs it elsewhere.
+13. **The Messages marks match a conversation's number to the smallest number of the person you answered about.** A person with two numbers is marked only on the smaller; the other number's conversation is listed like any other. Keying every number of a person at answer time would fix it, and is not built.
 
 ---
 

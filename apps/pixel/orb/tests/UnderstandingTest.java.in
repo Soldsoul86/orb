@@ -357,6 +357,11 @@ final class UnderstandingTest {
         String look = screen.substring(screen.indexOf("private void showMessagesLook("), screen.indexOf("private void updateTally("));
         Harness.check("it marks only when What Orb has noticed is on, and reads no contact", look.indexOf("UnderstandingAccess.granted(this)") > 0 && look.indexOf("UnderstandingAccess.granted(this)") < look.indexOf("Understanding.closeNumbers(")
             && !screen.contains("ContactsReader") && !screen.contains("ContactsContract"));
+        Harness.check("the marked are listed first, labelled, counted, and the button ticks only them, and only when there are some",
+            look.contains("rows = survey.listed(close);") && look.contains("MessagesRules.rowLabel(c, zone, closeHere.contains(c.number))")
+            && look.contains("if (!closeHere.isEmpty()) {") && look.contains("for (MessagesRules.Conversation c : rows) if (closeHere.contains(c.number)) shown++;")
+            && look.contains("if (closeHere.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);"));
+        Harness.check("when it cannot tell who, no one is marked rather than a guess", look.contains("close = new java.util.HashSet<>();   // cannot tell who"));
         Harness.check("nothing is ticked for you: the only tick is the button you press", screen.split("setChecked\\(true\\)", -1).length - 1 == 1 && look.contains("Tick those ") && look.indexOf("setChecked(true)") > look.indexOf("Tick those "));
     }
 
