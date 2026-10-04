@@ -7621,8 +7621,8 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 
 #### Checked before the device
 
-- Phone-side suite: 2537 checks; brain (378), TypeScript (600), lint and type-check clean.
-- **Mutation checks** on the counts and the line, the first words, the time (zones, month ends, the day a clock changes), the gate and its order, the late limit, what the journal says, the records, the shell that shows it once, the one entry point, the grant and the switch-off, the status, and the screen's glue: @@MUT@@
+- Phone-side suite: 2545 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the counts and the line, the first words, the time (zones, month ends, the day a clock changes), the gate and its order, the late limit, what the journal says, the records, the shell that shows it once, the one entry point, the grant and the switch-off, the status, and the screen's glue: **74 mutants; 64 caught by the first suite, 10 survived** (a waiting item dated today, the half-hour in a time, minutes late measured from an early moment, midnight as a time, lateness measured from the time chosen, the status naming that time, the · between parts, the cut of the first words, and two screen-wiring lines: asking Android first, and re-arming after a change of time). Each became a test or a guard on the screen's code and **all are now caught**; none is equivalent.
 - **Not testable off the phone:** whether Android delivers the alarm at 08:00 on your phone, and how the notification looks.
 
 #### Predictions
