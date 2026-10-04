@@ -18,7 +18,9 @@ were; the name is the round, not a subject. Run one against the phone app:
 | `und*.json` | Understanding (what Orb judged and why) |
 | `note*.json` `marks*.json` `sev.json` | Person notes, marks, severity |
 | `c*.json` `l*.json` `h.json` `n3.json` `p*.json` | Earlier phone-app rounds (capture, links, handoff, nudge, people) |
+| `money-a.json` | Money slice A: the ledger and its corroboration, the six-way dispositions, the keep capability and bundle erasing (54 mutants; 52 killed, 2 documented equivalent after two rounds) |
 | `tools-export.json` | The export analyser (use with `--config tools/mutate/tools-export.json`) |
+| `tools-engsys.json` | The engineering system's tools: scenarios, governance, slice (70 mutants, all killed; use with `--config tools/mutate/tools-engsys.json`) |
 
 ## Status against HEAD (`--verify`)
 

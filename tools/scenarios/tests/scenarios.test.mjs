@@ -40,6 +40,11 @@ test("parseSuite reads the phone harness, with groups, passes and failures, and 
   ]);
 });
 
+test("a summary line is not a group: a check after it keeps the group it was in", () => {
+  const r = parseSuite("phone", "  g\n    ok   a\n\n  5 checks, 0 failed\n    ok   b\n");
+  assert.deepEqual(r.map((x) => [x.group, x.name]), [["g", "a"], ["g", "b"]]);
+});
+
 test("parseSuite reads the node spec reporter", () => {
   assert.deepEqual(parseSuite("tools", TOOLS).map((x) => [x.name, x.ok]), [["tool one", true], ["tool two", false], ["tool three", true]]);
   assert.throws(() => parseSuite("elsewhere", ""), /unknown suite/);
@@ -134,6 +139,7 @@ test("globs: ** crosses directories, * stays in one, ? is one character, dots ar
   assert.ok(!globToRegExp("a/*.java").test("a/b/B.java"));
   assert.ok(globToRegExp("a/?.x").test("a/b.x"));
   assert.ok(!globToRegExp("a/?.x").test("a/bc.x"));
+  assert.ok(!globToRegExp("a/?.x").test("a//.x"), "? is one character that is not a slash");
   assert.ok(!globToRegExp("a.b").test("axb"));
   assert.ok(globToRegExp("**/x.md").test("deep/er/x.md"));
   assert.deepEqual(touches(["src/**"], ["src/a", "docs/b"]), ["src/a"]);
@@ -145,6 +151,7 @@ test("impact names the invariants a change threatens, whether each is still held
     { id: "I-002", statement: "two", threatenedBy: ["a/**"], heldBy: [{ suite: "phone", check: "third check" }] },
     { id: "I-003", statement: "three", threatenedBy: ["b/**"], heldBy: [{ suite: "phone", check: "first check" }] },
     { id: "I-004", statement: "four", threatenedBy: ["a/**"], heldBy: [] },
+    { id: "I-005", statement: "five", threatenedBy: ["a/**"], heldBy: [{ suite: "phone", check: "first check" }, { suite: "phone", check: "third check" }] },
   ];
   const scenarios = [
     { id: "S-001", name: "by file", risk: "high", files: ["a/x"], invariants: ["I-003"] },
@@ -152,7 +159,7 @@ test("impact names the invariants a change threatens, whether each is still held
     { id: "S-003", name: "untouched", risk: "low", files: ["z/**"], invariants: ["I-003"] },
   ];
   const r = impact(["a/x"], inv, scenarios, suites());
-  assert.deepEqual(r.threatened.map((t) => [t.id, t.held, t.heldBy]), [["I-001", true, 1], ["I-002", false, 1], ["I-004", false, 0]]);
+  assert.deepEqual(r.threatened.map((t) => [t.id, t.held, t.heldBy]), [["I-001", true, 1], ["I-002", false, 1], ["I-004", false, 0], ["I-005", false, 2]]);
   assert.deepEqual(r.threatened[1].unheld, ["third check"]);
   assert.deepEqual(r.affected.map((a) => [a.id, a.byFiles]), [["S-001", true], ["S-002", false]]);
   assert.deepEqual(impact(["unrelated"], inv, scenarios, suites()), { threatened: [], affected: [] });

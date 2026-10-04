@@ -34,6 +34,8 @@ test("the budget counts files and lines, ignores generated files, and names ever
   const gen = (f) => f.endsWith(".apk");
   const ok = budgetCheck([{ file: "src/a", added: 10, removed: 5 }, { file: "orb.apk", added: 0, removed: 0 }], slice(), gen);
   assert.deepEqual([ok.files, ok.lines, ok.ok], [1, 15, true]);
+  const edge = budgetCheck([1, 2, 3].map((i) => ({ file: `src/${i}`, added: 50, removed: 0 })).slice(0, 2).concat([{ file: "src/3", added: 0, removed: 0 }]), slice(), gen);
+  assert.deepEqual([edge.files, edge.lines, edge.ok], [3, 100, true], "exactly the budget is within it");
   assert.equal(budgetCheck([1, 2, 3, 4].map((i) => ({ file: `src/${i}`, added: 1, removed: 0 })), slice(), gen).over[0], "files 4 > 3");
   assert.equal(budgetCheck([{ file: "src/a", added: 99, removed: 2 }], slice(), gen).over[0], "lines 101 > 100");
   const stray = budgetCheck([{ file: "elsewhere/x", added: 1, removed: 0 }, { file: "src/y", added: 1, removed: 0 }], slice(), gen);
@@ -46,7 +48,7 @@ test("the budget counts files and lines, ignores generated files, and names ever
   assert.equal(budgetCheck([{ file: "extra/z", added: 1, removed: 0 }], { ...slice(), scope: { files: ["src/**"], alsoAllowed: ["extra/**"] } }, gen).outside.length, 0);
 });
 
-const DECISIONS = "# D\n\n## DR-1 — one\n\nbody one\n\n## DR-10 — ten\n\nbody ten\n\n## DR-2 — two\n\nlast\n";
+const DECISIONS = "# D\n\n## DR-10 — ten\n\nbody ten\n\n## DR-1 — one\n\nbody one\n\n## DR-2 — two\n\nlast\n";
 test("a decision's section runs from its heading to the next, DR-1 is not DR-10, and a missing one is null", () => {
   assert.equal(decisionSection(DECISIONS, "DR-1"), "## DR-1 — one\n\nbody one");
   assert.equal(decisionSection(DECISIONS, "DR-10"), "## DR-10 — ten\n\nbody ten");
@@ -58,6 +60,7 @@ test("pending decisions are found by the slice they name, and only among the ope
   const md = "# P\n\n```\n## PD-000 — example\n- **Slice:** TEST-A\n```\n\n## Open\n\n## PD-001 — first\n\n- **Slice:** TEST-A\n\n## PD-002 — second\n\n- **Slice:** OTHER\n\n## PD-003 — third\n\n- **Slice:** TEST-A\n";
   assert.deepEqual(pendingFor(md, "TEST-A"), [{ id: "PD-001", title: "first" }, { id: "PD-003", title: "third" }]);
   assert.deepEqual(pendingFor(md, "NONE"), []);
+  assert.deepEqual(pendingFor(md.replace(/TEST-A/g, "TEST-AB"), "TEST-A"), [], "a slice id is not a prefix match");
   assert.deepEqual(pendingFor("# P\n\n## Open\n\n*(none)*\n", "TEST-A"), []);
 });
 
