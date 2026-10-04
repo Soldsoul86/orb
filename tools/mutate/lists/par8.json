@@ -1,0 +1,50 @@
+{
+ "about": "Mutation list converted from the mut_par8 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Observation.java.in",
+   "old": "s(o.direction), s(o.stage),",
+   "new": "s(o.stage),"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "return Observation.REQUEST_RECEIVED.equals(o.type) ? LoopRules.ME : o.bearer;",
+   "new": "return o.bearer;"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "for (Hit h : all) if (h.legacy.forms() && h.legacy.signature().equals(first.legacy.signature())) for (Observation o : h.facts) facts.put(o.id, o);",
+   "new": "for (Observation o : first.facts) facts.put(o.id, o);"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (keptCount >= MAX_KEPT) { cutKept++; continue; }",
+   "new": "if (false) { cutKept++; continue; }"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return LoopRules.validOwner(o.bearer) ? new Effect(ADVANCE, LoopRules.GIVE, o.bearer, LoopRules.STATED, false, null) : NOTHING;",
+   "new": "return new Effect(ADVANCE, LoopRules.GIVE, o.bearer, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;\n                return a.id.compareTo(b.id);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "return minor > 0 ? \"INR\" : \"\";",
+   "new": "return \"INR\";"
+  },
+  {
+   "file": "src/ObservationFacts.java.in",
+   "old": "if (month == null || !month.matches(\"\\\\d{4}-\\\\d{2}\"))",
+   "new": "if (month == null)"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "out.put(\"match.cut\", cutKept);",
+   "new": "out.put(\"match.cut\", 0L);"
+  }
+ ]
+}

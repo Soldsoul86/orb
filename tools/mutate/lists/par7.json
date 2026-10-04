@@ -1,0 +1,405 @@
+{
+ "about": "Mutation list converted from the mut_par7 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Observation.java.in",
+   "old": "s(o.subjectRef), Long.toString(o.occurredMs)",
+   "new": "s(o.subjectRef)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "s(o.objectClass), Long.toString(o.minor)",
+   "new": "s(o.objectClass)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "Long.toString(o.minor), s(o.subjectRef)",
+   "new": "s(o.subjectRef)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "s(o.bearer), s(o.direction), s(o.stage)",
+   "new": "s(o.direction), s(o.stage)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "s(o.direction), s(o.stage),",
+   "new": "s(o.stage),"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (confidencePercent < 0 || confidencePercent > 100)",
+   "new": "if (confidencePercent < 0 || confidencePercent >= 100)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (confidencePercent < 0 || confidencePercent > 100)",
+   "new": "if (confidencePercent <= 0 || confidencePercent > 100)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (minor < 0)",
+   "new": "if (minor < -1)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (VALUE_MOVED.equals(type) != (direction != null))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (direction != null && !OUT.equals(direction) && !IN.equals(direction))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (!TIERS.contains(tier))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (!LoopRules.validBasis(subjectBasis))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "if (!LoopRules.validOwner(bearer) && !BEARER_UNKNOWN.equals(bearer))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/Observation.java.in",
+   "old": "return !INFORMATION_NOTED.equals(type) && !VALUE_MOVED.equals(type);",
+   "new": "return !INFORMATION_NOTED.equals(type);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return Observation.ACT.equals(o.objectClass) ? LoopRules.DO : LoopRules.GIVE;",
+   "new": "return LoopRules.GIVE;"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return LoopRules.INFERRED.equals(o.subjectBasis) ? LoopRules.CLASS_SUGGESTS : LoopRules.CLASS_EXACT;",
+   "new": "return LoopRules.CLASS_SUGGESTS;"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return LoopRules.INFERRED.equals(o.subjectBasis) ? LoopRules.CLASS_SUGGESTS : LoopRules.CLASS_EXACT;",
+   "new": "return LoopRules.CLASS_EXACT;"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return LoopRules.validOwner(o.bearer) ? new Effect(OPEN, kindOf(o), o.bearer, LoopRules.STATED, false, null) : NOTHING;",
+   "new": "return new Effect(OPEN, kindOf(o), o.bearer, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return LoopRules.validOwner(o.bearer) ? new Effect(ADVANCE, LoopRules.GIVE, o.bearer, LoopRules.STATED, false, null) : NOTHING;",
+   "new": "return new Effect(ADVANCE, LoopRules.GIVE, o.bearer, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return new Effect(OPEN, LoopRules.ATTEND, LoopRules.ME, LoopRules.STATED, false, null);",
+   "new": "return new Effect(OPEN, LoopRules.ATTEND, LoopRules.THEM, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return new Effect(ADVANCE, LoopRules.ATTEND, LoopRules.ME, LoopRules.STATED, false, null);",
+   "new": "return new Effect(OPEN, LoopRules.ATTEND, LoopRules.ME, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return new Effect(OPEN, kindOf(o), LoopRules.ME, LoopRules.ASKED, false, null);",
+   "new": "return new Effect(OPEN, kindOf(o), LoopRules.ME, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return new Effect(OPEN, LoopRules.DECIDE, LoopRules.ME, LoopRules.STATED, false, null);",
+   "new": "return new Effect(OPEN, LoopRules.DECIDE, LoopRules.THEM, LoopRules.STATED, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, false, closureClass(o)) : NOTHING;",
+   "new": "return new Effect(CLOSURE_CANDIDATE, null, null, null, false, closureClass(o));"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, true, closureClass(o)) : new Effect(NONE, null, null, null, true, null);",
+   "new": "return new Effect(CLOSURE_CANDIDATE, null, null, null, true, closureClass(o));"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, true, closureClass(o)) : new Effect(NONE, null, null, null, true, null);",
+   "new": "return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, false, closureClass(o)) : new Effect(NONE, null, null, null, false, null);"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "case Observation.OBLIGATION_WITHDRAWN:\n            case Observation.ATTENDANCE_CANCELLED:",
+   "new": "case Observation.ATTENDANCE_CANCELLED:"
+  },
+  {
+   "file": "src/Interpreter.java.in",
+   "old": "case Observation.DECISION_MADE:\n                return matched",
+   "new": "case Observation.DECISION_MADE:\n                return NOTHING; case Observation.INFORMATION_NOTED:\n                return matched"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (day(c) - day(open.get(i)) <= WINDOW_DAYS) {",
+   "new": "if (day(c) - day(open.get(i)) < WINDOW_DAYS) {"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (used[i] || day(open.get(i)) > day(c)) continue;",
+   "new": "if (used[i]) continue;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (used[i] || day(open.get(i)) > day(c)) continue;",
+   "new": "if (day(open.get(i)) > day(c)) continue;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "used[i] = true;\n                        r.matched.add(c.id);",
+   "new": "r.matched.add(c.id);"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "return Observation.REQUEST_RECEIVED.equals(o.type) ? LoopRules.ME : o.bearer;",
+   "new": "return o.bearer;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "return o.minor > 0 && (Observation.OBLIGATION_STATED",
+   "new": "return (Observation.OBLIGATION_STATED"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "return o.minor > 0 && (Observation.VALUE_MOVED",
+   "new": "return (Observation.VALUE_MOVED"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (Observation.VALUE_MOVED.equals(o.type)) return Observation.OUT.equals(o.direction) ? LoopRules.ME : LoopRules.THEM;",
+   "new": "if (Observation.VALUE_MOVED.equals(o.type)) return Observation.OUT.equals(o.direction) ? LoopRules.THEM : LoopRules.ME;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (i < open.size() && day(open.get(i)) - day(open.get(i - 1)) <= WINDOW_DAYS) continue;",
+   "new": "if (i < open.size() && day(open.get(i)) - day(open.get(i - 1)) < WINDOW_DAYS) continue;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (day(c) >= first && day(c) - last <= WINDOW_DAYS)",
+   "new": "if (day(c) - last <= WINDOW_DAYS)"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (Observation.VALUE_MOVED.equals(o.type) && paired.contains(",
+   "new": "if (false && paired.contains("
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;\n                return a.id.compareTo(b.id);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "for (Observation m : sameMoney) r.closing.add(m.id);",
+   "new": ""
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "r.closing.add(c.id);",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;\n                return a.id.compareTo(b.id);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (o.id.equals(f[0])) out.add(o);",
+   "new": "out.add(o);"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "return month.compareTo(current) <= 0 && month.compareTo(MessagesRules.minusMonths(current, RETENTION_MONTHS)) >= 0;",
+   "new": "return month.compareTo(MessagesRules.minusMonths(current, RETENTION_MONTHS)) >= 0;"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "return month.compareTo(current) <= 0 && month.compareTo(MessagesRules.minusMonths(current, RETENTION_MONTHS)) >= 0;",
+   "new": "return month.compareTo(current) <= 0 && month.compareTo(MessagesRules.minusMonths(current, RETENTION_MONTHS)) > 0;"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "static final int RETENTION_MONTHS = 24;",
+   "new": "static final int RETENTION_MONTHS = 12;"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (observations.isEmpty()) return EMPTY;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (SmsNormalizer.SOURCE_KIND.equals(sourceKind) && quiet.quiet(sourceId)) return QUIET;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (!inRetention(month, currentMonth)) return OUTSIDE;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "for (Live l : before) if (l.identity.equals(identity)) return HELD;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "for (Live l : before) Erase.execute(context, journal, l.eventHash);\n            return KEPT;",
+   "new": "return KEPT;"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (l.sourceKey.equals(key) && l.month.equals(month)) before.add(l);",
+   "new": "if (l.sourceKey.equals(key)) before.add(l);"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (SmsNormalizer.SOURCE_KIND.equals(o.sourceKind) && quiet.quiet(o.sourceId)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (!l.sourceKey.equals(key)) continue;\n            Erase.Result done",
+   "new": "Erase.Result done"
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (inRetention(l.month, currentMonth)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/ObservationStore.java.in",
+   "old": "if (bundle == null) continue;",
+   "new": "if (bundle == null) bundle = new ArrayList<Observation>();"
+  },
+  {
+   "file": "src/ObservationFacts.java.in",
+   "old": "if (sourceKey == null || !sourceKey.matches(\"[0-9a-f]{16}\"))",
+   "new": "if (sourceKey == null)"
+  },
+  {
+   "file": "src/ObservationFacts.java.in",
+   "old": "if (month == null || !month.matches(\"\\d{4}-\\d{2}\"))",
+   "new": "if (month == null)"
+  },
+  {
+   "file": "src/ObservationFacts.java.in",
+   "old": "if (sourceKind == null || !sourceKind.matches(\"[a-z.]{1,24}\"))",
+   "new": "if (sourceKind == null)"
+  },
+  {
+   "file": "src/ObservationFacts.java.in",
+   "old": "p.put(\"count\", Math.max(0L, count));",
+   "new": "p.put(\"count\", count);"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "add(out, Observation.OUT.equals(o.direction) ? \"ledger.out\" : \"ledger.in\", 1L);",
+   "new": "add(out, \"ledger.out\", 1L);"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (!matched.closing.contains(o.id)) ledgerOnly++;",
+   "new": "if (!matched.matched.contains(o.id)) ledgerOnly++;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (n.discarded != null) bump(t.counts, \"discard.\" + n.discarded);",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "bump(t.counts, \"obs.\" + o.type);",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (keptCount >= MAX_KEPT) { cutKept++; continue; }",
+   "new": "if (false) { cutKept++; continue; }"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "Interpreter.Effect effect = Interpreter.effectOf(o, closing);",
+   "new": "Interpreter.Effect effect = Interpreter.effectOf(o, false);"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "out.put(\"closure.candidates\", matched.candidates);",
+   "new": "out.put(\"closure.candidates\", matched.closers);"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "if (hasAmount && PAYMENT_DONE.matcher(b).find() && PAYMENT_OF.matcher(b).find()) {\n            List<Observation> facts",
+   "new": "if (false) {\n            List<Observation> facts"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".bearer(LoopRules.ME).stage(\"failed\")",
+   "new": ".bearer(LoopRules.THEM).stage(\"failed\")"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".bearer(LoopRules.THEM).stage(\"refund-started\")",
+   "new": ".bearer(LoopRules.ME).stage(\"refund-started\")"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".stage(\"in-transit\")",
+   "new": ".stage(\"transit\")"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "direction(Observation.IN).object(Observation.MONEY, minor, cur).build())));",
+   "new": "direction(Observation.OUT).object(Observation.MONEY, minor, cur).build())));"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "base(Observation.OBLIGATION_STATED, senderId, occurredMs, seenMs, \"order\", 80).bearer(LoopRules.THEM)",
+   "new": "base(Observation.OBLIGATION_STATED, senderId, occurredMs, seenMs, \"order\", 80).bearer(LoopRules.ME)"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".object(Observation.ACT, 0L, \"\")",
+   "new": ".object(Observation.OTHER, 0L, \"\")"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "return minor > 0 ? \"INR\" : \"\";",
+   "new": "return \"INR\";"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "for (Hit h : all) if (h.legacy.forms() && h.legacy.signature().equals(first.legacy.signature())) for (Observation o : h.facts) facts.put(o.id, o);",
+   "new": "for (Observation o : first.facts) facts.put(o.id, o);"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": "if (LoopFit.EVIDENCE.equals(first.legacy.role)) return new Result(first.facts, null, null, first.legacy);",
+   "new": "if (LoopFit.EVIDENCE.equals(first.legacy.role)) return new Result(new ArrayList<Observation>(), null, null, first.legacy);"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".counterparty(senderId).read(rule)",
+   "new": ".counterparty(\"\").read(rule)"
+  },
+  {
+   "file": "src/SmsNormalizer.java.in",
+   "old": ".read(rule).confidence(confidence)",
+   "new": ".read(rule).confidence(0)"
+  }
+ ]
+}

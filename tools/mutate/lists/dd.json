@@ -1,0 +1,325 @@
+{
+ "about": "Mutation list converted from the mut_dd harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "MAX_LISTED = 12",
+   "new": "MAX_LISTED = 13"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "MAX_LINE = 140",
+   "new": "MAX_LINE = 141"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "MAX_SEGMENTS = 4000",
+   "new": "MAX_SEGMENTS = 4001"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|due|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|pay|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|payable|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|before|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|deadline|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|expires|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|expiry|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "renews?|renewal",
+   "new": "renew|renewal"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "renews?|renewal",
+   "new": "renews?"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|appointment|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "check[- ]in",
+   "new": "check-in"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|departure|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|arrival|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|delivery|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|interview|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|exam|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|last date|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "valid (?:until|till)",
+   "new": "valid until"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(?<![\\\\p{L}\\\\p{N}])(?:due",
+   "new": "(?:due"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(?![\\\\p{L}\\\\p{N}])\");\n    // *by*",
+   "new": "\");\n    // *by*"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "by\\\\s+(?:the\\\\s+)?(?:\\\\d|",
+   "new": "by\\\\s+(?:the\\\\s+)?(?:"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?![\\\\p{L}]))",
+   "new": "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|nov|dec)[a-z]*(?![\\\\p{L}]))"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "return CUE.matcher(line).find() || BY_DATE.matcher(line).find();",
+   "new": "return CUE.matcher(line).find();"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "return CUE.matcher(line).find() || BY_DATE.matcher(line).find();",
+   "new": "return BY_DATE.matcher(line).find();"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (flat.isEmpty()) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "flat.split(\"(?<=[.;!?])\\\\s+\")",
+   "new": "flat.split(\"(?<=[.;])\\\\s+\")"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (chunk.length() > 0 && chunk.length() + 1 + word.length() > MAX_LINE) {",
+   "new": "if (chunk.length() > 0 && chunk.length() + word.length() > MAX_LINE) {"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "word.length() > MAX_LINE ? word.substring(0, MAX_LINE) : word",
+   "new": "word"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (out.size() >= MAX_SEGMENTS) return new ArrayList<>(out.subList(0, MAX_SEGMENTS));",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (!hasDigit(segment)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "h.value.compareTo(today) < 0",
+   "new": "h.value.compareTo(today) <= 0"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "h.value.compareTo(today) < 0",
+   "new": "false"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "!h.kind.equals(\"date\") ||",
+   "new": "false ||"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(!have.deadline && cue)",
+   "new": "cue"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "have == null ||",
+   "new": "have != null ||"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (result.deadlines.size() > room) {",
+   "new": "if (result.deadlines.size() >= room) {"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "result.more += result.deadlines.size() - room;",
+   "new": "result.more += 1;"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "if (room > 0) { result.others.add(f); room--; } else { result.more++; }",
+   "new": "if (room > 0) { result.others.add(f); } else { result.more++; }"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "room -= result.deadlines.size();",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "for (Found f : all) (f.deadline ? result.deadlines : second).add(f);",
+   "new": "for (Found f : all) (f.deadline ? second : result.deadlines).add(f);"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "new TreeMap<>()",
+   "new": "new java.util.LinkedHashMap<>()"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "replaceAll(\"\\\\s+\", \" \")",
+   "new": "replaceAll(\"\\\\s{2,}\", \" \")"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (documents.contains(item.hash)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (found.deadlines.isEmpty() && found.others.isEmpty()) return;",
+   "new": "if (found.deadlines.isEmpty()) return;"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (!found.others.isEmpty() || found.more > 0) {",
+   "new": "if (!found.others.isEmpty()) {"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line));\n                    }",
+   "new": "new Item(docEntry, false, false, null, null, f.line));\n                    }"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Dated(f.date, new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line))",
+   "new": "new Dated(f.date, new Item(docEntry, false, false, null, null, f.line))"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "String shown() { return line != null ? line : entry.snippet; }",
+   "new": "String shown() { return entry.snippet; }"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "for (Fold fold : all.folds) if (fold.entry.id != null && entryIds.contains(fold.entry.id)) out.folds.add(fold);",
+   "new": ""
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Fold(docEntry, found.more)",
+   "new": "new Fold(docEntry, 0)"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "return;\n                }\n                Recall.Entry entry = null;",
+   "new": "}\n                Recall.Entry entry = null;"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "line.contains(\"\\\"referrer\\\":\\\"\" + REFERRER + \"\\\"\")",
+   "new": "line.contains(\"referrer\")"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "!Shares.TYPE.equals(Journal.typeOf(line)) ||",
+   "new": "false ||"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "if (!open.remove(key)) open.add(key);",
+   "new": "open.add(key);"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "if (!showing) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "item.line != null ? item.line : TodayActivity.firstWords(item.entry.snippet)",
+   "new": "TodayActivity.firstWords(item.entry.snippet)"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "if (result.days.isEmpty() && result.folds.isEmpty()) {",
+   "new": "if (result.days.isEmpty()) {"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "folds(result, kept);\n    }",
+   "new": "}"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "row.addView(text(item.shown(), 12, false));",
+   "new": "row.addView(text(item.entry.snippet, 12, false));"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "item.line != null ? item.line : firstWords(item.entry.snippet)",
+   "new": "firstWords(item.entry.snippet)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "row.addView(text(item.shown(), 12, false));",
+   "new": "row.addView(text(item.entry.snippet, 12, false));"
+  }
+ ]
+}

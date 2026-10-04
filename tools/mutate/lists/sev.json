@@ -1,0 +1,180 @@
+{
+ "about": "Mutation list converted from the mut_sev harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"accessibilityOverlay\", NOW, 1,",
+   "new": "new Reason(\"accessibilityOverlay\", NOW, 3,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"smsNotifications\", NOW, 2,",
+   "new": "new Reason(\"smsNotifications\", NOW, 4,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"notifications\", NOW, 4,",
+   "new": "new Reason(\"notifications\", NOW, 3,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"admin\", NOW, 5,",
+   "new": "new Reason(\"admin\", NOW, 11,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"noLock\", NOW, 6,",
+   "new": "new Reason(\"noLock\", NOW, 12,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"installer\", REVIEW, 10,",
+   "new": "new Reason(\"installer\", REVIEW, 19,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"keyboard\", REVIEW, 11,",
+   "new": "new Reason(\"keyboard\", REVIEW, 13,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"sms\", REVIEW, 12,",
+   "new": "new Reason(\"sms\", REVIEW, 14,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"callLog\", REVIEW, 13,",
+   "new": "new Reason(\"callLog\", REVIEW, 12,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"backgroundLocation\", REVIEW, 14,",
+   "new": "new Reason(\"backgroundLocation\", REVIEW, 17,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"allFiles\", REVIEW, 15,",
+   "new": "new Reason(\"allFiles\", REVIEW, 16,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"overlay\", REVIEW, 16,",
+   "new": "new Reason(\"overlay\", REVIEW, 15,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "new Reason(\"usbDebugging\", REVIEW, 17,",
+   "new": "new Reason(\"usbDebugging\", REVIEW, 18,"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "for (Reason r : reasons) if (r.rank < best.rank) best = r;",
+   "new": "for (Reason r : reasons) if (r.rank > best.rank) best = r;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "Reason best = reasons.get(0);",
+   "new": "Reason best = reasons.get(reasons.size() - 1);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "int strength = a.primary().rank - b.primary().rank;",
+   "new": "int strength = b.primary().rank - a.primary().rank;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return strength != 0 ? strength : a.label.compareToIgnoreCase(b.label);",
+   "new": "return strength != 0 ? strength : b.label.compareToIgnoreCase(a.label);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return strength != 0 ? strength : a.label.compareToIgnoreCase(b.label);",
+   "new": "return strength != 0 ? strength : a.label.compareTo(b.label);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (level != 0) return level;",
+   "new": "if (level == 99) return level;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return reason.group + \" (\" + findings.size() + \")\";",
+   "new": "return reason.group;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "for (Group g : out) if (g.reason == p) { group = g; break; }",
+   "new": "for (Group g : out) if (g.reason.level.equals(p.level)) { group = g; break; }"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (!f.level.equals(level)) continue;\n            Reason p",
+   "new": "Reason p"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return NOW.equals(level) || result.review <= OPEN_LIMIT;",
+   "new": "return result.review <= OPEN_LIMIT;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return NOW.equals(level) || result.review <= OPEN_LIMIT;",
+   "new": "return NOW.equals(level) || result.review < OPEN_LIMIT;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return NOW.equals(level) || result.review <= OPEN_LIMIT;",
+   "new": "return NOW.equals(level);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "OPEN_LIMIT = 8",
+   "new": "OPEN_LIMIT = 9"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "boolean open = SafetyRules.startsOpen(result, level) != flipped.contains(id);",
+   "new": "boolean open = SafetyRules.startsOpen(result, level);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "boolean open = SafetyRules.startsOpen(result, level) != flipped.contains(id);",
+   "new": "boolean open = !flipped.contains(id);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (!flipped.remove(id)) flipped.add(id);",
+   "new": "flipped.add(id);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (!open) continue;\n            for",
+   "new": "for"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "flipped.clear();",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (journal != null && shown != null) show(journal, shown);",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "        shown = result;\n",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "(open ? \"Hide \\u2014 \" : \"Show \\u2014 \")",
+   "new": "(open ? \"Show \\u2014 \" : \"Hide \\u2014 \")"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "java.util.List<SafetyRules.Group> groups = SafetyRules.groups(result, level);\n        if (groups.isEmpty()) return;\n        list.addView(text(title, 15, true));",
+   "new": "java.util.List<SafetyRules.Group> groups = SafetyRules.groups(result, level);\n        list.addView(text(title, 15, true));"
+  }
+ ]
+}

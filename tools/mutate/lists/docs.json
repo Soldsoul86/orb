@@ -1,0 +1,365 @@
+{
+ "about": "Mutation list converted from the mut_docs harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "\"application/pdf\".equals(d.mime) || d.name",
+   "new": "false || d.name"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "|| d.name.toLowerCase(Locale.ROOT).endsWith(\".pdf\")",
+   "new": "|| d.name.endsWith(\".pdf\")"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "|| d.name.toLowerCase(Locale.ROOT).endsWith(\".pdf\")",
+   "new": "|| d.name.toLowerCase(Locale.ROOT).contains(\".pdf\")"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (a.modified != b.modified) return a.modified > b.modified ? -1 : 1;",
+   "new": "if (a.modified != b.modified) return a.modified > b.modified ? 1 : -1;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "int byName = a.name.compareToIgnoreCase(b.name);",
+   "new": "int byName = a.name.compareTo(b.name);"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return byName != 0 ? byName : a.uri.compareTo(b.uri);",
+   "new": "return byName;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return pdfs.size() > MAX_LISTED ? new ArrayList<>(pdfs.subList(0, MAX_LISTED)) : pdfs;",
+   "new": "return pdfs;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "MAX_LISTED = 40",
+   "new": "MAX_LISTED = 41"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return Math.max(0, pdfs - MAX_LISTED);",
+   "new": "return pdfs;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return d.size > MAX_BYTES ? TOO_BIG : null;",
+   "new": "return d.size >= MAX_BYTES ? TOO_BIG : null;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return d.size > MAX_BYTES ? TOO_BIG : null;",
+   "new": "return d.size > MAX_BYTES || d.size < 0 ? TOO_BIG : null;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "MAX_PAGES = 60",
+   "new": "MAX_PAGES = 61"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "replace(\"\\r\\n\", \"\\n\").replace('\\r', '\\n')",
+   "new": "replace(\"\\r\\n\", \"\\n\")"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "c >= ' ' && c != '\\u007f'",
+   "new": "c >= ' '"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "!(c >= '\\u0080' && c < '\\u00a0')",
+   "new": "true"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (blank > 1) continue;",
+   "new": "if (blank > 2) continue;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "String trimmed = line.trim();",
+   "new": "String trimmed = line;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return result;\n    }\n\n    /** The first words",
+   "new": "return result + \" \";\n    }\n\n    /** The first words"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (result.length() > MAX_TEXT_CHARS) result = result.substring(0, MAX_TEXT_CHARS).trim();",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (flat.length() <= PREVIEW_CHARS) return flat;",
+   "new": "if (flat.length() < PREVIEW_CHARS) return flat;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return cut + \"\\u2026\";",
+   "new": "return cut;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "\"held\".equals(storeState) ? HELD : \"destroyed\".equals(storeState) ? ERASED : READABLE",
+   "new": "\"destroyed\".equals(storeState) ? ERASED : READABLE"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "\"destroyed\".equals(storeState) ? ERASED : READABLE;",
+   "new": "READABLE;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return \"Already in Orb. \" + row.preview;",
+   "new": "return row.preview;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "boolean keepable() { return READABLE.equals(state); }",
+   "new": "boolean keepable() { return !UNREADABLE.equals(state); }"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (leftOut > 0) out.append",
+   "new": "if (true) out.append"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "shown == 1 ? \" PDF\" : \" PDFs\"",
+   "new": "\" PDFs\""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (refused != null) return DocumentsRules.unreadable(doc, refused);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (text.isEmpty()) return DocumentsRules.unreadable(doc, DocumentsRules.NO_TEXT);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "String identity = Attachments.identity(SharedText.document(text));",
+   "new": "String identity = Attachments.identity(SharedText.document(reading.text));"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (reading.reason != null) return DocumentsRules.unreadable(doc, reading.reason);",
+   "new": "if (reading.reason != null) return DocumentsRules.unreadable(doc, DocumentsRules.CANNOT);"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (DocumentsRules.refusal(doc) != null) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (reading.reason != null) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (text.isEmpty()) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (!\"stored\".equals(stored.outcome)) continue;",
+   "new": "if (stored.identity == null) continue;"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "payload.put(\"elapsedRealtimeMs\", elapsedRealtimeMs);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "DocumentsFacts.documentPayload(text.length())",
+   "new": "DocumentsFacts.documentPayload(reading.text.length())"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (SharedText.record(journal, context, payload, stored, null) != null) kept++;",
+   "new": "SharedText.record(journal, context, payload, stored, null); kept++;"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (kept > 0) Observe.run(journal);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "} catch (Exception skipped) {",
+   "new": "} catch (java.lang.IllegalStateException skipped) {"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "static final String REFERRER = \"orb-source://documents\";",
+   "new": "static final String REFERRER = \"orb-source://x\";"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "p.put(\"found\", found);",
+   "new": "p.put(\"found\", unreadable);"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "p.put(\"kept\", kept);",
+   "new": "p.put(\"kept\", 1L);"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "p.put(\"source\", SOURCE);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "return REFERRER.equals(referrer) ?",
+   "new": "return referrer != null ?"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (folder != null) release(context, folder);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (previous != null && !previous.equals(tree.toString())) release(context, previous);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (journal != null) journal.append(DocumentsFacts.CHOSEN, DocumentsFacts.chosen());",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "new File(context.getFilesDir(), FLAG).delete();\n        String folder",
+   "new": "String folder"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (journal == null || granted(context)) return;",
+   "new": "if (journal == null) return;"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "return uri.isEmpty() ? null : uri;",
+   "new": "return uri;"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (!DocumentsAccess.granted(this)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (lookPicked && !picked.isEmpty()) {\n            lookPicked = false;",
+   "new": "if (!picked.isEmpty()) {"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "lookPicked = true;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "v.box.isEnabled() && v.box.isChecked()",
+   "new": "v.box.isEnabled()"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "view.box.setEnabled(row.keepable());",
+   "new": "view.box.setEnabled(true);"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "journal.append(DocumentsFacts.KEPT, DocumentsFacts.kept(kept));",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (journal != null) journal.append(DocumentsFacts.LOOKED, DocumentsFacts.looked(found, unreadable));",
+   "new": "if (journal != null) journal.append(DocumentsFacts.LOOKED, DocumentsFacts.looked(unreadable, found));"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE",
+   "new": "WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "pick.setType(\"application/pdf\");",
+   "new": "pick.setType(\"*/*\");"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (unreadable > 0) ",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (DocumentsRules.UNREADABLE.equals(row.state)) unreadable++;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (row.keepable()) keepable++;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (docs.isEmpty()) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, DOCUMENTS);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, APPSEC);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "kept += Math.max(0L, number(line, \"kept\"));",
+   "new": "kept += 1;"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "number(looked, \"found\") + \" PDFs found",
+   "new": "number(looked, \"unreadable\") + \" PDFs found"
+  },
+  {
+   "file": "src/Orb.java.in",
+   "old": "DocumentsAccess.reconcile(this, journal);",
+   "new": ""
+  },
+  {
+   "file": "src/Orb.java.in",
+   "old": "SafetyAccess.reconcile(this, journal);",
+   "new": ""
+  }
+ ]
+}

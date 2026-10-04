@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_p3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/People.java.in",
+   "old": "(p.sure() ? result.people : result.possible).add(p);",
+   "new": "result.people.add(p);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (Evidence e : items) if (!BY_NAME.equals(e.by)) return true;\n            return false;",
+   "new": "return false;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (Evidence e : items) if (!BY_NAME.equals(e.by)) return true;\n            return false;",
+   "new": "return true;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "Collections.sort(result.possible, order);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "Collections.sort(result.people, order);",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsFacts.java.in",
+   "old": "        p.put(\"possible\", possible);\n",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsFacts.java.in",
+   "old": "p.put(\"version\", 2L);",
+   "new": "p.put(\"version\", 1L);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "Math.max(0L, number(read, \"possible\"))",
+   "new": "number(read, \"possible\")"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "+ \" tied by number or email, \" + possible + \" only by a name\"",
+   "new": "+ \" mentioned\""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "ContactsFacts.read(result.contacts, result.people.size(), result.possible.size())",
+   "new": "ContactsFacts.read(result.contacts, result.people.size(), 0)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "for (final People.Person person : result.people) list.addView(row(person));",
+   "new": "for (final People.Person person : result.people) list.addView(row(person));\n        for (final People.Person person : result.possible) list.addView(row(person));"
+  }
+ ]
+}

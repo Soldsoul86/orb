@@ -1,0 +1,215 @@
+{
+ "about": "Mutation list converted from the mut_note2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "ROLE_MAX = 60",
+   "new": "ROLE_MAX = 61"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "NOTE_MAX = 1000",
+   "new": "NOTE_MAX = 1001"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\r\\\\t]]\", \"\").replaceAll(\"\\\\s+\", \" \").trim();",
+   "new": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\r\\\\t]]\", \"\").trim();"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\r\\\\t]]\", \"\").replaceAll(\"\\\\s+\", \" \").trim();",
+   "new": ".replaceAll(\"\\\\s+\", \" \").trim();"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\r\\\\t]]\", \"\").replaceAll(\"\\\\s+\", \" \").trim();",
+   "new": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\r\\\\t]]\", \"\").replaceAll(\"\\\\s+\", \" \");"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "return t.length() > ROLE_MAX ? t.substring(0, ROLE_MAX).trim() : t;",
+   "new": "return t.length() >= ROLE_MAX ? t.substring(0, ROLE_MAX - 1).trim() : t;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "return t.length() > ROLE_MAX ? t.substring(0, ROLE_MAX).trim() : t;",
+   "new": "return t;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "raw.replace(\"\\r\\n\", \"\\n\").replace('\\r', '\\n')",
+   "new": "raw.replace(\"\\r\\n\", \"\\n\")"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\t]]\", \"\").trim();",
+   "new": ".trim();"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\t]]\", \"\").trim();",
+   "new": ".replaceAll(\"[\\\\p{Cntrl}&&[^\\\\n\\\\t]]\", \"\");"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "return t.length() > NOTE_MAX ? t.substring(0, NOTE_MAX).trim() : t;",
+   "new": "return t;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "out.append(\"role:\").append(oneLine(role)).append('\\n');",
+   "new": "out.append(\"role:\").append(role).append('\\n');"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (String n : person.names) out.append(\"name:\").append(oneLine(n)).append('\\n');",
+   "new": "for (String n : person.names) out.append(\"name:\").append(n).append('\\n');"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (!s.startsWith(prefix)) return null;",
+   "new": "if (false) return null;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (!firstLine) text.append('\\n');",
+   "new": "text.append('\\n');"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "else if (line.startsWith(\"role:\")) role = line.substring(5);",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (line.startsWith(\"name:\")) who.names.add(line.substring(5));",
+   "new": "if (false) who.names.add(line.substring(5));"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "else if (line.startsWith(\"phone:\")) who.phones.add(line.substring(6));",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "else if (line.startsWith(\"email:\")) who.emails.add(line.substring(6));",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (item == null || erased.contains(hash)) continue;",
+   "new": "if (item == null) continue;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Erasure.Item item : Erasure.items(lines)) if (PersonNoteFacts.DESCRIBED.equals(item.type)) byHash.put(item.hash, item);",
+   "new": "for (Erasure.Item item : Erasure.items(lines)) byHash.put(item.hash, item);"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (!PersonNoteFacts.DESCRIBED.equals(Journal.typeOf(line))) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Note n : notes) if (PersonLink.matches(n.who, person)) found = n;",
+   "new": "for (Note n : notes) if (PersonLink.matches(n.who, person) && found == null) found = n;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Note n : notes) if (PersonLink.matches(n.who, person)) found = n;",
+   "new": "for (Note n : notes) found = n;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "p.role = n.role.isEmpty() ? null : n.role;",
+   "new": "p.role = n.role;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "p.note = n.text.isEmpty() ? null : n.text;",
+   "new": "p.note = n.text;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (notes.isEmpty()) return;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (r.isEmpty() && t.isEmpty()) {",
+   "new": "if (r.isEmpty() || t.isEmpty()) {"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (current != null && current.role.equals(r) && current.text.equals(t)) return UNCHANGED;",
+   "new": "if (current != null && (current.role.equals(r) || current.text.equals(t))) return UNCHANGED;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (current != null && current.role.equals(r) && current.text.equals(t)) return UNCHANGED;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "if (stored.identity == null) return NOTE_FAILED;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "boolean sealedNow = \"stored\".equals(stored.outcome);",
+   "new": "boolean sealedNow = false;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Note old : before) if (PersonLink.matches(old.who, person)) erase(context, journal, old.eventHash);",
+   "new": ""
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Note old : before) if (PersonLink.matches(old.who, person)) erase(context, journal, old.eventHash);",
+   "new": "for (Note old : before) erase(context, journal, old.eventHash);"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "for (Note note : all(context, journal)) if (PersonLink.matches(note.who, person) && erase(context, journal, note.eventHash)) n++;",
+   "new": "for (Note note : all(context, journal)) if (erase(context, journal, note.eventHash)) n++;"
+  },
+  {
+   "file": "src/PersonNote.java.in",
+   "old": "return Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome);",
+   "new": "return false;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "names.get(0) + (role == null ? \"\" : \" (\" + role + \")\")",
+   "new": "names.get(0)"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "(names.size() > 1 ? \" (+\" + (names.size() - 1) + \")\" : \"\");\n        }\n    }\n\n    static final class Result",
+   "new": "\"\";\n        }\n    }\n\n    static final class Result"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (lower.startsWith(query) || lower.contains(\" \" + query)) best = Math.min(best, 1);",
+   "new": "if (lower.startsWith(query) || lower.contains(\" \" + query)) best = Math.min(best, 0);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (lower.startsWith(query) || lower.contains(\" \" + query)) best = Math.min(best, 1);",
+   "new": "if (lower.startsWith(query)) best = Math.min(best, 1);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "else if (lower.contains(query)) best = Math.min(best, 2);\n            }\n            if (best < 3)",
+   "new": "else if (false) best = Math.min(best, 2);\n            }\n            if (best < 3)"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "PersonNote.attach(context, journal, people);",
+   "new": ""
+  }
+ ]
+}

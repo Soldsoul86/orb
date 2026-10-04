@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_calls2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return n != null ? n : People.normalPhone(raw);",
+   "new": "return People.normalPhone(raw);"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "(s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.missedSince++;",
+   "new": "(s.lastSpoken == null || c.dateMs >= s.lastSpoken.dateMs)) s.missedSince++;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "nice.setTimeZone(zone);",
+   "new": ""
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (new File(context.getFilesDir(), FILE).exists()) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (flag.exists()) return;\n",
+   "new": ""
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (journal == null) return;\n        File flag",
+   "new": "File flag"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "for (String p : info.requestedPermissions) if (PERMISSION.equals(p)) return true;\n            return false;",
+   "new": "return true;"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (info.requestedPermissions == null) return false;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "c.getInt(2), c.getLong(3), c.getLong(4)",
+   "new": "c.getInt(2), c.getLong(4), c.getLong(3)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (CallsAccess.permitted(PeopleActivity.this)) finishCalls();",
+   "new": "if (true) finishCalls();"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (callsFor != null) reopenName = callsFor.names.get(0);",
+   "new": ""
+  }
+ ]
+}

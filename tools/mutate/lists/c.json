@@ -1,0 +1,225 @@
+{
+ "about": "Mutation list converted from the mut_c harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return value.replace('\\n', ' ').replace('\\r', ' ').trim();",
+   "new": "return value.trim();"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (text.isEmpty()) return new Opened(NO_WORDS, null);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (text.length() > MAX_WORDS) text = text.substring(0, MAX_WORDS);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (sealedNow) {\n                try {\n                    Attachments.discard(context, stored.identity);",
+   "new": "if (false) {\n                try {\n                    Attachments.discard(context, stored.identity);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "List<String> causes = itemEventId == null ? Collections.<String>emptyList() : Arrays.asList(itemEventId);",
+   "new": "List<String> causes = Collections.<String>emptyList();"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else if (CommitmentFacts.DONE.equals(type)) c.last = DONE;",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else if (CommitmentFacts.DROPPED.equals(type)) c.last = DROPPED;",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else if (CommitmentFacts.REOPENED.equals(type)) c.last = OPEN;",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "c.dueDate = due == null || due.isEmpty() ? null : due;\n                } else if",
+   "new": "} else if"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (DONE.equals(c.last)) return DONE;\n        if (DROPPED.equals(c.last)) return DROPPED;",
+   "new": "if (DROPPED.equals(c.last)) return DROPPED;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return cmp < 0 ? OVERDUE : cmp == 0 ? DUE_TODAY : OPEN;",
+   "new": "return cmp < 0 ? OVERDUE : OPEN;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return cmp < 0 ? OVERDUE : cmp == 0 ? DUE_TODAY : OPEN;",
+   "new": "return cmp <= 0 ? OVERDUE : OPEN;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "/ 86_400_000L",
+   "new": "/ 3_600_000L"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return days == 1 ? \"due tomorrow\" : \"due in \" + days + \" days\";",
+   "new": "return \"due in \" + days + \" days\";"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return \"still open, \" + past + (past == 1 ? \" day\" : \" days\") + \" past \" + c.dueDate;",
+   "new": "return \"still open, \" + past + \" days past \" + c.dueDate;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (c.closed()) continue;\n            if (CommitmentFacts.WAITING",
+   "new": "if (CommitmentFacts.WAITING"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (CommitmentFacts.WAITING.equals(c.direction)) { t.waiting.add(c); continue; }",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else if (c.dueDate.compareTo(todayDate) < 0) t.overdue.add(c);",
+   "new": "else if (c.dueDate.compareTo(todayDate) <= 0) t.overdue.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else if (c.dueDate.compareTo(last) <= 0) t.week.add(c);",
+   "new": "else if (c.dueDate.compareTo(last) < 0) t.week.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "else t.later++;",
+   "new": "else t.week.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Collections.sort(t.overdue, byDate);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Collections.sort(t.undated, oldest);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (a.dueDate == null) return 1;\n                if (b.dueDate == null) return -1;\n                return a.dueDate.compareTo(b.dueDate);\n            }\n        });\n        if (ahead != null) {",
+   "new": "if (a.dueDate == null) return -1;\n                if (b.dueDate == null) return 1;\n                return a.dueDate.compareTo(b.dueDate);\n            }\n        });\n        if (ahead != null) {"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (c.itemId != null && c.dueDate != null) tracked.add(c.itemId + \"|\" + c.dueDate);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (day.date.compareTo(todayDate) < 0 || day.date.compareTo(last) > 0) continue;",
+   "new": "if (day.date.compareTo(todayDate) < 0) continue;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (!c.closed() && PersonLink.matches(c.who, person)) out.add(c);",
+   "new": "if (PersonLink.matches(c.who, person)) out.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Remind.itemErased(context, journal, c.eventId, scheduler);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (!Erase.DESTROYED.equals(done.outcome) && !Erase.KEPT_BY_OTHERS.equals(done.outcome)) return false;",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "static boolean done(Journal journal, Commitment c) { return act(journal, c, CommitmentFacts.DONE, CommitmentFacts.done()); }",
+   "new": "static boolean done(Journal journal, Commitment c) { return act(journal, c, CommitmentFacts.DROPPED, CommitmentFacts.dropped()); }"
+  },
+  {
+   "file": "src/CommitmentFacts.java.in",
+   "old": "return date != null && date.matches(\"\\\\d{4}-\\\\d{2}-\\\\d{2}\") ? date : \"\";",
+   "new": "return date != null ? date : \"\";"
+  },
+  {
+   "file": "src/CommitmentFacts.java.in",
+   "old": "return WAITING.equals(direction) ? WAITING : OWE;",
+   "new": "return direction;"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();\n    }\n\n    private void keep(",
+   "new": "}\n\n    private void keep("
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "remind.start(c.eventId, ymd, c.words);",
+   "new": "remind.start(null, ymd, c.words);"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "Commitments.delete(host, journal, c, new ReminderAlarms(host))",
+   "new": "true"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "if (typed[0].isEmpty()) { say(\"Say what it is first.\"); return; }",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "direction.check(owe.getId());",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "final String[] choices = c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE};",
+   "new": "final String[] choices = new String[] {DONE, MOVE, DROP, REMIND, DELETE};"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "if (DONE.equals(what)) changed(Commitments.done(journal, c), onChanged);",
+   "new": "if (DONE.equals(what)) changed(Commitments.drop(journal, c), onChanged);"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "section(\"Waiting for\", t.waiting, today, refresh);",
+   "new": ""
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "section(\"Overdue \\u2014 still open\", t.overdue, today, refresh);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "for (Commitments.Commitment c : mine) column.addView(commitmentFlow.row(c, today, reopenAfter(person)));",
+   "new": ""
+  },
+  {
+   "file": "src/RecallActivity.java.in",
+   "old": "commitments.start(entry.id, TodayActivity.firstWords(entry.snippet), null, null, null);",
+   "new": "commitments.start(null, TodayActivity.firstWords(entry.snippet), null, null, null);"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), when, null, null);",
+   "new": "commitments.start(item.entry.id, TodayActivity.firstWords(item.entry.snippet), null, null, null);"
+  }
+ ]
+}

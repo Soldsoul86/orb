@@ -1,0 +1,340 @@
+{
+ "about": "Mutation list converted from the mut_json2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c == ' ' || c == '\\n' || c == '\\r' || c == '\\t' || c == 0xFEFF) { next(); continue; }",
+   "new": "if (c == ' ' || c == '\\n' || c == '\\r' || c == '\\t') { next(); continue; }"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c == ' ' || c == '\\n' || c == '\\r' || c == '\\t' || c == 0xFEFF) { next(); continue; }",
+   "new": "if (c == ' ' || c == '\\n' || c == '\\r' || c == 0xFEFF) { next(); continue; }"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "found.format = \"JSON\";",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "found.root = \"(list)\";",
+   "new": "found.root = \"\";"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (first == '[') {",
+   "new": "if (first == '{') {"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c.skipSpace() == '}') {\n            c.next();\n        } else {\n            while (true) {\n                String key = string(c);\n                c.expect(':');\n                keys.add(key);",
+   "new": "if (false) {\n            c.next();\n        } else {\n            while (true) {\n                String key = string(c);\n                c.expect(':');\n                keys.add(key);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (!listed && c.skipSpace() == '[') {",
+   "new": "if (c.skipSpace() == '[') {"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (sep == '}') break;\n                if (sep != ',') throw new IOException(\"not valid JSON: expected ',' or '}'\");\n            }\n        }\n        if (!listed)",
+   "new": "if (sep == '}') break;\n            }\n        }\n        if (!listed)"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "found.root = \"(object)\";\n            found.attributes.addAll(keys);",
+   "new": "found.root = \"(object)\";"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c.skipSpace() == ']') { c.next(); return; }\n        while (true) {\n            if (c.skipSpace() == '{') item",
+   "new": "while (true) {\n            if (c.skipSpace() == '{') item"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c.skipSpace() == '{') item(c, found, sink, max); else skipValue(c, 0);",
+   "new": "item(c, found, sink, max);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (sep == ']') return;\n            if (sep != ',') throw new IOException(\"not valid JSON: expected ',' or ']'\");\n        }\n    }\n\n    private static void item",
+   "new": "if (sep == ']') return;\n        }\n    }\n\n    private static void item"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "boolean firstItem = found.child.isEmpty();\n        if (firstItem) found.child = \"item\";",
+   "new": "boolean firstItem = true;\n        found.child = \"item\";"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (firstItem) found.attributes.add(key);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (lead == '\"') value = string(c);\n                else if (lead == '{' || lead == '[') skipValue(c, 0);\n                else value = scalar(c);",
+   "new": "if (lead == '\"') value = string(c);\n                else value = scalar(c);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (key.equals(\"adress\") || key.equals(\"address\")) address = value;",
+   "new": "if (key.equals(\"adress\")) address = value;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (key.equals(\"adress\") || key.equals(\"address\")) address = value;",
+   "new": "if (key.equals(\"address\")) address = value;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "else if (key.equals(\"name\") || key.equals(\"contact_name\")) name = value;",
+   "new": "else if (key.equals(\"name\")) name = value;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "else if (key.equals(\"time\") || key.equals(\"date\")) time = value;",
+   "new": "else if (key.equals(\"time\")) time = value;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "else if (key.equals(\"type\")) type = value;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "else if (key.equals(\"body\")) body = value;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (address == null || time == null) return;",
+   "new": "if (time == null) return;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (address == null || time == null) return;",
+   "new": "if (address == null) return;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "kind = type == null ? 0 : Integer.parseInt(type.trim());",
+   "new": "kind = type == null ? 1 : Integer.parseInt(type.trim());"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "} catch (NumberFormatException skip) {\n            return;\n        }",
+   "new": "} catch (NumberFormatException skip) {\n            when = 0; kind = 0;\n        }"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (Math.abs(when) < 100_000_000_000L) when *= 1000L;",
+   "new": "if (false) when *= 1000L;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (Math.abs(when) < 100_000_000_000L) when *= 1000L;",
+   "new": "if (Math.abs(when) < 10_000_000_000L) when *= 1000L;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (Math.abs(when) < 100_000_000_000L) when *= 1000L;",
+   "new": "if (Math.abs(when) < 1_000_000_000_000L) when *= 1000L;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "found.messages++;\n        sink.message(",
+   "new": "sink.message("
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (found.messages >= max) {",
+   "new": "if (found.messages > max) {"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "found.cut = true;\n            throw new Stop();",
+   "new": "throw new Stop();"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (out.length() > 64) throw new IOException(\"not valid JSON: a value is too long\");",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (text.isEmpty()) throw new IOException(\"not valid JSON: a value is missing\");",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "return text.equals(\"null\") ? null : text;",
+   "new": "return text;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (ch < 0) throw new IOException(\"not valid JSON: a string never ends\");",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case 'n': out.append('\\n'); break;",
+   "new": "case 'n': out.append('n'); break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case 'r': out.append('\\r'); break;",
+   "new": "case 'r': out.append('r'); break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case 't': out.append('\\t'); break;",
+   "new": "case 't': out.append('t'); break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case 'b': out.append('\\b'); break;",
+   "new": "case 'b': out.append('b'); break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case 'f': out.append('\\f'); break;",
+   "new": "case 'f': out.append('f'); break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case '/': out.append('/'); break;",
+   "new": "case '/': break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case '\\\\': out.append('\\\\'); break;",
+   "new": "case '\\\\': break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "case '\"': out.append('\"'); break;",
+   "new": "case '\"': break;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (h < 0) throw new IOException(\"not valid JSON: a bad \\\\u escape\");",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "code = code * 16 + h;",
+   "new": "code = code * 15 + h;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "default: throw new IOException(\"not valid JSON: a bad escape\");",
+   "new": "default: out.append((char) esc);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (depth > MAX_DEPTH) throw",
+   "new": "if (depth > MAX_DEPTH + 100000) throw"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "MAX_DEPTH = 64",
+   "new": "MAX_DEPTH = 65"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (lead == '\"') { string(c); return; }",
+   "new": "if (lead == '\"') { return; }"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "skipValue(c, depth + 1);\n                int sep = c.skipSpace();\n                c.next();\n                if (sep == '}') return;",
+   "new": "skipValue(c, depth);\n                int sep = c.skipSpace();\n                c.next();\n                if (sep == '}') return;"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c.skipSpace() == '}') { c.next(); return; }\n            while (true) {\n                string(c);",
+   "new": "while (true) {\n                string(c);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (c.skipSpace() == ']') { c.next(); return; }\n            while (true) {\n                skipValue",
+   "new": "while (true) {\n                skipValue"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "c.expect(':');\n                skipValue(c, depth + 1);",
+   "new": "skipValue(c, depth + 1);"
+  },
+  {
+   "file": "src/MessagesJson.java.in",
+   "old": "if (skipSpace() != want) throw new IOException(\"not valid JSON: expected '\" + want + \"'\");",
+   "new": "if (false) throw new IOException(\"\");"
+  },
+  {
+   "file": "src/MessagesFile.java.in",
+   "old": "if (c == 0xEF) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/MessagesFile.java.in",
+   "old": "while (c == ' ' || c == '\\n' || c == '\\r' || c == '\\t') {",
+   "new": "while (false) {"
+  },
+  {
+   "file": "src/MessagesFile.java.in",
+   "old": "if (c == '{' || c == '[') return MessagesJson.parse(buffered, sink, max);",
+   "new": "if (c == '{') return MessagesJson.parse(buffered, sink, max);"
+  },
+  {
+   "file": "src/MessagesFile.java.in",
+   "old": "if (c == '{' || c == '[') return MessagesJson.parse(buffered, sink, max);",
+   "new": "if (c == '[') return MessagesJson.parse(buffered, sink, max);"
+  },
+  {
+   "file": "src/MessagesFile.java.in",
+   "old": "throw new IOException(\"the file is neither XML nor JSON\");",
+   "new": "return new MessagesXml.Recognition();"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return messages > 0 && (\"JSON\".equals(format) || \"smses\".equals(root));",
+   "new": "return messages > 0;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return messages > 0 && (\"JSON\".equals(format) || \"smses\".equals(root));",
+   "new": "return messages > 0 && \"smses\".equals(root);"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return messages > 0 && (\"JSON\".equals(format) || \"smses\".equals(root));",
+   "new": "return \"JSON\".equals(format) || \"smses\".equals(root);"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (\"JSON\".equals(format)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "(child.isEmpty() ? \"object\" + (attributes.isEmpty() ? \"\" : \" with: \" + String.join(\", \", attributes))",
+   "new": "(child.isEmpty() ? \"object\""
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "(attributes.isEmpty() ? \"\" : \" whose first item has: \" + String.join(\", \", attributes))",
+   "new": "\"\""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "this.name = cleaned.equals(this.address.trim()) ? \"\" : cleaned;",
+   "new": "this.name = cleaned;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "this.name = cleaned.equals(this.address.trim()) ? \"\" : cleaned;",
+   "new": "this.name = cleaned.equals(this.address) ? \"\" : cleaned;"
+  }
+ ]
+}

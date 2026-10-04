@@ -1,0 +1,65 @@
+{
+ "about": "Mutation list converted from the mut_p6 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/People.java.in",
+   "old": "static final int FIND_MIN = 2;",
+   "new": "static final int FIND_MIN = 1;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (lower.startsWith(query)) best = Math.min(best, 0);",
+   "new": "if (lower.startsWith(query)) best = Math.min(best, 1);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "else if (lower.contains(\" \" + query)) best = Math.min(best, 1);",
+   "new": "else if (lower.contains(query)) best = Math.min(best, 1);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "typed.trim().toLowerCase",
+   "new": "typed.toLowerCase"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "final String query = typed.trim().toLowerCase(java.util.Locale.ROOT);",
+   "new": "final String query = typed.trim();"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return out.size() > FIND_LIMIT ? new ArrayList<>(out.subList(0, FIND_LIMIT)) : out;",
+   "new": "return out;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "        result.all.addAll(people);\n",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "        Collections.sort(out, new Comparator<Person>() {\n            @Override public int compare(Person a, Person b) {\n                int d",
+   "new": "        if (false) Collections.sort(out, new Comparator<Person>() {\n            @Override public int compare(Person a, Person b) {\n                int d"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (String name : p.names) {\n                String lower",
+   "new": "for (String name : p.names.subList(0, 1)) {\n                String lower"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return d != 0 ? d : a.names.get(0).compareToIgnoreCase(b.names.get(0));",
+   "new": "return d;"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "mentions.setVisibility(View.GONE);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "People.find(result.all, typed)",
+   "new": "result.people"
+  }
+ ]
+}

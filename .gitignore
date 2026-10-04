@@ -36,3 +36,7 @@ coverage/
 
 # Probe signing keys: throwaway test identities, never committed
 apps/pixel/*/keys/
+
+# Real data — exports, backups and message files are inputs to tools/, never outputs of it
+orb-2*.txt
+*.sms

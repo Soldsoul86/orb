@@ -1,0 +1,15 @@
+{
+ "about": "Mutation list converted from the mut_par6 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/SenderFacts.java.in",
+   "old": "if (senderId == null) return false;",
+   "new": "if (senderId == null) return true;"
+  },
+  {
+   "file": "src/SenderRules.java.in",
+   "old": "if (a.matches(\"[A-Z0-9]{2,12}\") && a.matches(\".*[A-Z].*\")) return a;",
+   "new": "if (a.matches(\"[A-Z0-9]{2,13}\") && a.matches(\".*[A-Z].*\")) return a;"
+  }
+ ]
+}

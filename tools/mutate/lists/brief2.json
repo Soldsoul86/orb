@@ -1,0 +1,385 @@
+{
+ "about": "Mutation list converted from the mut_brief2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "DEFAULT_MINUTE = 8 * 60",
+   "new": "DEFAULT_MINUTE = 9 * 60"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "WAITING_DAYS = 7",
+   "new": "WAITING_DAYS = 8"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "LATE_MS = 3L * 60 * 60 * 1000",
+   "new": "LATE_MS = 4L * 60 * 60 * 1000"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "WORDS_MAX = 60",
+   "new": "WORDS_MAX = 61"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "c.overdue = t.overdue.size();",
+   "new": "c.overdue = 0;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "c.today = t.today.size();",
+   "new": "c.today = 0;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) < 0)) c.waiting++;",
+   "new": "if (w.openedAtMs < nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) < 0)) c.waiting++;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) < 0)) c.waiting++;",
+   "new": "if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS) c.waiting++;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) < 0)) c.waiting++;",
+   "new": "if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) <= 0)) c.waiting++;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "for (ComingUp.Day day : t.dates) c.dates += day.items.size();",
+   "new": "for (ComingUp.Day day : t.dates) c.dates++;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "part(out, c.overdue, \" overdue\", \" overdue\");",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "part(out, c.today, \" due today\", \" due today\");",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "part(out, c.waiting, \" waiting for\", \" waiting for\");",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "part(out, c.dates, \" date this week\", \" dates this week\");",
+   "new": "part(out, c.dates, \" dates this week\", \" dates this week\");"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (n <= 0) return;",
+   "new": "if (n < 0) return;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (out.length() > 0) out.append(\" \\u00b7 \");",
+   "new": "if (out.length() > 0) out.append(\", \");"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "out.append(n).append(n == 1 ? one : many);",
+   "new": "out.append(n).append(many);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "Commitments.Commitment first = !t.overdue.isEmpty() ? t.overdue.get(0) : !t.today.isEmpty() ? t.today.get(0) : null;",
+   "new": "Commitments.Commitment first = !t.today.isEmpty() ? t.today.get(0) : !t.overdue.isEmpty() ? t.overdue.get(0) : null;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "int others = t.overdue.size() + t.today.size() - 1;",
+   "new": "int others = t.overdue.size() + t.today.size();"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "String words = first.words.length() > WORDS_MAX ? first.words.substring(0, WORDS_MAX).trim() + \"\\u2026\" : first.words;",
+   "new": "String words = first.words;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "(others > 0 ? \" (+\" + others + \" more)\" : \"\")",
+   "new": "\"\""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "return ComingUp.dateOf(nowMs, zone.getID());",
+   "new": "return ComingUp.dateOf(nowMs, \"UTC\");"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "Calendar c = Calendar.getInstance(zone);\n        c.clear();\n        c.setLenient(true);",
+   "new": "Calendar c = Calendar.getInstance(TimeZone.getTimeZone(\"UTC\"));\n        c.clear();\n        c.setLenient(true);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]), minuteOfDay / 60, minuteOfDay % 60, 0);",
+   "new": "Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]), minuteOfDay / 60, 0, 0);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "return today > nowMs ? today : scheduledAt(ComingUp.plusDays(day, 1), minuteOfDay, zone);",
+   "new": "return today >= nowMs ? today : scheduledAt(ComingUp.plusDays(day, 1), minuteOfDay, zone);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "return today > nowMs ? today : scheduledAt(ComingUp.plusDays(day, 1), minuteOfDay, zone);",
+   "new": "return scheduledAt(ComingUp.plusDays(day, 1), minuteOfDay, zone);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (!on) return OFF;",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (!permitted) return NO_PERMISSION;",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (shownToday) return ALREADY;",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (nowMs - scheduledMs > LATE_MS) return LATE;",
+   "new": "if (nowMs - scheduledMs >= LATE_MS) return LATE;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (nowMs - scheduledMs > LATE_MS) return LATE;",
+   "new": ""
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "return Math.max(0L, (nowMs - scheduledMs) / 60_000L);",
+   "new": "return (nowMs - scheduledMs) / 60_000L;"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "return Math.max(0L, (nowMs - scheduledMs) / 60_000L);",
+   "new": "return Math.max(0L, (nowMs - scheduledMs) / 6_000L);"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "minuteOfDay / 60, minuteOfDay % 60);",
+   "new": "minuteOfDay % 60, minuteOfDay / 60);"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return PackageGrants.lastIsGrant(lines, Capabilities.BRIEF);",
+   "new": "return PackageGrants.lastIsGrant(lines, Capabilities.CALLS);"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return m >= 0 && m < 24 * 60 ? m : BriefRules.DEFAULT_MINUTE;",
+   "new": "return m;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return m >= 0 && m < 24 * 60 ? m : BriefRules.DEFAULT_MINUTE;",
+   "new": "return m > 0 && m < 24 * 60 ? m : BriefRules.DEFAULT_MINUTE;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "if (v == null) return BriefRules.DEFAULT_MINUTE;",
+   "new": "if (v == null) return 0;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return \"true\".equals(field(WORDS, lastOf(lines, BriefFacts.CONFIGURED)));",
+   "new": "return !\"false\".equals(field(WORDS, lastOf(lines, BriefFacts.CONFIGURED)));"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return field(DAY, lastOf(lines, BriefFacts.SHOWN));",
+   "new": "return field(DAY, lastOf(lines, BriefFacts.SKIPPED));"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "if (day.equals(lastShownDay(lines))) return true;",
+   "new": ""
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip != null && (skip.equals(day + \"|\" + BriefRules.NOTHING) || skip.equals(day + \"|\" + BriefRules.LATE));",
+   "new": "return skip != null && (skip.equals(day + \"|\" + BriefRules.NOTHING) || skip.equals(day + \"|\" + BriefRules.LATE) || skip.equals(day + \"|\" + BriefRules.NO_PERMISSION));"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip != null && (skip.equals(day + \"|\" + BriefRules.NOTHING) || skip.equals(day + \"|\" + BriefRules.LATE));",
+   "new": "return skip != null && skip.equals(day + \"|\" + BriefRules.NOTHING);"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip != null && (skip.equals(day + \"|\" + BriefRules.NOTHING) || skip.equals(day + \"|\" + BriefRules.LATE));",
+   "new": "return skip != null && skip.equals(day + \"|\" + BriefRules.LATE);"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return (day + \"|\" + reason).equals(lastSkip(lines));",
+   "new": "return false;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return day == null || reason == null ? null : day + \"|\" + reason;",
+   "new": "return day == null || reason == null ? null : reason + \"|\" + day;"
+  },
+  {
+   "file": "src/BriefFacts.java.in",
+   "old": "p.put(\"day\", day);\n        p.put(\"overdue\", (long) counts.overdue);",
+   "new": "p.put(\"overdue\", (long) counts.overdue);"
+  },
+  {
+   "file": "src/BriefFacts.java.in",
+   "old": "p.put(\"minutesLate\", minutesLate);",
+   "new": ""
+  },
+  {
+   "file": "src/BriefFacts.java.in",
+   "old": "p.put(\"withWords\", withWords);",
+   "new": "p.put(\"withWords\", false);"
+  },
+  {
+   "file": "src/BriefFacts.java.in",
+   "old": "p.put(\"dates\", (long) counts.dates);",
+   "new": "p.put(\"dates\", (long) counts.waiting);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "long scheduled = BriefRules.scheduledAt(day, BriefConfig.minute(lines), zone);",
+   "new": "long scheduled = BriefRules.scheduledAt(day, BriefRules.DEFAULT_MINUTE, zone);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (counts.total() == 0) refusal = BriefRules.NOTHING;",
+   "new": ""
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (!BriefConfig.skipRecorded(lines, day, refusal) && journal.append(BriefFacts.SKIPPED, BriefFacts.skipped(refusal, day)) == null) return FAILED;",
+   "new": "if (journal.append(BriefFacts.SKIPPED, BriefFacts.skipped(refusal, day)) == null) return FAILED;"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "return \"skipped:\" + refusal;",
+   "new": "return SHOWN;"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "notifier.post(BriefRules.text(counts), withWords ? BriefRules.firstWords(t) : null);",
+   "new": "notifier.post(BriefRules.text(counts), BriefRules.firstWords(t));"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "notifier.post(BriefRules.text(counts), withWords ? BriefRules.firstWords(t) : null);",
+   "new": "notifier.post(BriefRules.text(counts), null);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (!BriefConfig.enabled(lines)) {\n            scheduler.cancel();\n            return \"off\";\n        }",
+   "new": "if (!BriefConfig.enabled(lines)) {\n            return \"off\";\n        }"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (nowMs >= BriefRules.scheduledAt(day, minute, zone) && !BriefConfig.handledToday(lines, day)) {",
+   "new": "if (!BriefConfig.handledToday(lines, day)) {"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (nowMs >= BriefRules.scheduledAt(day, minute, zone) && !BriefConfig.handledToday(lines, day)) {",
+   "new": "if (nowMs >= BriefRules.scheduledAt(day, minute, zone)) {"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "scheduler.schedule(BriefRules.nextFire(nowMs, zone, minute));\n        return outcome;",
+   "new": "return outcome;"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "grant.put(\"standing\", URGENCY);",
+   "new": ""
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "grant.put(\"tier\", Capabilities.TIER_ACT_REVERSIBLE);",
+   "new": "grant.put(\"tier\", Capabilities.TIER_OBSERVE);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (journal.append(PackageGrants.GRANTED, grant) == null) return false;\n        return configure(journal, minuteOfDay, words);",
+   "new": "if (journal.append(PackageGrants.GRANTED, grant) == null) return false;\n        return true;"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "boolean recorded = journal.append(PackageGrants.REVOKED, revoke) != null;\n        scheduler.cancel();",
+   "new": "boolean recorded = journal.append(PackageGrants.REVOKED, revoke) != null;"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, BRIEF);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, UNDERSTAND);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "boolean lastWasShown = shown != null && wallClock(shown) >= wallClock(skipped);",
+   "new": "boolean lastWasShown = shown != null;"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "return new Status(granted ? \"ON \\u2014 at \" + BriefRules.clock(BriefConfig.minute(lines)) : \"OFF \\u2014 not turned on\"",
+   "new": "return new Status(granted ? \"ON \\u2014 at 08:00\" : \"OFF \\u2014 not turned on\""
+  },
+  {
+   "file": "src/BriefAlarms.java.in",
+   "old": "alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pending());",
+   "new": "alarms.setExact(AlarmManager.RTC_WAKEUP, atMs, pending());"
+  },
+  {
+   "file": "src/BriefNotifier.java.in",
+   "old": ".setVisibility(Notification.VISIBILITY_PRIVATE)",
+   "new": ".setVisibility(Notification.VISIBILITY_PUBLIC)"
+  },
+  {
+   "file": "src/BriefNotifier.java.in",
+   "old": ".setContentText(\"Your morning brief is ready\")",
+   "new": ".setContentText(text)"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "askBrief(false, BriefRules.DEFAULT_MINUTE, false)",
+   "new": "askBrief(false, BriefRules.DEFAULT_MINUTE, true)"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();\n    }\n\n    /** Android allows notifications",
+   "new": "card.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus();\n    }\n\n    /** Android allows notifications"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "} else if (!ReminderNotifier.permitted(TodayActivity.this)) {",
+   "new": "} else if (false) {"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "if (!Brief.configure(journal, chosen, chosenWords)) { say(\"Orb could not record this, so nothing changed.\"); return; }\n                        rearm(journal);",
+   "new": "if (!Brief.configure(journal, chosen, chosenWords)) { say(\"Orb could not record this, so nothing changed.\"); return; }"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "if (out.length() > 0) out.append(\" · \");",
+   "new": "if (out.length() > 0) out.append(\", \");"
+  },
+  {
+   "file": "src/BriefRules.java.in",
+   "old": "String words = first.words.length() > WORDS_MAX ? first.words.substring(0, WORDS_MAX).trim() + \"…\" : first.words;",
+   "new": "String words = first.words;"
+  }
+ ]
+}

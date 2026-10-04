@@ -1,0 +1,100 @@
+{
+ "about": "Mutation list converted from the mut_marks harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return listed(Collections.<String>emptySet());",
+   "new": "return new ArrayList<>(by.values());"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (x != y) return x ? -1 : 1;",
+   "new": "if (x != y) return x ? 1 : -1;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (x != y) return x ? -1 : 1;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "boolean x = first.contains(a.number), y = first.contains(b.number);",
+   "new": "boolean x = false, y = false;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (a.last != b.last) return a.last > b.last ? -1 : 1;\n                    return a.number.compareTo(b.number);\n                }\n            });\n            return all.size() > MAX_LISTED ? new ArrayList<>(all.subList(0, MAX_LISTED)) : all;\n        }\n\n        int leftOut",
+   "new": "if (a.last != b.last) return a.last > b.last ? 1 : -1;\n                    return a.number.compareTo(b.number);\n                }\n            });\n            return all.size() > MAX_LISTED ? new ArrayList<>(all.subList(0, MAX_LISTED)) : all;\n        }\n\n        int leftOut"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return rowLabel(c, zone, false);",
+   "new": "return rowLabel(c, zone, true);"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "(regularTouch ? \"\\nyou said: in regular touch\" : \"\")",
+   "new": "\"\\nyou said: in regular touch\""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "(regularTouch ? \"\\nyou said: in regular touch\" : \"\")",
+   "new": "\"\""
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (verdicts.isEmpty()) return out;",
+   "new": ""
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.REGULAR + \":\" + keyer.key(UnderstandingRules.REGULAR, number)))",
+   "new": "verdicts.containsKey(UnderstandingRules.REGULAR + \":\" + keyer.key(UnderstandingRules.REGULAR, number))"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.REGULAR + \":\" + keyer.key(UnderstandingRules.REGULAR, number)))",
+   "new": "UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.QUIET + \":\" + keyer.key(UnderstandingRules.QUIET, number)))"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.REGULAR + \":\" + keyer.key(UnderstandingRules.REGULAR, number)))",
+   "new": "UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.REGULAR + \":\" + keyer.key(UnderstandingRules.MANY, number)))"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (UnderstandingAccess.granted(this)) {\n            try {\n                close =",
+   "new": "if (true) {\n            try {\n                close ="
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "rows = survey.listed(close);",
+   "new": "rows = survey.listed();"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "MessagesRules.rowLabel(c, zone, closeHere.contains(c.number))",
+   "new": "MessagesRules.rowLabel(c, zone, false)"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (closeHere.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);",
+   "new": "messageBoxes.get(i).setChecked(true);"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (!closeHere.isEmpty()) {\n            int shown = 0;",
+   "new": "if (true) {\n            int shown = 0;"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "for (MessagesRules.Conversation c : rows) if (closeHere.contains(c.number)) shown++;",
+   "new": "shown = rows.size();"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "close = new java.util.HashSet<>();   // cannot tell who",
+   "new": "close = new java.util.HashSet<>(survey.by.keySet());   // cannot tell who"
+  }
+ ]
+}

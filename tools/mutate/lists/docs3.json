@@ -1,0 +1,20 @@
+{
+ "about": "Mutation list converted from the mut_docs3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "!(c >= '\\u0080' && c < '\\u00a0')",
+   "new": "true"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return cut + \"\\u2026\";",
+   "new": "return cut;"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (DocumentsRules.refusal(doc) != null) continue;",
+   "new": ""
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+package @PKG@;
+
+import java.io.FileInputStream;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * The fit probe: reads a message backup the way the phone does (`MessagesFile.parse` into `LoopFit`) and prints **counts and nothing else** — never a
+ * message body, never a person's name. It is the container-side twin of the Sources screen's fit paragraph, so a rule can be iterated against the real
+ * inbox without a phone round-trip (`tools/fit/DESIGN.md`).
+ *
+ * What it names: the counts by name, the share left unmapped, and the **brands** (non-numeric sender ids of service senders) and brand pairs the
+ * rules could not place — the same closed vocabulary `LoopFit.Report` already gives the phone. Output is a pure function of the file, so two runs
+ * agree. It is a tool, not part of the app: it lives under `tools/` and compiles into the test build only (`tools/fit/probe.sh`).
+ */
+public final class FitProbe {
+    private FitProbe() {}
+
+    public static void main(String[] args) throws Exception {
+        if (args.length != 1) {
+            System.err.println("usage: probe.sh <messages-backup.json|xml>");
+            System.exit(64);
+        }
+        LoopFit fit = new LoopFit();
+        try (FileInputStream in = new FileInputStream(args[0])) {
+            MessagesFile.parse(in, fit, MessagesRules.MAX_MESSAGES);
+        }
+        LoopFit.Report all = fit.report();
+        System.out.println("messages " + all.messages + " service " + all.service + " conversational " + all.conversational + " other " + all.other);
+        StringBuilder line = new StringBuilder();
+        for (Map.Entry<String, Long> e : new TreeMap<>(all.counts()).entrySet()) line.append(e.getKey()).append('=').append(e.getValue()).append("  ");
+        System.out.println(line.toString().trim());
+        System.out.println("unmapped% " + all.unmappedPercent() + "  notALoop " + all.notALoop());
+        System.out.println("topUnmapped " + all.topUnmapped(25));
+        System.out.println("topAmbiguous " + all.topAmbiguous(12));
+
+        // The sender-mark simulation: quiet every candidate and show what that would hide (docs/SENDER_MARKS_PHONE.md).
+        final Set<String> candidates = new TreeSet<>();
+        for (SenderRules.Row row : fit.senders(SenderRules.NONE)) if (SenderRules.candidate(row)) candidates.add(row.id);
+        LoopFit.Report quiet = fit.report(new SenderRules.Quiet() {
+            @Override public boolean quiet(String id) {
+                return candidates.contains(id);
+            }
+        });
+        System.out.println("candidates " + candidates.size());
+        System.out.println("quiet-candidates: unmapped " + quiet.get("unmapped") + " (" + quiet.unmappedPercent() + "%) hid " + quiet.get("quiet.hid") + " of "
+                + quiet.get("quiet.messages") + " messages from " + quiet.get("quiet.senders") + " senders; " + SenderRules.costLine(quiet.get("quiet.senders"), quiet.get("quiet.hid")));
+        long sum = quiet.get("opens") + quiet.get("advances") + quiet.get("closes") + quiet.get("evidence") + quiet.get("noise") + quiet.get("ambiguous") + quiet.get("unmapped");
+        System.out.println("roles-sum " + sum + " of " + quiet.service + (sum == quiet.service ? " ok" : " MISMATCH"));
+    }
+}

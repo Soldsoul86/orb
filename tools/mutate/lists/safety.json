@@ -1,0 +1,295 @@
+{
+ "about": "Mutation list converted from the mut_safety harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.accessibility && overlay) reasons.add(ACCESSIBILITY_OVERLAY);",
+   "new": "if (false) reasons.add(ACCESSIBILITY_OVERLAY);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "else if (a.accessibility) reasons.add(ACCESSIBILITY);",
+   "new": "else if (false) reasons.add(ACCESSIBILITY);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (sms && a.notificationListener) reasons.add(SMS_NOTIFICATIONS);",
+   "new": "if (false) reasons.add(SMS_NOTIFICATIONS);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "else if (a.notificationListener) reasons.add(NOTIFICATIONS);",
+   "new": "else if (false) reasons.add(NOTIFICATIONS);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.deviceAdmin) reasons.add(ADMIN);",
+   "new": "if (false) reasons.add(ADMIN);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "boolean now = !reasons.isEmpty();",
+   "new": "boolean now = false;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (sms && !(a.notificationListener)) reasons.add(SMS);",
+   "new": "if (sms) reasons.add(SMS);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.granted.contains(READ_CALL_LOG)) reasons.add(CALL_LOG);",
+   "new": "if (a.requested.contains(READ_CALL_LOG)) reasons.add(CALL_LOG);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.granted.contains(BACKGROUND_LOCATION)) reasons.add(BACKGROUND_LOC);",
+   "new": "if (a.requested.contains(BACKGROUND_LOCATION)) reasons.add(BACKGROUND_LOC);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.requested.contains(ALL_FILES)) reasons.add(FILES);",
+   "new": "if (a.granted.contains(ALL_FILES)) reasons.add(FILES);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (overlay && !a.accessibility) reasons.add(OVERLAY_ONLY);",
+   "new": "if (overlay) reasons.add(OVERLAY_ONLY);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.requested.contains(INSTALL_APPS) && outside) reasons.add(INSTALLER);",
+   "new": "if (a.requested.contains(INSTALL_APPS)) reasons.add(INSTALLER);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.keyboard) reasons.add(KEYBOARD);",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "boolean sms = has(a.granted, READ_SMS, RECEIVE_SMS);",
+   "new": "boolean sms = has(a.requested, READ_SMS, RECEIVE_SMS);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "boolean sms = has(a.granted, READ_SMS, RECEIVE_SMS);",
+   "new": "boolean sms = has(a.granted, READ_SMS);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return installer == null || !STORES.contains(installer);",
+   "new": "return !STORES.contains(installer);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return installer == null || !STORES.contains(installer);",
+   "new": "return installer == null;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.system || a.pkg.equals(ownPackage)) continue;",
+   "new": "if (a.pkg.equals(ownPackage)) continue;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (a.system || a.pkg.equals(ownPackage)) continue;",
+   "new": "if (a.system) continue;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (!phone.screenLock) {",
+   "new": "if (phone.screenLock) {"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (phone.usbDebugging) weaker.add(USB_DEBUGGING);",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "phone.patchAgeDays > OLD_PATCH_DAYS",
+   "new": "phone.patchAgeDays >= OLD_PATCH_DAYS"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "phone.patchAgeDays > OLD_PATCH_DAYS",
+   "new": "phone.patchAgeDays > OLD_PATCH_DAYS + 1"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "OLD_PATCH_DAYS = 183",
+   "new": "OLD_PATCH_DAYS = 90"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (phone != null) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return level != 0 ? level : a.label.compareToIgnoreCase(b.label);",
+   "new": "return level != 0 ? level : a.label.compareTo(b.label);"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "return level != 0 ? level : a.label.compareToIgnoreCase(b.label);",
+   "new": "return level;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "(NOW.equals(a.level) ? 0 : 1) - (NOW.equals(b.level) ? 0 : 1)",
+   "new": "(NOW.equals(b.level) ? 0 : 1) - (NOW.equals(a.level) ? 0 : 1)"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "r.apps = apps.size();",
+   "new": "r.apps = 0;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (NOW.equals(f.level)) r.now++;",
+   "new": "if (!NOW.equals(f.level)) r.now++;"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (r.now == 0 && r.review == 0) return",
+   "new": "if (r.now == 0 || r.review == 0) return"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (r.now > 0) out.append",
+   "new": "out.append"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (r.review > 0) out.append",
+   "new": "out.append"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "\" to look at now\"",
+   "new": "\" to look at\""
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "\" worth a look\"",
+   "new": "\" to review\""
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "+ (outsideStore && NOW.equals(level) ? \", and it came from outside a known app store\" : \"\")",
+   "new": "+ (outsideStore ? \", and it came from outside a known app store\" : \"\")"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "if (pkg == null) return reasons.get(0).text + \".\";",
+   "new": "if (pkg == null) return label + \": \" + reasons.get(0).text + \".\";"
+  },
+  {
+   "file": "src/SafetyRules.java.in",
+   "old": "\"com.amazon.venezia\", ",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyFacts.java.in",
+   "old": "type.startsWith(\"orb.safety.\")",
+   "new": "type.startsWith(\"orb.safety.checked\")"
+  },
+  {
+   "file": "src/SafetyFacts.java.in",
+   "old": "p.put(\"apps\", apps);",
+   "new": "p.put(\"apps\", now);"
+  },
+  {
+   "file": "src/SafetyFacts.java.in",
+   "old": "p.put(\"review\", review);",
+   "new": "p.put(\"review\", now);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (!SafetyAccess.granted(this)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "SafetyAccess.grant(SafetyActivity.this, journal);",
+   "new": "if (false) SafetyAccess.grant(SafetyActivity.this, journal);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "journal.append(SafetyFacts.DEFERRED, SafetyFacts.deferred());",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (!recorded) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "recorded = true;",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "SafetyFacts.checked(result.apps, result.now, result.review)",
+   "new": "SafetyFacts.checked(result.apps, result.review, result.now)"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE",
+   "new": "FLAG_KEEP_SCREEN_ON, WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "list.addView(text(SafetyRules.CANNOT_SEE, 12, false));",
+   "new": ""
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "app.keyboard = !system && imes.contains(info.packageName);",
+   "new": "app.keyboard = imes.contains(info.packageName);"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "REQUESTED_PERMISSION_GRANTED) != 0",
+   "new": "REQUESTED_PERMISSION_GRANTED) == 0"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "lock = keyguard.isDeviceSecure();",
+   "new": "lock = false;"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "== 1;",
+   "new": "== 0;"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "Settings.Global.ADB_ENABLED, 0) == 1",
+   "new": "Settings.Global.ADB_ENABLED, 1) == 1"
+  },
+  {
+   "file": "src/SafetyAccess.java.in",
+   "old": "safety-access.granted",
+   "new": "safety-access.x"
+  },
+  {
+   "file": "src/MainActivity.java.in",
+   "old": "SafetyFacts.firstRun(journal.readLines())",
+   "new": "true"
+  },
+  {
+   "file": "src/MainActivity.java.in",
+   "old": "if (state == null) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, APPSEC);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, PACKAGES);"
+  }
+ ]
+}

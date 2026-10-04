@@ -1,0 +1,40 @@
+{
+ "about": "Mutation list converted from the mut_p4 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/RemindFlow.java.in",
+   "old": "if (presetNote != null) note.setText(presetNote);",
+   "new": ""
+  },
+  {
+   "file": "src/RemindFlow.java.in",
+   "old": "ask.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);",
+   "new": ""
+  },
+  {
+   "file": "src/RemindFlow.java.in",
+   "old": "{presetNote == null ? \"\" : presetNote.trim()}",
+   "new": "{\"\"}"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "flow.start(null, null, callNote);",
+   "new": "flow.start(\"x\", null, callNote);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (flow != null) flow.onPermissionResult(code, results);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "\"Call \" + person.names.get(0)",
+   "new": "person.names.get(0)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": ".setNeutralButton(\"Remind me about this person\\u2026\"",
+   "new": ".setNegativeButton(\"Remind me about this person\\u2026\""
+  }
+ ]
+}

@@ -1,0 +1,405 @@
+{
+ "about": "Mutation list converted from the mut_loop harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (cmp == 0) return DUE_TODAY;",
+   "new": "if (cmp == 0) return OPEN;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return ATTEND.equals(kind) ? PASSED : OVERDUE;",
+   "new": "return OVERDUE;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return ATTEND.equals(kind) ? PASSED : OVERDUE;",
+   "new": "return PASSED;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (due == null || due.isEmpty()) return OPEN;",
+   "new": "if (due == null) return OPEN;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (DROPPED.equals(last)) return DROPPED;",
+   "new": "if (DROPPED.equals(last)) return DONE;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": " || OVERDUE.equals(state);",
+   "new": ";"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return OPEN.equals(state) || DUE_TODAY",
+   "new": "return DUE_TODAY"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "case CommitmentFacts.DONE: return CLOSED;",
+   "new": "case CommitmentFacts.DONE: return DROPPED_TYPE;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "case CommitmentFacts.MOVED: return MOVED;",
+   "new": "case CommitmentFacts.MOVED: return ADVANCED;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "owner = CommitmentFacts.WAITING.equals(direction) ? THEM : ME;",
+   "new": "owner = CommitmentFacts.WAITING.equals(direction) ? ME : THEM;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "kind = CommitmentFacts.WAITING.equals(direction) ? GET : DO;",
+   "new": "kind = CommitmentFacts.WAITING.equals(direction) ? DO : GET;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "origin = SELF;\n                    }",
+   "new": "}"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (validKind(k)) kind = k;",
+   "new": ""
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (validOwner(o)) owner = o;\n                    if (validOrigin(g)) origin = g;\n                    due",
+   "new": "due"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (validOwner(o)) { owner = o; did = true; }",
+   "new": ""
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (validOrigin(g)) { origin = g; did = true; }",
+   "new": ""
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (d != null) { due = dayOrNull(d); did = true; }",
+   "new": "if (d != null && !d.isEmpty()) { due = dayOrNull(d); did = true; }"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (BY_YOU.equals(by)) { last = DONE; closedBy = BY_YOU; return true; }",
+   "new": "if (BY_YOU.equals(by)) { last = DONE; closedBy = BY_YOU; return false; }"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (by == null) by = BY_YOU;",
+   "new": ""
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "BY_EVIDENCE.equals(by) && CLASS_EXACT.equals(e.field(\"class\"))",
+   "new": "BY_EVIDENCE.equals(by)"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "BY_EVIDENCE.equals(by) && CLASS_EXACT.equals(e.field(\"class\"))",
+   "new": "BY_EVIDENCE.equals(by) && !CLASS_YOU.equals(e.field(\"class\"))"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "last = OPEN; closedBy = null; return true;",
+   "new": "last = OPEN; return true;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "case DROPPED_TYPE: last = DROPPED; return true;",
+   "new": "case DROPPED_TYPE: last = DONE; return true;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (opening == null || !OPENED.equals(opening.type)) return null;",
+   "new": "if (opening == null) return null;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (events.isEmpty()) return null;",
+   "new": "if (false) return null;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return THEM.equals(l.owner) && active(l.state(today));",
+   "new": "return ME.equals(l.owner) && active(l.state(today));"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return ME.equals(l.owner) && active(l.state(today));",
+   "new": "return !THEM.equals(l.owner) && active(l.state(today));"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return PROMISED.equals(l.origin) && OVERDUE",
+   "new": "return ASKED.equals(l.origin) && OVERDUE"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return PROMISED.equals(l.origin) && OVERDUE.equals(l.state(today));",
+   "new": "return PROMISED.equals(l.origin) && !DONE.equals(l.state(today));"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (a.minor <= 0 || b.minor <= 0 || a.minor != b.minor) return false;",
+   "new": "if (a.minor != b.minor) return false;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (a.minor <= 0 || b.minor <= 0 || a.minor != b.minor) return false;",
+   "new": "if (a.minor <= 0 || b.minor <= 0) return false;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "|| !a.counterparty.equals(b.counterparty)) return false;",
+   "new": ") return false;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "if (a.counterparty == null || b.counterparty == null || ",
+   "new": "if ("
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "|| !a.objectClass.equals(b.objectClass)) return false;",
+   "new": ") return false;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return Math.abs(a.day - b.day) <= toleranceDays;",
+   "new": "return Math.abs(a.day - b.day) < toleranceDays;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "return Math.abs(a.day - b.day) <= toleranceDays;",
+   "new": "return a.day - b.day <= toleranceDays;"
+  },
+  {
+   "file": "src/LoopRules.java.in",
+   "old": "static final String PROTOCOL = \"loop/0.1\";",
+   "new": "static final String PROTOCOL = \"loop/0.2\";"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "return LoopRules.stateOf(CommitmentFacts.WAITING.equals(c.direction) ? LoopRules.GET : LoopRules.DO, c.last, c.dueDate, today);",
+   "new": "return OPEN;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "c.dueDate = loop.due;\n                c.last = loop.last;",
+   "new": "c.last = loop.last;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "c.last = loop.last;",
+   "new": "c.dueDate = loop.due;"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "loop.apply(event);",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFacts.java.in",
+   "old": "if (id == null || !id.matches(\"[a-z0-9.]{1,40}\"))",
+   "new": "if (id == null)"
+  },
+  {
+   "file": "src/LoopFacts.java.in",
+   "old": "counterpartyKey.matches(\"[0-9a-f]{16}\")",
+   "new": "counterpartyKey.matches(\"[0-9a-f]{1,16}\")"
+  },
+  {
+   "file": "src/LoopFacts.java.in",
+   "old": "p.put(\"protocol\", LoopRules.PROTOCOL);",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFacts.java.in",
+   "old": "for (Map.Entry<String, Long> e : r.topUnmapped(LoopFit.TOP_UNMAPPED).entrySet()) p.put(\"unmapped.\" + e.getKey(), e.getValue());",
+   "new": "for (Map.Entry<String, Long> e : r.topUnmapped(100).entrySet()) p.put(\"unmapped.\" + e.getKey(), e.getValue());"
+  },
+  {
+   "file": "src/LoopFacts.java.in",
+   "old": "p.put(\"conversational\", r.conversational);",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (m.number != null) { conversational++; return; }",
+   "new": "if (m.number == null) { conversational++; return; }"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (m.type != MessagesRules.RECEIVED && m.type != MessagesRules.SENT) { other++; return; }",
+   "new": "if (m.type != MessagesRules.RECEIVED) { other++; return; }"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (MessagesRules.looksLikeCode(b) && !TXN_WORD.matcher(b).find())",
+   "new": "if (MessagesRules.looksLikeCode(b))"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": " && !TXN_WORD.matcher(b).find()) return new Reading(NOISE",
+   "new": ") return new Reading(NOISE"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (FAILED.matcher(b).find() && FAILED_ABOUT.matcher(b).find())",
+   "new": "if (FAILED.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (hasAmount && PAYMENT_DONE.matcher(b).find() && PAYMENT_OF.matcher(b).find())",
+   "new": "if (hasAmount && PAYMENT_DONE.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (hasAmount && OUT.matcher(b).find())",
+   "new": "if (OUT.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (hasAmount && IN.matcher(b).find())",
+   "new": "if (IN.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (hasAmount && DUE.matcher(b).find() && !PROMO.matcher(b).find())",
+   "new": "if (hasAmount && DUE.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (hasAmount && DUE.matcher(b).find() && !PROMO.matcher(b).find())",
+   "new": "if (DUE.matcher(b).find() && !PROMO.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (RENEW.matcher(b).find() && !PROMO.matcher(b).find())",
+   "new": "if (RENEW.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (ATTEND.matcher(b).find() && !PROMO.matcher(b).find())",
+   "new": "if (ATTEND.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (DECIDE.matcher(b).find() && !PROMO.matcher(b).find())",
+   "new": "if (DECIDE.matcher(b).find())"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (WILL_DELIVER.matcher(b).find()) return new Reading(OPENS",
+   "new": "if (DELIVERED.matcher(b).find()) return new Reading(CLOSES, LoopRules.GET, 0L, null, \"delivered\");\n        if (WILL_DELIVER.matcher(b).find()) return new Reading(OPENS"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "setScale(0, java.math.RoundingMode.HALF_UP)",
+   "new": "setScale(0, java.math.RoundingMode.DOWN)"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": ".movePointRight(2)",
+   "new": ".movePointRight(1)"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "a = a.replaceFirst(\"^[A-Z]{2}-\", \"\").replaceFirst(\"-[A-Z]$\", \"\");",
+   "new": "a = a.replaceFirst(\"^[A-Z]{2}-\", \"\");"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "a = a.replaceFirst(\"^[A-Z]{2}-\", \"\").replaceFirst(\"-[A-Z]$\", \"\");",
+   "new": "a = a.replaceFirst(\"-[A-Z]$\", \"\");"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (a.matches(\"[A-Z0-9]{2,12}\") && a.matches(\".*[A-Z].*\")) return a;",
+   "new": "if (a.matches(\"[A-Z0-9]{2,12}\")) return a;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (UNMAPPED.equals(r.role)) {",
+   "new": "if (!NOISE.equals(r.role)) {"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (keptCount >= MAX_KEPT) { cutKept++; return; }",
+   "new": "if (keptCount >= 1) { cutKept++; return; }"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (used[i] || o.get(i) > closeDay) continue;",
+   "new": "if (used[i]) continue;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (used[i] || o.get(i) > closeDay) continue;",
+   "new": "if (o.get(i) > closeDay) continue;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "static final int MATCH_DAYS = 45;",
+   "new": "static final int MATCH_DAYS = 4;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "static final int MATCH_DAYS = 45;",
+   "new": "static final int MATCH_DAYS = 4000;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "used[i] = true;\n                        matched++;",
+   "new": "matched++;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "int c = Long.compare(b.getValue(), a.getValue());",
+   "new": "int c = Long.compare(a.getValue(), b.getValue());"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "return c != 0 ? c : a.getKey().compareTo(b.getKey());",
+   "new": "return c;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "return n == 0 ? 0L : Math.round(100.0 * get(UNMAPPED) / n);",
+   "new": "return n == 0 ? 0L : (100 * get(UNMAPPED) / n);"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "return service - get(NOISE);",
+   "new": "return service;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (LoopRules.GIVE.equals(r.kind) && r.minor > 0 && (OPENS.equals(r.role) || CLOSES.equals(r.role))) {",
+   "new": "if (LoopRules.GIVE.equals(r.kind) && r.minor > 0) {"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "Map<String, List<Long>> into = OPENS.equals(r.role) ? opens : closes;",
+   "new": "Map<String, List<Long>> into = opens;"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "String key = brand + \"|\" + r.minor;",
+   "new": "String key = brand;"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "fit.message(message);",
+   "new": ""
+  }
+ ]
+}

@@ -39,6 +39,12 @@ API.md
 
 TESTS.md
 
+## Tooling
+
+Measure with the tools in `/tools` (see `docs/AGENT_TOOLING.md`): `tools/mutate` for what the tests would miss, `tools/fit` for
+the reading rules on a real backup, `tools/export` for a device export. They print counts and names, never a person's words;
+real exports and backups never enter the repository. Commands: `/mutate`, `/fit`, `/export`.
+
 ## Coding Standards
 
 * TypeScript strict mode.

@@ -19,7 +19,8 @@
     "lint": "node scripts/lint.mjs",
     "test": "npm run build && node --test --test-reporter=spec \"runtime/*/dist/tests/**/*.test.js\" \"packages/*/dist/tests/**/*.test.js\"",
     "test:unit": "npm run build && node --test --test-reporter=spec \"runtime/*/dist/tests/**/*.test.js\" \"packages/*/dist/tests/**/*.test.js\"",
-    "verify": "npm run lint && npm run build && npm run test"
+    "verify": "npm run lint && npm run build && npm run test && npm run test:tools",
+    "test:tools": "node --test --test-reporter=spec \"tools/*/tests/*.test.mjs\""
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

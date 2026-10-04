@@ -1,0 +1,95 @@
+{
+ "about": "Mutation list converted from the mut_dd2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "MAX_LINE = 140",
+   "new": "MAX_LINE = 141"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "MAX_SEGMENTS = 4000",
+   "new": "MAX_SEGMENTS = 4001"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(?:due|pay|",
+   "new": "(?:pay|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "|pay|",
+   "new": "|"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "flat.split(\"(?<=[.;!?])\\\\s+\")",
+   "new": "flat.split(\"(?<=[.;])\\\\s+\")"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "chunk.length() + 1 + word.length() > MAX_LINE",
+   "new": "chunk.length() + word.length() > MAX_LINE"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "!h.kind.equals(\"date\") ||",
+   "new": "false ||"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "(!have.deadline && cue)",
+   "new": "cue"
+  },
+  {
+   "file": "src/DocumentDates.java.in",
+   "old": "replaceAll(\"\\\\s+\", \" \")",
+   "new": "replaceAll(\"\\\\s{2,}\", \" \")"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (found.deadlines.isEmpty() && found.others.isEmpty()) return;",
+   "new": "if (found.deadlines.isEmpty()) return;"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (!found.others.isEmpty() || found.more > 0) {",
+   "new": "if (!found.others.isEmpty()) {"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line));\n                    }",
+   "new": "new Item(docEntry, false, false, null, null, f.line));\n                    }"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Dated(f.date, new Item(docEntry, remindedOn(waiting, docEntry, f.date, zoneId), false, null, null, f.line))",
+   "new": "new Dated(f.date, new Item(docEntry, false, false, null, null, f.line))"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "new Fold(docEntry, found.more)",
+   "new": "new Fold(docEntry, 0)"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "if (!showing) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "if (result.days.isEmpty() && result.folds.isEmpty()) {",
+   "new": "if (result.days.isEmpty()) {"
+  },
+  {
+   "file": "src/ComingUpActivity.java.in",
+   "old": "folds(result, kept);\n    }",
+   "new": "}"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "item.line != null ? item.line : firstWords(item.entry.snippet)",
+   "new": "firstWords(item.entry.snippet)"
+  }
+ ]
+}

@@ -1,0 +1,105 @@
+{
+ "about": "Mutation list converted from the mut_docs2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "int byName = a.name.compareToIgnoreCase(b.name);",
+   "new": "int byName = a.name.compareTo(b.name);"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return byName != 0 ? byName : a.uri.compareTo(b.uri);",
+   "new": "return byName;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "c >= ' ' && c != '\\u007f'",
+   "new": "c >= ' '"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "!(c >= '\\u0080' && c < '\\u00a0')",
+   "new": "true"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "return cut + \"\\u2026\";",
+   "new": "return cut;"
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (DocumentsRules.refusal(doc) != null) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "payload.put(\"elapsedRealtimeMs\", elapsedRealtimeMs);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsFlow.java.in",
+   "old": "if (SharedText.record(journal, context, payload, stored, null) != null) kept++;",
+   "new": "SharedText.record(journal, context, payload, stored, null); kept++;"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (previous != null && !previous.equals(tree.toString())) release(context, previous);",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "if (journal != null) journal.append(DocumentsFacts.CHOSEN, DocumentsFacts.chosen());",
+   "new": ""
+  },
+  {
+   "file": "src/DocumentsAccess.java.in",
+   "old": "return uri.isEmpty() ? null : uri;",
+   "new": "return uri;"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "lookPicked = true;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "view.box.setEnabled(row.keepable());",
+   "new": "view.box.setEnabled(true);"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (DocumentsRules.UNREADABLE.equals(row.state)) unreadable++;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (row.keepable()) keepable++;",
+   "new": ""
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (docs.isEmpty()) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "if (blank > 1) continue;",
+   "new": "if (blank > 2) continue;"
+  },
+  {
+   "file": "src/DocumentsRules.java.in",
+   "old": "\"held\".equals(storeState) ? HELD : \"destroyed\".equals(storeState) ? ERASED : READABLE",
+   "new": "\"destroyed\".equals(storeState) ? ERASED : READABLE"
+  }
+ ]
+}

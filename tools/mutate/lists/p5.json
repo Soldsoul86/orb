@@ -1,0 +1,10 @@
+{
+ "about": "Mutation list converted from the mut_p5 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": ".setNeutralButton(\"Remind me about this person\\u2026\"",
+   "new": ".setNegativeButton(\"Remind me about this person\\u2026\""
+  }
+ ]
+}

@@ -1,0 +1,435 @@
+{
+ "about": "Mutation list converted from the mut_calls harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "WINDOW_DAYS = 365",
+   "new": "WINDOW_DAYS = 366"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "MAX_CALLS = 5000",
+   "new": "MAX_CALLS = 5001"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "RECENT_DAYS = 90",
+   "new": "RECENT_DAYS = 91"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "static final int INCOMING = 1;",
+   "new": "static final int INCOMING = 2;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "static final int MISSED = 3;",
+   "new": "static final int MISSED = 4;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "static final int REJECTED = 5;",
+   "new": "static final int REJECTED = 6;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return (type == INCOMING || type == OUTGOING) && durationSec > 0;",
+   "new": "return (type == INCOMING || type == OUTGOING);"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return (type == INCOMING || type == OUTGOING) && durationSec > 0;",
+   "new": "return type == INCOMING && durationSec > 0;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return (type == INCOMING || type == OUTGOING) && durationSec > 0;",
+   "new": "return (type == INCOMING || type == OUTGOING) && durationSec > 1;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return type == MISSED || type == REJECTED;",
+   "new": "return type == MISSED;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "return type == MISSED || type == REJECTED;",
+   "new": "return type == MISSED || type == REJECTED || type == INCOMING;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "String n = People.normalPhone(cachedNormalized);\n        return n != null ? n : People.normalPhone(raw);",
+   "new": "return People.normalPhone(raw);"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "String n = People.normalPhone(cachedNormalized);\n        return n != null ? n : People.normalPhone(raw);",
+   "new": "return People.normalPhone(cachedNormalized);"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.dateMs < since || c.dateMs > nowMs) continue;",
+   "new": "if (c.dateMs < since) continue;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.dateMs < since || c.dateMs > nowMs) continue;",
+   "new": "if (c.dateMs > nowMs) continue;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.dateMs < since || c.dateMs > nowMs) continue;",
+   "new": "if (c.dateMs <= since || c.dateMs > nowMs) continue;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.examined++;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.number == null || !mine.contains(c.number)) continue;",
+   "new": "if (!mine.contains(c.number)) continue;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.number == null || !mine.contains(c.number)) continue;",
+   "new": "if (c.number == null) continue;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.matched++;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.spoken() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.lastSpoken = c;",
+   "new": "if (c.spoken() && s.lastSpoken == null) s.lastSpoken = c;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.spoken() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.lastSpoken = c;",
+   "new": "if (c.spoken() && (s.lastSpoken == null || c.dateMs < s.lastSpoken.dateMs)) s.lastSpoken = c;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.unanswered() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.missedSince++;",
+   "new": "if (c.unanswered()) s.missedSince++;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.unanswered() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.missedSince++;",
+   "new": "if (c.unanswered() && (s.lastSpoken == null || c.dateMs >= s.lastSpoken.dateMs)) s.missedSince++;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.unanswered() && (s.lastSpoken == null || c.dateMs > s.lastSpoken.dateMs)) s.missedSince++;",
+   "new": "if (c.unanswered() && s.lastSpoken != null && c.dateMs > s.lastSpoken.dateMs) s.missedSince++;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.spoken() && c.dateMs >= recentSince) {",
+   "new": "if (c.spoken() && c.dateMs > recentSince) {"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (c.spoken() && c.dateMs >= recentSince) {",
+   "new": "if (c.spoken()) {"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.recentSeconds += c.durationSec;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.truncated = calls.size() >= MAX_CALLS;",
+   "new": "s.truncated = calls.size() > MAX_CALLS;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.truncated = calls.size() >= MAX_CALLS;",
+   "new": "s.truncated = false;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (seconds < 60) return seconds + \" sec\";",
+   "new": "if (seconds < 61) return seconds + \" sec\";"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "long minutes = (seconds + 30) / 60;",
+   "new": "long minutes = seconds / 60;"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (minutes < 60) return minutes + \" min\";",
+   "new": "if (minutes < 61) return minutes + \" min\";"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "(minutes % 60 == 0 ? \"\" : \" \" + (minutes % 60) + \" min\")",
+   "new": "\"\""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (then.equals(key.format(new Date(nowMs)))) return \"today\";",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (then.equals(key.format(new Date(nowMs - DAY_MS)))) return \"yesterday\";",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "key.setTimeZone(zone);",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "nice.setTimeZone(zone);",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "thisYear ? \"EEE d MMM\" : \"EEE d MMM yyyy\"",
+   "new": "\"EEE d MMM\""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "String cut = s.truncated ?",
+   "new": "String cut = false ?"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (s.matched == 0) {",
+   "new": "if (s.matched == 1) {"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (s.lastSpoken == null) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.lastSpoken.type == OUTGOING ? \"you called\" : \"they called\"",
+   "new": "\"you called\""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (s.missedSince > 0) out.add(s.missedSince + (s.missedSince == 1 ? \" call missed since then\" : \" calls missed since then\"));",
+   "new": ""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "s.missedSince == 1 ? \" call missed since then\" : \" calls missed since then\"",
+   "new": "\" calls missed since then\""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "if (s.recentCalls > 0) out.add(",
+   "new": "if (false) out.add("
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "(s.recentCalls == 1 ? \" call, \" : \" calls, \")",
+   "new": "\" calls, \""
+  },
+  {
+   "file": "src/CallsRules.java.in",
+   "old": "\"Calls (phone calls only): none with their numbers in the last year\"",
+   "new": "\"Calls: none with their numbers in the last year\""
+  },
+  {
+   "file": "src/CallsFacts.java.in",
+   "old": "p.put(\"matched\", matched);",
+   "new": ""
+  },
+  {
+   "file": "src/CallsFacts.java.in",
+   "old": "p.put(\"examined\", examined);",
+   "new": "p.put(\"examined\", matched);"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (new File(context.getFilesDir(), FILE).exists()) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "return new File(context.getFilesDir(), FILE).exists() && permitted(context);",
+   "new": "return new File(context.getFilesDir(), FILE).exists();"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "return new File(context.getFilesDir(), FILE).exists() && permitted(context);",
+   "new": "return permitted(context);"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": "record(journal, PackageGrants.REVOKED, \"operator\");"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": "new File(context.getFilesDir(), FILE).delete();"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (flag.exists() && !permitted(context)) flag.delete();",
+   "new": ""
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (flag.exists()) return;\n",
+   "new": ""
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (journal == null) return;\n        File flag",
+   "new": "File flag"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "for (String p : info.requestedPermissions) if (PERMISSION.equals(p)) return true;\n            return false;",
+   "new": "return true;"
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "if (info.requestedPermissions == null) return false;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsAccess.java.in",
+   "old": "context.getPackageName(), PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS)",
+   "new": "\"x\", PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS)"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "if (!CallsAccess.permitted(context)) return null;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "CallLog.Calls.DATE + \" >= ?\"",
+   "new": "CallLog.Calls.DATE + \" <= ?\""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "CallLog.Calls.DATE + \" DESC LIMIT \" + CallsRules.MAX_CALLS",
+   "new": "CallLog.Calls.DATE + \" ASC LIMIT \" + CallsRules.MAX_CALLS"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "if (c == null) return null;",
+   "new": ""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(3), c.getLong(4)",
+   "new": "CallsRules.normal(c.getString(0), c.getString(1)), c.getInt(2), c.getLong(4), c.getLong(3)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (!CallsAccess.available(this)) {\n            column.addView(text(\"Calls: not in this build of Orb.\", 11, false));\n            return;\n        }",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (person.phones.isEmpty()) return;   // nothing to match their calls to",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (!CallsAccess.granted(this)) {\n            column.addView(text(\"Calls: off.\", 12, false));",
+   "new": "if (false) {\n            column.addView(text(\"Calls: off.\", 12, false));"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (summary != null && journal != null) journal.append(CallsFacts.READ, CallsFacts.read(summary.examined, summary.matched));",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "CallsFacts.read(summary.examined, summary.matched)",
+   "new": "CallsFacts.read(summary.matched, summary.examined)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": ".setNegativeButton(\"Cancel\", null)\n            .setPositiveButton(\"Allow\", new DialogInterface.OnClickListener() {\n                @Override public void onClick(DialogInterface d, int which) {\n                    if (CallsAccess.permitted",
+   "new": ".setNegativeButton(\"Cancel\", null)\n            .setPositiveButton(\"Allow\", new DialogInterface.OnClickListener() {\n                @Override public void onClick(DialogInterface d, int which) {\n                    if (true || CallsAccess.permitted"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (allowed) finishCalls();",
+   "new": "finishCalls();"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();\n    }\n\n    /** Android said yes: now the person's own decision is recorded, and only then does anything read. */\n    private void finishCalls",
+   "new": "}\n\n    /** Android said yes: now the person's own decision is recorded, and only then does anything read. */\n    private void finishCalls"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "CallsAccess.grant(this, journal);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (callsFor != null) reopenName = callsFor.names.get(0);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "Phone calls only \\u2014 not WhatsApp.",
+   "new": "Phone calls."
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "new Declaration(CALLS, CALLS_VERSION, \"When you last spoke with someone\", CALLS_SAYS, TIER_OBSERVE,",
+   "new": "new Declaration(CALLS, CALLS_VERSION, \"When you last spoke with someone\", CALLS_SAYS, TIER_ACT_REVERSIBLE,"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, CALLS);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, CONTACTS);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "number(read, \"matched\") + \" with that person, at the last look\"",
+   "new": "number(read, \"examined\") + \" with that person, at the last look\""
+  },
+  {
+   "file": "src/MayDoActivity.java.in",
+   "old": "b.setText(\"Not in this build of Orb\");\n                b.setEnabled(false);",
+   "new": "b.setText(\"Turn on\");"
+  },
+  {
+   "file": "src/Orb.java.in",
+   "old": "CallsAccess.reconcile(this, journal);",
+   "new": ""
+  },
+  {
+   "file": "build.sh",
+   "old": "CALLS=\"${ORB_CALL_LOG:-0}\"",
+   "new": "CALLS=\"${ORB_CALL_LOG:-1}\""
+  },
+  {
+   "file": "build.sh",
+   "old": "if [ \"$CALLS\" = \"1\" ]; then\n  CALL_LOG=",
+   "new": "if [ \"$CALLS\" = \"0\" ]; then\n  CALL_LOG="
+  },
+  {
+   "file": "build.sh",
+   "old": "  -e \"s|@CALL_LOG@|$CALL_LOG|\" \\\n",
+   "new": ""
+  },
+  {
+   "file": "AndroidManifest.xml",
+   "old": "@CALL_LOG@\n",
+   "new": "<uses-permission android:name=\"android.permission.READ_CALL_LOG\" />\n"
+  }
+ ]
+}

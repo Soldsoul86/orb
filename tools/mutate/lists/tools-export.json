@@ -1,0 +1,159 @@
+{
+ "mutants": [
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (integrity.previous !== previous) linkBreaks++;",
+   "new": "if (integrity.previous === previous) linkBreaks++;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (integrity.previous !== previous) linkBreaks++;",
+   "new": ""
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "previous = integrity.hash ?? null;",
+   "new": "previous = null;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "} else if (sha256(canon(e.payload)) !== integrity.payloadHash) {",
+   "new": "} else if (sha256(canon(e.payload)) === integrity.payloadHash) {"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "\"sealed\" in e.payload",
+   "new": "\"sealed\" in e.payload && false"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "ok: linkBreaks === 0 && payloadMismatches === 0",
+   "new": "ok: linkBreaks === 0"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "ok: linkBreaks === 0 && payloadMismatches === 0",
+   "new": "ok: payloadMismatches === 0"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (e && typeof e === \"object\" && typeof e.type === \"string\") events.push(e);",
+   "new": "if (e && typeof e === \"object\") events.push(e);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (line.trim() === \"\") continue;",
+   "new": "if (line === \"\") continue;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "else unparseable++;",
+   "new": "else unparseable += 0;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "counts[e.type] = (counts[e.type] ?? 0) + 1;",
+   "new": "counts[e.type] = (counts[e.type] ?? 0) + 2;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "(a < b ? -1 : 1)",
+   "new": "(a < b ? 1 : -1)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (e.type !== \"orb.process.start\") continue;",
+   "new": "if (e.type === \"orb.process.start\") continue;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (typeof v === \"number\" && !seen.includes(v)) seen.push(v);",
+   "new": "if (typeof v === \"number\") seen.push(v);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (typeof v === \"number\" && !seen.includes(v)) seen.push(v);",
+   "new": "if (!seen.includes(v)) seen.push(v);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "crashed: counts[\"orb.process.crashed\"] ?? 0",
+   "new": "crashed: counts[\"orb.fault.caught\"] ?? 0"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (!NUMERIC_REPORTS.includes(type)) throw",
+   "new": "if (NUMERIC_REPORTS.includes(type)) throw"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "const last = [...events].reverse().find((e) => e.type === type);",
+   "new": "const last = events.find((e) => e.type === type);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (typeof v === \"number\") payload[k] = v;",
+   "new": "payload[k] = v;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (!last) continue;",
+   "new": "if (false) continue;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "const d = (b[type] ?? 0) - (a[type] ?? 0);",
+   "new": "const d = (a[type] ?? 0) - (b[type] ?? 0);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "if (d !== 0) changed[type] = d;",
+   "new": "changed[type] = d;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "added: after.length - before.length",
+   "new": "added: before.length - after.length"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "newBuilds: builds(after).filter((v) => !had.includes(v))",
+   "new": "newBuilds: builds(after)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "(c.min === undefined || n >= c.min)",
+   "new": "(c.min === undefined || n > c.min)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "(c.max === undefined || n <= c.max)",
+   "new": "(c.max === undefined || n < c.max)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "(c.min === undefined || n >= c.min) && (c.max === undefined || n <= c.max)",
+   "new": "(c.min === undefined || n >= c.min) || (c.max === undefined || n <= c.max)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "ok: results.every((r) => r.ok)",
+   "new": "ok: results.some((r) => r.ok)"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "const n = counts[c.type] ?? 0;",
+   "new": "const n = counts[c.type] ?? 1;"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "for (const k of Object.keys(e.payload ?? {})) keys.add(k);",
+   "new": "for (const k of Object.values(e.payload ?? {})) keys.add(k);"
+  },
+  {
+   "file": "tools/export/lib.mjs",
+   "old": "return [...keys].sort();",
+   "new": "return [...keys];"
+  }
+ ]
+}

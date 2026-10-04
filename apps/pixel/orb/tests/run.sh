@@ -9,6 +9,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PKG="${ORB_PROBE_PKG:-dev.orb.app}"
+# Two hooks for tools/ (see tools/fit): ORB_EXTRA_SOURCES adds .java.in files to the compile and ORB_MAIN names a different entry point,
+# so a tool reuses this source list instead of keeping a second copy of it. Left unset, nothing changes.
+ORB_EXTRA_SOURCES="${ORB_EXTRA_SOURCES:-}"
 PKG_PATH="${PKG//.//}"
 OUT="build/tests"
 
@@ -20,7 +23,7 @@ BRAIN_CLASSES="$(cd ../../../runtime/brain && pwd)/build/classes"
 
 for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/Install.java.in \
               src/AssistPolicy.java.in src/AllowList.java.in src/AssistFacts.java.in src/PixelStats.java.in src/ScreenText.java.in src/Capture.java.in src/Recall.java.in src/Observe.java.in src/Provenance.java.in src/Shares.java.in src/Backup.java.in src/DeclaredPackages.java.in src/SharedText.java.in src/PackageGrants.java.in src/Rekeep.java.in src/Mentions.java.in src/ActionFacts.java.in src/Reminders.java.in src/ReminderNote.java.in src/Remind.java.in src/ComingUp.java.in src/Capabilities.java.in src/People.java.in src/ContactsFacts.java.in src/Handoff.java.in src/HandoffFacts.java.in src/Nudge.java.in src/SafetyRules.java.in src/SafetyFacts.java.in src/DocumentsRules.java.in src/DocumentDates.java.in src/DocumentPeople.java.in src/MessagesXml.java.in src/MessagesJson.java.in src/MessagesFile.java.in src/MessagesRules.java.in src/MessagesFacts.java.in src/MessagesFlow.java.in src/BriefRules.java.in src/BriefFacts.java.in src/BriefConfig.java.in src/Brief.java.in src/UnderstandingRules.java.in src/UnderstandingFacts.java.in src/Understanding.java.in src/CallsRules.java.in src/CallsFacts.java.in src/DocumentsFacts.java.in src/DocumentsFlow.java.in src/PersonLink.java.in src/PersonLinkFacts.java.in src/PersonNote.java.in src/PersonNoteFacts.java.in src/Faults.java.in src/Commitments.java.in src/CommitmentFacts.java.in src/LoopRules.java.in src/LoopFacts.java.in src/Observation.java.in src/SmsNormalizer.java.in src/Interpreter.java.in src/Correlator.java.in src/ObservationFacts.java.in src/ObservationStore.java.in src/LoopFit.java.in src/SenderRules.java.in src/SenderFacts.java.in src/SendersAccess.java.in src/Senders.java.in src/SenderSession.java.in \
-              ../pass1/src/Journal.java.in ../pass1/src/Json.java.in \
+              ../pass1/src/Journal.java.in ../pass1/src/Json.java.in $ORB_EXTRA_SOURCES \
               ../pass1/src/Hlc.java.in ../pass1/src/Ids.java.in \
               ../pass1/tests/Harness.java.in tests/*.java.in; do
   name="$(basename "$source" .java.in)"
@@ -28,4 +31,4 @@ for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/
 done
 
 javac -Xlint:all -cp "$BRAIN_CLASSES" -d "$OUT/classes" ../pass1/tests/shim/android/content/Context.java "$OUT/src/$PKG_PATH"/*.java
-java -Dorb.root="$PWD" -cp "$OUT/classes:$BRAIN_CLASSES:$BRAIN/lib/kotlin-stdlib.jar" "$PKG.Tests"
+java -Dorb.root="$PWD" -cp "$OUT/classes:$BRAIN_CLASSES:$BRAIN/lib/kotlin-stdlib.jar" "$PKG.${ORB_MAIN:-Tests}" "$@"

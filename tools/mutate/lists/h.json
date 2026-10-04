@@ -1,0 +1,155 @@
+{
+ "about": "Mutation list converted from the mut_h harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Handoff.java.in",
+   "old": "{8,15}",
+   "new": "{7,15}"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "{8,15}",
+   "new": "{8,16}"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "\"whatsapp://send?phone=\" + number.substring(1)",
+   "new": "\"whatsapp://send?phone=\" + number"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "return \"tel:\" + number;",
+   "new": "return \"tel:\" + number.substring(1);"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "else if (HandoffFacts.REVOKED.equals(type)) on = false;",
+   "new": ""
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (HandoffFacts.ALLOWED.equals(type)) on = true;",
+   "new": "if (false) on = true;"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (!enabled(lines)) return refuse(journal, confirmedId, HandoffFacts.SWITCHED_OFF);",
+   "new": ""
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (releasedAlready(lines, confirmedId)) return refuse(journal, confirmedId, HandoffFacts.ALREADY_RELEASED);",
+   "new": ""
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (link == null) return refuse(journal, confirmedId, HandoffFacts.BAD_NUMBER);",
+   "new": "if (link == null) return \"refused:badNumber\";"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (!launcher.open(channel, link)) return refuse(journal, confirmedId, HandoffFacts.APP_MISSING);",
+   "new": "launcher.open(channel, link);"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "return idOf(journal.append(HandoffFacts.CONFIRMED, HandoffFacts.confirmed(channel), Arrays.asList(intentId)));",
+   "new": "return idOf(journal.append(HandoffFacts.CONFIRMED, HandoffFacts.confirmed(channel)));"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "journal.append(HandoffFacts.CANCELLED, HandoffFacts.cancelled(reason), Arrays.asList(intentId));",
+   "new": "journal.append(HandoffFacts.CANCELLED, HandoffFacts.cancelled(reason));"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "HandoffFacts.released(channel), Collections.singletonList(confirmedId)) == null) {",
+   "new": "HandoffFacts.released(channel)) == null) {"
+  },
+  {
+   "file": "src/HandoffFacts.java.in",
+   "old": "return CHANNELS.contains(channel) ? channel : \"other\";",
+   "new": "return channel;"
+  },
+  {
+   "file": "src/HandoffFacts.java.in",
+   "old": "p.put(\"versionCode\", versionCode);\n        return p;",
+   "new": "return p;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "first = Math.min(first, e.entry.wallClock);",
+   "new": "first = Math.max(first, e.entry.wallClock);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "last = Math.max(last, e.entry.wallClock);",
+   "new": "last = Math.min(last, e.entry.wallClock);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (Provenance.SHARED_TEXT.equals(e.entry.type)) shared++;",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "int d = b.getValue() - a.getValue();\n                return d != 0 ? d : a.getKey().compareTo(b.getKey());",
+   "new": "return a.getKey().compareTo(b.getKey());"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "i < ranked.size() && i < CONTEXT_APPS",
+   "new": "i < ranked.size()"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (item.entry.id != null && entryIds.contains(item.entry.id)) kept.items.add(item);",
+   "new": "kept.items.add(item);"
+  },
+  {
+   "file": "src/ComingUp.java.in",
+   "old": "if (!kept.items.isEmpty()) out.days.add(kept);",
+   "new": "out.days.add(kept);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "opened + \" opened — Orb sent nothing\"",
+   "new": "\"opened — Orb sent nothing\""
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "Handoff.enabled(lines) ? \"ON — every tap is confirmed\" : \"OFF — you turned it off\"",
+   "new": "\"ON — every tap is confirmed\""
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "Handoff.cancel(journal, intentId, HandoffFacts.DECLINED); }\n            })\n            .setPositiveButton",
+   "new": "}\n            })\n            .setPositiveButton"
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);",
+   "new": ""
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "which.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);",
+   "new": ""
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "open.setEnabled(!person.phones.isEmpty());",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "handoff.start(channel[0], person);",
+   "new": "handoff.start(HandoffFacts.DIAL, person);"
+  }
+ ]
+}

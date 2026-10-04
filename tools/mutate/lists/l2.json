@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_l2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (!s.startsWith(prefix)) return null;",
+   "new": "if (false) return null;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": ".append(\"nonce:\")",
+   "new": ".append(\"n:\")"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "for (Link l : all(context, journal)) if (itemEventId.equals(l.itemId) && matches(l.who, person)) return ALREADY;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (itemEventId == null) return NOTE_FAILED;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (sealedNow) {\n                try {\n                    Attachments.discard(context, stored.identity);",
+   "new": "if (false) {\n                try {\n                    Attachments.discard(context, stored.identity);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (linkItem != null) confirmLink(person, linkItem, null);\n                else showPerson(person);",
+   "new": "showPerson(person);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();\n    }\n\n    private void link(",
+   "new": "}\n\n    private void link("
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (People.BY_LINK.equals(item.by) && item.linkHash != null) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "People.BY_LINK.equals(e.by) && e.entry.id != null",
+   "new": "false"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "say(\"Already linked.\", null);",
+   "new": ""
+  },
+  {
+   "file": "src/RecallActivity.java.in",
+   "old": "if (entry.id == null) return;\n        Button row",
+   "new": "Button row"
+  }
+ ]
+}

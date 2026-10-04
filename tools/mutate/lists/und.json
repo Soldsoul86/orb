@@ -1,0 +1,395 @@
+{
+ "about": "Mutation list converted from the mut_und harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "REGULAR_CALLS = 6",
+   "new": "REGULAR_CALLS = 5"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "REGULAR_CALLS = 6",
+   "new": "REGULAR_CALLS = 7"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "REGULAR_DAYS = 90",
+   "new": "REGULAR_DAYS = 91"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "REGULAR_MONTHS = 3",
+   "new": "REGULAR_MONTHS = 2"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "REGULAR_SPAN = 6",
+   "new": "REGULAR_SPAN = 7"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "QUIET_EARLIER_CALLS = 4",
+   "new": "QUIET_EARLIER_CALLS = 3"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "QUIET_SILENT_DAYS = 120",
+   "new": "QUIET_SILENT_DAYS = 121"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "QUIET_WINDOW_DAYS = 365",
+   "new": "QUIET_WINDOW_DAYS = 366"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "QUIET_MONTHS = 4",
+   "new": "QUIET_MONTHS = 3"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "MANY_ITEMS = 4",
+   "new": "MANY_ITEMS = 3"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "MAX_LISTED = 30",
+   "new": "MAX_LISTED = 31"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return documents + messageMonths.size() + others;",
+   "new": "return documents + messageMonths.size();"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (t <= nowMs && t > nowMs - days * DAY_MS) n++;",
+   "new": "if (t > nowMs - days * DAY_MS) n++;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (t <= nowMs && t > nowMs - days * DAY_MS) n++;",
+   "new": "if (t <= nowMs && t >= nowMs - days * DAY_MS) n++;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (t <= nowMs && t > nowMs - days * DAY_MS) n++;",
+   "new": "if (t < nowMs && t > nowMs - days * DAY_MS) n++;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (age >= fromDays * DAY_MS && age <= toDays * DAY_MS) n++;",
+   "new": "if (age > fromDays * DAY_MS && age <= toDays * DAY_MS) n++;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (age >= fromDays * DAY_MS && age <= toDays * DAY_MS) n++;",
+   "new": "if (age >= fromDays * DAY_MS && age < toDays * DAY_MS) n++;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "for (int back = 1; back <= span; back++)",
+   "new": "for (int back = 0; back <= span; back++)"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "for (int back = 1; back <= span; back++)",
+   "new": "for (int back = 1; back < span; back++)"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (REGULAR.equals(kind)) return !s.spokenMs.isEmpty() || !s.messageMonths.isEmpty();",
+   "new": "if (REGULAR.equals(kind)) return !s.spokenMs.isEmpty();"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (QUIET.equals(kind)) return !s.spokenMs.isEmpty();",
+   "new": "if (QUIET.equals(kind)) return true;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.items() > 0;",
+   "new": "return true;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return (s.callsKnown && callsWithin(s, nowMs, REGULAR_DAYS) >= REGULAR_CALLS) || monthsWithin(s, nowMs, zone, REGULAR_SPAN) >= REGULAR_MONTHS;",
+   "new": "return (callsWithin(s, nowMs, REGULAR_DAYS) >= REGULAR_CALLS) || monthsWithin(s, nowMs, zone, REGULAR_SPAN) >= REGULAR_MONTHS;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return (s.callsKnown && callsWithin(s, nowMs, REGULAR_DAYS) >= REGULAR_CALLS) || monthsWithin(s, nowMs, zone, REGULAR_SPAN) >= REGULAR_MONTHS;",
+   "new": "return (s.callsKnown && callsWithin(s, nowMs, REGULAR_DAYS) >= REGULAR_CALLS) && monthsWithin(s, nowMs, zone, REGULAR_SPAN) >= REGULAR_MONTHS;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.callsKnown && callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS) >= QUIET_EARLIER_CALLS\n                && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;",
+   "new": "return callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS) >= QUIET_EARLIER_CALLS\n                && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "&& callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;\n        }\n        return s.items() >= MANY_ITEMS;",
+   "new": "&& monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;\n        }\n        return s.items() >= MANY_ITEMS;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "&& callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;\n        }\n        return s.items() >= MANY_ITEMS;",
+   "new": "&& callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0;\n        }\n        return s.items() >= MANY_ITEMS;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.items() >= MANY_ITEMS;",
+   "new": "return s.items() > MANY_ITEMS;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.callsKnown && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;",
+   "new": "return callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.callsKnown && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 && monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;",
+   "new": "return s.callsKnown && callsWithin(s, nowMs, QUIET_SILENT_DAYS) == 0 || monthsWithin(s, nowMs, zone, QUIET_MONTHS) == 0;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.callsKnown && (callsWithin(s, nowMs, QUIET_SILENT_DAYS) > 0 || monthsWithin(s, nowMs, zone, QUIET_MONTHS) > 0);",
+   "new": "return (callsWithin(s, nowMs, QUIET_SILENT_DAYS) > 0 || monthsWithin(s, nowMs, zone, QUIET_MONTHS) > 0);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return s.callsKnown && (callsWithin(s, nowMs, QUIET_SILENT_DAYS) > 0 || monthsWithin(s, nowMs, zone, QUIET_MONTHS) > 0);",
+   "new": "return s.callsKnown && (callsWithin(s, nowMs, QUIET_SILENT_DAYS) > 0);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (REGULAR.equals(kind)) return callsWithin(s, nowMs, REGULAR_DAYS) * 10L + monthsWithin(s, nowMs, zone, REGULAR_SPAN);",
+   "new": "if (REGULAR.equals(kind)) return callsWithin(s, nowMs, REGULAR_DAYS) + monthsWithin(s, nowMs, zone, REGULAR_SPAN);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "out.put(\"calls\", (long) callsWithin(s, nowMs, REGULAR_DAYS));",
+   "new": "out.put(\"calls\", 0L);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "out.put(\"months\", (long) monthsWithin(s, nowMs, zone, REGULAR_SPAN));",
+   "new": "out.put(\"months\", 0L);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "out.put(\"earlier\", (long) callsBetween(s, nowMs, QUIET_SILENT_DAYS, QUIET_WINDOW_DAYS));",
+   "new": "out.put(\"earlier\", 0L);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "out.put(\"items\", (long) s.items());",
+   "new": "out.put(\"items\", 0L);"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (s.callsKnown) parts.add(plural(callsWithin(s, nowMs, REGULAR_DAYS), \"spoken call\", \"spoken calls\")",
+   "new": "if (true) parts.add(plural(callsWithin(s, nowMs, REGULAR_DAYS), \"spoken call\", \"spoken calls\")"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (months > 0) parts.add(",
+   "new": "if (true) parts.add("
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (s.documents > 0) parts.add(",
+   "new": "if (true) parts.add("
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (!s.messageMonths.isEmpty()) parts.add(plural(s.messageMonths.size(), \"message month\", \"message months\"));",
+   "new": "parts.add(plural(s.messageMonths.size(), \"message month\", \"message months\"));"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (s.others > 0) parts.add(",
+   "new": "if (true) parts.add("
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "return n + \" \" + (n == 1 ? one : many);",
+   "new": "return n + \" \" + many;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "out.append(i == 0 ? \"\" : \"; \")",
+   "new": "out.append(i == 0 ? \"\" : \", \")"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (s.id == null || !seen.add(s.id)) continue;",
+   "new": "if (s.id == null) continue;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (s.id == null || !seen.add(s.id)) continue;",
+   "new": "if (!seen.add(s.id)) continue;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (!relevant(kind, s)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (!verdicts.isEmpty() || holds) {",
+   "new": "if (holds) {"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (\"rejected\".equals(verdict)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "} else if (\"confirmed\".equals(verdict)) {",
+   "new": "} else if (false) {"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (faded(kind, s, nowMs, zone)) asks.add(new Item(kind, s, key, ASK_AGAIN,",
+   "new": "if (false) asks.add(new Item(kind, s, key, ASK_AGAIN,"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "} else if (holds) {",
+   "new": "} else if (true) {"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (aAgain != bAgain) return aAgain ? -1 : 1;",
+   "new": "if (aAgain != bAgain) return aAgain ? 1 : -1;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (a.strength != b.strength) return a.strength > b.strength ? -1 : 1;",
+   "new": "if (a.strength != b.strength) return a.strength > b.strength ? 1 : -1;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "int byName = a.subject.name.compareToIgnoreCase(b.subject.name);\n                return byName != 0 ? byName : a.kind.compareTo(b.kind);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "if (i < MAX_LISTED) plan.ask.add(asks.get(i)); else plan.left++;",
+   "new": "plan.ask.add(asks.get(i));"
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "Collections.sort(plan.yes, byName);",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingRules.java.in",
+   "old": "Collections.sort(plan.no, byName);",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "p.put(\"asked\", asked);",
+   "new": "p.put(\"asked\", confirmed);"
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "p.put(\"verdict\", verdict);",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "for (Map.Entry<String, Long> e : evidence.entrySet()) p.put(e.getKey(), e.getValue());",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": ".substring(0, 16)",
+   "new": ".substring(0, 15)"
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "\"und:\" + kind + \":\" + subjectId",
+   "new": "\"und:\" + subjectId"
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "if (!JUDGED.equals(Journal.typeOf(line))) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingFacts.java.in",
+   "old": "if (kind.find(payload) && key.find(payload) && verdict.find(payload)) out.put(kind.group(1) + \":\" + key.group(1), verdict.group(1));",
+   "new": "if (kind.find(payload) && key.find(payload) && verdict.find(payload)) out.put(key.group(1), verdict.group(1));"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (!MessagesFacts.isMessages(referrer)) return null;",
+   "new": "if (referrer == null) return null;"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "return all.isEmpty() ? null : all.first();",
+   "new": "return all.isEmpty() ? null : all.last();"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (!c.spoken() || c.number == null) continue;",
+   "new": "if (c.number == null) continue;"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (People.BY_NAME.equals(e.by)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (month != null) months.add(month);\n                else if (DocumentsFacts.REFERRER.equals(e.entry.referrer)) documents++;",
+   "new": "if (month != null) months.add(month);\n                else if (e.entry.referrer != null) documents++;"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "for (int i = 0; i < evidence.size() && i < 10; i++)",
+   "new": "for (int i = 0; i < evidence.size(); i++)"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "UnderstandingRules.Subject s = new UnderstandingRules.Subject(id, person.display(), calls != null, documents, others);",
+   "new": "UnderstandingRules.Subject s = new UnderstandingRules.Subject(id, person.display(), true, documents, others);"
+  },
+  {
+   "file": "src/Understanding.java.in",
+   "old": "if (id == null) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/UnderstandingAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/UnderstandingAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": "record(journal, PackageGrants.REVOKED, \"operator\");"
+  },
+  {
+   "file": "src/UnderstandingAccess.java.in",
+   "old": "if (journal == null || granted(context)) return;",
+   "new": "if (journal == null) return;"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "number(read, \"asked\") + \" to confirm, \"",
+   "new": "number(read, \"confirmed\") + \" to confirm, \""
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, UNDERSTAND);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, CALLS);"
+  }
+ ]
+}

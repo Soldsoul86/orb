@@ -1,0 +1,160 @@
+{
+ "about": "Mutation list converted from the mut_l harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (!s.startsWith(prefix)) return null;",
+   "new": "if (false) return null;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "out.append(\"nonce:\").append(nonce)",
+   "new": "out.append(\"n:\").append(nonce)"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "for (String p : who.phones) if (person.phones.contains(p)) return true;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "for (String e : who.emails) if (person.emails.contains(e)) return true;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (n.equalsIgnoreCase(m)) return true;",
+   "new": "if (n.equals(m)) return true;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "return value.replace('\\n', ' ').replace('\\r', ' ').trim();",
+   "new": "return value.trim();"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (item == null || causes.isEmpty() || erased.contains(hash)) continue;",
+   "new": "if (item == null || causes.isEmpty()) continue;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (itemEventId.equals(l.itemId) && matches(l.who, person)) return ALREADY;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (itemEventId == null) return NOTE_FAILED;",
+   "new": ""
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (sealedNow) {\n                try {\n                    Attachments.discard(context, stored.identity);",
+   "new": "if (false) {\n                try {\n                    Attachments.discard(context, stored.identity);"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "Arrays.asList(itemEventId));\n        if (event == null) {",
+   "new": "new ArrayList<String>());\n        if (event == null) {"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "return Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome);",
+   "new": "return Erase.DESTROYED.equals(done.outcome);"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (itemEventId != null && itemEventId.equals(r.itemId) && unlink(context, journal, r.eventHash)) n++;",
+   "new": "if (unlink(context, journal, r.eventHash)) n++;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "if (!done.add(r.eventHash) || !erasedItem(lines, erased, r.itemId)) continue;",
+   "new": "if (!done.add(r.eventHash)) continue;"
+  },
+  {
+   "file": "src/PersonLink.java.in",
+   "old": "return hash != null && erased.contains(hash);",
+   "new": "return false;"
+  },
+  {
+   "file": "src/PersonLinkFacts.java.in",
+   "old": "p.put(\"attachmentBytes\", bytes);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (linkedHere != null && linkedHere.containsKey(g)) { by = BY_LINK; linkHash = linkedHere.get(g); }",
+   "new": "if (false) { by = BY_LINK; linkHash = linkedHere.get(g); }"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (by == null) for (String ph : people.get(g).phones)",
+   "new": "for (String ph : people.get(g).phones)"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (!forItem.containsKey(g)) forItem.put(g, l.eventHash);",
+   "new": "forItem.put(g, l.eventHash);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (BY_LINK.equals(e.by)) you++;\n            else if (BY_NUMBER.equals(e.by)) number++;",
+   "new": "if (BY_NUMBER.equals(e.by)) number++;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (you > 0) parts.add(you + \" by you\");",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (linkItem != null) return;   // Choose mode: the search is all there is.",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (linkItem != null) confirmLink(person, linkItem, null);\n                else showPerson(person);",
+   "new": "showPerson(person);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();\n    }\n\n    private void link(",
+   "new": "}\n\n    private void link("
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (People.BY_LINK.equals(item.by) && item.linkHash != null) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "People.BY_LINK.equals(e.by) && e.entry.id != null",
+   "new": "false"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "say(\"Already linked.\", null);",
+   "new": ""
+  },
+  {
+   "file": "src/RecallActivity.java.in",
+   "old": "PersonLink.itemErased(this, journal, entry.id);",
+   "new": ""
+  },
+  {
+   "file": "src/RecallActivity.java.in",
+   "old": "if (entry.id == null) return;\n        Button row",
+   "new": "Button row"
+  },
+  {
+   "file": "src/Backup.java.in",
+   "old": "|| PersonLinkFacts.LINKED.equals(item.type) ||",
+   "new": "||"
+  },
+  {
+   "file": "src/Orb.java.in",
+   "old": "PersonLink.reconcile(this, journal);",
+   "new": ""
+  }
+ ]
+}

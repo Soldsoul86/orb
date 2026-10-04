@@ -1,0 +1,565 @@
+{
+ "about": "Mutation list converted from the mut_msg2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (depth == 0) {\n                    found.root = qName;",
+   "new": "if (depth == 1) {\n                    found.root = qName;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (found.child.isEmpty()) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (\"sms\".equals(qName)) {",
+   "new": "if (\"sms\".equals(qName) || \"mms\".equals(qName)) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (address != null && date != null) {",
+   "new": "if (date != null) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (address != null && date != null) {",
+   "new": "if (address != null) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "type = attrs.getValue(\"type\") == null ? 0 : Integer.parseInt(attrs.getValue(\"type\").trim());",
+   "new": "type = 1;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "when = Long.parseLong(date.trim());",
+   "new": "when = 0L;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "attrs.getValue(\"contact_name\")",
+   "new": "attrs.getValue(\"readable_date\")"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "found.messages++;\n",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (found.messages >= max) {",
+   "new": "if (found.messages > max) {"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "found.cut = true;\n                                throw new Stop();",
+   "new": "throw new Stop();"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return new InputSource(new StringReader(\"\"));",
+   "new": "return null;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return \"smses\".equals(root) && messages > 0;",
+   "new": "return messages > 0;"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "return \"smses\".equals(root) && messages > 0;",
+   "new": "return \"smses\".equals(root);"
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "if (root.isEmpty()) return \"Not recognised: the file is not XML Orb could read.\";",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesXml.java.in",
+   "old": "String.join(\", \", attributes)",
+   "new": "String.join(\", \", attributes.subList(0, Math.min(1, attributes.size())))"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "MONTHS = 12",
+   "new": "MONTHS = 13"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "MAX_ITEMS_PER_KEEP = 60",
+   "new": "MAX_ITEMS_PER_KEEP = 61"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "MAX_LISTED = 50",
+   "new": "MAX_LISTED = 51"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "MAX_MESSAGES = 200_000",
+   "new": "MAX_MESSAGES = 200_001"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "MAX_BYTES = 200L * 1024 * 1024",
+   "new": "MAX_BYTES = 201L * 1024 * 1024"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "PREVIEW_CHARS = 120",
+   "new": "PREVIEW_CHARS = 121"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "static final int RECEIVED = 1;",
+   "new": "static final int RECEIVED = 2;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "static final int SENT = 2;",
+   "new": "static final int SENT = 1;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return People.normalPhone(address);",
+   "new": "return address;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return n.equalsIgnoreCase(\"(Unknown)\") || n.equalsIgnoreCase(\"null\") || n.equalsIgnoreCase(\"unknown\") ? \"\" : n;",
+   "new": "return n;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return n.equalsIgnoreCase(\"(Unknown)\") || n.equalsIgnoreCase(\"null\") || n.equalsIgnoreCase(\"unknown\") ? \"\" : n;",
+   "new": "return n.equalsIgnoreCase(\"(Unknown)\") ? \"\" : n;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "String n = name.replaceAll(\"\\\\s+\", \" \").trim();",
+   "new": "String n = name.trim();"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "(?:otp|one[- ]time|",
+   "new": "(?:one[- ]time|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|verification code|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|security code|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|login code|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|pin|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|cvv|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|password|",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|passcode)",
+   "new": "|"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "(?<![\\\\p{L}\\\\p{N}])(?:otp",
+   "new": "(?:otp"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return body != null && CODE.matcher(body).find();",
+   "new": "return false;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (c == '\\n' || c == '\\r' || c == '\\t') out.append(' ');",
+   "new": "if (c == '\\n') out.append(' ');"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "else if (c >= ' ' && c != '\\u007f' && !(c >= '\\u0080' && c < '\\u00a0')) out.append(c);",
+   "new": "else out.append(c);"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": ".replaceAll(\" {2,}\", \" \").trim();",
+   "new": ".trim();"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (flat.length() <= PREVIEW_CHARS) return flat;",
+   "new": "if (flat.length() < PREVIEW_CHARS) return flat;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (space > PREVIEW_CHARS / 2) cut = cut.substring(0, space);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return cut + \"\\u2026\";",
+   "new": "return cut;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "f.setTimeZone(zone);\n        return f.format(new Date(whenMs));",
+   "new": "return f.format(new Date(whenMs));"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "int m = Integer.parseInt(month.substring(5, 7)) - 1 - n;",
+   "new": "int m = Integer.parseInt(month.substring(5, 7)) - n;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "y += Math.floorDiv(m, 12);",
+   "new": "y += m / 12;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "m = Math.floorMod(m, 12);",
+   "new": "m = m % 12;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return month.compareTo(current) < 0 && month.compareTo(minusMonths(current, MONTHS)) >= 0;",
+   "new": "return month.compareTo(current) <= 0 && month.compareTo(minusMonths(current, MONTHS)) >= 0;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return month.compareTo(current) < 0 && month.compareTo(minusMonths(current, MONTHS)) >= 0;",
+   "new": "return month.compareTo(current) < 0 && month.compareTo(minusMonths(current, MONTHS)) > 0;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return month.compareTo(current) < 0 && month.compareTo(minusMonths(current, MONTHS)) >= 0;",
+   "new": "return month.compareTo(current) < 0;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (m.type != RECEIVED && m.type != SENT) { other++; return; }",
+   "new": "if (m.type != RECEIVED) { other++; return; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (m.number == null) { service++; return; }",
+   "new": "if (m.number == null) { other++; return; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (looksLikeCode(m.body)) { codes++; return; }",
+   "new": "if (false) { codes++; return; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (!inWindow(month, current)) { outside++; return; }",
+   "new": "if (false) { outside++; return; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "c.months.add(month);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (m.dateMs < c.first) c.first = m.dateMs;",
+   "new": "if (m.dateMs > c.first) c.first = m.dateMs;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (m.dateMs >= c.last) { c.last = m.dateMs; c.snippet = preview(m.body); }",
+   "new": "if (m.dateMs > c.last) { c.last = m.dateMs; c.snippet = preview(m.body); }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (!m.name.isEmpty() && m.dateMs >= c.nameAt) { c.name = m.name; c.nameAt = m.dateMs; }",
+   "new": "if (!m.name.isEmpty()) { c.name = m.name; c.nameAt = m.dateMs; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (a.last != b.last) return a.last > b.last ? -1 : 1;",
+   "new": "if (a.last != b.last) return a.last > b.last ? 1 : -1;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return a.number.compareTo(b.number);\n                }\n            });\n            return all.size() > MAX_LISTED",
+   "new": "return 0;\n                }\n            });\n            return all.size() > MAX_LISTED"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return all.size() > MAX_LISTED ? new ArrayList<>(all.subList(0, MAX_LISTED)) : all;",
+   "new": "return all;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return Math.max(0, by.size() - MAX_LISTED);",
+   "new": "return by.size();"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|| m.number == null || !numbers.contains(m.number) || looksLikeCode(m.body)) return;",
+   "new": "|| m.number == null || looksLikeCode(m.body)) return;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "|| m.number == null || !numbers.contains(m.number) || looksLikeCode(m.body)) return;",
+   "new": "|| m.number == null || !numbers.contains(m.number)) return;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (!inWindow(month, current)) return;",
+   "new": "if (false) return;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "public int compare(Message a, Message b) { return Long.compare(a.dateMs, b.dateMs); }",
+   "new": "public int compare(Message a, Message b) { return 0; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": ".append(m.type == SENT ? \"you to \" : \"\")",
+   "new": ".append(\"\""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (line.isEmpty()) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "name.isEmpty() ? \"\" : \" (\" + name + \")\").append(\" \\u2014 \")",
+   "new": "\"\").append(\" \\u2014 \")"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "stamp.setTimeZone(zone);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return text.length() > DocumentsRules.MAX_TEXT_CHARS ? text.substring(0, DocumentsRules.MAX_TEXT_CHARS) : text;",
+   "new": "return text;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "int byMonth = b.month.compareTo(a.month);",
+   "new": "int byMonth = a.month.compareTo(b.month);"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "return byMonth != 0 ? byMonth : a.number.compareTo(b.number);",
+   "new": "return byMonth;"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (!m.name.isEmpty() && m.dateMs >= at) { name = m.name; at = m.dateMs; }",
+   "new": "if (!m.name.isEmpty()) { name = m.name; at = m.dateMs; }"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "\" \\u00b7 up to \" + c.months.size()",
+   "new": "\" \\u00b7 up to \" + c.messages"
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "c.messages + (c.messages == 1 ? \" message\" : \" messages\")",
+   "new": "c.messages + \" messages\""
+  },
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "(from.equals(to) ? from : from + \" to \" + to)",
+   "new": "(from + \" to \" + to)"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "static final String PREFIX = \"orb-source://messages/\";",
+   "new": "static final String PREFIX = \"orb-source://msgs/\";"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "return referrer != null && referrer.startsWith(PREFIX);",
+   "new": "return referrer != null;"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "return slash > 0 ? rest.substring(0, slash) : null;",
+   "new": "return rest;"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "if (key != null && hash != null && !erased.contains(hash)) out.add(key);",
+   "new": "if (key != null && hash != null) out.add(key);"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "if (!Shares.TYPE.equals(Journal.typeOf(line))) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "p.put(\"source\", SOURCE);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "p.put(\"leftOut\", leftOut);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "p.put(\"conversations\", conversations);",
+   "new": "p.put(\"conversations\", messages);"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "return isMessages(referrer) ? \"a message backup you chose\" : null;",
+   "new": "return \"a message backup you chose\";"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": ".substring(0, 16);",
+   "new": ".substring(0, 8);"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "\"msgconv:\" + number + \":\" + month",
+   "new": "\"msgconv:\" + number"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (Attachments.HELD_STATE.equals(state)) { result.held++; continue; }",
+   "new": "if (false) { result.held++; continue; }"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (Attachments.DESTROYED_STATE.equals(state)) { result.erased++; continue; }",
+   "new": "if (false) { result.erased++; continue; }"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (live.contains(key)) { result.earlier++; continue; }",
+   "new": "if (false) { result.earlier++; continue; }"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (result.kept >= MessagesRules.MAX_ITEMS_PER_KEEP) { result.capped++; continue; }",
+   "new": "if (result.kept > MessagesRules.MAX_ITEMS_PER_KEEP) { result.capped++; continue; }"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (result.kept >= MessagesRules.MAX_ITEMS_PER_KEEP) { result.capped++; continue; }",
+   "new": "if (false) { result.capped++; continue; }"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "payload.put(\"elapsedRealtimeMs\", elapsedRealtimeMs);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "MessagesFacts.payload(chunk.text.length(), key, chunk.month)",
+   "new": "MessagesFacts.payload(chunk.text.length(), key, \"2026-01\")"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "result.kept++;\n                    live.add(key);",
+   "new": "result.kept++;"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (result.kept > 0) Observe.run(journal);",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "return survey.service + survey.codes + survey.outside + survey.other;",
+   "new": "return survey.service + survey.codes;"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "if (!\"stored\".equals(stored.outcome)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/MessagesAccess.java.in",
+   "old": "if (journal == null || granted(context)) return;",
+   "new": "if (journal == null) return;"
+  },
+  {
+   "file": "src/MessagesAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": "record(journal, PackageGrants.REVOKED, \"operator\");"
+  },
+  {
+   "file": "src/MessagesAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, MESSAGES);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, DOCUMENTS);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "String looked = lastOfTypeFrom(lines, MessagesFacts.LOOKED_TYPE, MessagesFacts.SOURCE);",
+   "new": "String looked = lastOfTypeFrom(lines, MessagesFacts.LOOKED_TYPE, DocumentsFacts.SOURCE);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "line.contains(\"\\\"source\\\":\\\"\" + MessagesFacts.SOURCE + \"\\\"\")) kept += Math.max(0L, number(line, \"kept\"));",
+   "new": "true) kept += Math.max(0L, number(line, \"kept\"));"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "number(looked, \"conversations\") + \" conversations in the last file, \"",
+   "new": "number(looked, \"messages\") + \" conversations in the last file, \""
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "String looked = lastOfTypeFrom(lines, DocumentsFacts.LOOKED, DocumentsFacts.SOURCE);",
+   "new": "String looked = lastOfType(lines, DocumentsFacts.LOOKED);"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "|| line.contains(\"\\\"referrer\\\":\\\"\" + MessagesFacts.PREFIX))) continue;",
+   "new": ")) continue;"
+  },
+  {
+   "file": "src/DocumentsFacts.java.in",
+   "old": "return MessagesFacts.fromLabel(referrer);",
+   "new": "return null;"
+  },
+  {
+   "file": "src/MessagesReader.java.in",
+   "old": "return MessagesXml.parse(in, sink, MessagesRules.MAX_MESSAGES);",
+   "new": "return MessagesXml.parse(in, sink, 10);"
+  },
+  {
+   "file": "src/MessagesReader.java.in",
+   "old": "if (in == null) throw new java.io.IOException(\"the file could not be opened\");",
+   "new": ""
+  }
+ ]
+}

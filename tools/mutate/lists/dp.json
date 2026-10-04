@@ -1,0 +1,180 @@
+{
+ "about": "Mutation list converted from the mut_dp harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "MAX_SUGGESTED = 10",
+   "new": "MAX_SUGGESTED = 11"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "MAX_SUGGESTED = 10",
+   "new": "MAX_SUGGESTED = 9"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (i < MAX_SUGGESTED) result.list.add(found.get(i)); else result.more++;",
+   "new": "result.list.add(found.get(i));"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (i < MAX_SUGGESTED) result.list.add(found.get(i)); else result.more++;",
+   "new": "if (i < MAX_SUGGESTED) result.list.add(found.get(i));"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(named) ? 0 : \"email\".equals(named) ? 1 : 2",
+   "new": "\"number\".equals(named) ? 1 : \"email\".equals(named) ? 0 : 2"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(named) ? 0 : \"email\".equals(named) ? 1 : 2",
+   "new": "\"number\".equals(named) ? 0 : \"email\".equals(named) ? 2 : 1"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return byRank != 0 ? byRank : a.person.display().compareToIgnoreCase(b.person.display());",
+   "new": "return byRank;"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return byRank != 0 ? byRank : a.person.display().compareToIgnoreCase(b.person.display());",
+   "new": "return byRank != 0 ? byRank : a.person.display().compareTo(b.person.display());"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (!itemId.equals(e.entry.id)) continue;",
+   "new": "if (itemId.equals(e.entry.id)) continue;"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named)",
+   "new": "\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named) || \"first\".equals(e.named)"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named)",
+   "new": "\"number\".equals(e.named) || \"full\".equals(e.named)"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named)",
+   "new": "\"email\".equals(e.named) || \"full\".equals(e.named)"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "\"number\".equals(e.named) || \"email\".equals(e.named) || \"full\".equals(e.named)",
+   "new": "\"number\".equals(e.named) || \"email\".equals(e.named)"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "new Suggestion(p, e.named, People.BY_LINK.equals(e.by))",
+   "new": "new Suggestion(p, e.named, false)"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "                    break;\n                }\n            }\n        }",
+   "new": "                }\n            }\n        }"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (itemId != null) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (\"number\".equals(named)) return \"has their number\";",
+   "new": "if (\"number\".equals(named)) return \"has their email\";"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (\"email\".equals(named)) return \"has their email\";",
+   "new": "if (\"email\".equals(named)) return \"has their number\";"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return !item.erased && documents.contains(item.hash);",
+   "new": "return documents.contains(item.hash);"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return !item.erased && documents.contains(item.hash);",
+   "new": "return !item.erased;"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "if (itemId == null) return false;",
+   "new": "if (false) return false;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (have == null || (have.by.equals(\"first\") && m.by.equals(\"full\"))) byName.put(g, m);",
+   "new": "if (have == null) byName.put(g, m);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (have == null || (have.by.equals(\"first\") && m.by.equals(\"full\"))) byName.put(g, m);",
+   "new": "byName.put(g, m);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (String ph : people.get(g).phones) if (inItem.contains(\"phone:\" + ph)) { named = \"number\"; break; }",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (named == null) for (String em : people.get(g).emails) if (inItem.contains(\"email:\" + em)) { named = \"email\"; break; }",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (named == null && byName.containsKey(g)) named = byName.get(g).by;",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (named == null && byName.containsKey(g)) named = byName.get(g).by;",
+   "new": "if (named == null && byName.containsKey(g)) named = \"full\";"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "new Evidence(entry, by, word, linkHash, named)",
+   "new": "new Evidence(entry, by, word, linkHash, null)"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (linkItem != null) suggestFor(journal, result);",
+   "new": "suggestFor(journal, result);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (!document) return;",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (named.list.isEmpty()) return;",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (!s.linked) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "confirmLink(s.person, linkItem, null);\n                    }\n                });",
+   "new": "confirmLink(s.person, linkItem, null);\n                    }\n                });\n                row.setOnClickListener(null);"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (named.more > 0) list.addView",
+   "new": "if (false) list.addView"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "s.linked ? \"You linked this to them. (\" + s.how() + \")\" : s.how() + \" \\u00b7 tap to link\"",
+   "new": "s.how()"
+  }
+ ]
+}

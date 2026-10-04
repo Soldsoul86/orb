@@ -1,0 +1,55 @@
+{
+ "about": "Mutation list converted from the mut_calls4 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "while (c.moveToNext() && out.size() < CallsRules.MAX_CALLS) {",
+   "new": "while (c.moveToNext()) {"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "while (c.moveToNext() && out.size() < CallsRules.MAX_CALLS) {",
+   "new": "while (c.moveToNext() && out.size() <= CallsRules.MAX_CALLS) {"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "CallLog.Calls.DATE + \" DESC\")) {",
+   "new": "CallLog.Calls.DATE + \" DESC LIMIT \" + CallsRules.MAX_CALLS)) {"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "CallLog.Calls.DATE + \" DESC\")) {",
+   "new": "CallLog.Calls.DATE + \" ASC\")) {"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "return new Read(null, unreadable.getClass().getSimpleName());",
+   "new": "return new Read(null, unreadable.getMessage());"
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "if (c == null) return new Read(null, \"the call log gave no answer\");",
+   "new": ""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "if (!CallsAccess.permitted(context)) return new Read(null, \"Android's permission is not there\");",
+   "new": ""
+  },
+  {
+   "file": "src/CallsReader.java.in",
+   "old": "return new Read(out, null);",
+   "new": "return new Read(out, \"x\");"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "\"Calls: could not be read (\" + read.failure + \"), so nothing is shown rather than a guess.\"",
+   "new": "\"Calls: could not be read, so nothing is shown rather than a guess.\""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "read.calls == null ? null : CallsRules.summarize(read.calls, numbers, now)",
+   "new": "CallsRules.summarize(read.calls, numbers, now)"
+  }
+ ]
+}

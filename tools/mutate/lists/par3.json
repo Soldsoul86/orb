@@ -1,0 +1,80 @@
+{
+ "about": "Mutation list converted from the mut_par3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "|\\\\b(?:filled|executed)\\\\b.*\\\\border\\\\b",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "\\\\border\\\\b.*\\\\b(?:filled|executed)\\\\b|",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(?<!be )",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(?<!already )",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(?<!if )",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(?<!not )(?<!no )",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(inFirst < 0 || outFirst < inFirst)",
+   "new": "(inFirst < 0 || outFirst > inFirst)"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "(outFirst < 0 || inFirst < outFirst)",
+   "new": "(outFirst < 0 || inFirst > outFirst)"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "outFirst >= 0 && (inFirst < 0 ||",
+   "new": "outFirst >= 0 && (false ||"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "inFirst >= 0 && (outFirst < 0 ||",
+   "new": "inFirst >= 0 && (false ||"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "avail(?:able)?\\\\.? ?bal(?:ance)?",
+   "new": "avl\\\\.? ?bal"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": " && !(hasAmount && DUE.matcher(b).find())) out.add(",
+   "new": ") out.add("
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "|\\\\btransfer(?:red)?\\\\b.{0,80}\\\\bfrom\\\\b.{0,40}\\\\b(?:a/c|acct|account)\\\\b",
+   "new": ""
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "new Reading(EVIDENCE, null, null, 0L, null, \"trade-fill\")",
+   "new": "new Reading(NOISE, null, null, 0L, \"promo\", \"trade-fill\")"
+  },
+  {
+   "file": "src/LoopFit.java.in",
+   "old": "if (TRADE_FILL.matcher(b).find())",
+   "new": "if (false)"
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+{
+  "about": "The export analyser's own suite (tools/export). Mutation-tests the tooling with the tooling.",
+  "copy": ["tools/export"],
+  "cwd": ".",
+  "test": "node --test tools/export/tests/export.test.mjs 2>&1",
+  "pass": "# fail 0",
+  "fail": "# fail [1-9]|^not ok",
+  "build": "SyntaxError"
+}

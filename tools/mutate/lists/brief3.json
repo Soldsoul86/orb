@@ -1,0 +1,50 @@
+{
+ "about": "Mutation list converted from the mut_brief3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip != null && skipIsCurrent(lines) && (skip.equals(day + \"|\" + BriefRules.NOTHING)",
+   "new": "return skip != null && (skip.equals(day + \"|\" + BriefRules.NOTHING)"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skipIsCurrent(lines) && (day + \"|\" + reason).equals(lastSkip(lines));",
+   "new": "return (day + \"|\" + reason).equals(lastSkip(lines));"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip > configured;",
+   "new": "return skip >= 0;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return skip > configured;",
+   "new": "return skip >= configured;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return alarm > configured;",
+   "new": "return alarm >= 0;"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "lines.get(i).contains(\"\\\"day\\\":\\\"\" + day + \"\\\"\")) alarm = i;",
+   "new": "true) alarm = i;"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "if (BriefConfig.alarmRecorded(lines, day)) return false;",
+   "new": ""
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "long late = BriefRules.minutesLate(nowMs, BriefRules.scheduledAt(day, BriefConfig.minute(lines), zone));",
+   "new": "long late = BriefRules.minutesLate(nowMs, BriefRules.scheduledAt(day, BriefRules.DEFAULT_MINUTE, zone));"
+  },
+  {
+   "file": "src/BriefFacts.java.in",
+   "old": "p.put(\"minutesLate\", minutesLate);\n        return p;\n    }\n\n    static Map<String, Object> configured",
+   "new": "return p;\n    }\n\n    static Map<String, Object> configured"
+  }
+ ]
+}

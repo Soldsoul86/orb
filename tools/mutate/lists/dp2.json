@@ -1,0 +1,25 @@
+{
+ "about": "Mutation list converted from the mut_dp2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return byRank != 0 ? byRank : a.person.display().compareToIgnoreCase(b.person.display());",
+   "new": "return byRank;"
+  },
+  {
+   "file": "src/DocumentPeople.java.in",
+   "old": "return byRank != 0 ? byRank : a.person.display().compareToIgnoreCase(b.person.display());",
+   "new": "return byRank != 0 ? byRank : a.person.display().compareTo(b.person.display());"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (named.more > 0) list.addView",
+   "new": "if (false) list.addView"
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "s.linked ? \"You linked this to them. (\" + s.how() + \")\" : s.how() + \" \\u00b7 tap to link\"",
+   "new": "s.how()"
+  }
+ ]
+}

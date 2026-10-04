@@ -1,0 +1,45 @@
+{
+ "about": "Mutation list converted from the mut_safety2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "SafetyAccess.grant(SafetyActivity.this, journal);",
+   "new": "if (false) SafetyAccess.grant(SafetyActivity.this, journal);"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "if (!recorded) {",
+   "new": "if (true) {"
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "recorded = true;",
+   "new": ""
+  },
+  {
+   "file": "src/SafetyActivity.java.in",
+   "old": "list.addView(text(SafetyRules.CANNOT_SEE, 12, false));",
+   "new": ""
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "app.keyboard = !system && imes.contains(info.packageName);",
+   "new": "app.keyboard = imes.contains(info.packageName);"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "REQUESTED_PERMISSION_GRANTED) != 0",
+   "new": "REQUESTED_PERMISSION_GRANTED) == 0"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "== 1;",
+   "new": "== 0;"
+  },
+  {
+   "file": "src/AppSecurityReader.java.in",
+   "old": "Settings.Global.ADB_ENABLED, 0) == 1",
+   "new": "Settings.Global.ADB_ENABLED, 1) == 1"
+  }
+ ]
+}

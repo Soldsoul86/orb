@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_c3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (c.changedAtMs >= since) t.closed.add(c);",
+   "new": "t.closed.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (c.changedAtMs >= since) t.closed.add(c);",
+   "new": "if (c.changedAtMs < since) t.closed.add(c);"
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Collections.sort(t.closed, new Comparator<Commitment>() {\n            @Override public int compare(Commitment a, Commitment b) { return Long.compare(b.changedAtMs, a.changedAtMs); }\n        });",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "long since = nowMs - CLOSED_DAYS * 86_400_000L;",
+   "new": "long since = nowMs - 86_400_000L;"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "section(\"Closed in the last \" + Commitments.CLOSED_DAYS + \" days \\u2014 you can reopen\", t.closed, today, refresh);",
+   "new": ""
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "&& t.closed.isEmpty() && t.later == 0);",
+   "new": "&& t.later == 0);"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "quick.setText(c.closed() ? \"Reopen\" : \"Done\");",
+   "new": "quick.setText(\"Done\");"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "changed(c.closed() ? Commitments.reopen(journal, c) : Commitments.done(journal, c), onChanged);",
+   "new": "changed(Commitments.done(journal, c), onChanged);"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "row.setClickable(true);",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "buttons.addView(more);",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "row.addView(buttons);",
+   "new": ""
+  }
+ ]
+}

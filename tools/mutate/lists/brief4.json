@@ -1,0 +1,35 @@
+{
+ "about": "Mutation list converted from the mut_brief4 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return day.equals(lastShownDay(lines)) && lastIndex(lines, BriefFacts.SHOWN) > lastIndex(lines, BriefFacts.CONFIGURED);",
+   "new": "return day.equals(lastShownDay(lines));"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "return day.equals(lastShownDay(lines)) && lastIndex(lines, BriefFacts.SHOWN) > lastIndex(lines, BriefFacts.CONFIGURED);",
+   "new": "return lastIndex(lines, BriefFacts.SHOWN) > lastIndex(lines, BriefFacts.CONFIGURED);"
+  },
+  {
+   "file": "src/BriefConfig.java.in",
+   "old": "if (shownToday(lines, day)) return true;\n        return skippedForTheDay(lines, day);",
+   "new": "return skippedForTheDay(lines, day);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "BriefConfig.shownToday(lines, day), nowMs, scheduled);",
+   "new": "day.equals(BriefConfig.lastShownDay(lines)), nowMs, scheduled);"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "&& !BriefConfig.skippedForTheDay(lines, day)) {",
+   "new": "&& !BriefConfig.handledToday(lines, day)) {"
+  },
+  {
+   "file": "src/Brief.java.in",
+   "old": "&& !BriefConfig.skippedForTheDay(lines, day)) {",
+   "new": ") {"
+  }
+ ]
+}

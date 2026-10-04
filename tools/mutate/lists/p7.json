@@ -1,0 +1,10 @@
+{
+ "about": "Mutation list converted from the mut_p7 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/People.java.in",
+   "old": "if (lower.startsWith(query)) best = Math.min(best, 0);",
+   "new": "if (lower.startsWith(query)) best = Math.min(best, 1);"
+  }
+ ]
+}

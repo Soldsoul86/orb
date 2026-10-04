@@ -1,0 +1,135 @@
+{
+ "about": "Mutation list converted from the mut_p harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/People.java.in",
+   "old": "else parent[find(parent, i)] = find(parent, other);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (String e : contacts.get(i).emails) keys.add(\"e:\" + e);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (String p : contacts.get(i).phones) keys.add(\"p:\" + p);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (by == null) for (String em : people.get(g).emails)",
+   "new": "if (false) for (String em : people.get(g).emails)"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (by == null && byName.containsKey(g))",
+   "new": "if (byName.containsKey(g))"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "for (String ph : people.get(g).phones) if (inItem.contains(\"phone:\" + ph)) { by = BY_NUMBER; break; }",
+   "new": "for (String ph : people.get(g).phones) if (false) { by = BY_NUMBER; break; }"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (g != null && !byName.containsKey(g)) byName.put(g, m);",
+   "new": "if (g != null) byName.put(g, m);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (own.get(g).contains(h.kind + \":\" + h.value)) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return b.getValue() - a.getValue();",
+   "new": "return a.getValue() - b.getValue();"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (p.items.isEmpty()) continue;",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (b.items.size() != a.items.size()) return b.items.size() - a.items.size();",
+   "new": "if (b.items.size() != a.items.size()) return a.items.size() - b.items.size();"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return a.names.get(0).compareToIgnoreCase(b.names.get(0));",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "result.sharedFirstNames = Mentions.sharedFirstNames(ids, names);",
+   "new": "result.sharedFirstNames = 0;"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (entry == null) entry = Recall.entryFor(item, app, screen, doc, null);",
+   "new": "entry = Recall.entryFor(item, app, screen, doc, null);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (number > 0) parts.add(number + \" by number\");",
+   "new": "if (number > 0) parts.add(number + \" by numbers\");"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "(names.size() > 1 ? \" (+\" + (names.size() - 1) + \")\" : \"\")",
+   "new": "\"\""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (!p.phones.contains(ph)) p.phones.add(ph);",
+   "new": "p.phones.add(ph);"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "if (journal == null || granted(context)) return;",
+   "new": "if (journal == null) return;"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "payload.put(\"capability\", Capabilities.CONTACTS);",
+   "new": "payload.put(\"capability\", Capabilities.PACKAGES);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "granted = PackageGrants.lastIsGrant(lines, CONTACTS);",
+   "new": "granted = PackageGrants.lastIsGrant(lines, PACKAGES);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "long people = number(read, \"people\");",
+   "new": "long people = number(read, \"contacts\");"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "(people == 1 ? \" person\" : \" people\")",
+   "new": "\" people\""
+  },
+  {
+   "file": "src/ContactsFacts.java.in",
+   "old": "\"contacts\"",
+   "new": "\"count\""
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "about": "Mutation list converted from the mut_mime harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "return \"JSON\".equals(format) ? MIME_JSON : MIME_XML;",
+   "new": "return MIME_XML;"
+  },
+  {
+   "file": "src/MessagesFacts.java.in",
+   "old": "return \"JSON\".equals(format) ? MIME_JSON : MIME_XML;",
+   "new": "return MIME_JSON;"
+  },
+  {
+   "file": "src/MessagesFlow.java.in",
+   "old": "chunk.month, read.format);",
+   "new": "chunk.month, \"XML\");"
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "about": "Mutation list converted from the mut_msg3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/MessagesRules.java.in",
+   "old": "if (!m.name.isEmpty() && m.dateMs >= c.nameAt) { c.name = m.name; c.nameAt = m.dateMs; }",
+   "new": "if (!m.name.isEmpty()) { c.name = m.name; c.nameAt = m.dateMs; }"
+  },
+  {
+   "file": "src/MessagesAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": "record(journal, PackageGrants.REVOKED, \"operator\");"
+  }
+ ]
+}

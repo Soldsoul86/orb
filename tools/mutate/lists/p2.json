@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_p2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/People.java.in",
+   "old": "for (String e : contacts.get(i).emails) keys.add(\"e:\" + e);",
+   "new": ""
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "if (g != null && !byName.containsKey(g)) byName.put(g, m);",
+   "new": "if (g != null) byName.put(g, m);"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return b.getValue() - a.getValue();",
+   "new": "return a.getValue() - b.getValue();"
+  },
+  {
+   "file": "src/People.java.in",
+   "old": "return a.names.get(0).compareToIgnoreCase(b.names.get(0));",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+   "new": "record(journal, PackageGrants.GRANTED"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "new File(context.getFilesDir(), FILE).delete();\n",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "record(journal, PackageGrants.REVOKED, \"operator\");",
+   "new": ""
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "if (journal == null || granted(context)) return;",
+   "new": "if (journal == null) return;"
+  },
+  {
+   "file": "src/ContactsAccess.java.in",
+   "old": "payload.put(\"capability\", Capabilities.CONTACTS);",
+   "new": "payload.put(\"capability\", Capabilities.PACKAGES);"
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "(people == 1 ? \" person\" : \" people\")",
+   "new": "\" people\""
+  },
+  {
+   "file": "src/Capabilities.java.in",
+   "old": "(contacts == 1 ? \" contact\" : \" contacts\")",
+   "new": "\" contacts\""
+  }
+ ]
+}

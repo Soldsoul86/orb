@@ -1,0 +1,135 @@
+{
+ "about": "Mutation list converted from the mut_n3 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Nudge.java.in",
+   "old": "DAYS[c.get(Calendar.DAY_OF_WEEK) - 1]",
+   "new": "DAYS[c.get(Calendar.DAY_OF_WEEK) % 7]"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "MONTHS[month - 1]",
+   "new": "MONTHS[month % 12]"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "return space < 0 ? t : t.substring(0, space);",
+   "new": "return t;"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "if (t.isEmpty()) return \"there\";",
+   "new": "if (false) return \"there\";"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "boolean passed = dueDate != null && dueDate.compareTo(today) < 0;",
+   "new": "boolean passed = dueDate != null && dueDate.compareTo(today) <= 0;"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "boolean passed = dueDate != null && dueDate.compareTo(today) < 0;",
+   "new": "boolean passed = dueDate != null;"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "if (CommitmentFacts.WAITING.equals(direction)) {",
+   "new": "if (!CommitmentFacts.WAITING.equals(direction)) {"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "} else if (dueDate == null) {",
+   "new": "} else if (dueDate != null) {"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "} else if (dueDate.equals(today)) {",
+   "new": "} else if (!dueDate.equals(today)) {"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "return text.length() > MAX_CHARS ? text.substring(0, MAX_CHARS) : text;",
+   "new": "return text;"
+  },
+  {
+   "file": "src/Nudge.java.in",
+   "old": "(words == null ? \"\" : words.trim())",
+   "new": "(words == null ? \"\" : words)"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": ".replace(\"+\", \"%20\")",
+   "new": ""
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "return t.length() > MAX_TEXT ? t.substring(0, MAX_TEXT) : t;",
+   "new": "return t;"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (t.isEmpty()) return null;\n        return t.length()",
+   "new": "return t.length()"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "return \"whatsapp://send?phone=\" + number.substring(1) + (t == null ? \"\" : \"&text=\" + percentEncode(t));",
+   "new": "return \"whatsapp://send?phone=\" + number.substring(1) + (t == null ? \"\" : \"&text=\" + t);"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "String draft = HandoffFacts.DIAL.equals(channel) ? null : textOrNull(text);",
+   "new": "String draft = textOrNull(text);"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "HandoffFacts.released(channel, draft != null)",
+   "new": "HandoffFacts.released(channel, true)"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "if (!launcher.open(channel, link, draft)) return refuse",
+   "new": "if (!launcher.open(channel, link, null)) return refuse"
+  },
+  {
+   "file": "src/Handoff.java.in",
+   "old": "static final long VERSION = 2L;",
+   "new": "static final long VERSION = 1L;"
+  },
+  {
+   "file": "src/HandoffFacts.java.in",
+   "old": "p.put(\"drafted\", drafted);\n        return p;\n    }\n\n    static Map<String, Object> refused",
+   "new": "return p;\n    }\n\n    static Map<String, Object> refused"
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "if (draft != null && HandoffFacts.SMS.equals(kind)) intent.putExtra(\"sms_body\", draft);",
+   "new": "if (draft != null) intent.putExtra(\"sms_body\", draft);"
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "orb.versionCode(), draft != null);",
+   "new": "orb.versionCode(), false);"
+  },
+  {
+   "file": "src/HandoffFlow.java.in",
+   "old": "to.setText(\"To: \" + (person.names.isEmpty() ? \"\" : person.names.get(0) + \" \\u00b7 \") + shown",
+   "new": "to.setText(\"To: \" + shown"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "final boolean canNudge = !c.closed() && !c.who.phones.isEmpty();",
+   "new": "final boolean canNudge = !c.closed();"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "new HandoffFlow(host).start(channels[index], person, Nudge.draft(c.direction, c.words, name, c.dueDate, today()));",
+   "new": "new HandoffFlow(host).start(channels[index], person);"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "final String[] channels = {HandoffFacts.WHATSAPP, HandoffFacts.SMS};",
+   "new": "final String[] channels = {HandoffFacts.SMS, HandoffFacts.WHATSAPP};"
+  }
+ ]
+}

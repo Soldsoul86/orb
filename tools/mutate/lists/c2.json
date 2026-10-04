@@ -1,0 +1,60 @@
+{
+ "about": "Mutation list converted from the mut_c2 harness script (2026-10-04).",
+ "mutants": [
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Collections.sort(t.overdue, byDate);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "Collections.sort(t.week, byDate);",
+   "new": ""
+  },
+  {
+   "file": "src/Commitments.java.in",
+   "old": "if (a.dueDate == null && b.dueDate == null) return 0;\n                if (a.dueDate == null) return 1;",
+   "new": "if (a.dueDate == null && b.dueDate == null) return 0;\n                if (a.dueDate == null) return -1;"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "if (typed[0].isEmpty()) { say(\"Say what it is first.\"); return; }",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "direction.check(owe.getId());",
+   "new": ""
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "final String[] choices = c.closed() ? new String[] {REOPEN, DELETE} : new String[] {DONE, MOVE, DROP, REMIND, DELETE};",
+   "new": "final String[] choices = new String[] {DONE, MOVE, DROP, REMIND, DELETE};"
+  },
+  {
+   "file": "src/CommitmentFlow.java.in",
+   "old": "if (DONE.equals(what)) changed(Commitments.done(journal, c), onChanged);",
+   "new": "if (DONE.equals(what)) changed(Commitments.drop(journal, c), onChanged);"
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "section(\"Waiting for\", t.waiting, today, refresh);",
+   "new": ""
+  },
+  {
+   "file": "src/TodayActivity.java.in",
+   "old": "section(\"Today\", t.today, today, refresh);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "if (commitmentFlow != null) commitmentFlow.onPermissionResult(code, results);",
+   "new": ""
+  },
+  {
+   "file": "src/PeopleActivity.java.in",
+   "old": "for (Commitments.Commitment c : mine) column.addView(commitmentFlow.row(c, today, reopenAfter(person)));",
+   "new": ""
+  }
+ ]
+}

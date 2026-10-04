@@ -6,7 +6,7 @@
  * invariants that CLAUDE.md and CONSTITUTION.md impose on this repository.
  * It is deliberately small, deterministic, and dependency-free.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { workspaceDirs, sourceFiles, repoRoot } from "./_workspace.mjs";
 
 const problems = [];
@@ -22,6 +22,18 @@ for (const dir of workspaceDirs()) {
   for (const doc of ["README.md", "DESIGN.md", "API.md", "TESTS.md"]) {
     if (!existsSync(new URL(`${dir}/${doc}`, repoRoot))) {
       report(`${dir}/${doc}`, 0, "package-docs", `missing required package document ${doc}`);
+    }
+  }
+}
+
+// The same for every tool under tools/ (docs/AGENT_TOOLING.md): a tool is a package, whatever language it is in.
+if (existsSync(new URL("tools/", repoRoot))) {
+  for (const entry of readdirSync(new URL("tools/", repoRoot), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const doc of ["README.md", "DESIGN.md", "API.md", "TESTS.md"]) {
+      if (!existsSync(new URL(`tools/${entry.name}/${doc}`, repoRoot))) {
+        report(`tools/${entry.name}/${doc}`, 0, "package-docs", `missing required tool document ${doc}`);
+      }
     }
   }
 }

@@ -1,0 +1,9 @@
+{
+  "about": "The Orb phone app's suite. Copies the app, its pass-1 sources, the brain, the fixtures and the scripts into isolated workspaces and runs the app's own test script.",
+  "copy": ["apps/pixel/orb", "apps/pixel/pass1", "runtime/brain", "docs/fixtures", "scripts"],
+  "cwd": "apps/pixel/orb",
+  "test": "bash tests/run.sh 2>&1",
+  "pass": "\\d+ checks, 0 failed",
+  "fail": "\\bFAIL\\b|\\d+ checks, [1-9]\\d* failed",
+  "build": ": error:"
+}
