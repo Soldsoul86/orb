@@ -1,6 +1,6 @@
 # The morning brief — Orb comes to you (B6; proposed)
 
-> Status: **approved 2026-10-04 ("Yes, go ahead with A, the morning brief", then "Yes, go ahead with the build") and built, awaiting the device** (`DEVICE_LOOP.md` §7b91, `orb-app-v54-brief.apk`; `DECISIONS.md` DR-40). As-built notes in §10.
+> Status: **approved 2026-10-04 ("Yes, go ahead with A, the morning brief", then "Yes, go ahead with the build") and built; verified on the device 2026-10-04 (v56)** (`DEVICE_LOOP.md` §7b91–§7b93, `orb-app-v56-brief-once.apk`; `DECISIONS.md` DR-40). As-built notes in §10.
 > Builds on `COMMITMENTS_PHONE.md` (what you owe and are waiting for), `COMING_UP_PHONE.md` (dates ahead), `GATE_PHONE.md` (the gate, the alarm and the notification a reminder passes through). Contracts: `Capability.md`, `Policy.md`, `Action.md`; `CLAIMS.md` §5 Ruling 1 (standing authorization).
 
 ## 1. Why, in plain words

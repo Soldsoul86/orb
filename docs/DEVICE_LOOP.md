@@ -7744,3 +7744,18 @@ Open in this round: P311 (Play Protect), P312, P313 (shown in the sequence of ev
 4. Open Orb a couple of times afterwards. *(P326)*
 5. **Export and share journal** and send it. *(P325)*
 
+#### Result — export `orb-20261004-131102` (operator, 2026-10-04): "Working now"
+
+891 events; v56 (`29851650`) started once. **Nothing in the journal names a person or holds a word.**
+
+| Time | Event |
+| --- | --- |
+| 13:04:02 | v56 starts; the brief was set for 12:50 and had not been shown under it → shown at once, 14 minutes late (the start-up catch-up, inside the three-hour limit) |
+| 13:04:28 | time changed to **13:07** |
+| 13:07:04 | **`orb.brief.alarm`** (on the minute) then **`orb.brief.shown`** — the alarm fired and the brief appeared |
+| 13:07:58 | time changed to **13:10** |
+| 13:10:09 | **`orb.brief.alarm`** then **`orb.brief.shown`** again — **the same day, under the new time** |
+| 13:10:54 | turned off (`grants.capability.revoked`) |
+
+**P324 and P325 confirmed:** a brief fires at a time chosen after one has already been shown that day, and each has its alarm record then its showing record, on the minute. **P317 (the alarm fires at the chosen time) and P321/P323 are confirmed.** P316 (tap opens Today) was confirmed earlier. **The morning brief is verified on the device** for turning on, changing the time, firing, and turning off. Still not seen in a journal: P326 (a second start the same day writes one `already`), P318 (a quiet day shows nothing), a real next-morning firing, and a firing after a reboot — the next export that spans a night will show them.
+
