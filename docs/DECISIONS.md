@@ -1407,7 +1407,7 @@ box — **where they are the app's by design, like the number**.
 
 ## DR-40 — The morning brief: one daily notification, counts only, under a standing authorization
 
-- **Status:** Proposed · **Proposed:** 2026-10-04, after the operator said "Yes, go ahead with A, the morning brief" to the project review's first recommendation (`MORNING_BRIEF_PHONE.md`). **Not yet approved for building.**
+- **Status:** Decided and built · **Decided:** 2026-10-04, operator ("Yes, go ahead with A, the morning brief", then "Yes, go ahead with the build" on `MORNING_BRIEF_PHONE.md`, all six points as proposed).
 
 **The ruling proposed.** A second *Act (reversible)* capability, `orb.brief.daily` v1: once a day at a time the person chose, Orb shows **one notification with counts only** (overdue, due today, waiting, dates this week), computed at that moment from commitments and Coming up. Standing authorization (CLAIMS.md §5 Ruling 1) is argued in the grant — waiting would defeat the purpose of a morning brief — and the gate re-decides at every release (on, permitted, once a day, not too late, something to say), writing every refusal. Nothing is shown on a quiet day; words never appear in the notification by default; the contacts are not read in the background.
 

@@ -7602,3 +7602,51 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 - **Then What Orb has noticed was opened** (`asked: 17, confirmed: 12, rejected: 0`): the twelve earlier answers stand; seventeen questions are waiting (it was 23 before the messages came in).
 - **Not in the journal, so open:** P304 (Play Protect), P305–P307 (that the marked rows came first, how many, that Tick those N ticked exactly them), P309 (whether the *Because* lines now include *messages kept from N of the last 6 months*), P308 (not tried). The save-then-remove steps that crashed v51 were not repeated in this stretch.
 
+
+
+### 7b91. The morning brief — Orb comes to you (DR-40) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v54-brief.apk` — the calls build, as v46–v53. Design: `docs/MORNING_BRIEF_PHONE.md` (§10 as built); decision `DECISIONS.md` DR-40; limits `ARCHITECTURAL_DEBT.md` AD-35.
+
+**Why:** everything Orb holds waited for you to open it. The brief is Orb telling you, once a morning, what is on your plate — from what it already holds, with nothing new read.
+
+#### What changed
+
+1. **Today** gains a **Morning brief** card: off until you turn it on. **Turn on the morning brief…** → a form (time picker at 08:00, an unticked *also show the first words* box, **Cancel** focused) → Android's notification permission if it is missing → on.
+2. **Once a day at that time, one notification:** *3 overdue · 1 due today · 3 waiting for · 2 dates this week* (only the parts that are not zero). **Counts only**; the lock screen says *Your morning brief is ready*. **Tapping it opens Today.**
+3. **Nothing on a quiet day.** A day with nothing overdue, due today, waited on or ahead shows nothing and is recorded as `nothing`.
+4. **Show me today's brief** previews exactly what it would say now (writes nothing). **Change…** the time or the words box; **Turn off**; What Orb may do shows the status and a switch.
+5. **If the phone was off at the time:** shown at the next start within three hours, else skipped and recorded as `late`.
+6. **Every refusal is written** (`off`, `noPermission`, `already`, `late`, `nothing`) with the day; every showing is written **before** it is shown, with the counts. The grant records its argument for standing in advance.
+
+#### Checked before the device
+
+- Phone-side suite: 2537 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **Mutation checks** on the counts and the line, the first words, the time (zones, month ends, the day a clock changes), the gate and its order, the late limit, what the journal says, the records, the shell that shows it once, the one entry point, the grant and the switch-off, the status, and the screen's glue: @@MUT@@
+- **Not testable off the phone:** whether Android delivers the alarm at 08:00 on your phone, and how the notification looks.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P311** | v54 installs over v53 with **no Play Protect warning** (a non-exported receiver is added; no permission) | flagged — record the exact words |
+| **P312** | **Today** shows **Morning brief — Off** and **Turn on the morning brief…**; the form shows 08:00, the words box **unticked**, **Cancel** focused | on by itself, or the box ticked |
+| **P313** | **Turn on** → (Android asks for notifications if it has not before) → *On — each morning at 08:00 · counts only* | stays off, or no card change |
+| **P314** | **Show me today's brief** reads the same counts as Today's sections, or says there is nothing to say | the numbers disagree with Today |
+| **P315** | Turning on **after** the time (within three hours) shows the brief **at once**: counts only; on the lock screen only *Your morning brief is ready* | a name or word on the lock screen |
+| **P316** | **Tapping** the notification opens **Today** | opens something else |
+| **P317** | **Set the time two or three minutes ahead** and wait: the notification appears at about that time (a few minutes' slack is normal) | nothing arrives |
+| **P318** | With **nothing** open or ahead, **no notification**, and the export has `orb.brief.skipped` with reason `nothing` | a notification of zeros |
+| **P319** | **Export and share journal:** `grants.capability.granted` for `orb.brief.daily` (with `standing`), `orb.brief.configured`, and `orb.brief.shown` / `orb.brief.skipped` with counts and reasons — **no word, name or number** | a word or name is in the journal |
+| **P320** | **What Orb may do** shows ***A morning brief — ON — at 08:00*** and the last result; **Switch off the morning brief** → no notification next morning, and the export has the revocation | still arrives after switching off |
+
+#### Protocol
+
+1. Install `orb-app-v54-brief.apk` over v53; open Orb once. *(P311)*
+2. **Today** → read the **Morning brief** card → **Turn on the morning brief…** → look at the form → **Cancel** once. *(P312)*
+3. Turn it on properly with a time **two or three minutes ahead**; allow notifications if asked. *(P313, P317)*
+4. Press **Show me today's brief** and compare with the sections below it. *(P314)*
+5. When the notification arrives, read it (and, with the phone locked, its lock-screen form); tap it. *(P315, P316)*
+6. Optional: turn it on again for a time **after** now by an hour or so to see the "at once" rule; and on a day with nothing open, see that nothing arrives. *(P315, P318)*
+7. **What Orb may do** → the new line; **Switch off the morning brief**. *(P320)*
+8. **Export and share journal** and send it. *(P319)*

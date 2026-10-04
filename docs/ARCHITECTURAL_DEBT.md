@@ -850,6 +850,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-35 — what the morning brief does not know
+
+**Opened 2026-10-04** (`DECISIONS.md` DR-40). Debts, stated.
+
+1. **An alarm is a request, not a promise.** `setAndAllowWhileIdle` can be minutes late in Doze and can be lost to a force-stop or aggressive battery management until Orb next starts. The journal says what happened (`shown`, `skipped`, or no record); the next export tells whether the phone is keeping it.
+2. **A brief can appear when Orb is opened.** If the alarm was missed and Orb starts within three hours of the time, the brief is shown then. After that it is skipped.
+3. **A silenced channel looks like no permission.** If you turn the brief's notification channel off in Android, the gate cannot tell that from the permission being missing; both are recorded as `noPermission`.
+4. **Your own commitments due later this week are not counted** until they are due (only written dates in kept items are). Whether that is right is for the device to say.
+5. **The time follows the zone Orb sees when the alarm is set.** After travelling across zones, the day's alarm may fire at the old zone's moment until Orb next starts and sets it again.
+6. **One brief, one time, English only.** No evening review, no weekdays-only, no second brief.
+7. **Android keeps the notification's text** (history, a paired watch, apps with notification access) beyond Orb's reach. That is why the default is counts only and the lock screen shows no count.
+8. **Counts say how many, not which.** The details are one tap away, on Today.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

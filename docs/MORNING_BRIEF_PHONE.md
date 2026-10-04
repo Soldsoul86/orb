@@ -1,6 +1,6 @@
 # The morning brief — Orb comes to you (B6; proposed)
 
-> Status: **proposed 2026-10-04 — awaiting approval** (the operator said "Yes, go ahead with A, the morning brief" to the one-paragraph proposal in the project review; the build waits for an explicit "go ahead" on this design, as for every slice). Decision record: `DECISIONS.md` DR-40 (proposed).
+> Status: **approved 2026-10-04 ("Yes, go ahead with A, the morning brief", then "Yes, go ahead with the build") and built, awaiting the device** (`DEVICE_LOOP.md` §7b91, `orb-app-v54-brief.apk`; `DECISIONS.md` DR-40). As-built notes in §10.
 > Builds on `COMMITMENTS_PHONE.md` (what you owe and are waiting for), `COMING_UP_PHONE.md` (dates ahead), `GATE_PHONE.md` (the gate, the alarm and the notification a reminder passes through). Contracts: `Capability.md`, `Policy.md`, `Action.md`; `CLAIMS.md` §5 Ruling 1 (standing authorization).
 
 ## 1. Why, in plain words
@@ -67,3 +67,18 @@ One capability, declared once and frozen: **`orb.brief.daily` v1**, tier **Act (
 ## 9. Not in this slice
 
 An evening review, a weekly summary, per-day settings, several briefs, anything read from a model, anything about people (waiting on contacts-in-the-background, which the architecture does not allow), sounds beyond the channel's defaults.
+
+## 10. As built (v54)
+
+All six approvals in §8 were taken as written: counts only (words off by default), 08:00 by default, nothing on a quiet day, the four lines, skipped when more than three hours late, and a standing authorization with the gate deciding at each release.
+
+- **Where it lives.** `BriefRules` (the counts, the line, the time, the gate), `BriefConfig` (reading the grant, the time, the words option, what has been done today — all from the journal), `BriefFacts` (the only builder of the records), `Brief` (the gate's wiring: `release`, the one entry point `rearm`, turning on and off), and Android glue: `BriefAlarms`, `BriefNotifier`, `BriefReceiver` (not exported). The capability `orb.brief.daily` v1 (*Act (reversible)*) is declared in `Capabilities` with its words pinned. **One new manifest component, no new permission.**
+- **One entry point.** The alarm, every Orb start and every change of time call `Brief.rearm`: if the brief is on, due today and not done, the gate decides (and writes any refusal); then tomorrow's alarm is set. If it is off, the alarm is cleared and nothing is written.
+- **The gate, in order:** off → no permission (Android's, or you silenced the brief's channel) → already shown today → more than three hours late → nothing to say. Every refusal is written as `orb.brief.skipped` with the day and the reason; the same refusal twice in a row is written once. *Nothing* and *late* finish the day; *no permission* does not (you may allow it later).
+- **Recorded before shown.** `orb.brief.shown` (the day, the four counts, minutes late, whether words were asked for) is written first; then the notification is posted.
+- **What the notification says.** Private version: **"3 overdue · 1 due today · 3 waiting for · 2 dates this week"**, only the parts that are not zero. Lock screen: **"Your morning brief is ready"**, no counts. If you ticked *also show the first words*: a second line with the first overdue (else first due today) commitment's words, cut at 60 characters, and *(+N more)* — in the notification only, never in the journal.
+- **The card (Today).** Off: a sentence and **Turn on the morning brief…**. The form has a time picker (08:00), the words box (unticked, saying what it exposes) and **Cancel** focused. Android's notification permission is asked only at **Turn on**, if it is missing. On: *On — each morning at 08:00 · counts only*, **Show me today's brief** (what the notification would say right now; writes nothing), **Change…**, **Turn off**. What Orb may do shows the status and **Switch off the morning brief**.
+- **Turning on late.** If it is already past the time today when you turn it on, the brief is shown at once if that is within three hours; otherwise it is skipped (`late`) and recorded. The form says so.
+- **Not built, as designed:** people to get back in touch with (the contacts are read only on the People screen), anything about calls or messages, anything inferred from words, an evening review.
+- **A question the design left open, for the device:** your own commitments due **later this week** are not counted (they appear on the day they are due); only *written dates* in kept items are counted for the week. If that feels wrong, adding *N due this week* is one line.
+
