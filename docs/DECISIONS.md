@@ -1451,6 +1451,12 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this proposal:** categories and budgets, recurrence, trade fills (`value.exchanged`), XLSX/PDF statements, a notification listener, the public API.
 
+## DR-45 — The engineering system: scenarios, invariants, slices and a review packet around the existing tools
+
+- **Status:** **Proposed** — awaiting the operator (`ENGINEERING_SYSTEM.md`) · **Proposed:** 2026-10-04, after the operator's thirty-point proposal for a single-builder engineering system.
+
+**The proposal.** Phase 1 only: an **invariant registry**, a **scenario registry** whose state is *derived* from the proof it names (never hand-set), a **slice file** and `/slice` command with a budget and stop conditions, a generated **change report**, **file classes** with a diff check against recorded approvals, and a **decision queue** and learnings log. JSON, not YAML; checks before blocking hooks; three agent prompts, not five. It changes no product architecture, contract or protocol. Phases 2–4 (impact graph, conformance/golden/differential runners, worktrees, device runner and prediction registry, privacy and permission scanners, release gate, artifact registry, dashboard) are mapped, not scheduled.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
