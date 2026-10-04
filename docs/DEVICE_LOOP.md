@@ -7961,3 +7961,13 @@ Until now Orb read a bank text and decided on the spot "this closes a bill". The
 3. **Senders…**: mark the candidates, then take one back. *(P343)*
 4. Open **Today** and the morning brief. *(P344)*
 5. Optional: **Record this fit report**, then **Export and share journal**. *(P345)*
+
+#### Result — export `orb-20261004-165004` (operator, 2026-10-04): v59 on the device
+
+916 events; v59 (`29851876`) started once, 11:18:25; **no crash, no fault**. One `orb.loop.fit.reported`, 11:20:01 (the operator tapped Record). It holds numbers only, ten unmapped sender codes and five rule pairs — no text.
+
+**The regression holds on the phone, as it did in the container.** With one sender quiet (the 203-message one, marked in v58 and **still honoured after the upgrade** — the mark and the grant survived), the report is the container's report minus that sender, to the message: unread 3,842 (= 4,044 − 202), ambiguous 119, information 8,785, obligations 185, closed 13, matched 20, noise 3,394 (= 3,192 − 1 code + 203 quiet), `noise.sender` 203, `quiet.hid` 0 (that sender had read as no loop).
+
+**P341 confirmed. P342 confirmed to the digit:** `ledger.out` 5,460 · `ledger.in` 634 · `closure.candidates` 20 · `ledger.only` 6,074. **P345 confirmed:** the new keys (`obs.*`, `effect.*`, `discard.*`, `ledger.*`, `closure.candidates`) are present and numeric; nothing else. **P343** in part: a mark persists across versions and is applied. **P344** is not visible in a journal (no `orb.commitment.*`, `orb.loop.*` or `orb.brief.*` event was written; the screens themselves are the operator's to judge).
+
+**What the seam says, now measured on the device:** of 6,094 payments, 20 (0.3 %) look like the end of something open; 99.7 % are the ledger only. Facts stated: 873 obligations, 105 progressions, 23 fulfilments, 44 requests, 353 attendances, 4 decisions.
