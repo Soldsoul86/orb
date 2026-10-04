@@ -335,6 +335,15 @@
    "rule": "money-out",
    "tag": null,
    "owner": "me"
+  },
+  {
+   "body": "123456 is your One Time Password for CRM Log In. Regards Testco",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "code",
+   "tag": "code",
+   "owner": null
   }
  ],
  "minor": [
