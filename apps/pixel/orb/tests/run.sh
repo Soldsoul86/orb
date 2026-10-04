@@ -31,4 +31,8 @@ for source in src/Erasure.java.in src/Erase.java.in src/Attachments.java.in src/
 done
 
 javac -Xlint:all -cp "$BRAIN_CLASSES" -d "$OUT/classes" ../pass1/tests/shim/android/content/Context.java "$OUT/src/$PKG_PATH"/*.java
-java -Dorb.root="$PWD" -cp "$OUT/classes:$BRAIN_CLASSES:$BRAIN/lib/kotlin-stdlib.jar" "$PKG.${ORB_MAIN:-Tests}" "$@"
+# The suites make thousands of temporary journals. They go into one directory that is removed when the run ends, so a run (and a mutation round of dozens) leaves
+# nothing behind in /tmp: before this, each run left tens of thousands of directories and a long round filled the disk.
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+java -Djava.io.tmpdir="$SCRATCH" -Dorb.root="$PWD" -cp "$OUT/classes:$BRAIN_CLASSES:$BRAIN/lib/kotlin-stdlib.jar" "$PKG.${ORB_MAIN:-Tests}" "$@"
