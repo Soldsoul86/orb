@@ -82,6 +82,14 @@ public final class MainActivity extends Activity {
         });
         root.addView(sources);
 
+        // MONEY_PHONE.md: money that moved, read from the facts Orb has kept. Nothing here reads anything; it shows what was kept.
+        Button money = new Button(this);
+        money.setText("Money moved");
+        money.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new Intent(MainActivity.this, LedgerActivity.class)); }
+        });
+        root.addView(money);
+
         // COMMITMENTS_PHONE.md: what you owe and what you are waiting for, and where each stands.
         Button today = new Button(this);
         today.setText("Today");

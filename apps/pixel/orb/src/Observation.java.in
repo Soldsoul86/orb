@@ -129,6 +129,11 @@ final class Observation {
         }
     }
 
+    /** Whether the source gave a reference of its own for the subject (`observed`, or `stated` in so many words) — as opposed to none, or one a rule inferred. */
+    boolean hasOwnReference() {
+        return !subjectRef.isEmpty() && !LoopRules.INFERRED.equals(subjectBasis);
+    }
+
     /** True for a type that says something is owed or expected, or asked, or to be attended or decided: it can open a loop. */
     boolean stateful() {
         return !INFORMATION_NOTED.equals(type) && !VALUE_MOVED.equals(type);

@@ -38,6 +38,8 @@ test("the probe prints counts that add up and never a word of any message", opts
     const out = run.stdout;
     assert.match(out, /^messages 13 service 10 conversational 3 other 0$/m);
     assert.match(out, /^roles-sum 10 of 10 ok$/m);
+    assert.match(out, /^dispositions LOOP=\d+  CLOSURE_CANDIDATE=\d+  LEDGER_ONLY=\d+  NOT_A_LOOP=\d+  AMBIGUOUS=\d+  UNMAPPABLE=\d+  sum 10 of 10 ok /m);
+    assert.match(out, /^ledger movements 6 \(out 6, in 0\) months 1 /m);
     assert.match(out, /^unmapped% \d+/m);
     assert.ok(!out.includes(CANARY), "message text leaked into the probe's output");
     assert.ok(!run.stderr.includes(CANARY), "message text leaked into the probe's errors");

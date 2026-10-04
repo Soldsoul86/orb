@@ -1,0 +1,170 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.List;
+import java.util.TimeZone;
+
+/**
+ * Money moved (`docs/MONEY_PHONE.md` \u00a75, DR-44): the ledger, read from the facts Orb has kept \u2014 and from nothing else. **Secure like Recall**: amounts and sender
+ * codes are on this screen only. It says *moved*, never spent or earned, because the same money can appear twice (a card's spends and the payment that settles
+ * the card), and it never adds one currency to another. It is not a view of loops. The one other thing here is the explicit act of erasing what was kept.
+ */
+public final class LedgerActivity extends Activity {
+    private static final int SHOWN = 40;
+
+    private LinearLayout list;
+    private List<Ledger.Movement> movements;
+    private List<String> months;
+    private int at = -1;
+    private boolean loading;
+    private final TimeZone zone = TimeZone.getDefault();
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        load();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private Button button(String label, View.OnClickListener l) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(l);
+        return b;
+    }
+
+    private void load() {
+        if (loading) return;
+        Orb orb = Orb.get();
+        final Journal journal = orb == null ? null : orb.journal();
+        list.removeAllViews();
+        list.addView(text("Money moved", 17, true));
+        if (journal == null) {
+            list.addView(text("\nOrb's history could not be opened.", 13, false));
+            return;
+        }
+        list.addView(text("\nReading what Orb has kept\u2026", 13, false));
+        loading = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                List<Observation> facts = null;
+                try {
+                    facts = ObservationStore.load(LedgerActivity.this, journal, Senders.quiet(LedgerActivity.this, journal));
+                } catch (IOException unreadable) {
+                    facts = null;
+                }
+                final List<Observation> loaded = facts;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        loading = false;
+                        if (loaded == null) {
+                            list.removeAllViews();
+                            list.addView(text("Money moved", 17, true));
+                            list.addView(text("\nOrb could not read what it has kept.", 13, false));
+                            return;
+                        }
+                        movements = Ledger.movements(loaded);
+                        months = Ledger.months(movements, zone);
+                        if (at < 0 || at >= months.size()) at = months.size() - 1;
+                        render();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("Money moved", 17, true));
+        list.addView(text("\nThis is money that moved, read from the facts Orb has kept \u2014 not what you spent or earned. The same money can appear twice: "
+            + "card payments and card spends both show. Amounts in different currencies are never added together.", 12, false));
+        if (movements == null || movements.isEmpty()) {
+            list.addView(text("\nNothing is kept yet. Look at a message backup in Sources, then choose \u201cKeep what Orb read\u201d.", 13, false));
+            return;
+        }
+        final String month = months.get(at);
+        Ledger.Month view = Ledger.month(movements, month, zone);
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        Button older = button("\u2039 older", new View.OnClickListener() {
+            @Override public void onClick(View v) { at--; render(); }
+        });
+        older.setEnabled(at > 0);
+        Button newer = button("newer \u203a", new View.OnClickListener() {
+            @Override public void onClick(View v) { at++; render(); }
+        });
+        newer.setEnabled(at < months.size() - 1);
+        nav.addView(older);
+        nav.addView(newer);
+        list.addView(nav);
+        list.addView(text(month + " \u00b7 " + view.movements.size() + " movements", 15, true));
+        for (Ledger.Line line : view.lines) {
+            list.addView(text("\n" + Ledger.say(line), 13, true));
+            list.addView(text(line.single + " seen by one source \u00b7 " + line.corroborated + " by more than one", 11, false));
+        }
+        list.addView(text("\nMovements", 13, true));
+        int n = 0;
+        for (int i = view.movements.size() - 1; i >= 0 && n < SHOWN; i--, n++) list.addView(text(Ledger.say(view.movements.get(i), zone), 12, false));
+        if (view.movements.size() > SHOWN) list.addView(text("\u2026and " + (view.movements.size() - SHOWN) + " earlier in the month.", 11, false));
+        list.addView(text("\nOn your phone, the account is the sender code of the bank's messages. Until a statement is added, Orb can show which account moved, not whom the money went to.", 11, false));
+        list.addView(button("Erase everything Orb has kept\u2026", new View.OnClickListener() {
+            @Override public void onClick(View v) { confirmErase(); }
+        }));
+    }
+
+    private void confirmErase() {
+        new AlertDialog.Builder(this)
+            .setTitle("Erase everything kept?")
+            .setMessage("Every bundle of facts Orb has kept will be erased: the keys that open them are destroyed and they cannot be brought back. "
+                + "The record that they were kept stays, with nothing in it. Your messages and loops are not touched.")
+            .setPositiveButton("Erase", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    Orb orb = Orb.get();
+                    Journal journal = orb == null ? null : orb.journal();
+                    int n = -1;
+                    try {
+                        if (journal != null) n = ObservationStore.eraseAll(LedgerActivity.this, journal);
+                    } catch (IOException failed) {
+                        n = -1;
+                    }
+                    new AlertDialog.Builder(LedgerActivity.this).setMessage(n < 0 ? "Orb could not erase them." : "Erased " + n + (n == 1 ? " bundle." : " bundles.")).setPositiveButton("OK", null).show();
+                    load();
+                }
+            })
+            .setNegativeButton("Keep them", null)
+            .show();
+    }
+}

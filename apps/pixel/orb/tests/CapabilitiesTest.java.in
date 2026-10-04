@@ -36,7 +36,7 @@ final class CapabilitiesTest {
     static void run() throws Exception {
         Harness.suite("thirteen capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.messages.senders", "orb.read.calls", "orb.understand", "orb.brief.daily", "orb.remind.local", "orb.handoff.communicate"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.messages.senders", "orb.observations.keep", "orb.read.calls", "orb.understand", "orb.brief.daily", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
@@ -65,6 +65,7 @@ final class CapabilitiesTest {
         Harness.check("the documents source is Observe and switchable, and says it keeps only what you tick and records only counts",
             Capabilities.byId(Capabilities.DOCUMENTS).tier.equals("Observe") && Capabilities.byId(Capabilities.DOCUMENTS).switchable
             && Capabilities.DOCUMENTS_SAYS.contains("only when you tap Look now") && Capabilities.DOCUMENTS_SAYS.contains("Nothing is kept unless you tick it; only counts are recorded"));
+        Harness.equal("keeping facts: its words are pinned", pin(Capabilities.OBS_KEEP_SAYS), "sha256:13b02d16b1184beefa61fa2709287459b7fdf2d6e0c0c11220827ed69056d096");
         Harness.equal("the call history's words are pinned", pin(Capabilities.CALLS_SAYS), "sha256:aae241a0f41bc9aee8883b3e20f7df6f5bd51cf6c4cfd6a6b6e78b12b4d193cd");
         Harness.check("the call history is Observe and switchable, says phone and a page being open, and that nothing is kept",
             Capabilities.byId(Capabilities.CALLS).tier.equals("Observe") && Capabilities.byId(Capabilities.CALLS).switchable

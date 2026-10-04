@@ -110,6 +110,14 @@ final class ObservationStore {
         return out;
     }
 
+    /**
+     * Whether a fact is worth keeping: everything that can open, move on or close a loop, or move money. `information.noted` is evidence only — it changes no
+     * loop and no ledger — so it is not kept (on the real inbox that is the difference between 347 bundles and 323).
+     */
+    static boolean keepable(Observation o) {
+        return !Observation.INFORMATION_NOTED.equals(o.type);
+    }
+
     // ---- months, sources
 
     static String monthOf(long ms, TimeZone zone) {
@@ -219,6 +227,7 @@ final class ObservationStore {
     static Kept keepAll(Context context, Journal journal, SenderRules.Quiet quiet, List<Observation> observations, TimeZone zone, String currentMonth) {
         Map<String, List<Observation>> groups = new TreeMap<>();
         for (Observation o : observations) {
+            if (!keepable(o)) continue;
             String k = o.sourceKind + "\u0000" + o.sourceId + "\u0000" + monthOf(o.occurredMs, zone);
             List<Observation> g = groups.get(k);
             if (g == null) { g = new ArrayList<>(); groups.put(k, g); }
@@ -266,6 +275,16 @@ final class ObservationStore {
         int n = 0;
         for (Live l : live(journal.readLines())) {
             if (!l.sourceKey.equals(key)) continue;
+            Erase.Result done = Erase.execute(context, journal, l.eventHash);
+            if (Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome)) n++;
+        }
+        return n;
+    }
+
+    /** Erases **everything** kept (every bundle's key is destroyed). The person's explicit act; switching keeping off never does this. Returns how many bundles. */
+    static int eraseAll(Context context, Journal journal) throws IOException {
+        int n = 0;
+        for (Live l : live(journal.readLines())) {
             Erase.Result done = Erase.execute(context, journal, l.eventHash);
             if (Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome)) n++;
         }

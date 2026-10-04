@@ -74,6 +74,8 @@ final class Capabilities {
     static final long BRIEF_VERSION = 1L;
     static final String SENDERS = "orb.messages.senders";
     static final long SENDERS_VERSION = 1L;
+    static final String OBS_KEEP = "orb.observations.keep";
+    static final long OBS_KEEP_VERSION = 1L;
     static final String UNDERSTAND = "orb.understand";
     static final long UNDERSTAND_VERSION = 1L;
     static final String DOCUMENTS = "orb.read.documents";
@@ -112,6 +114,11 @@ final class Capabilities {
     static final String SENDERS_SAYS =
         "Lets you say that a sender of service messages is not about your obligations. Orb remembers only your answer, against a key that reveals nothing, "
         + "and uses it to leave those messages out of what it reads from a message backup you choose. Nothing leaves the phone. You can take any answer back.";
+
+    static final String OBS_KEEP_SAYS =
+        "Keeps the facts Orb reads from a source you choose \u2014 an amount, a day, which service and what kind of fact \u2014 sealed on this phone, one bundle for each "
+        + "source and month, for 24 months, so that your money ledger and your obligations survive after you delete the backup file. It never keeps a message or "
+        + "any of its words. Nothing leaves the phone. Switching it off stops keeping and erases nothing; erasing what was kept is a separate choice you make.";
 
     static final String CALLS_SAYS =
         "Reads your call history \u2014 the number, time, length and kind of each call in the last year \u2014 only while a person's page is open, only on the phone, "
@@ -162,6 +169,10 @@ final class Capabilities {
             "your grant \u2014 a recorded decision, made at your first mark \u2014 and your own answer for each sender", Arrays.asList(SenderFacts.JUDGED),
             "Switch off sender marks", true,
             Arrays.asList("SenderRules", "SenderFacts", "SendersAccess", "Senders", "SenderSession", "SendersActivity")),
+        new Declaration(OBS_KEEP, OBS_KEEP_VERSION, "The facts Orb has read, kept sealed", OBS_KEEP_SAYS, TIER_OBSERVE,
+            "your grant \u2014 a recorded decision, made when you first say yes to keeping \u2014 and your tapping Keep each time", Arrays.asList(ObservationFacts.KEPT),
+            "Switch off keeping facts", true,
+            Arrays.asList("ObservationStore", "ObservationFacts", "KeepAccess", "Ledger", "LedgerActivity", "SourcesActivity")),
         new Declaration(CALLS, CALLS_VERSION, "When you last spoke with someone", CALLS_SAYS, TIER_OBSERVE,
             "your grant \u2014 a recorded decision \u2014 Android's own permission, and a person's page being open (only in the calls build)", Arrays.asList(CallsFacts.READ),
             "Switch off the call-history line", true,
@@ -381,6 +392,17 @@ final class Capabilities {
             String last = lastOfType(lines, SenderFacts.JUDGED);
             int quiet = SenderFacts.quietCount(lines);
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(last), last == null ? "no sender marked" : quiet + (quiet == 1 ? " sender is" : " senders are") + " quiet");
+        }
+        if (OBS_KEEP.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, OBS_KEEP);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String last = lastOfType(lines, ObservationFacts.KEPT);
+            int bundles = ObservationStore.bundles(lines);
+            return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(last), last == null ? "nothing kept yet" : bundles + (bundles == 1 ? " bundle" : " bundles") + " kept");
         }
         if (DOCUMENTS.equals(id)) {
             boolean granted;

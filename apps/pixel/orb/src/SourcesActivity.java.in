@@ -534,6 +534,9 @@ public final class SourcesActivity extends Activity {
         messageResults.addView(button("Senders\u2026 (mark those that are not about your obligations)", new View.OnClickListener() {
             @Override public void onClick(View view) { startActivity(new android.content.Intent(SourcesActivity.this, SendersActivity.class)); }
         }));
+        messageResults.addView(button("Keep what Orb read\u2026 (the facts, not the messages)", new View.OnClickListener() {
+            @Override public void onClick(View view) { confirmKeepFacts(); }
+        }));
         showFit();
         final java.util.TimeZone zone = java.util.TimeZone.getDefault();
         for (MessagesRules.Conversation c : rows) {
@@ -590,6 +593,81 @@ public final class SourcesActivity extends Activity {
             ? " and its screens read only the newest " + Recall.SCAN_LIMIT + " \u2014 this may push older ones out of view." : "; its screens read the newest " + Recall.SCAN_LIMIT + ".");
         tally.setText(ticked + (ticked == 1 ? " conversation ticked" : " conversations ticked") + " \u2014 up to " + items + (items == 1 ? " item" : " items")
             + " (at most " + MessagesRules.MAX_ITEMS_PER_KEEP + " per Keep)." + hold);
+    }
+
+    /** The facts (amounts, days, who) of the last Look that are worth keeping and inside the 24 months, and how many bundles they make. Counts only. */
+    private static final class Keepable {
+        final List<Observation> facts = new ArrayList<>();
+        int bundles;
+    }
+
+    private Keepable keepable() {
+        Keepable out = new Keepable();
+        if (messagesLook == null) return out;
+        java.util.TimeZone zone = java.util.TimeZone.getDefault();
+        String current = ObservationStore.monthOf(System.currentTimeMillis(), zone);
+        java.util.Set<String> groups = new java.util.HashSet<>();
+        for (Observation o : messagesLook.tally.observations(Senders.quiet(this, journal()))) {
+            if (!ObservationStore.keepable(o)) continue;
+            String month = ObservationStore.monthOf(o.occurredMs, zone);
+            if (!ObservationStore.inRetention(month, current)) continue;
+            out.facts.add(o);
+            groups.add(o.sourceKind + "|" + o.sourceId + "|" + month);
+        }
+        out.bundles = groups.size();
+        return out;
+    }
+
+    private void confirmKeepFacts() {
+        final Keepable k = keepable();
+        if (k.facts.isEmpty()) {
+            message("There are no facts to keep from this file.");
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Keep what Orb read?")
+            .setMessage("Orb will keep " + k.facts.size() + " facts \u2014 an amount, a day, which service and what kind of fact \u2014 sealed on this phone, in " + k.bundles
+                + " bundles (one for each sender and month), for 24 months. It will not keep any message or any of its words, and nothing leaves the phone. "
+                + "Months that have not changed are not written again. You can erase everything kept from the Money screen at any time.")
+            .setPositiveButton("Keep", new android.content.DialogInterface.OnClickListener() {
+                @Override public void onClick(android.content.DialogInterface d, int which) { keepFacts(k); }
+            })
+            .setNegativeButton("Not now", null)
+            .show();
+    }
+
+    private void keepFacts(final Keepable k) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        try {
+            KeepAccess.grant(this, journal);
+        } catch (IOException notRecorded) {
+            message("Orb could not record your yes, so it kept nothing.");
+            return;
+        }
+        looking = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                ObservationStore.Kept kept = null;
+                try {
+                    java.util.TimeZone zone = java.util.TimeZone.getDefault();
+                    kept = ObservationStore.keepAll(SourcesActivity.this, journal, Senders.quiet(SourcesActivity.this, journal), k.facts, zone,
+                        ObservationStore.monthOf(System.currentTimeMillis(), zone));
+                } catch (RuntimeException failed) {
+                    kept = null;
+                }
+                final ObservationStore.Kept done = kept;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        looking = false;
+                        if (messageResults == null) return;
+                        messageResults.addView(text(done == null ? "Orb could not keep these." : "Kept " + done.kept + " bundles. Unchanged, not written again: " + done.held
+                            + " \u00b7 outside the 24 months: " + done.outside + " \u00b7 from quiet senders: " + done.quiet + " \u00b7 could not be kept: " + done.failed
+                            + ". See them on the Money screen. Delete the backup file now.", 13, true));
+                    }
+                });
+            }
+        }).start();
     }
 
     private void keepMessages() {

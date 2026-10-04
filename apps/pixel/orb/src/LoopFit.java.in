@@ -41,6 +41,14 @@ final class LoopFit implements MessagesXml.Sink {
     /** Two or more rules read it as different loops (or as opening and closing). Counted apart, never forced into a kind. */
     static final String AMBIGUOUS = "ambiguous";
     static final String UNMAPPED = "unmapped";
+    /** The six-way disposition of one service message (`docs/MONEY_PHONE.md` §15): exactly one per message, summing to the service total. Coverage, not accuracy. */
+    static final String D_LOOP = "LOOP";
+    static final String D_NOT_A_LOOP = "NOT_A_LOOP";
+    static final String D_UNMAPPABLE = "UNMAPPABLE";
+    static final String D_AMBIGUOUS = "AMBIGUOUS";
+    static final String D_LEDGER_ONLY = "LEDGER_ONLY";
+    static final String D_CLOSURE_CANDIDATE = "CLOSURE_CANDIDATE";
+    static final List<String> DISPOSITIONS = Collections.unmodifiableList(java.util.Arrays.asList(D_LOOP, D_CLOSURE_CANDIDATE, D_LEDGER_ONLY, D_NOT_A_LOOP, D_AMBIGUOUS, D_UNMAPPABLE));
     static final List<String> ROLES = Collections.unmodifiableList(java.util.Arrays.asList(OPENS, ADVANCES, CLOSES, EVIDENCE, NOISE, AMBIGUOUS, UNMAPPED));
 
     /** What one message was read as. `kind` and `owner` are a protocol kind and next mover for opens/advances/closes, else null; `tag` names why for noise. */
@@ -115,6 +123,22 @@ final class LoopFit implements MessagesXml.Sink {
         final Map<String, Long> ambiguousPairs = new HashMap<>();
         /** The normalized observations of this sender (no raw text), as far as `MAX_KEPT` allows. */
         final List<Observation> observations = new ArrayList<>();
+        /** One entry per message: what is needed to give it a disposition once correlation is known. No words. */
+        final List<Msg> msgs = new ArrayList<>();
+    }
+
+    /** What a message was, without its words: its role, whether any fact it states opens or moves on a loop, whether it moved money, and its facts' ids. */
+    private static final class Msg {
+        final String role;
+        final boolean loop;
+        final boolean money;
+        final List<String> ids = new ArrayList<>();
+
+        Msg(String role, boolean loop, boolean money) {
+            this.role = role;
+            this.loop = loop;
+            this.money = money;
+        }
     }
 
     private final Map<String, Tally> senders = new HashMap<>();
@@ -152,7 +176,16 @@ final class LoopFit implements MessagesXml.Sink {
         if (UNMAPPED.equals(r.role)) t.unmapped++;
         if (AMBIGUOUS.equals(r.role)) bumpCapped(t.ambiguousPairs, r.rule, 40, "other");
         if (n.discarded != null) bump(t.counts, "discard." + n.discarded);
+        boolean loopy = false, money = false;
         for (Observation o : n.observations) {
+            Interpreter.Effect e = Interpreter.effectOf(o, false);
+            if (Interpreter.OPEN.equals(e.type) || Interpreter.ADVANCE.equals(e.type)) loopy = true;
+            if (Observation.VALUE_MOVED.equals(o.type)) money = true;
+        }
+        Msg msg = new Msg(r.role, loopy, money);
+        t.msgs.add(msg);
+        for (Observation o : n.observations) {
+            msg.ids.add(o.id);
             bump(t.counts, "obs." + o.type);
             if (keptCount >= MAX_KEPT) { cutKept++; continue; }
             keptCount++;
@@ -268,6 +301,21 @@ final class LoopFit implements MessagesXml.Sink {
         return SenderRules.order(rows);
     }
 
+    private static boolean closes(Msg m, java.util.Set<String> closing) {
+        for (String id : m.ids) if (closing.contains(id)) return true;
+        return false;
+    }
+
+    /** The normalized facts read so far, with nobody's words: those of every sender that is not quiet, in no particular order. This is what `ObservationStore` keeps. */
+    List<Observation> observations(SenderRules.Quiet quiet) {
+        List<Observation> out = new ArrayList<>();
+        for (Map.Entry<String, Tally> e : senders.entrySet()) {
+            if (!e.getKey().isEmpty() && quiet.quiet(e.getKey())) continue;
+            out.addAll(e.getValue().observations);
+        }
+        return out;
+    }
+
     /** The reading with nobody quiet. For tests and diagnostics: a reader of the person's messages calls `report(Quiet)` with their marks. */
     Report report() {
         return report(SenderRules.NONE);
@@ -283,6 +331,7 @@ final class LoopFit implements MessagesXml.Sink {
         Map<String, Long> brands = new HashMap<>();
         Map<String, Long> pairs = new HashMap<>();
         List<Observation> facts = new ArrayList<>();
+        List<Msg> pending = new ArrayList<>();
         long hid = 0, quietMessages = 0, quietSenders = 0;
         for (Map.Entry<String, Tally> e : senders.entrySet()) {
             Tally t = e.getValue();
@@ -293,6 +342,7 @@ final class LoopFit implements MessagesXml.Sink {
                 add(out, NOISE, t.messages);
                 add(tags, "sender", t.messages);
                 add(out, "discard.quiet", t.messages);
+                add(out, "disposition." + D_NOT_A_LOOP, t.messages);
                 continue;
             }
             for (Map.Entry<String, Long> c : t.counts.entrySet()) add(out, c.getKey(), c.getValue());
@@ -300,6 +350,7 @@ final class LoopFit implements MessagesXml.Sink {
             for (Map.Entry<String, Long> c : t.ambiguousPairs.entrySet()) add(pairs, c.getKey(), c.getValue());
             if (t.unmapped > 0) add(brands, brandOfSender(e.getKey()), t.unmapped);
             facts.addAll(t.observations);
+            pending.addAll(t.msgs);
         }
         // Correlate, then interpret: which payments look like the end of something open, and what each observation does to loops. Order does not matter.
         Correlator.Result matched = Correlator.run(facts);
@@ -313,6 +364,18 @@ final class LoopFit implements MessagesXml.Sink {
             }
             add(out, "effect." + effect.type, 1L);
         }
+        // Each message, once: ambiguous, unmappable, closure candidate, loop, ledger only, else not a loop.
+        for (Msg m : pending) {
+            String d;
+            if (AMBIGUOUS.equals(m.role)) d = D_AMBIGUOUS;
+            else if (UNMAPPED.equals(m.role)) d = D_UNMAPPABLE;
+            else if (closes(m, matched.closing)) d = D_CLOSURE_CANDIDATE;
+            else if (m.loop) d = D_LOOP;
+            else if (m.money) d = D_LEDGER_ONLY;
+            else d = D_NOT_A_LOOP;
+            add(out, "disposition." + d, 1L);
+        }
+        for (String d : DISPOSITIONS) if (!out.containsKey("disposition." + d)) out.put("disposition." + d, 0L);
         for (String role : ROLES) if (!out.containsKey(role)) out.put(role, 0L);
         for (Map.Entry<String, Long> c : tags.entrySet()) out.put("noise." + c.getKey(), c.getValue());
         out.put("match.opens", matched.openers);

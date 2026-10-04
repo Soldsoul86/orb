@@ -1443,9 +1443,11 @@ box — **where they are the app's by design, like the number**.
 
 ## DR-44 — Money is an adapter and a view on the Observation seam, not a module
 
-- **Status:** **Proposed** — awaiting the operator (`MONEY_PHONE.md`) · **Proposed:** 2026-10-04, after the operator's direction "design Money as a Money adapter over the Observation seam; the first experiment is whether Orb can turn financial observations into ledger entries and correlate only the subset that corresponds to known Loops".
+- **Status:** **Decided; slice A in build** (`MONEY_PHONE.md` §15) · **Decided:** 2026-10-04, operator ("A → B → C — approved … CSV first, one account — approved … payee sealed … hard bars … precision reported, never used as a gate … ICS as third source"); proposed after the operator's direction "design Money as a Money adapter over the Observation seam; the first experiment is whether Orb can turn financial observations into ledger entries and correlate only the subset that corresponds to known Loops".
 
 **The proposal.** Money adds **no Observation type, no Interpreter effect and no kernel contract**. It adds a **statement adapter** (a second source of `value.moved`, with the bank's own references, read from a CSV the person picks; the phone gains no network permission), **corroboration** (a computed, order-independent rule so a payment seen by two sources is one movement in the ledger), a read-only **ledger view that says "moved", never "spent"**, the first caller of `ObservationStore.keep` behind one new capability, and the person's answer to a `CLOSURE_CANDIDATE` (*Mark paid* · *Not this* · *Already paid*) as the instrument that measures correlation. Success measures are stated before anything is built (§12). The app-facing API stays unbuilt until three unlike sources share the seam (§10).
+
+**Also ruled:** the ledger is not a view of loops (₹8,421 moved with no loop; a GIVE with no movement) — they meet only in correlation. Precision is reported, never a gate: "20 good answers" must never become "Orb may now close payments".
 
 **Not in this proposal:** categories and budgets, recurrence, trade fills (`value.exchanged`), XLSX/PDF statements, a notification listener, the public API.
 

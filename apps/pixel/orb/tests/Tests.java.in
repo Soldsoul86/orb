@@ -39,6 +39,7 @@ public final class Tests {
         LoopTest.run();
         SenderTest.run();
         ObservationTest.run();
+        LedgerTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }

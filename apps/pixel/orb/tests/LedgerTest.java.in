@@ -1,0 +1,341 @@
+package @PKG@;
+
+import android.content.Context;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.TimeZone;
+
+/**
+ * Money (`docs/MONEY_PHONE.md`, DR-44), slice A: the ledger \u2014 money **moved**, counted once, in any order \u2014 its corroboration rule held with *two adapters* even
+ * though only one exists yet, keeping and replaying the facts, the capability, and the guards on what the ledger may say and read.
+ */
+final class LedgerTest {
+    private LedgerTest() {}
+
+    private static final long DAY = 86_400_000L;
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+
+    private static Observation sms(String sender, String direction, long minor, long day) {
+        return Observation.of(Observation.VALUE_MOVED).source("sms.sender", sender, Observation.T0).times(day * DAY + 12 * 3_600_000L, day * DAY + 12 * 3_600_000L)
+            .direction(direction).object(Observation.MONEY, minor, "INR").confidence(90).build();
+    }
+
+    /** A second adapter, as a statement will be: a different adapter id and source kind, a reference of its own where the row had one. */
+    private static Observation statement(String account, String direction, long minor, long day, String reference, String basis) {
+        return Observation.of(Observation.VALUE_MOVED).source("account", account, Observation.T1).adapter("statement.test", 1L).times(day * DAY, day * DAY)
+            .direction(direction).object(Observation.MONEY, minor, "INR").subject("payment", reference, basis, "", 1L).confidence(95).build();
+    }
+
+    private static Observation statementIn(String currency, long minor, long day) {
+        return Observation.of(Observation.VALUE_MOVED).source("account", "ACCT", Observation.T1).adapter("statement.test", 1L).times(day * DAY, day * DAY)
+            .direction("in").object(Observation.MONEY, minor, currency).build();
+    }
+
+    static void run() throws Exception {
+        movements();
+        conformance();
+        months();
+        keeping();
+        access();
+        guards();
+        dispositions();
+    }
+
+    private static int witnesses(List<Ledger.Movement> all, int index) {
+        return all.get(index).witnesses.size();
+    }
+
+    private static void movements() {
+        Harness.suite("movements: one real event is one movement, however many sources saw it");
+        List<Observation> smsOnly = Arrays.asList(sms("BANKA", "out", 500L, 10L), sms("BANKB", "out", 500L, 10L), sms("BANKA", "out", 500L, 11L), sms("BANKA", "in", 500L, 10L));
+        Harness.equal("one adapter: every fact is its own movement, even the same amount on the same day from two senders", Ledger.movements(smsOnly).size(), 4);
+
+        List<Ledger.Movement> pair = Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 10L, "", "inferred")));
+        Harness.check("two adapters, the same direction, currency and amount on the same day: one movement with two witnesses", pair.size() == 1 && witnesses(pair, 0) == 2 && !pair.get(0).pairedByCount);
+        Harness.equal("it is shown under the account of its first witness by adapter, so it is always the same account", pair.get(0).account(), "BANKA");
+        Harness.equal("a day apart still pairs", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 11L, "", "inferred"))).size(), 1);
+        Harness.equal("two days apart does not", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 12L, "", "inferred"))).size(), 2);
+        Harness.equal("a different amount does not", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 501L, 10L, "", "inferred"))).size(), 2);
+        Harness.equal("a different direction does not", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "in", 500L, 10L, "", "inferred"))).size(), 2);
+        Harness.equal("a different currency does not", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statementIn("USD", 500L, 10L))).size(), 2);
+
+        
+        Harness.equal("two chai at the same price on the same day seen by one adapter are two movements (an identical fact twice is one fact)", Ledger.movements(Arrays.asList(sms("UPI", "out", 4000L, 10L), sms("UPI", "out", 4000L, 10L))).size(), 1);
+        List<Observation> sameDayTwice = Arrays.asList(sms("UPI", "out", 4000L, 10L), sms("UPI2", "out", 4000L, 10L), statement("ACCT", "out", 4000L, 10L, "", "inferred"), statement("ACCT2", "out", 4000L, 10L, "", "inferred"));
+        List<Ledger.Movement> counted = Ledger.movements(sameDayTwice);
+        Harness.check("two payments, each seen by both: two movements of two witnesses each, not one of four", counted.size() == 2 && witnesses(counted, 0) == 2 && witnesses(counted, 1) == 2);
+        Harness.check("and since the partner was not unique they say they paired by count", counted.get(0).pairedByCount || counted.get(1).pairedByCount);
+        List<Ledger.Movement> surplus = Ledger.movements(Arrays.asList(sms("UPI", "out", 4000L, 10L), sms("UPI2", "out", 4000L, 10L), statement("ACCT", "out", 4000L, 10L, "", "inferred")));
+        Harness.check("two seen by SMS and one by the statement: two movements, one witnessed twice and one once", surplus.size() == 2 && witnessesTotal(surplus) == 3);
+        Harness.equal("a movement holds at most one witness per adapter", maxPerAdapter(counted) + "|" + maxPerAdapter(surplus), "1|1");
+
+        Harness.equal("the same reference pairs them", Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 10L, "UTR1", "observed"))).size(), 1);
+        List<Observation> bothRef = Arrays.asList(statement("ACCT", "out", 500L, 10L, "UTR1", "observed"), statement("ACCT", "out", 500L, 10L, "UTR1", "observed"));
+        Harness.equal("a reference the source gave is part of what the fact is; one source's fact twice is one fact", Ledger.movements(bothRef).size(), 1);
+        Observation other = Observation.of(Observation.VALUE_MOVED).source("export", "OTHER", Observation.T1).adapter("other.test", 1L).times(10L * DAY, 10L * DAY).direction("out")
+            .object(Observation.MONEY, 500L, "INR").subject("payment", "UTR2", "stated", "", 1L).build();
+        Harness.equal("two references that are both the source's own and differ are different payments", Ledger.movements(Arrays.asList(statement("ACCT", "out", 500L, 10L, "UTR1", "observed"), other)).size(), 2);
+        Harness.equal("an inferred reference is not one: it does not stop a pairing", Ledger.movements(Arrays.asList(statement("ACCT", "out", 500L, 10L, "UTR1", "observed"),
+            Observation.of(Observation.VALUE_MOVED).source("export", "OTHER", Observation.T1).adapter("other.test", 1L).times(10L * DAY, 10L * DAY).direction("out").object(Observation.MONEY, 500L, "INR")
+                .subject("payment", "zzz", "inferred", "r", 1L).build())).size(), 1);
+
+        Harness.equal("a fact that is not money moved is not in the ledger", Ledger.movements(Arrays.asList(Observation.of(Observation.OBLIGATION_STATED).bearer("me").object(Observation.MONEY, 500L, "INR").build(),
+            Observation.of(Observation.INFORMATION_NOTED).object(Observation.MONEY, 500L, "INR").build())).size(), 0);
+        Harness.equal("nor is a movement with no amount", Ledger.movements(Arrays.asList(Observation.of(Observation.VALUE_MOVED).direction("out").build())).size(), 0);
+
+        List<Observation> mixed = new ArrayList<>(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 10L, "", "inferred"), sms("BANKB", "in", 900L, 11L), sms("BANKB", "out", 500L, 11L),
+            statement("ACCT", "out", 500L, 11L, "", "inferred"), sms("UPI", "out", 4000L, 12L), sms("UPI2", "out", 4000L, 12L), statement("ACCT", "out", 4000L, 12L, "", "inferred")));
+        String want = Ledger.fingerprint(Ledger.movements(mixed));
+        boolean same = true;
+        for (int seed = 0; seed < 40; seed++) {
+            List<Observation> shuffled = new ArrayList<>(mixed);
+            Collections.shuffle(shuffled, new Random(seed));
+            same &= Ledger.fingerprint(Ledger.movements(shuffled)).equals(want);
+        }
+        Harness.check("the same observations in any order give the same movements", same);
+        List<Observation> twice = new ArrayList<>(mixed);
+        twice.addAll(mixed);
+        Harness.equal("and reading everything twice changes nothing", Ledger.fingerprint(Ledger.movements(twice)), want);
+        Harness.check("the fingerprint is a hash of facts, and moves when a fact moves", want.matches("[0-9a-f]{64}") && !Ledger.fingerprint(Ledger.movements(mixed.subList(1, mixed.size()))).equals(want));
+    }
+
+    private static Object fixture(String name) throws Exception {
+        Path p = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/money/" + name);
+        return MiniJson.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+    }
+
+    private static void conformance() throws Exception {
+        Harness.suite("the corroboration rule, held to the language-neutral corpus in docs/fixtures/money");
+        java.util.Map<String, Object> corpus = MiniJson.map(fixture("corroboration.json"));
+        Harness.equal("the corpus names the rule this implements", corpus.get("rule"), Ledger.RULE + ".v" + Ledger.RULE_VERSION);
+        for (Object c : (List<?>) corpus.get("cases")) {
+            java.util.Map<String, Object> one = MiniJson.map(c);
+            List<Observation> facts = new ArrayList<>();
+            for (Object f : (List<?>) one.get("facts")) {
+                java.util.Map<String, Object> x = MiniJson.map(f);
+                String ref = (String) x.get("ref");
+                facts.add(Observation.of(Observation.VALUE_MOVED).source("src", (String) x.get("source"), Observation.T0).adapter((String) x.get("adapter"), 1L)
+                    .times(MiniJson.num(x.get("day")) * DAY + 12 * 3_600_000L, 0L).direction((String) x.get("direction")).object(Observation.MONEY, MiniJson.num(x.get("minor")), "INR")
+                    .subject("payment", ref, (String) x.get("basis"), "", 1L).build());
+            }
+            List<Integer> want = new ArrayList<>();
+            for (Object w : (List<?>) one.get("witnesses")) want.add((int) MiniJson.num(w));
+            Collections.sort(want);
+            boolean allOrders = true;
+            String got = "";
+            for (int seed = 0; seed < 12; seed++) {
+                List<Observation> shuffled = new ArrayList<>(facts);
+                Collections.shuffle(shuffled, new Random(seed));
+                List<Ledger.Movement> made = Ledger.movements(shuffled);
+                List<Integer> counts = new ArrayList<>();
+                for (Ledger.Movement m : made) counts.add(m.witnesses.size());
+                Collections.sort(counts);
+                got = made.size() + " " + counts;
+                allOrders &= got.equals(MiniJson.num(one.get("movements")) + " " + want);
+            }
+            Harness.check((String) one.get("name") + ": " + one.get("movements") + " movement(s), witnesses " + want + ", in every order", allOrders);
+        }
+    }
+
+    private static int witnessesTotal(List<Ledger.Movement> all) {
+        int n = 0;
+        for (Ledger.Movement m : all) n += m.witnesses.size();
+        return n;
+    }
+
+    private static int maxPerAdapter(List<Ledger.Movement> all) {
+        int max = 0;
+        for (Ledger.Movement m : all) {
+            java.util.Map<String, Integer> per = new java.util.HashMap<>();
+            for (Observation o : m.witnesses) per.merge(o.adapterId, 1, Integer::sum);
+            for (int v : per.values()) max = Math.max(max, v);
+        }
+        return max;
+    }
+
+    private static long day(String iso) {
+        return java.time.LocalDate.parse(iso).toEpochDay();
+    }
+
+    private static void months() {
+        Harness.suite("a month of the ledger: moved, per account and currency \u2014 never added together");
+        List<Observation> facts = Arrays.asList(sms("BANKA", "out", 150000L, day("2026-09-30")), sms("BANKA", "out", 25050L, day("2026-10-01")), sms("BANKA", "out", 100L, day("2026-10-02")), sms("BANKA", "in", 99900L, day("2026-10-02")),
+            sms("BANKB", "out", 700L, day("2026-10-03")), statementIn("USD", 12345L, day("2026-10-03")));
+        List<Ledger.Movement> all = Ledger.movements(facts);
+        Harness.equal("the months that have a movement, oldest first", Ledger.months(all, UTC).toString(), "[2026-09, 2026-10]");
+        Ledger.Month oct = Ledger.month(all, "2026-10", UTC);
+        Harness.equal("five movements in October", oct.movements.size(), 5);
+        StringBuilder lines = new StringBuilder();
+        for (Ledger.Line l : oct.lines) lines.append(Ledger.say(l)).append(" / ");
+        Harness.equal("a line for each account and currency, in a fixed order, amounts in whole units with two places", lines.toString(),
+            "ACCT: USD 0.00 out (0) \u00b7 USD 123.45 in (1) / BANKA: \u20b9251.50 out (2) \u00b7 \u20b9999.00 in (1) / BANKB: \u20b97.00 out (1) \u00b7 \u20b90.00 in (0) / ");
+        Harness.equal("September is its own month", Ledger.month(all, "2026-09", UTC).lines.get(0).outMinor, 150000L);
+        Harness.equal("a thousands separator", Ledger.amount(123456789L), "1,234,567.89");
+        Harness.equal("and a cent", Ledger.amount(5L), "0.05");
+        long midnight = day("2026-10-01") * DAY - 1;
+        Observation late = Observation.of(Observation.VALUE_MOVED).source("sms.sender", "BANKA", Observation.T0).times(midnight, midnight).direction("out").object(Observation.MONEY, 100L, "INR").build();
+        Harness.equal("the month is the person's calendar month, not UTC's", Ledger.months(Ledger.movements(Arrays.asList(late)), TimeZone.getTimeZone("Asia/Kolkata")) + "|" + Ledger.months(Ledger.movements(Arrays.asList(late)), UTC), "[2026-10]|[2026-09]");
+        String line = Ledger.say(all.get(0), UTC);
+        Harness.check("a movement's line says the day, the amount, the direction, the account and how often it was seen", line.contains("30 Sep") && line.contains("\u20b91,500.00 out") && line.contains("BANKA") && line.contains("seen once"));
+        List<Ledger.Movement> two = Ledger.movements(Arrays.asList(sms("BANKA", "out", 500L, 10L), statement("ACCT", "out", 500L, 10L, "", "inferred")));
+        Harness.check("a corroborated one says so", Ledger.say(two.get(0), UTC).contains("seen by 2 sources"));
+        Ledger.Line l = Ledger.month(two, Ledger.months(two, UTC).get(0), UTC).lines.get(0);
+        Harness.equal("and the line counts movements seen once and by more than one", l.single + "|" + l.corroborated, "0|1");
+    }
+
+    private static Context[] box() {
+        return new Context[1];
+    }
+
+    private static Journal open(Context[] holder) throws Exception {
+        Install.forget();
+        Context context = new Context(Files.createTempDirectory("orb-ledger").toFile());
+        holder[0] = context;
+        return Journal.open(context, Install.lane(context), Install.id(context));
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static void keeping() throws Exception {
+        Harness.suite("keeping and replaying: the ledger from the sealed facts is the ledger from the live ones");
+        Context[] holder = box();
+        Journal journal = open(holder);
+        Context context = holder[0];
+        List<Observation> live = new ArrayList<>(Arrays.asList(sms("BANKA", "out", 500L, day("2026-09-10")), sms("BANKA", "in", 900L, day("2026-09-11")), sms("BANKB", "out", 500L, day("2026-09-10")),
+            sms("BANKA", "out", 600L, day("2026-10-02")), statement("ACCT", "out", 500L, day("2026-09-10"), "", "inferred")));
+        Observation note = Observation.of(Observation.INFORMATION_NOTED).source("sms.sender", "BANKA", Observation.T0).times(day("2026-10-02") * DAY, 0L).object(Observation.MONEY, 12345L, "INR").build();
+        Observation bill = Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", "BANKA", Observation.T0).times(day("2026-10-01") * DAY, 0L).bearer("me").object(Observation.MONEY, 700L, "INR").build();
+        List<Observation> offered = new ArrayList<>(live);
+        offered.add(note);
+        offered.add(bill);
+        ObservationStore.Kept kept = ObservationStore.keepAll(context, journal, SenderRules.NONE, offered, UTC, "2026-10");
+        Harness.equal("bundles by source and month: BANKA's two months, BANKB's one, the statement's one (the note is evidence only and is not kept)", kept.kept, 4);
+        Harness.check("information.noted is not kept; the bill is", !ObservationStore.keepable(note) && ObservationStore.keepable(bill) && ObservationStore.keepable(live.get(0)));
+        List<Observation> back = ObservationStore.load(context, journal, SenderRules.NONE);
+        Harness.equal("replay holds every kept fact and not the note", back.size(), 6);
+        Harness.equal("replay == live: the ledger from the sealed bundles has the same fingerprint as the ledger from the live facts", Ledger.fingerprint(Ledger.movements(back)), Ledger.fingerprint(Ledger.movements(live)));
+        Harness.equal("keeping again writes nothing", ObservationStore.keepAll(context, journal, SenderRules.NONE, offered, UTC, "2026-10").held + "|" + count(journal, ObservationFacts.KEPT), "4|4");
+        final java.util.Set<String> quietIds = new java.util.HashSet<>(Arrays.asList("BANKB"));
+        SenderRules.Quiet quiet = new SenderRules.Quiet() {
+            @Override public boolean quiet(String id) { return quietIds.contains(id); }
+        };
+        Harness.equal("a quiet sender's money is out of the ledger while it is quiet", Ledger.movements(ObservationStore.load(context, journal, quiet)).size(), 3);
+        Harness.equal("and back in when taken back", Ledger.movements(ObservationStore.load(context, journal, SenderRules.NONE)).size(), 4);
+        String journalText = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no amount, sender code or account: only blinded keys, months and counts", !journalText.contains("BANKA") && !journalText.contains("BANKB") && !journalText.contains("ACCT") && !journalText.contains("\"minor\""));
+        Harness.equal("erasing everything destroys every bundle", ObservationStore.eraseAll(context, journal) + "|" + ObservationStore.bundles(journal.readLines()) + "|" + ObservationStore.load(context, journal, SenderRules.NONE).size(), "4|0|0");
+        Harness.check("the record that they were kept stays, with nothing in it", count(journal, ObservationFacts.KEPT) == 4 && count(journal, "orb.erasure") >= 4);
+    }
+
+    private static void access() throws Exception {
+        Harness.suite("the capability to keep: a recorded decision, switchable, taken back after a restore");
+        Context[] holder = box();
+        Journal journal = open(holder);
+        Context context = holder[0];
+        Harness.check("off until the person says yes", !KeepAccess.granted(context) && !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        KeepAccess.grant(context, journal);
+        Harness.check("a yes is an event and then a flag", KeepAccess.granted(context) && PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        KeepAccess.grant(context, journal);
+        Harness.equal("saying yes twice records one grant", count(journal, PackageGrants.GRANTED), 1);
+        ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", Arrays.asList(sms("BANKA", "out", 500L, day("2026-09-10"))), "2026-10");
+        KeepAccess.revoke(context, journal);
+        Harness.check("switching off stops it and says so", !KeepAccess.granted(context) && !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        Harness.equal("and erases nothing", ObservationStore.bundles(journal.readLines()), 1);
+        KeepAccess.grant(context, journal);
+        new java.io.File(context.getFilesDir(), "observations-keep.granted").delete();
+        KeepAccess.reconcile(context, journal);
+        Harness.check("a restore that brings the grant back without the flag is made to agree", !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        Capabilities.Status status = Capabilities.status(Capabilities.OBS_KEEP, journal.readLines());
+        Harness.check("the screen says OFF, and what is kept", status.state.startsWith("OFF") && status.lastDetail.contains("1 bundle"));
+        Harness.check("the capability is declared once, observe-tier and switchable, and records as the bundle event", Capabilities.ids().contains(Capabilities.OBS_KEEP) && Capabilities.OBS_KEEP_SAYS.contains("24 months") && Capabilities.OBS_KEEP_SAYS.contains("never keeps a message"));
+    }
+
+    private static String code(String source) {
+        return source.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", "");
+    }
+
+    private static String read(String name) throws Exception {
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        return new String(Files.readAllBytes(root.resolve("src/" + name + ".java.in")), StandardCharsets.UTF_8);
+    }
+
+    private static int occurrences(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) n++;
+        return n;
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("what the ledger may say, read and do \u2014 held by the source");
+        String ledger = code(read("Ledger"));
+        Harness.check("the ledger is not a view of loops: it names no loop, correlator, interpreter or commitment", !ledger.contains("LoopRules") && !ledger.contains("Correlator") && !ledger.contains("Interpreter") && !ledger.contains("Commitment"));
+        Harness.check("it is pure: no storage, clock, Android or pattern", !ledger.contains("Context") && !ledger.contains("currentTimeMillis") && !ledger.contains("import android") && !ledger.contains("Pattern") && !ledger.contains("Journal"));
+        Harness.check("it reads value.moved and nothing else", ledger.contains("VALUE_MOVED") && !ledger.contains("OBLIGATION") && !ledger.contains("REQUEST"));
+        Harness.check("it never says spent or earned", !ledger.toLowerCase().contains("spent") && !ledger.toLowerCase().contains("earned") && !ledger.toLowerCase().contains("income") && !ledger.toLowerCase().contains("expense"));
+        String screen = read("LedgerActivity");
+        Harness.equal("the screen says spent and earned once each: to say it does not show them", occurrences(code(screen), "spent") + "|" + occurrences(code(screen), "earned"), "1|1");
+        Harness.check("the screen is secure like Recall", screen.contains("FLAG_SECURE"));
+        Harness.check("the screen reads only what was kept: it calls load, never a message reader", screen.contains("ObservationStore.load(") && !screen.contains("MessagesReader") && !screen.contains("MessagesFile"));
+        Harness.check("erasing is an explicit, confirmed act on the screen, and nothing else erases the kept facts", screen.contains("eraseAll(") && screen.contains("setPositiveButton(\"Erase\"")
+            && !code(read("SourcesActivity")).contains("eraseAll(") && !code(read("MayDoActivity")).contains("eraseAll(") && !code(read("KeepAccess")).contains("eraseAll("));
+        int callers = 0;
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (!name.endsWith(".java.in") || name.startsWith("ObservationStore")) continue;
+                callers += occurrences(code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)), "ObservationStore.keepAll(");
+            }
+        }
+        Harness.equal("one place keeps facts \u2014 the Keep dialog on the Sources screen", callers, 1);
+        String sources = code(read("SourcesActivity"));
+        Harness.check("and it asks first, then records the person's yes before it keeps", sources.indexOf("setPositiveButton(\"Keep\"") > 0 && sources.indexOf("KeepAccess.grant(") < sources.indexOf("ObservationStore.keepAll(")
+            && sources.contains("will not keep any message or any of its words"));
+        Harness.check("a revoked capability stops keeping: keepFacts is only reached from the dialog, which only the button opens", occurrences(read("SourcesActivity"), "keepFacts(k);") == 1 && occurrences(read("SourcesActivity"), "confirmKeepFacts();") == 1);
+        Harness.check("the manifest declares the screen, not exported", code(read("MainActivity")).contains("LedgerActivity.class")
+            && new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").matches("(?s).*<activity\\s+android:name=\"\\.LedgerActivity\"\\s+android:exported=\"false\"\\s*/>.*"));
+    }
+
+    private static void dispositions() throws Exception {
+        Harness.suite("the six-way disposition of every service message: coverage, never accuracy");
+        LoopFit fit = new LoopFit();
+        long day = System.currentTimeMillis();
+        String[][] messages = {
+            {"VM-TESTBK", "Your electricity bill of Rs.500.00 is due on 05-Oct. Pay now."},
+            {"VM-TESTBK", "Rs.500.00 debited from A/c XX0000 on 01-Oct. UPI Ref 123."},
+            {"VM-TESTBK", "Rs.500.00 debited from A/c XX0000 on 01-Oct. UPI Ref 124."},
+            {"VM-SHOP", "Your refund of Rs.300.00 has been initiated and will reflect in 5-7 days."},
+            {"VM-PROMO", "Flat 50% off on everything. Use code SAVE50. Shop now!"},
+            {"VM-OTPBK", "123456 is your OTP for login. Do not share it."},
+            {"VM-ODDBK", "Zzzz qqq wwww xyxyx."},
+        };
+        long t = 1_790_000_000_000L;
+        for (String[] m : messages) fit.message(new MessagesRules.Message(m[0], "", t += 1000L, 1, m[1]));
+        fit.message(new MessagesRules.Message("+919000000001", "", t += 1000L, 1, "see you at five"));
+        LoopFit.Report r = fit.report();
+        long sum = 0;
+        for (String d : LoopFit.DISPOSITIONS) sum += r.get("disposition." + d);
+        Harness.equal("every service message has exactly one disposition: they add up to the service total", sum, r.service);
+        Harness.equal("a message from a person is counted and not read, so it has none", r.conversational, 1L);
+        Harness.equal("the payment that matches the open bill is a closure candidate", r.get("disposition.CLOSURE_CANDIDATE"), 1L);
+        Harness.equal("a payment with nothing open is ledger only", r.get("disposition.LEDGER_ONLY"), 1L);
+        Harness.equal("the refund begun moves a loop on", r.get("disposition.LOOP") + "|" + r.get("disposition.UNMAPPABLE") + "|" + r.get("disposition.AMBIGUOUS"), "2|1|0");
+        Harness.equal("a promotion and a code are not loops", r.get("disposition.NOT_A_LOOP"), 2L);
+        Harness.equal("the figures agree with the ledger's own: closure candidates and ledger-only are the fit report's own", r.get("closure.candidates") + "|" + r.get("ledger.only"), "1|1");
+        LoopFit.Report quiet = fit.report(new SenderRules.Quiet() { @Override public boolean quiet(String id) { return "TESTBK".equals(id); } });
+        long qsum = 0;
+        for (String d : LoopFit.DISPOSITIONS) qsum += quiet.get("disposition." + d);
+        Harness.equal("a quiet sender's messages are not loops, and the dispositions still add up", qsum + "|" + quiet.get("disposition.NOT_A_LOOP"), quiet.service + "|5");
+    }
+}

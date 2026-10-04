@@ -175,6 +175,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.OBS_KEEP)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.OBS_KEEP);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is on, so no control is offered on a guess.
+            }
+            final boolean keepOn = known;
+            b.setText(keepOn ? "Switch off keeping facts" : "Turn on (opens Sources)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (keepOn) {
+                        KeepAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, SourcesActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Capabilities.UNDERSTAND)) {
             boolean known;
             try {

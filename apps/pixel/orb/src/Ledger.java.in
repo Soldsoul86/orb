@@ -1,0 +1,252 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/**
+ * The money ledger (`docs/MONEY_PHONE.md` \u00a74\u20135, DR-44): **money moved**, computed from `value.moved` observations and from nothing else. It is a view \u2014 never
+ * stored, so it cannot disagree with the observations \u2014 and **it is not a view of loops**: it does not consult one. \u20b98,421 may have moved with no loop at all,
+ * and a loop may owe \u20b98,421 with nothing moved yet; they meet only in correlation (`Correlator`).
+ *
+ * **A movement is one real-world event, however many sources saw it.** Corroboration (`money.corroborate.v1`) is deliberately narrow: two observations are one
+ * movement only if they come from **different adapters**, have the same direction, currency and amount to the minor unit, happened within one day of each other,
+ * and \u2014 where both give a reference of their own \u2014 the same reference. A movement holds **at most one witness per adapter**: two payments of \u20b940 in one day
+ * seen by the same adapter are two movements, and two senders of the same adapter are never paired by this rule. Pairing is by count and never merges;
+ * when more than one partner was possible the movement says so (`pairedByCount`). The result does not depend on the order the observations arrive in.
+ *
+ * It says **moved**, never spent or earned, and it never adds one currency to another.
+ */
+final class Ledger {
+    private Ledger() {}
+
+    static final String RULE = "money.corroborate";
+    static final long RULE_VERSION = 1L;
+    /** Observations of different adapters this near (in days) can be one movement. */
+    static final int WINDOW_DAYS = 1;
+
+    /** One real-world movement of money, and who saw it. */
+    static final class Movement {
+        final List<Observation> witnesses = new ArrayList<>();
+        /** More than one partner was possible when this was paired: it paired by count, not by a reference. */
+        boolean pairedByCount;
+
+        Observation first() {
+            return witnesses.get(0);
+        }
+
+        String direction() {
+            return first().direction;
+        }
+
+        String currency() {
+            return first().currency;
+        }
+
+        long minor() {
+            return first().minor;
+        }
+
+        long occurredMs() {
+            return first().occurredMs;
+        }
+
+        /** The account it is shown under: the source of its first witness (by adapter, then source). */
+        String account() {
+            return first().sourceId;
+        }
+
+        boolean seenBy(String adapterId) {
+            for (Observation o : witnesses) if (o.adapterId.equals(adapterId)) return true;
+            return false;
+        }
+    }
+
+    private static long day(Observation o) {
+        return Math.floorDiv(o.occurredMs, 86_400_000L);
+    }
+
+    private static boolean moneyMoved(Observation o) {
+        return Observation.VALUE_MOVED.equals(o.type) && o.minor > 0 && o.direction != null;
+    }
+
+    /** Whether the observation could be another witness of the movement. */
+    private static boolean fits(Movement m, Observation o) {
+        if (m.seenBy(o.adapterId)) return false;
+        Observation f = m.first();
+        if (!f.direction.equals(o.direction) || !f.currency.equals(o.currency) || f.minor != o.minor) return false;
+        if (Math.abs(day(f) - day(o)) > WINDOW_DAYS) return false;
+        if (f.hasOwnReference() && o.hasOwnReference() && !f.subjectRef.equals(o.subjectRef)) return false;
+        return true;
+    }
+
+    private static final Comparator<Observation> ORDER = new Comparator<Observation>() {
+        @Override public int compare(Observation a, Observation b) {
+            if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;
+            int c = a.adapterId.compareTo(b.adapterId);
+            return c != 0 ? c : a.id.compareTo(b.id);
+        }
+    };
+
+    /** The movements, in the order they happened. The same observations in any order give the same movements. */
+    static List<Movement> movements(List<Observation> all) {
+        List<Observation> sorted = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Observation o : all) if (moneyMoved(o) && seen.add(o.id)) sorted.add(o);   // the same fact twice is one fact
+        Collections.sort(sorted, ORDER);
+        List<Movement> out = new ArrayList<>();
+        for (Observation o : sorted) {
+            Movement into = null;
+            int possible = 0;
+            for (Movement m : out) {
+                if (!fits(m, o)) continue;
+                possible++;
+                if (into == null) into = m;   // the earliest unpaired movement
+            }
+            if (into == null) {
+                Movement m = new Movement();
+                m.witnesses.add(o);
+                out.add(m);
+            } else {
+                into.witnesses.add(o);
+                if (possible > 1) into.pairedByCount = true;
+            }
+        }
+        // Pairing is by order among equal candidates. Where there was more than one way to pair, say so on every movement involved, whichever way it fell.
+        Map<String, List<Movement>> shapes = new TreeMap<>();
+        for (Movement m : out) {
+            String key = m.direction() + "|" + m.currency() + "|" + m.minor();
+            List<Movement> group = shapes.get(key);
+            if (group == null) { group = new ArrayList<>(); shapes.put(key, group); }
+            group.add(m);
+        }
+        for (List<Movement> group : shapes.values()) {
+            for (Movement a : group) {
+                for (Movement b : group) {
+                    if (a == b || Math.abs(day(a.first()) - day(b.first())) > WINDOW_DAYS) continue;
+                    for (Observation w : b.witnesses) {
+                        if (a.seenBy(w.adapterId) && (a.witnesses.size() > 1 || b.witnesses.size() > 1)) { a.pairedByCount = true; b.pairedByCount = true; }
+                    }
+                }
+            }
+        }
+        for (Movement m : out) {
+            Collections.sort(m.witnesses, ORDER);
+            // The account is the first witness in adapter order, so the same movement is always shown under the same account.
+            Collections.sort(m.witnesses, new Comparator<Observation>() {
+                @Override public int compare(Observation a, Observation b) {
+                    int c = a.adapterId.compareTo(b.adapterId);
+                    return c != 0 ? c : a.id.compareTo(b.id);
+                }
+            });
+        }
+        Collections.sort(out, new Comparator<Movement>() {
+            @Override public int compare(Movement a, Movement b) {
+                if (a.occurredMs() != b.occurredMs()) return a.occurredMs() < b.occurredMs() ? -1 : 1;
+                return a.first().id.compareTo(b.first().id);
+            }
+        });
+        return out;
+    }
+
+    /** What one account moved in one currency in one month. */
+    static final class Line {
+        final String account;
+        final String currency;
+        long outMinor;
+        long inMinor;
+        long outCount;
+        long inCount;
+        /** Movements seen by more than one adapter, and by exactly one. */
+        long corroborated;
+        long single;
+
+        Line(String account, String currency) {
+            this.account = account;
+            this.currency = currency;
+        }
+    }
+
+    /** One month of the ledger: a line per account and currency, in a fixed order. */
+    static final class Month {
+        final String month;
+        final List<Line> lines = new ArrayList<>();
+        final List<Movement> movements = new ArrayList<>();
+
+        Month(String month) {
+            this.month = month;
+        }
+    }
+
+    /** The calendar months (in `zone`) that have any movement, oldest first. */
+    static List<String> months(List<Movement> movements, TimeZone zone) {
+        Set<String> set = new java.util.TreeSet<>();
+        for (Movement m : movements) set.add(MessagesRules.monthOf(m.occurredMs(), zone));
+        return new ArrayList<>(set);
+    }
+
+    static Month month(List<Movement> movements, String month, TimeZone zone) {
+        Month out = new Month(month);
+        Map<String, Line> lines = new TreeMap<>();
+        for (Movement m : movements) {
+            if (!month.equals(MessagesRules.monthOf(m.occurredMs(), zone))) continue;
+            out.movements.add(m);
+            String key = m.account() + "\u0000" + m.currency();
+            Line line = lines.get(key);
+            if (line == null) { line = new Line(m.account(), m.currency()); lines.put(key, line); }
+            if (Observation.OUT.equals(m.direction())) { line.outMinor += m.minor(); line.outCount++; } else { line.inMinor += m.minor(); line.inCount++; }
+            if (m.witnesses.size() > 1) line.corroborated++; else line.single++;
+        }
+        out.lines.addAll(lines.values());
+        return out;
+    }
+
+    /** `1,234.50` for 123450. Whole currency units with two decimals; the unit is named by the caller. */
+    static String amount(long minor) {
+        long units = minor / 100;
+        long cents = minor % 100;
+        return String.format(java.util.Locale.ROOT, "%,d.%02d", units, cents);
+    }
+
+    static String symbol(String currency) {
+        return "INR".equals(currency) ? "\u20b9" : currency + " ";
+    }
+
+    /** One line of the screen: *HDFCBK: \u20b91,200.00 out (3) \u00b7 \u20b9500.00 in (1)*. Moved, not spent. */
+    static String say(Line l) {
+        return l.account + ": " + symbol(l.currency) + amount(l.outMinor) + " out (" + l.outCount + ") \u00b7 " + symbol(l.currency) + amount(l.inMinor) + " in (" + l.inCount + ")";
+    }
+
+    /** A movement as one line: the day, the amount, the direction, the account, and how many sources saw it. */
+    static String say(Movement m, TimeZone zone) {
+        java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("d MMM", java.util.Locale.ENGLISH);
+        day.setTimeZone(zone);
+        String seen = m.witnesses.size() == 1 ? "seen once" : "seen by " + m.witnesses.size() + " sources";
+        return day.format(new java.util.Date(m.occurredMs())) + " \u00b7 " + symbol(m.currency()) + amount(m.minor()) + " " + m.direction() + " \u00b7 " + m.account() + " \u00b7 " + seen
+            + (m.pairedByCount ? " \u00b7 paired by count" : "");
+    }
+
+    /** A stable digest of the movements, so two ledgers (live and replayed) can be shown equal without comparing them by eye. Facts only. */
+    static String fingerprint(List<Movement> movements) {
+        StringBuilder sb = new StringBuilder();
+        for (Movement m : movements) {
+            sb.append(m.occurredMs()).append('|').append(m.direction()).append('|').append(m.currency()).append('|').append(m.minor()).append('|').append(m.account()).append('|').append(m.pairedByCount);
+            for (Observation o : m.witnesses) sb.append('|').append(o.id);
+            sb.append('\n');
+        }
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : d) hex.append(String.format(java.util.Locale.ROOT, "%02x", b));
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+}

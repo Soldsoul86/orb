@@ -33,6 +33,13 @@ public final class FitProbe {
         for (Map.Entry<String, Long> e : new TreeMap<>(all.counts()).entrySet()) line.append(e.getKey()).append('=').append(e.getValue()).append("  ");
         System.out.println(line.toString().trim());
         System.out.println("unmapped% " + all.unmappedPercent() + "  notALoop " + all.notALoop());
+        StringBuilder disp = new StringBuilder();
+        long dispSum = 0;
+        for (String d : LoopFit.DISPOSITIONS) {
+            disp.append(d).append('=').append(all.get("disposition." + d)).append("  ");
+            dispSum += all.get("disposition." + d);
+        }
+        System.out.println("dispositions " + disp.toString().trim() + "  sum " + dispSum + " of " + all.service + (dispSum == all.service ? " ok" : " MISMATCH") + "  (coverage, not accuracy: the rules were tuned on this inbox)");
         System.out.println("topUnmapped " + all.topUnmapped(25));
         System.out.println("topAmbiguous " + all.topAmbiguous(12));
 
@@ -47,6 +54,45 @@ public final class FitProbe {
         System.out.println("candidates " + candidates.size());
         System.out.println("quiet-candidates: unmapped " + quiet.get("unmapped") + " (" + quiet.unmappedPercent() + "%) hid " + quiet.get("quiet.hid") + " of "
                 + quiet.get("quiet.messages") + " messages from " + quiet.get("quiet.senders") + " senders; " + SenderRules.costLine(quiet.get("quiet.senders"), quiet.get("quiet.hid")));
+        // The ledger the phone would show (docs/MONEY_PHONE.md section 4-5): movements, and, descriptively only, how often different senders state the same amount on the
+        // same day (a rule across senders is not assumed; nothing acts on this number).
+        java.util.List<Observation> facts = fit.observations(new SenderRules.Quiet() { @Override public boolean quiet(String id) { return candidates.contains(id); } });
+        java.util.List<Ledger.Movement> movements = Ledger.movements(facts);
+        long out = 0, in = 0;
+        for (Ledger.Movement m : movements) if (Observation.OUT.equals(m.direction())) out++; else in++;
+        java.util.Map<String, Set<String>> byShape = new java.util.HashMap<>();
+        for (Observation o : facts) {
+            if (!Observation.VALUE_MOVED.equals(o.type) || o.minor <= 0) continue;
+            String shape = o.direction + "|" + o.currency + "|" + o.minor + "|" + Math.floorDiv(o.occurredMs, 86_400_000L);
+            Set<String> senders = byShape.get(shape);
+            if (senders == null) { senders = new TreeSet<>(); byShape.put(shape, senders); }
+            senders.add(o.sourceId);
+        }
+        long crossSender = 0;
+        for (Set<String> senders : byShape.values()) if (senders.size() > 1) crossSender++;
+        System.out.println("ledger movements " + movements.size() + " (out " + out + ", in " + in + ") months " + Ledger.months(movements, java.util.TimeZone.getTimeZone("UTC")).size()
+            + "  same-amount-same-day-different-senders groups " + crossSender);
+        // What keeping would make: sealed bundles, one per source x month (docs/MONEY_PHONE.md section 7). Counts of groups, by what they hold.
+        java.util.TimeZone zone = java.util.TimeZone.getTimeZone("UTC");
+        long newest = 0;
+        for (Observation o : fit.observations(SenderRules.NONE)) newest = Math.max(newest, o.occurredMs);
+        String current = ObservationStore.monthOf(newest, zone);
+        Set<String> allGroups = new TreeSet<>(), money = new TreeSet<>();
+        long keptFacts = 0;
+        for (Observation o : fit.observations(new SenderRules.Quiet() { @Override public boolean quiet(String id) { return candidates.contains(id); } })) {
+            String month = ObservationStore.monthOf(o.occurredMs, zone);
+            if (!ObservationStore.inRetention(month, current)) continue;
+            if (!ObservationStore.keepable(o)) continue;
+            keptFacts++;
+            String group = o.sourceId + "|" + month;
+            allGroups.add(group);
+            if (Observation.VALUE_MOVED.equals(o.type)) money.add(group);
+        }
+        java.util.List<String> recent = Ledger.months(movements, zone);
+        StringBuilder perMonth = new StringBuilder();
+        for (int i = Math.max(0, recent.size() - 4); i < recent.size(); i++) perMonth.append(recent.get(i)).append('=').append(Ledger.month(movements, recent.get(i), zone).movements.size()).append("  ");
+        System.out.println("movements per recent month " + perMonth.toString().trim());
+        System.out.println("keepable (24 months, candidates quiet, information left out): facts " + keptFacts + " bundles " + allGroups.size() + " of which holding money " + money.size());
         long sum = quiet.get("opens") + quiet.get("advances") + quiet.get("closes") + quiet.get("evidence") + quiet.get("noise") + quiet.get("ambiguous") + quiet.get("unmapped");
         System.out.println("roles-sum " + sum + " of " + quiet.service + (sum == quiet.service ? " ok" : " MISMATCH"));
     }

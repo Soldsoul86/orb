@@ -1,0 +1,45 @@
+{
+ "rule": "money.corroborate.v1",
+ "about": "Language-neutral conformance for the ledger's corroboration rule (docs/MONEY_PHONE.md section 4). Each case lists value.moved facts as {adapter, source, direction, minor, day, ref, basis} (day = days since 1970-01-01; ref and basis empty when the source gave none). `movements` is how many real-world movements they make; `witnesses` the witness count of each, sorted. Any implementation must give the same numbers, in every order of the input. Nothing here is a real transaction.",
+ "cases": [
+  {"name": "one adapter, nothing to pair", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "sms", "source": "B", "direction": "out", "minor": 500, "day": 100, "ref": "", "basis": "inferred"}],
+   "movements": 2, "witnesses": [1, 1]},
+  {"name": "two adapters, same payment", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 500, "day": 101, "ref": "", "basis": "inferred"}],
+   "movements": 1, "witnesses": [2]},
+  {"name": "two days apart is two payments", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 500, "day": 102, "ref": "", "basis": "inferred"}],
+   "movements": 2, "witnesses": [1, 1]},
+  {"name": "out and in of the same amount are two", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "in", "minor": 500, "day": 100, "ref": "", "basis": "inferred"}],
+   "movements": 2, "witnesses": [1, 1]},
+  {"name": "two real identical payments stay two, each seen by both", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "sms", "source": "B", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "Y", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"}],
+   "movements": 2, "witnesses": [2, 2]},
+  {"name": "two seen by SMS, one by the statement", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "sms", "source": "B", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 4000, "day": 100, "ref": "", "basis": "inferred"}],
+   "movements": 2, "witnesses": [1, 2]},
+  {"name": "references the source gave, and differ: different payments", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "R1", "basis": "stated"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 500, "day": 100, "ref": "R2", "basis": "observed"}],
+   "movements": 2, "witnesses": [1, 1]},
+  {"name": "the same reference: the same payment", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "R1", "basis": "stated"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 500, "day": 100, "ref": "R1", "basis": "observed"}],
+   "movements": 1, "witnesses": [2]},
+  {"name": "an inferred reference does not separate", "facts": [
+    {"adapter": "sms", "source": "A", "direction": "out", "minor": 500, "day": 100, "ref": "zz", "basis": "inferred"},
+    {"adapter": "stmt", "source": "X", "direction": "out", "minor": 500, "day": 100, "ref": "R2", "basis": "observed"}],
+   "movements": 1, "witnesses": [2]}
+ ]
+}

@@ -146,6 +146,11 @@
             android:name=".SendersActivity"
             android:exported="false" />
 
+        <!-- Money moved: the ledger, read from the facts Orb has kept (docs/MONEY_PHONE.md). Not exported; secure like Recall. -->
+        <activity
+            android:name=".LedgerActivity"
+            android:exported="false" />
+
         <!-- Today: what matters now. Not exported; secure like Recall. -->
         <activity
             android:name=".TodayActivity"
