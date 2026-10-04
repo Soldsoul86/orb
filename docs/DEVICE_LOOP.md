@@ -7546,3 +7546,12 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 3. On the person with the most calls: **Say what they are to you…** → save a role and a note; then **Remove** it. Do it two or three times, on that person and on another. Note what happens each time. *(P302)*
 4. **Export and share journal** and send it, whether or not anything failed. *(P303)*
 
+#### Result — export `orb-20261004-103444` (operator, 2026-10-04)
+
+741 events; v52 (`29850398`) started once. **Nothing in the journal contains a word, name or number.** The previous process (v51) ended with `low.memory` — the system reclaiming it overnight, not a crash (`DEVICE_LOOP.md` §7b21: a `low.memory` exit is not an error of Orb's).
+
+- **One save and one removal** (`orb.person.described`, 109 bytes; then `orb.erasure`) about 13 seconds apart: the same steps that crashed v51 three times, **and this time no crash, no `orb.process.crashed`, no `orb.fault.caught`**, and no second start.
+- **That is one try, and it does not say the bug is gone.** The journal cannot say whether the person was the one with 318 calls, and v51's crashes came on the *second* person's save. Until the steps are repeated on that person — a few times — **P302 is open** and the cause is **still unknown**. If it happens again, the export will now say what and where.
+- Not in the journal, so not known: P300 (Play Protect), P301.
+- Noticed in passing: `grants.packages` records a newly installed package, `all.backup.restore` — the operator's backup app — as a change in what is installed, as designed.
+
