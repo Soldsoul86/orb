@@ -7699,3 +7699,48 @@ Open in this round: P311 (Play Protect), P312, P313 (shown in the sequence of ev
 3. When it arrives, tap it (opens Today). Then **Change…** to three minutes ahead once more and wait. *(P323)*
 4. **Export and share journal** and send it. *(P322)*
 
+#### Result — export `orb-20261004-125447` (operator, 2026-10-04): "First time it fired and it took to Today's page, second time it didn't"
+
+879 events; v55 (`29851625`) started once. **Nothing in the journal names a person or holds a word.** In the phone's clock:
+
+| Time | Event |
+| --- | --- |
+| 12:46:24 | v55 starts. The brief was on, set for **12:44** → due and not done → **`orb.brief.shown`** (2 minutes late; 0 overdue, 0 due today, 1 waiting, 3 dates; words asked for). *This was the start-up catch-up, not the alarm.* The operator tapped it: **Today opened (P316 confirmed)**. |
+| 12:46:57 / 12:47:09 | turned off; turned on for **12:50** |
+| 12:51:21 | **`orb.brief.alarm`: the alarm fired, 1 minute after 12:50.** No brief followed. |
+
+**P322 in part, and a finding.** The new record settles the question v54 could not: **Android delivered the alarm, one minute and 21 seconds late — about what the same phone's reminders do (31 to 74 seconds).** The alarm was never the problem.
+
+**The second try stayed silent because of the once-a-day rule.** A brief had already been shown that day (12:46) and the rule counted it against the *new* time too; the gate also wrote nothing, so the journal showed an alarm and then silence. Two faults of mine: a new time the person chose should start the day afresh — for a showing as for a skip — and a refused brief must always be explained. Fixed in §7b93.
+
+### 7b93. The morning brief — a showing belongs to the time it was made under; a refusal is always written (v56) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v56-brief-once.apk`. Same design (`MORNING_BRIEF_PHONE.md`); limits `ARCHITECTURAL_DEBT.md` AD-35 item 9.
+
+#### What changed
+
+1. **A brief shown under an earlier time no longer stops the one for a time you choose.** Turning the brief on again, or **Change…**, starts the day afresh; the brief then shows at the new time even if one was shown earlier today. *Left alone, at one time, it is still once a day.*
+2. **A refusal is always written.** When the alarm or a start finds the brief already shown under the current time, it now writes `orb.brief.skipped` with the reason `already` (once per time chosen), so a brief that did not come again is explained, not silent.
+
+#### Checked before the device
+
+- Phone-side suite: 2562 checks; brain (378), TypeScript (600), lint and type-check clean.
+- **The exact sequence of this export is now a test:** shown under 12:44; turn off; turn on for 12:50; the alarm at 12:51:21 shows it again; at 12:55 the same time says `already`.
+- **Mutation checks** on the changed rules: 6 mutants, **all caught** — including putting the old behaviour back, and the silence.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P324** | Having had a brief today, **Change…** the time to three minutes ahead: **it fires again at that time** (within about two minutes) | nothing arrives; the export's `orb.brief.alarm` / `orb.brief.skipped` says why |
+| **P325** | **Export:** an `orb.brief.alarm` then an `orb.brief.shown`, for each time you set | an alarm with no brief and no skip |
+| **P326** | Leave it alone after a brief has shown and open Orb again: **no second brief**, and one `orb.brief.skipped` with reason `already` in the export | a second brief, or silence |
+
+#### Protocol
+
+1. Install `orb-app-v56-brief-once.apk` over v55.
+2. **Today → Morning brief → Change…** to three minutes ahead; wait. *(P324)*
+3. Repeat once more with another time three minutes ahead. *(P324)*
+4. Open Orb a couple of times afterwards. *(P326)*
+5. **Export and share journal** and send it. *(P325)*
+

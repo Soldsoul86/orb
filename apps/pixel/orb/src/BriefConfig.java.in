@@ -61,6 +61,20 @@ final class BriefConfig {
         return day == null || reason == null ? null : day + "|" + reason;
     }
 
+    private static int lastIndex(List<String> lines, String type) {
+        int found = -1;
+        for (int i = 0; i < lines.size(); i++) if (type.equals(Journal.typeOf(lines.get(i)))) found = i;
+        return found;
+    }
+
+    /**
+     * The brief was already shown today **under the time now set**. A brief shown under an earlier time does not count: choosing a new time is asking for the
+     * brief at that time, so it starts afresh (the once-a-day rule is about a day under one choice, not about a person who changed their mind).
+     */
+    static boolean shownToday(List<String> lines, String day) {
+        return day.equals(lastShownDay(lines)) && lastIndex(lines, BriefFacts.SHOWN) > lastIndex(lines, BriefFacts.CONFIGURED);
+    }
+
     /** Whether the last skip on record came after the person's last choice of time: a skip belongs to the time that was set when it was made, so a new choice starts a fresh decision. */
     private static boolean skipIsCurrent(List<String> lines) {
         int skip = -1;
@@ -78,7 +92,12 @@ final class BriefConfig {
      * done (the person may allow it), and a skip made under an earlier time does not count: choosing a new time starts a fresh decision.
      */
     static boolean handledToday(List<String> lines, String day) {
-        if (day.equals(lastShownDay(lines))) return true;
+        if (shownToday(lines, day)) return true;
+        return skippedForTheDay(lines, day);
+    }
+
+    /** The day is finished by a skip made under the time now set: there was nothing to say, or it was too late. */
+    static boolean skippedForTheDay(List<String> lines, String day) {
         String skip = lastSkip(lines);
         return skip != null && skipIsCurrent(lines) && (skip.equals(day + "|" + BriefRules.NOTHING) || skip.equals(day + "|" + BriefRules.LATE));
     }

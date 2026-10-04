@@ -56,7 +56,7 @@ final class Brief {
         List<String> lines = journal.readLines();
         String day = BriefRules.dayOf(nowMs, zone);
         long scheduled = BriefRules.scheduledAt(day, BriefConfig.minute(lines), zone);
-        String refusal = BriefRules.gate(BriefConfig.enabled(lines), permitted, day.equals(BriefConfig.lastShownDay(lines)), nowMs, scheduled);
+        String refusal = BriefRules.gate(BriefConfig.enabled(lines), permitted, BriefConfig.shownToday(lines, day), nowMs, scheduled);
         Commitments.Today t = null;
         BriefRules.Counts counts = null;
         if (refusal == null) {
@@ -97,7 +97,8 @@ final class Brief {
         int minute = BriefConfig.minute(lines);
         String day = BriefRules.dayOf(nowMs, zone);
         String outcome = "waiting";
-        if (nowMs >= BriefRules.scheduledAt(day, minute, zone) && !BriefConfig.handledToday(lines, day)) {
+        // Due, and not finished by a skip: the gate decides — including `already`, which is written (once) so a brief that did not come again is explained.
+        if (nowMs >= BriefRules.scheduledAt(day, minute, zone) && !BriefConfig.skippedForTheDay(lines, day)) {
             outcome = release(context, journal, nowMs, zone, permitted, notifier);
         }
         scheduler.schedule(BriefRules.nextFire(nowMs, zone, minute));

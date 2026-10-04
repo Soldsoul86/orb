@@ -863,6 +863,7 @@ a second source for the compiler's checksum exists (item 1).
 7. **Android keeps the notification's text** (history, a paired watch, apps with notification access) beyond Orb's reach. That is why the default is counts only and the lock screen shows no count.
 8. **Counts say how many, not which.** The details are one tap away, on Today.
 9. **A skip is read against the time it was made under.** Choosing a new time starts the day afresh (a bug in v54 let a *late* skip under 08:00 hide a brief set for 12:23 the same day); a skip for *no permission* never ended a day. The alarm's own firing is now recorded (`orb.brief.alarm`) so a missing brief can be told from a missing alarm.
+10. **A showing, like a skip, is read against the time it was made under.** v55 still let a brief shown at 12:46 stop the one the person set for 12:50 (and wrote nothing); from v56 a new time starts the day afresh and a refusal is always written. Left alone at one time it is once a day. A person who keeps changing the time can therefore be shown more than one brief in a day — their own doing.
 
 ---
 

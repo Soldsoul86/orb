@@ -278,6 +278,24 @@ final class BriefTest {
         Harness.equal("at 12:22 it waits and sets the alarm for 12:23", Brief.rearm(ctx3, j3, at("2026-10-04T12:22:37", IST), IST, true, recorder(out3), alarm3) + "|" + alarm3.at, "waiting|" + at("2026-10-04T12:23:00", IST));
         Harness.equal("the alarm fires a little after 12:23: the brief is shown", Brief.rearm(ctx3, j3, at("2026-10-04T12:23:40", IST), IST, true, recorder(out3), alarm3) + "|" + out3.size(), "shown|1");
 
+        Harness.suite("a brief shown under an earlier time does not stop the one the person asks for (the second try that stayed silent)");
+        Install.forget();
+        File dir5 = Files.createTempDirectory("orb-brief5").toFile();
+        Context ctx5 = new Context(dir5);
+        Journal j5 = Journal.open(ctx5, Install.lane(ctx5), Install.id(ctx5));
+        Commitments.open(ctx5, j5, null, "Call the bank", "owe", "2026-10-01", null);
+        Alarm alarm5 = new Alarm();
+        List<String> out5 = new ArrayList<>();
+        Brief.turnOn(j5, 12 * 60 + 44, true);
+        Harness.equal("a start two minutes after the time: shown at once", Brief.rearm(ctx5, j5, at("2026-10-04T12:46:25", IST), IST, true, recorder(out5), alarm5) + "|" + out5.size(), "shown|1");
+        Brief.turnOff(j5, alarm5);
+        Brief.turnOn(j5, 12 * 60 + 50, false);
+        Harness.check("under the new time the day is not yet done", !BriefConfig.shownToday(j5.readLines(), "2026-10-04") && !BriefConfig.handledToday(j5.readLines(), "2026-10-04"));
+        Harness.equal("before the new time it waits", Brief.rearm(ctx5, j5, at("2026-10-04T12:48:00", IST), IST, true, recorder(out5), alarm5) + "|" + out5.size(), "waiting|1");
+        Harness.equal("the alarm fires a minute after the new time: shown again, because the person asked for that time", Brief.rearm(ctx5, j5, at("2026-10-04T12:51:21", IST), IST, true, recorder(out5), alarm5) + "|" + out5.size(), "shown|2");
+        Harness.check("both showings are on record, under their own times", count(j5, BriefFacts.SHOWN) == 2);
+        Harness.equal("the same time again that day is once only, and says why", Brief.rearm(ctx5, j5, at("2026-10-04T12:55:00", IST), IST, true, recorder(out5), alarm5) + "|" + out5.size() + "|" + BriefConfig.lastSkip(j5.readLines()), "skipped:already|2|2026-10-04|already");
+
         Harness.suite("the alarm says that it fired");
         Install.forget();
         File dir4 = Files.createTempDirectory("orb-brief4").toFile();
@@ -306,11 +324,12 @@ final class BriefTest {
             "waiting|0|" + at("2026-10-04T08:00:00", IST));
         Harness.equal("the alarm fires at the time: shown, and tomorrow's alarm set", Brief.rearm(ctx2, j2, morning, IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + alarm.at,
             "shown|1|" + at("2026-10-05T08:00:00", IST));
-        Harness.equal("Orb starts again the same morning: not shown twice", Brief.rearm(ctx2, j2, morning + HOUR, IST, true, recorder(out2), alarm) + "|" + out2.size(), "waiting|1");
+        Harness.equal("Orb starts again the same morning: not shown twice, and the refusal is written", Brief.rearm(ctx2, j2, morning + HOUR, IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + BriefConfig.lastSkip(j2.readLines()), "skipped:already|1|2026-10-04|already");
+        Harness.equal("and starting again does not write it twice", Brief.rearm(ctx2, j2, morning + 2 * HOUR, IST, true, recorder(out2), alarm) + "|" + count(j2, BriefFacts.SKIPPED), "skipped:already|1");
         Harness.equal("a start after the time, not yet shown that day, within three hours: shown now", Brief.rearm(ctx2, j2, at("2026-10-05T10:00:00", IST), IST, true, recorder(out2), alarm) + "|" + out2.size(), "shown|2");
         Harness.equal("a start five hours late: skipped as late, and the next alarm is still set", Brief.rearm(ctx2, j2, at("2026-10-06T13:00:00", IST), IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + alarm.at,
             "skipped:late|2|" + at("2026-10-07T08:00:00", IST));
-        Harness.equal("starting again that day does not write the skip again", Brief.rearm(ctx2, j2, at("2026-10-06T14:00:00", IST), IST, true, recorder(out2), alarm) + "|" + count(j2, BriefFacts.SKIPPED), "waiting|1");
+        Harness.equal("starting again that day does not write the skip again", Brief.rearm(ctx2, j2, at("2026-10-06T14:00:00", IST), IST, true, recorder(out2), alarm) + "|" + count(j2, BriefFacts.SKIPPED), "waiting|2");
         Brief.turnOff(j2, alarm);
         Harness.check("turning it off records the withdrawal and clears the alarm", !BriefConfig.enabled(j2.readLines()) && alarm.at == -1L && lastOf(j2, PackageGrants.REVOKED).contains("orb.brief.daily"));
     }
