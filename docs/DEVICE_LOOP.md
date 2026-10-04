@@ -7971,3 +7971,61 @@ Until now Orb read a bank text and decided on the spot "this closes a bill". The
 **P341 confirmed. P342 confirmed to the digit:** `ledger.out` 5,460 · `ledger.in` 634 · `closure.candidates` 20 · `ledger.only` 6,074. **P345 confirmed:** the new keys (`obs.*`, `effect.*`, `discard.*`, `ledger.*`, `closure.candidates`) are present and numeric; nothing else. **P343** in part: a mark persists across versions and is applied. **P344** is not visible in a journal (no `orb.commitment.*`, `orb.loop.*` or `orb.brief.*` event was written; the screens themselves are the operator's to judge).
 
 **What the seam says, now measured on the device:** of 6,094 payments, 20 (0.3 %) look like the end of something open; 99.7 % are the ledger only. Facts stated: 873 obligations, 105 progressions, 23 fulfilments, 44 requests, 353 attendances, 4 decisions.
+
+### 7b97. Money slice A — Orb can keep what it read, and show the money that moved (v60) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v60-money.apk`. Design `MONEY_PHONE.md` (approved 2026-10-04; DR-44); change report `artifacts/reports/MONEY-A-*.md`; first slice built under the engineering system (DR-45). **No new Android permission.** Your commitments, Today, the morning brief and your sender marks are untouched.
+
+#### In plain words
+
+Until now Orb read your messages, told you what it saw, and **forgot** it. v60 adds two things.
+
+1. **Keep what Orb read.** After a Look, a new button, *Keep what Orb read…*, asks first. If you say *Keep*, Orb seals the **facts** — an amount, a day, which service, what kind of fact — on this phone, one sealed bundle for each sender and month, for 24 months. **It never keeps a message or a word of one.** Switching it off later stops keeping and erases nothing; erasing is its own button.
+2. **Money moved.** A new button on the main screen shows the money that moved, month by month and sender by sender, **read only from the kept facts**. It says *moved*, not *spent* or *earned*: the same money can show twice (a card's spends and the payment that settles the card), and Orb does not guess that two accounts are yours. It does not look at your obligations at all.
+
+Nothing is closed, opened or changed by either. A payment is still only a *candidate* for a bill, and only your tap would ever close anything — that tap arrives in the next slice.
+
+#### What changed
+
+1. **Sources → Messages → Look** gains **Keep what Orb read… (the facts, not the messages)** under the Senders button.
+2. **Main screen** gains **Money moved**.
+3. **What Orb may do** gains *The facts Orb has read, kept sealed* (`orb.observations.keep`), switchable.
+4. Under the surface: the six-way reading of every service message (loop · closure candidate · ledger only · not a loop · ambiguous · unreadable) — in the container probe, not on the phone — and a rule (`money.corroborate.v1`) so that, once a second source exists, one payment seen twice is counted once. **With messages as the only source it changes nothing.**
+
+#### Checked before the device
+
+- Phone-side suite **3,317 checks**, tool tests **70**, lint clean; 16 invariants all held; 40 scenarios: 37 proven by named checks, 3 honest drafts for slice C (a statement that does not reproduce its balances; payee text never leaving the bundle; a keep that fails part-way).
+- **Mutation:** 54 mutants of the ledger, the dispositions and the keep capability: **49 killed, 5 documented equivalent, 0 alive**, after three rounds (the first left 15 alive against a green suite).
+- **On your real backup, in the container (counts only; the rules were tuned on this inbox — coverage, not accuracy):** 23,633 service messages: **LOOP 1,379 · CLOSURE_CANDIDATE 20 · LEDGER_ONLY 6,074 · NOT_A_LOOP 11,997 · AMBIGUOUS 119 · UNMAPPABLE 4,044**. The ledger holds **6,094 movements** (5,460 out, 634 in) over 37 months; the last four months have **217 · 194 · 227 · 31**. Keeping the last 24 months (six candidate senders quiet) would seal **about 3,700 facts in 323 bundles**, 79 of them with money. 146 times two different senders state the same amount on the same day (descriptive only; nothing acts on it).
+- Change report: **REVIEW REQUIRED** (15 self-governing files changed; 1 draft scenario in the slice).
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P346** | Before anything is kept, **Money moved** opens and says *Nothing is kept yet. Look at a message backup in Sources, then choose “Keep what Orb read”.* | anything else |
+| **P347** | **Look** at the same backup shows the same figures as v59 (4,044-ish could not be read, 119 ambiguous, the same *Money moved: 5,460 out, 634 in; 20 …; 6,074 …* sentence, adjusted for the sender you have quiet) and a new button **Keep what Orb read…** | any difference: a regression |
+| **P348** | Tapping it asks first: **about 3,700 facts, about 320 bundles, 24 months**, *no message or word of one*, *nothing leaves the phone* | the figures far from these (a few percent either way is the one quiet sender and the time zone) |
+| **P349** | **Keep** ends with *Kept about 320 bundles. Unchanged, not written again: 0 · outside the 24 months: 0 · from quiet senders: 0 · could not be kept: 0* | any “could not be kept” |
+| **P350** | Tapping **Keep** a second time says *Kept 0 bundles. Unchanged: about 320* and writes nothing new | it writes again |
+| **P351** | **Money moved** now shows the newest month (October 2026, about 30 movements) with a line per sender (sender codes), *older / newer* buttons, and the latest months near **217 · 194 · 227** movements (September, August, July). The words *spent* and *earned* appear once, in the sentence saying it does not show them | wrong months, or a total called spending |
+| **P352** | Mark a busy sender quiet (Sources → Senders…), return to **Money moved**: its line is gone; take the mark back: it returns. Its kept facts were never erased | the line stays, or comes back missing |
+| **P353** | **What Orb may do** lists *The facts Orb has read, kept sealed* as **ON — you granted it**, about 320 bundles kept | OFF, or no bundles |
+| **P354** | **Switch off keeping facts**: it says OFF; **Money moved** still shows everything kept (switching off erases nothing) | it empties |
+| **P355** | The export has about **320** `orb.observations.kept` events and one grant, each holding only a blinded key, a month, a count and a hash — **no sender code, no amount** | a sender code or an amount: stop and tell me |
+| **P356** | *(Optional, destructive)* **Money moved → Erase everything Orb has kept… → Erase** says *Erased about 320 bundles*; the screen then says nothing is kept; the export shows the erasures | it does not empty |
+| **P357** | Today, your commitments and the morning brief look exactly as before | any difference |
+
+#### Protocol
+
+1. Install `orb-app-v60-money.apk` over v59.
+2. Open **Money moved**. *(P346)*
+3. **Sources → Messages**, pick the same backup, **Look**. *(P347)*
+4. Tap **Keep what Orb read…**, read the dialog *(P348)*, tap **Keep** *(P349)*, then **Keep** again *(P350)*.
+5. **Money moved**: read the newest month, press *older* twice. *(P351)*
+6. **Senders…**: mark one busy sender quiet, look at **Money moved**, take the mark back. *(P352)*
+7. **What Orb may do** → the new entry *(P353)* → switch off *(P354)* → **Money moved** still shows.
+8. **Export and share journal**. *(P355)* Then, if you want, erase everything *(P356)*.
+9. Open **Today** and the morning brief. *(P357)*
+
+*(Keep the numbers you see in P348 and P351 for me: they are your own figures.)*

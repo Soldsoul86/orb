@@ -1,0 +1,705 @@
+{
+ "summary": {
+  "killed": 49,
+  "alive": 0,
+  "missing": 0,
+  "invalid": 0,
+  "equivalent": 5,
+  "attempted": 54,
+  "total": 54
+ },
+ "results": [
+  {
+   "index": 0,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (m.seenBy(o.adapterId)) return false;",
+    "new": "if (false) return false;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a partner goes to the earliest movement that fits [0]",
+    "    FAIL a partner goes to the earliest movement that fits [1]"
+   ]
+  },
+  {
+   "index": 1,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "!f.direction.equals(o.direction) || !f.currency.equals(o.currency) || f.minor != o.minor",
+    "new": "!f.currency.equals(o.currency) || f.minor != o.minor"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a different direction does not",
+    "    FAIL out and in of the same amount are two: 2 movement(s), witnesses [1, 1], in every order"
+   ]
+  },
+  {
+   "index": 2,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "!f.direction.equals(o.direction) || !f.currency.equals(o.currency) || f.minor != o.minor",
+    "new": "!f.direction.equals(o.direction) || f.minor != o.minor"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same direction and amount in another currency is another payment",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 3,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "!f.direction.equals(o.direction) || !f.currency.equals(o.currency) || f.minor != o.minor",
+    "new": "!f.direction.equals(o.direction) || !f.currency.equals(o.currency)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a different amount does not",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 4,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "Math.abs(day(f) - day(o)) > WINDOW_DAYS",
+    "new": "Math.abs(day(f) - day(o)) >= WINDOW_DAYS"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a day apart still pairs",
+    "    FAIL two adapters, same payment: 1 movement(s), witnesses [2], in every order"
+   ]
+  },
+  {
+   "index": 5,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "Math.abs(day(f) - day(o)) > WINDOW_DAYS",
+    "new": "day(f) - day(o) > WINDOW_DAYS"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL two days apart does not",
+    "    FAIL two days apart is two payments: 2 movement(s), witnesses [1, 1], in every order"
+   ]
+  },
+  {
+   "index": 6,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "static final int WINDOW_DAYS = 1;",
+    "new": "static final int WINDOW_DAYS = 2;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL two days apart does not",
+    "    FAIL two days apart is two payments: 2 movement(s), witnesses [1, 1], in every order"
+   ]
+  },
+  {
+   "index": 7,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "f.hasOwnReference() && o.hasOwnReference() && !f.subjectRef.equals(o.subjectRef)",
+    "new": "f.hasOwnReference() || o.hasOwnReference()"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a fact that could join either of two movements joined one and says it chose",
+    "    FAIL a payment with a different reference of its own is separate and is not a choice"
+   ]
+  },
+  {
+   "index": 8,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "f.hasOwnReference() && o.hasOwnReference() && !f.subjectRef.equals(o.subjectRef)",
+    "new": "f.hasOwnReference() && o.hasOwnReference()"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same reference: the same payment: 1 movement(s), witnesses [2], in every order",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 9,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "return Observation.VALUE_MOVED.equals(o.type) && o.minor > 0 && o.direction != null;",
+    "new": "return Observation.VALUE_MOVED.equals(o.type) && o.direction != null;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL nor is a movement with no amount",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 10,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "return Observation.VALUE_MOVED.equals(o.type) && o.minor > 0 && o.direction != null;",
+    "new": "return o.minor > 0 && o.direction != null;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL it reads value.moved and nothing else",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 11,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (moneyMoved(o) && seen.add(o.id)) sorted.add(o);",
+    "new": "if (moneyMoved(o)) sorted.add(o);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL two chai at the same price on the same day seen by one adapter are two movements (an identical fact twice is one fact)",
+    "    FAIL a reference the source gave is part of what the fact is; one source's fact twice is one fact"
+   ]
+  },
+  {
+   "index": 12,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (into == null) into = m;",
+    "new": "into = m;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a partner goes to the earliest movement that fits [0]",
+    "    FAIL a partner goes to the earliest movement that fits [1]"
+   ]
+  },
+  {
+   "index": 13,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (possible > 1) into.pairedByCount = true;",
+    "new": "if (possible > 0) into.pairedByCount = true;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same payment ten days later is not a rival partner: no movement is flagged",
+    "    FAIL a payment with a different reference of its own is separate and is not a choice"
+   ]
+  },
+  {
+   "index": 14,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (possible > 1) into.pairedByCount = true;",
+    "new": ""
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a fact that could join either of two movements joined one and says it chose",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 15,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (a == b || Math.abs(day(a.first()) - day(b.first())) > WINDOW_DAYS) continue;",
+    "new": "if (a == b) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same payment ten days later is not a rival partner: no movement is flagged",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 16,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "(a.witnesses.size() > 1 || b.witnesses.size() > 1)",
+    "new": "true"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL two senders of one adapter with the same amount: two movements, neither paired by count",
+    "    FAIL a movement that paired by count says so on its line"
+   ]
+  },
+  {
+   "index": 17,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (a.seenBy(w.adapterId) &&",
+    "new": "if ("
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a payment with a different reference of its own is separate and is not a choice",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 18,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "a.pairedByCount = true; b.pairedByCount = true;",
+    "new": "a.pairedByCount = true;",
+    "equivalent": "The post-pass visits every pair of movements in both orders, so setting only `a` on each visit flags both sides in the end."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 19,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;\n            int c = a.adapterId.compareTo(b.adapterId);",
+    "new": "int c = a.adapterId.compareTo(b.adapterId);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a partner goes to the earliest movement that fits [1]",
+    "    FAIL a partner goes to the earliest movement that fits [2]"
+   ]
+  },
+  {
+   "index": 20,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "return c != 0 ? c : a.id.compareTo(b.id);\n        }\n    };",
+    "new": "return c != 0 ? c : 0;\n        }\n    };"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same observations in any order give the same movements",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 21,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "return a.first().id.compareTo(b.first().id);",
+    "new": "return 0;",
+    "equivalent": "Any deterministic tie order of two movements at one instant is correct; both orders are independent of the order the facts arrive in (held by the fingerprint test)."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 22,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (a.occurredMs() != b.occurredMs()) return a.occurredMs() < b.occurredMs() ? -1 : 1;",
+    "new": "if (a.occurredMs() != b.occurredMs()) return a.occurredMs() < b.occurredMs() ? 1 : -1;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement's line says the day, the amount, the direction, the account and how often it was seen",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 23,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (!month.equals(MessagesRules.monthOf(m.occurredMs(), zone))) continue;",
+    "new": "if (month.equals(MessagesRules.monthOf(m.occurredMs(), zone))) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL one account in two currencies is two lines, each seen by one source and corroborated by none",
+    "    FAIL five movements in October"
+   ]
+  },
+  {
+   "index": 24,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "line.inMinor += m.minor(); line.inCount++; }",
+    "new": "line.inMinor += m.minor(); line.inCount += 2; }"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a line for each account and currency, in a fixed order, amounts in whole units with two places",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 25,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (Observation.OUT.equals(m.direction())) { line.outMinor += m.minor(); line.outCount++; }",
+    "new": "if (Observation.IN.equals(m.direction())) { line.outMinor += m.minor(); line.outCount++; }"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a line for each account and currency, in a fixed order, amounts in whole units with two places",
+    "    FAIL September is its own month"
+   ]
+  },
+  {
+   "index": 26,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "String key = m.account() + \"\\u0000\" + m.currency();",
+    "new": "String key = m.account();"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL one account in two currencies is two lines, each seen by one source and corroborated by none",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 27,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "if (m.witnesses.size() > 1) line.corroborated++; else line.single++;",
+    "new": "if (m.witnesses.size() > 0) line.corroborated++; else line.single++;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL one account in two currencies is two lines, each seen by one source and corroborated by none",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 28,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "long units = minor / 100;",
+    "new": "long units = minor / 10;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a line for each account and currency, in a fixed order, amounts in whole units with two places",
+    "    FAIL a thousands separator"
+   ]
+  },
+  {
+   "index": 29,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "return \"INR\".equals(currency) ? \"\\u20b9\" : currency + \" \";",
+    "new": "return \"\\u20b9\";"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a line for each account and currency, in a fixed order, amounts in whole units with two places",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 30,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "(m.pairedByCount ? \" \\u00b7 paired by count\" : \"\")",
+    "new": "\"\""
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement that paired by count says so on its line",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 31,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "m.witnesses.size() == 1 ? \"seen once\"",
+    "new": "m.witnesses.size() == 2 ? \"seen once\""
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement's line says the day, the amount, the direction, the account and how often it was seen",
+    "    FAIL a corroborated one says so"
+   ]
+  },
+  {
+   "index": 32,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "for (Observation o : m.witnesses) sb.append('|').append(o.id);",
+    "new": "for (Observation o : m.witnesses) sb.append('|').append(o.adapterId);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL two ledgers whose second witness differs are different ledgers",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 33,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "sb.append(m.occurredMs()).append('|')",
+    "new": "sb.append('|')",
+    "equivalent": "Every witness id commits to the fact's occurredMs, and the fingerprint lists every witness id."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 34,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": ".append('|').append(m.pairedByCount);",
+    "new": ".append('|');",
+    "equivalent": "pairedByCount is derived from the witness structure of the whole set, which the fingerprint already commits to through every witness id."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 35,
+   "mutant": {
+    "file": "src/Ledger.java.in",
+    "old": "for (Observation o : witnesses) if (o.adapterId.equals(adapterId)) return true;",
+    "new": "for (Observation o : witnesses) if (o.adapterId.equals(adapterId) && false) return true;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a partner goes to the earliest movement that fits [0]",
+    "    FAIL a partner goes to the earliest movement that fits [1]"
+   ]
+  },
+  {
+   "index": 36,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "if (AMBIGUOUS.equals(m.role)) d = D_AMBIGUOUS;",
+    "new": "if (false) d = D_AMBIGUOUS;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the refund begun moves a loop on; one message nobody could read; one two rules read differently",
+    "    FAIL a promotion and a code are not loops"
+   ]
+  },
+  {
+   "index": 37,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "else if (UNMAPPED.equals(m.role)) d = D_UNMAPPABLE;",
+    "new": "else if (false) d = D_UNMAPPABLE;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the refund begun moves a loop on; one message nobody could read; one two rules read differently",
+    "    FAIL a promotion and a code are not loops"
+   ]
+  },
+  {
+   "index": 38,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "else if (closes(m, matched.closing)) d = D_CLOSURE_CANDIDATE;",
+    "new": "else if (closes(m, matched.matched)) d = D_CLOSURE_CANDIDATE;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a payment and the alert for the same money at the same instant are both the closure candidate; the bill is the loop",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 39,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "else if (m.loop) d = D_LOOP;\n            else if (m.money) d = D_LEDGER_ONLY;",
+    "new": "else if (m.money) d = D_LEDGER_ONLY;\n            else if (m.loop) d = D_LOOP;",
+    "equivalent": "No current rule states a loop-opening or advancing fact together with a movement in one message (a payment states a movement and a fulfilment, which is neither), so the precedence between LOOP and LEDGER_ONLY cannot be observed. If a rule ever does, the precedence needs its own test."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 40,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "else if (m.money) d = D_LEDGER_ONLY;",
+    "new": "else if (false) d = D_LEDGER_ONLY;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a payment with nothing open is ledger only, and so is one of a single cent",
+    "    FAIL a promotion and a code are not loops"
+   ]
+  },
+  {
+   "index": 41,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "if (Interpreter.OPEN.equals(e.type) || Interpreter.ADVANCE.equals(e.type)) loopy = true;",
+    "new": "if (Interpreter.OPEN.equals(e.type)) loopy = true;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the refund begun moves a loop on; one message nobody could read; one two rules read differently",
+    "    FAIL a promotion and a code are not loops"
+   ]
+  },
+  {
+   "index": 42,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "if (Observation.VALUE_MOVED.equals(o.type)) money = true;",
+    "new": "if (Observation.VALUE_MOVED.equals(o.type) && o.minor > 1) money = true;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a payment with nothing open is ledger only, and so is one of a single cent",
+    "    FAIL a promotion and a code are not loops"
+   ]
+  },
+  {
+   "index": 43,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "add(out, \"disposition.\" + D_NOT_A_LOOP, t.messages);",
+    "new": "add(out, \"disposition.\" + D_NOT_A_LOOP, 0L);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a quiet sender's messages are not loops, and the dispositions still add up",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 44,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "pending.addAll(t.msgs);",
+    "new": "pending.addAll(new ArrayList<Msg>());"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL every service message has exactly one disposition: they add up to the service total",
+    "    FAIL the payment that matches the open bill is a closure candidate"
+   ]
+  },
+  {
+   "index": 45,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "if (!e.getKey().isEmpty() && quiet.quiet(e.getKey())) continue;\n            out.addAll(e.getValue().observations);",
+    "new": "out.addAll(e.getValue().observations);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the facts handed to Keep leave a quiet sender's out, and the others' stay in; unmarked, everyone's are there",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 46,
+   "mutant": {
+    "file": "src/LoopFit.java.in",
+    "old": "for (String id : m.ids) if (closing.contains(id)) return true;",
+    "new": "for (String id : m.ids) if (closing.contains(id)) return false;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the payment that matches the open bill is a closure candidate",
+    "    FAIL a payment with nothing open is ledger only, and so is one of a single cent"
+   ]
+  },
+  {
+   "index": 47,
+   "mutant": {
+    "file": "src/ObservationStore.java.in",
+    "old": "return !Observation.INFORMATION_NOTED.equals(o.type);",
+    "new": "return true;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL information.noted is not kept; the bill is",
+    "    FAIL replay holds every kept fact and not the note"
+   ]
+  },
+  {
+   "index": 48,
+   "mutant": {
+    "file": "src/ObservationStore.java.in",
+    "old": "if (!keepable(o)) continue;",
+    "new": "if (false) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL replay holds every kept fact and not the note",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 49,
+   "mutant": {
+    "file": "src/ObservationStore.java.in",
+    "old": "            if (Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome)) n++;\n        }\n        return n;\n    }\n\n    /** Applies",
+    "new": "            if (false) n++;\n        }\n        return n;\n    }\n\n    /** Applies"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL erasing everything destroys every bundle",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 50,
+   "mutant": {
+    "file": "src/KeepAccess.java.in",
+    "old": "if (granted(context)) return;\n        record(journal, PackageGrants.GRANTED",
+    "new": "record(journal, PackageGrants.GRANTED"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL saying yes twice records one grant",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 51,
+   "mutant": {
+    "file": "src/KeepAccess.java.in",
+    "old": "new File(context.getFilesDir(), FILE).delete();\n        record(journal, PackageGrants.REVOKED, \"operator\");",
+    "new": "record(journal, PackageGrants.REVOKED, \"operator\");"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL switching off stops it and says so",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 52,
+   "mutant": {
+    "file": "src/KeepAccess.java.in",
+    "old": "if (journal == null || granted(context)) return;",
+    "new": "if (journal == null) return;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a grant the device does exercise is left alone by a reconcile",
+    "  3317 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 53,
+   "mutant": {
+    "file": "src/KeepAccess.java.in",
+    "old": "if (PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP)) record",
+    "new": "if (!PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP)) record"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a restore that brings the grant back without the flag is made to agree",
+    "    FAIL the screen says OFF, and what is kept"
+   ]
+  }
+ ]
+}

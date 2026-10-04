@@ -61,7 +61,8 @@
    "tools/README.md",
    ".claude/**",
    "CLAUDE.md",
-   "docs/AGENT_TOOLING.md"
+   "docs/AGENT_TOOLING.md",
+   "tools/mutate/**"
   ]
  },
  "budget": {
@@ -85,7 +86,8 @@
   "Slice A predates the engineering system; this slice file and its scenarios were written after the code, from it (M-001\u2026M-018) and from the design (M-019).",
   "The fit probe reads the inbox the rules were tuned on: coverage, not accuracy.",
   "The ledger's account is the sender code of the bank's messages; whom the money went to arrives with the statement (slice C).",
-  "A failed keep leaving the older bundle is designed but untested (M-019 is a draft)."
+  "A failed keep leaving the older bundle is designed but untested (M-019 is a draft).",
+  "tools/mutate/** was added to the scope while the slice ran: the engineering system's own mutation config and list (tools-engsys) were written during it. The report flagged this as out of scope until the slice file said so."
  ],
  "expectFitChange": true
 }

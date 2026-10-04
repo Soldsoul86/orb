@@ -721,7 +721,7 @@
     },
     {
      "suite": "phone",
-     "check": "a payment with nothing open is ledger only"
+     "check": "a payment with nothing open is ledger only, and so is one of a single cent"
     },
     {
      "suite": "phone",

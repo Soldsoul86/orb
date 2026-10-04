@@ -27,3 +27,11 @@
 - **Fix:** 37 checks added (`LedgerTest`, group "corroboration: which fact pairs with which…"); two survivors documented as equivalent.
 - **Regression:** `tools/mutate/lists/money-a.json`; scenarios M-003, M-004, M-009.
 - **Invariant:** I-003, I-004.
+
+## L-003 — A test renamed during a mutation fix left its scenario unproven
+
+- **Failure:** while closing the second mutation round, a check in the dispositions test was renamed ("a payment with nothing open is ledger only" → "…, and so is one of a single cent"). Scenario M-018 still named the old text. The suite passed; nothing in the phone suite noticed.
+- **Root cause:** a scenario names its proof by exact text, and a rename is a change to that text; only the scenario check reads both sides.
+- **Fix:** M-018 now names the new text. Caught by the first change report of MONEY-A (`UNPROVEN M-018`), before the commit it would have shipped in.
+- **Regression:** `tools/scenarios` derived state (`unproven` for a named check that did not run); the slice report's BLOCKED status for an unproven scenario.
+- **Invariant:** none (a property of the registry itself: a scenario is never proof, only the named, passing check is).
