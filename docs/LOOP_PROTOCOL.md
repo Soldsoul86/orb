@@ -328,3 +328,13 @@ What exists, and what does not.
 **The fit test is a measurement, and the draft rules are coarse.** The 10 % bar in §13 is for the protocol, not for these rules: a high `unmapped` on the first pass is expected and is the finding (what the protocol needs next, by sender), not a failure. Freezing waits for the operator's result and a second look at the clusters.
 
 **Scope note on §13.** The fit pass reads each service message's words once, in memory, to choose a role, and keeps nothing but the role, kind, amount (as a number), sender brand and day — only to count matches — all discarded when the Look screen closes. This is inside the words of `orb.read.messages` v1 ("Reads, in the one message-backup file you choose, the conversations and messages … only counts are recorded"); **no capability changed**.
+
+## 19. First fit result (2026-10-04, counts only)
+
+The operator's inbox (25,552 messages; 23,633 from names and short codes) read by the draft rules: **closes 4,915 · opens 990 · advances 105 · ambiguous 1,043 · information 65 · noise 3,186 · could not be read 13,329 (65 % of the non-noise; one sender is 62 % of those).** Full table and reading: `DEVICE_LOOP.md` §7b94, *Result*.
+
+- **Not frozen; not contradicted.** DO, GIVE (either owner), ATTEND and DECIDE occur; RESPOND does not in service SMS. The unread bulk is a property of the draft rules and one large sender, so criterion 3 (§13) cannot yet be judged.
+- **Closing needs a loop to close.** 4,280 money-out messages against 262 openings that owe money: a debit with no open loop is an *observed transfer* (evidence), never a closure. This is the shape of Money.
+- **Matching on sender + exact amount + 45 days matched 11 of 326 openings.** Which dimension fails is the next measurement (v58: relaxed matching, counts only).
+- **A message that closes one obligation and opens the next** is suspected in 252 cases (money-out + bill-due). If an example confirms it, recurrence (§12) gets designed with Money; no new kind is implied.
+- **Next:** a template census per large sender (distinct shapes, share of the commonest; numbers only) and the relaxed-matching figures, then the rules for the largest readable senders, then a second fit report.

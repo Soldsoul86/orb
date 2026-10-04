@@ -7799,3 +7799,30 @@ The protocol says what *open* means for anything in your life. Before it is froz
 4. Open **Today** and the **Morning brief** card as usual. *(P332)*
 5. **Export and share journal** and send it.
 6. Delete the backup file when you are done, as always.
+
+#### Result — export `orb-20261004-144657` (operator, 2026-10-04): the first fit report
+
+897 events; v57 (`29851744`) started once; **no crash, no fault**; one `orb.loop.fit.reported`, written when the operator tapped. The record holds numbers, `loop/0.1`, `fit/1`, ten sender codes and five rule-pair names — **no message text and no number of a person**. (Sender codes are in the export, not repeated here; below they are *sender #1…*.)
+
+**The file:** 25,552 messages = **23,633 from names and short codes (92.5 %)** + 1,919 from numbers (not read) + 0 other. **P328 confirmed** (they add up).
+
+| Reading of the 23,633 service messages | Count | Share |
+| --- | --- | --- |
+| closes a loop (of these: 4,280 GIVE owned by me — money going out; 635 GIVE owned by them — money coming in) | 4,915 | 20.8 % |
+| opens a loop (ATTEND 353 · DO 363 · GIVE by me 262 · GIVE by them 8 · DECIDE 4 · RESPOND 0) | 990 | 4.2 % |
+| moves a loop on | 105 | 0.4 % |
+| **ambiguous** | 1,043 | 4.4 % |
+| only information | 65 | 0.3 % |
+| noise (promotion 2,666 · code 520) | 3,186 | 13.5 % |
+| **could not be read** | **13,329** | **56.4 %** (65.2 % of what is not noise) |
+
+**What it says**
+
+1. **The first reading mostly measures my rules, not the ontology.** 65 % could not be read; the §13 bar is 10 %. **P329 was wrong** (I predicted 20–40 %). The reason is concentrated: **one sender (#1) is 8,212 of them — 61.6 % of everything unread, and 34.7 % of all service messages.** Without it the unread share is **41.8 %**. Ten senders cover **81.5 %** of the unread (the rest of #1 are #2 705, #3 673, a block of short-code senders 413, then 202 · 187 · 146 · 124 · 117 · 79).
+2. **No kind is contradicted, and one is never used.** DO, GIVE (both owners), ATTEND and DECIDE all occur; **RESPOND does not occur in service SMS** (expected — it lives in conversation, which this test does not read).
+3. **Most "closings" have nothing to close.** 4,280 money-out messages against **262** openings that owe money: roughly sixteen payments for every open obligation. Most debits are spending, not the end of a bill. So a message that matches no open loop is **an observed transfer, not a closure** — Money's ledger is a *view over evidence*, and "closes" must only be claimed when a loop exists. The protocol already says this (§7); the numbers show it matters.
+4. **Correlation by sender and exact amount almost never matches (P330: "some but far from all" — it is 11).** 326 openings with an amount, 4,895 closings with an amount, **11 matched (3.4 % of openings)**. Either the payment comes from another sender than the bill, or the amount differs (minimum or part payment), or the 45-day window is wrong. **The test cannot say which yet.**
+5. **Ambiguity is a few specific shapes, and mostly the rules' fault.** 968 of the 1,043 sit in five rule pairs: **money-out + money-in 640** (a transfer message that names both ends — a rule must say whose account was credited, not a new kind), **money-out + bill-due 252** (my reading: a message that closes one obligation and opens the next — which would be the *recurrence* case of §12; **unconfirmed** until an example is seen), money-out + collect-request 44, failed + attend 17, money-out + attend 15.
+6. **P327 (time) and P332 (nothing else changed):** no complaint and no crash or fault in the export; the Look and the record came six seconds apart. P331 confirmed: one record, ten sender codes, five rule pairs, no text.
+
+**Verdict.** The protocol is **not frozen** and **not contradicted**. The fit test as built cannot yet answer §13 criterion 3 (does anything need a new kind, a third owner or a field?) because most of the inbox is read by no rule. Next: find out what the big senders *are* without reading words — a **template census** (how many distinct message shapes each sender has, and how much the commonest covers; numbers only) and **relaxed matching** (ignore the sender; widen the window; allow part payments) to see which dimension breaks — plus one privacy-edited example from the biggest clusters if the operator is willing.
