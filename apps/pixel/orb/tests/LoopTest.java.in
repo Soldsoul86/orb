@@ -1,0 +1,490 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * The Loop protocol (`docs/LOOP_PROTOCOL.md` v0.1, DR-41): the vocabulary, the one fold, what a record may carry, matching, and the draft fit reading —
+ * held to the language-neutral conformance corpus in `docs/fixtures/loops/`, which any other implementation must pass unchanged.
+ */
+final class LoopTest {
+    private LoopTest() {}
+
+    private static Object fixture(String name) throws Exception {
+        Path p = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/loops/" + name);
+        return MiniJson.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+    }
+
+    private static String fieldOrNull(Map<String, Object> m, String k) {
+        Object v = m.get(k);
+        return v == null ? null : v.toString();
+    }
+
+    private static LoopRules.Event event(Map<String, Object> e) {
+        Map<String, String> fields = new HashMap<>();
+        for (Map.Entry<String, Object> f : MiniJson.map(e.get("fields")).entrySet()) fields.put(f.getKey(), f.getValue().toString());
+        String type = LoopRules.canonicalType(MiniJson.str(e.get("type")));
+        return new LoopRules.Event(type, null, MiniJson.num(e.get("at")), fields);
+    }
+
+    private static long dayOf(String iso) {
+        return LocalDate.parse(iso).toEpochDay();
+    }
+
+    private static long msOf(String iso) {
+        return LocalDate.parse(iso).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() + 12 * 3_600_000L;
+    }
+
+    static void run() throws Exception {
+        vocabulary();
+        records();
+        lifecycle();
+        invariants();
+        views();
+        matching();
+        fit();
+        inbox();
+        edges();
+        journal();
+    }
+
+    private static void vocabulary() {
+        Harness.suite("the vocabulary: five kinds, who moves next, how it began");
+        Harness.equal("five kinds", LoopRules.KINDS.toString(), "[DO, GIVE, ATTEND, RESPOND, DECIDE]");
+        Harness.check("ASK and PROMISE are origins, not kinds; GET is not a kind of its own", !LoopRules.validKind("ASK") && !LoopRules.validKind("PROMISE") && !LoopRules.validKind("GET")
+            && LoopRules.validOrigin("asked") && LoopRules.validOrigin("promised"));
+        Harness.equal("two owners: there is always a next mover", LoopRules.OWNERS.toString(), "[me, them]");
+        Harness.check("no owner called unknown", !LoopRules.validOwner("unknown") && !LoopRules.validOwner(null));
+        Harness.equal("three origins", LoopRules.ORIGINS.toString(), "[stated, asked, promised]");
+        Harness.equal("three bases, none of them a number", LoopRules.BASES.toString(), "[observed, stated, inferred]");
+        Harness.check("a word that is not in it is not valid", !LoopRules.validKind("do") && !LoopRules.validKind(null) && !LoopRules.validOwner("everyone") && !LoopRules.validBasis("0.96") && !LoopRules.validBasis("guessed"));
+        Harness.equal("a GIVE owned by them is what a person calls a get", LoopRules.plain("GIVE", "them") + "|" + LoopRules.plain("GIVE", "me") + "|" + LoopRules.plain("DO", "them"), "GET|GIVE|DO");
+        Harness.equal("the protocol names itself", LoopRules.PROTOCOL, "loop/0.1");
+
+        Harness.suite("the old names are read as the protocol's, and nothing else is");
+        Harness.equal("opened", LoopRules.canonicalType("orb.commitment.opened"), "orb.loop.opened");
+        Harness.equal("moved", LoopRules.canonicalType("orb.commitment.moved"), "orb.loop.moved");
+        Harness.equal("done is closed", LoopRules.canonicalType("orb.commitment.done"), "orb.loop.closed");
+        Harness.equal("dropped", LoopRules.canonicalType("orb.commitment.dropped"), "orb.loop.dropped");
+        Harness.equal("reopened", LoopRules.canonicalType("orb.commitment.reopened"), "orb.loop.reopened");
+        Harness.equal("a loop type is itself", LoopRules.canonicalType("orb.loop.advanced"), "orb.loop.advanced");
+        Harness.check("the fit report is not a lifecycle event", LoopRules.canonicalType(LoopFacts.FIT_REPORTED) == null);
+        Harness.check("neither is anything else", LoopRules.canonicalType("orb.shared") == null && LoopRules.canonicalType("orb.commitment.note") == null
+            && LoopRules.canonicalType("orb.loop.bogus") == null && LoopRules.canonicalType(null) == null);
+    }
+
+    private static void records() {
+        Harness.suite("a record carries the protocol's words, a day, a rule, and the identity of a sealed note");
+        Map<String, Object> o = LoopFacts.opened("sha256:x", 12L, "GIVE", "me", "asked", "2026-10-05", "inferred", "draft.bill", 1L, "0123456789abcdef");
+        Harness.equal("the fields of an opening", new TreeSet<>(o.keySet()).toString(),
+            "[attachment, attachmentBytes, basis, counterparty, dueDate, kind, origin, owner, protocol, rule, ruleVersion, version]");
+        Harness.equal("the protocol is named in it", o.get("protocol"), "loop/0.1");
+        Harness.check("a date that is not a day is none", LoopFacts.opened("s", 1L, "DO", "me", "stated", "5 Oct", "stated", "user", 1L, null).get("dueDate").equals(""));
+        Harness.equal("a counterparty that is not a blinded key is none", LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "stated", "user", 1L, "Ravi Kumar").get("counterparty"), "");
+        Harness.check("and neither is a short one", LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "stated", "user", 1L, "abc").get("counterparty").equals("")
+            && LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "stated", "user", 1L, "0123456789abcdef").get("counterparty").equals("0123456789abcdef"));
+        Harness.check("words outside the vocabulary are refused", throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "TASK", "me", "stated", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "all", "stated", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "me", "hearsay", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "0.96", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "GET", "them", "stated", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "unknown", "stated", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "me", "self", null, "stated", "user", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "guessed", "user", 1L, null); } }));
+        Harness.check("a rule id is a short lower-case name, never text", throwsOn(new Runnable() { public void run() { LoopFacts.opened("s", 1L, "DO", "me", "stated", null, "stated", "Pay Ravi 5000", 1L, null); } })
+            && throwsOn(new Runnable() { public void run() { LoopFacts.closedByEvidence(null); } }));
+        Harness.equal("closed by you says so", LoopFacts.closedByYou().get("by") + "/" + LoopFacts.closedByYou().get("class"), "you/you");
+        Harness.equal("closed by evidence is exact, and names the rule", LoopFacts.closedByEvidence("draft.bill").get("class") + "/" + LoopFacts.closedByEvidence("draft.bill").get("rule"), "exact/draft.bill");
+        Harness.check("an advance changes only what it names", !LoopFacts.advanced("them", null, null).containsKey("origin") && !LoopFacts.advanced("them", null, null).containsKey("dueDate")
+            && LoopFacts.advanced(null, "promised", "").get("dueDate").equals(""));
+        Harness.check("no status, no authorization, no confidence in any record", !o.containsKey("status") && !o.containsKey("auth") && !o.containsKey("confidence"));
+    }
+
+    private static boolean throwsOn(Runnable r) {
+        try {
+            r.run();
+            return false;
+        } catch (IllegalArgumentException refused) {
+            return true;
+        }
+    }
+
+    private static void lifecycle() throws Exception {
+        Harness.suite("the conformance corpus: events folded to a state on a given day");
+        Map<String, Object> corpus = MiniJson.map(fixture("lifecycle.json"));
+        List<Object> cases = MiniJson.list(corpus.get("cases"));
+        Harness.check("the corpus is there", cases.size() >= 20);
+        for (Object c : cases) {
+            Map<String, Object> one = MiniJson.map(c);
+            List<LoopRules.Event> events = new ArrayList<>();
+            for (Object e : MiniJson.list(one.get("events"))) events.add(event(MiniJson.map(e)));
+            LoopRules.Loop loop = LoopRules.fold("loop-1", events);
+            String name = MiniJson.str(one.get("name"));
+            if (one.get("expect") == null) {
+                Harness.check(name, loop == null);
+                continue;
+            }
+            Map<String, Object> want = MiniJson.map(one.get("expect"));
+            String got = loop == null ? "none" : loop.state(MiniJson.str(one.get("today"))) + "|" + loop.owner + "|" + loop.kind + "|" + loop.origin + "|" + loop.due + "|" + loop.closedBy;
+            String expected = want.get("state") + "|" + want.get("owner") + "|" + want.get("kind") + "|" + want.get("origin") + "|" + fieldOrNull(want, "due") + "|" + fieldOrNull(want, "closedBy");
+            Harness.equal(name, got, expected);
+        }
+    }
+
+    private static LoopRules.Event ev(String type, String... kv) {
+        Map<String, String> f = new HashMap<>();
+        for (int i = 0; i < kv.length; i += 2) f.put(kv[i], kv[i + 1]);
+        return new LoopRules.Event(type, null, 1L, f);
+    }
+
+    private static void invariants() {
+        Harness.suite("the invariants that do not change");
+        LoopRules.Loop open = LoopRules.fold("a", Arrays.asList(ev(LoopRules.OPENED, "kind", "GIVE", "owner", "me", "origin", "stated", "dueDate", "2026-10-10")));
+        Harness.equal("it is overdue the day after", open.state("2026-10-11"), "overdue");
+        Harness.equal("a year later it is still overdue: absence is never closure", open.state("2027-10-11"), "overdue");
+        Harness.check("nothing in the fold moves a loop to done on its own", !LoopRules.DONE.equals(open.last));
+        open.suggestedClosed = true;
+        Harness.equal("evidence that suggests it is closed does not change the state", open.state("2026-10-11"), "overdue");
+        Harness.check("a closing that breaks an invariant changes nothing", !open.apply(ev(LoopRules.CLOSED, "by", "evidence", "class", "suggests"))
+            && !open.apply(ev(LoopRules.CLOSED, "by", "evidence")) && !open.apply(ev(LoopRules.CLOSED, "by", "evidence", "class", "you")) && !open.apply(ev(LoopRules.CLOSED, "by", "magic", "class", "exact"))
+            && open.state("2026-10-11").equals("overdue"));
+        Harness.check("a closing by you is a change", open.apply(ev(LoopRules.CLOSED, "by", "you")));
+        open.apply(ev(LoopRules.REOPENED));
+        Harness.check("exact evidence closes it", open.apply(ev(LoopRules.CLOSED, "by", "evidence", "class", "exact")) && open.state("2026-10-11").equals("done") && LoopRules.BY_EVIDENCE.equals(open.closedBy));
+        open.apply(ev(LoopRules.REOPENED));
+        Harness.check("reopening undoes it, and forgets who closed it", open.state("2026-10-11").equals("overdue") && open.closedBy == null);
+        Harness.check("an event that is not an opening does not begin a loop", LoopRules.begin("x", ev(LoopRules.CLOSED, "by", "you")) == null && LoopRules.fold("x", Collections.<LoopRules.Event>emptyList()) == null);
+        Harness.equal("a date that is not a day is no date", LoopRules.dayOrNull("tomorrow") + "|" + LoopRules.dayOrNull("2026-10-05") + "|" + LoopRules.dayOrNull(""), "null|2026-10-05|null");
+        Harness.check("an advance that names nothing valid does nothing", !open.apply(ev(LoopRules.ADVANCED, "owner", "everyone", "origin", "rumour")));
+        Harness.check("lifelong states: only these", LoopRules.active("open") && LoopRules.active("dueToday") && LoopRules.active("overdue") && !LoopRules.active("passed") && !LoopRules.active("done") && !LoopRules.active("dropped"));
+    }
+
+    private static void views() {
+        Harness.suite("the views: on me, waiting for, said and still open");
+        LoopRules.Loop mine = LoopRules.fold("m", Arrays.asList(ev(LoopRules.OPENED, "kind", "GIVE", "owner", "me", "origin", "promised", "dueDate", "2026-10-10")));
+        LoopRules.Loop theirs = LoopRules.fold("t", Arrays.asList(ev(LoopRules.OPENED, "kind", "GIVE", "owner", "them", "origin", "stated", "dueDate", "2026-10-10")));
+        LoopRules.Loop gone = LoopRules.fold("g", Arrays.asList(ev(LoopRules.OPENED, "kind", "ATTEND", "owner", "me", "origin", "stated", "dueDate", "2026-10-01")));
+        Harness.check("mine is on me, not waiting", LoopRules.onMe(mine, "2026-10-04") && !LoopRules.waitingFor(mine, "2026-10-04"));
+        Harness.check("theirs is waiting, not on me", LoopRules.waitingFor(theirs, "2026-10-04") && !LoopRules.onMe(theirs, "2026-10-04"));
+        Harness.check("a promise ahead of its date is not yet said-and-still-open", !LoopRules.saidStillOpen(mine, "2026-10-04"));
+        Harness.check("past its date it is", LoopRules.saidStillOpen(mine, "2026-10-12"));
+        Harness.check("an expectation of theirs, stated, is not a broken promise", !LoopRules.saidStillOpen(theirs, "2026-10-12"));
+        Harness.check("a past attendance is on nobody's list", !LoopRules.onMe(gone, "2026-10-04") && !LoopRules.waitingFor(gone, "2026-10-04"));
+        mine.apply(ev(LoopRules.CLOSED, "by", "you"));
+        Harness.check("done leaves every list", !LoopRules.onMe(mine, "2026-10-12") && !LoopRules.saidStillOpen(mine, "2026-10-12"));
+    }
+
+    private static String signature(List<LoopRules.Seen> seen, List<List<Integer>> groups) {
+        List<String> out = new ArrayList<>();
+        for (List<Integer> g : groups) {
+            List<String> one = new ArrayList<>();
+            for (int i : g) one.add(seen.get(i).counterparty + "|" + seen.get(i).objectClass + "|" + seen.get(i).minor + "|" + seen.get(i).day);
+            Collections.sort(one);
+            out.add(one.toString());
+        }
+        Collections.sort(out);
+        return out.toString();
+    }
+
+    private static void permutations(List<LoopRules.Seen> seen, int k, List<List<LoopRules.Seen>> out) {
+        if (k == seen.size()) { out.add(new ArrayList<>(seen)); return; }
+        for (int i = k; i < seen.size(); i++) {
+            Collections.swap(seen, k, i);
+            permutations(seen, k + 1, out);
+            Collections.swap(seen, k, i);
+        }
+    }
+
+    private static void matching() throws Exception {
+        Harness.suite("the conformance corpus: which observations are one loop, in any order");
+        Map<String, Object> corpus = MiniJson.map(fixture("matching.json"));
+        for (Object c : MiniJson.list(corpus.get("cases"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            List<LoopRules.Seen> seen = new ArrayList<>();
+            for (Object s : MiniJson.list(one.get("seen"))) {
+                Map<String, Object> m = MiniJson.map(s);
+                seen.add(new LoopRules.Seen(MiniJson.str(m.get("counterparty")), MiniJson.str(m.get("objectClass")), MiniJson.num(m.get("minor")), MiniJson.num(m.get("day"))));
+            }
+            int tolerance = (int) MiniJson.num(one.get("tolerance"));
+            List<List<Integer>> want = new ArrayList<>();
+            for (Object g : MiniJson.list(one.get("groups"))) {
+                List<Integer> idx = new ArrayList<>();
+                for (Object i : MiniJson.list(g)) idx.add((int) MiniJson.num(i));
+                want.add(idx);
+            }
+            String name = MiniJson.str(one.get("name"));
+            Harness.equal(name, LoopRules.groups(seen, tolerance), want);
+            List<List<LoopRules.Seen>> orders = new ArrayList<>();
+            permutations(new ArrayList<>(seen), 0, orders);
+            boolean same = true;
+            String expected = signature(seen, LoopRules.groups(seen, tolerance));
+            for (List<LoopRules.Seen> order : orders) if (!signature(order, LoopRules.groups(order, tolerance)).equals(expected)) same = false;
+            Harness.check(name + " (the same in all " + orders.size() + " orders)", same);
+        }
+        LoopRules.Seen a = new LoopRules.Seen("x", "bill", 500L, 10L), b = new LoopRules.Seen("x", "bill", 500L, 20L);
+        Harness.check("matching is symmetric", LoopRules.sameLoop(a, b, 45) == LoopRules.sameLoop(b, a, 45));
+        Harness.check("a missing counterparty or class never matches", !LoopRules.sameLoop(new LoopRules.Seen(null, "bill", 500L, 1L), new LoopRules.Seen(null, "bill", 500L, 1L), 9)
+            && !LoopRules.sameLoop(new LoopRules.Seen("x", null, 500L, 1L), new LoopRules.Seen("x", null, 500L, 1L), 9));
+        Harness.equal("a key is made from the kind, the counterparty's blinded key, the class and the period", LoopRules.keyMaterial("GIVE", "ab", "card", "2026-09"), "loop:GIVE:ab:card:2026-09");
+    }
+
+    private static void fit() throws Exception {
+        Harness.suite("the draft reading of service messages: every one to exactly one role");
+        Map<String, Object> corpus = MiniJson.map(fixture("fit.json"));
+        Harness.equal("the corpus names the reading it holds", MiniJson.str(corpus.get("fit")), LoopFit.VERSION);
+        TreeSet<String> reached = new TreeSet<>();
+        for (Object c : MiniJson.list(corpus.get("cases"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            LoopFit.Reading r = LoopFit.read(MiniJson.str(one.get("body")));
+            String what = "\u201c" + MiniJson.str(one.get("rule")) + "\u201d: " + MiniJson.str(one.get("body"));
+            Harness.equal(what, r.role + "|" + r.kind + "|" + r.owner + "|" + r.minor + "|" + r.rule + "|" + r.tag,
+                MiniJson.str(one.get("role")) + "|" + MiniJson.str(one.get("kind")) + "|" + MiniJson.str(one.get("owner")) + "|" + MiniJson.num(one.get("minor")) + "|" + MiniJson.str(one.get("rule")) + "|" + MiniJson.str(one.get("tag")));
+            if (!LoopFit.AMBIGUOUS.equals(r.role)) reached.add(r.rule);
+            Harness.check("a message is only ever one role, and a GET is never a kind: " + r.rule, LoopFit.ROLES.contains(r.role) && !"GET".equals(r.kind) && (r.owner == null || LoopRules.validOwner(r.owner)));
+        }
+        Harness.equal("every rule the reading has is reached by a case", reached, new TreeSet<>(LoopFit.rules()));
+        Harness.check("a reading is one of the seven roles", LoopFit.ROLES.size() == 7);
+        Harness.check("a balance beside a loop does not make it ambiguous", LoopFit.read("Rs.500 debited. Avl Bal Rs.100").role.equals("closes"));
+        Harness.check("a promo word beside a bill is a promo, not a bill", LoopFit.read("Pay Rs.499 only, offer till last date").role.equals("noise"));
+        Harness.equal("every matching rule is listed, each on its own", LoopFit.readAll("Rs.500.00 debited from A/c XX0000. Your appointment is scheduled for 08-Oct.").size(), 2);
+        Harness.equal("and none is listed when none reads it", LoopFit.readAll("hello").size(), 0);
+        for (Object c : MiniJson.list(corpus.get("minor"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            Harness.equal("amount in \u201c" + MiniJson.str(one.get("body")) + "\u201d", LoopFit.minorOf(MiniJson.str(one.get("body"))), MiniJson.num(one.get("minor")));
+        }
+        Harness.equal("a number too large to hold is no amount", LoopFit.minorOf("Rs 99999999999999999999999 debited"), 0L);
+        for (Object c : MiniJson.list(corpus.get("brands"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            Harness.equal("brand of \u201c" + MiniJson.str(one.get("address")) + "\u201d", LoopFit.brandOf(MiniJson.str(one.get("address"))), MiniJson.str(one.get("brand")));
+        }
+        Harness.equal("an OTP warning inside a payment's own words does not hide the payment", LoopFit.read("Rs.500 debited. If not you, never share your OTP.").role, "closes");
+    }
+
+    private static MessagesFlow.Source source(final List<MessagesRules.Message> all) {
+        return new MessagesFlow.Source() {
+            @Override public MessagesXml.Recognition stream(MessagesXml.Sink sink) {
+                MessagesXml.Recognition r = new MessagesXml.Recognition();
+                for (MessagesRules.Message m : all) sink.message(m);
+                return r;
+            }
+        };
+    }
+
+    private static List<MessagesRules.Message> messagesOf(Map<String, Object> corpus) {
+        List<MessagesRules.Message> all = new ArrayList<>();
+        for (Object o : MiniJson.list(corpus.get("messages"))) {
+            Map<String, Object> m = MiniJson.map(o);
+            all.add(new MessagesRules.Message(MiniJson.str(m.get("address")), "", msOf(MiniJson.str(m.get("day"))), (int) MiniJson.num(m.get("type")), MiniJson.str(m.get("body"))));
+        }
+        return all;
+    }
+
+    private static void inbox() throws Exception {
+        Harness.suite("a small inbox read as a whole: counts, and which openings were paid");
+        Map<String, Object> corpus = MiniJson.map(fixture("inbox.json"));
+        List<MessagesRules.Message> all = messagesOf(corpus);
+        LoopFit fit = new LoopFit();
+        for (MessagesRules.Message m : all) fit.message(m);
+        LoopFit.Report r = fit.report();
+        Map<String, Object> want = MiniJson.map(corpus.get("expect"));
+        Harness.equal("messages", r.messages, MiniJson.num(want.get("messages")));
+        Harness.equal("from names and short codes", r.service, MiniJson.num(want.get("service")));
+        Harness.equal("from numbers, counted and not read", r.conversational, MiniJson.num(want.get("conversational")));
+        Harness.equal("drafts and other kinds", r.other, MiniJson.num(want.get("other")));
+        for (String k : new String[] {"opens", "advances", "closes", "evidence", "noise", "ambiguous", "unmapped", "kind.DO", "kind.GIVE", "kind.GIVE.me", "kind.GIVE.them", "kind.ATTEND", "opens.GIVE.me", "closes.GIVE.me", "match.opens", "match.opensMatched", "match.closes", "match.closesMatched"}) {
+            Harness.equal(k, r.get(k), MiniJson.num(want.get(k)));
+        }
+        Harness.equal("the unmapped sender is named by its brand code", r.topUnmapped(5).toString(), "{ODDBNK=1}");
+        long sum = 0;
+        for (String role : LoopFit.ROLES) sum += r.get(role);
+        Harness.equal("every service message is in exactly one role", sum, r.service);
+        Harness.equal("so the roles and the other counts add to all messages", sum + r.conversational + r.other, r.messages);
+        Harness.equal("the unmapped share of the rest", r.unmappedPercent(), Math.round(100.0 * 1 / 6));
+        Harness.check("the screen's sentence says the counts", r.say().contains("of 8 messages") && r.say().contains("1 from numbers") && r.say().contains("GIVE 5 (5 owed by you, 0 owed to you)") && r.say().contains("Not a loop: 2 (2 noise, 0 only information)")
+            && r.say().contains("Could not be read: 1 (17%") && r.say().contains("Ambiguous: 0") && r.say().contains("Of 2 openings with an amount, 1 have a closing"));
+
+        List<MessagesRules.Message> flipped = new ArrayList<>(all);
+        Collections.reverse(flipped);
+        LoopFit other = new LoopFit();
+        for (MessagesRules.Message m : flipped) other.message(m);
+        Harness.equal("the file's order does not change the report", other.report().counts(), r.counts());
+
+        MessagesFlow.Look look = MessagesFlow.look(source(all), msOf("2026-10-01"), java.util.TimeZone.getTimeZone("UTC"));
+        Harness.equal("the Look carries the same report", look.fit.counts(), r.counts());
+        Harness.check("and the survey is what it was: one number conversation, the rest from names", look.survey.by.size() == 1 && look.survey.service == 8 && look.survey.other == 1);
+
+        Map<String, Object> payload = LoopFacts.fitReported(r);
+        boolean onlyNumbers = true;
+        for (Map.Entry<String, Object> e : payload.entrySet()) {
+            Object v = e.getValue();
+            if (!(v instanceof Long) && !e.getKey().equals("protocol") && !e.getKey().equals("fit")) onlyNumbers = false;
+        }
+        Harness.check("the record is numbers, plus the protocol and fit names", onlyNumbers && payload.get("protocol").equals("loop/0.1") && payload.get("fit").equals("fit/1"));
+        String canon = Json.canonical(payload);
+        Harness.check("no word of any message, and no number of any person", !canon.contains("credit card") && !canon.contains("bill") && !canon.contains("9000000001") && !canon.contains("OTP") && canon.contains("unmapped.ODDBNK"));
+        Harness.check("no key is longer than it should be", payload.size() < 60);
+
+        LoopFit tangled = new LoopFit();
+        for (int i = 0; i < 3; i++) tangled.message(new MessagesRules.Message("VM-TESTBK", "", 1L, 1, "Rs.500.00 debited from A/c XX0000. Your appointment is scheduled for 08-Oct."));
+        tangled.message(new MessagesRules.Message("VM-TESTBK", "", 1L, 1, "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov."));
+        LoopFit.Report t = tangled.report();
+        Harness.equal("messages that two rules read differently are counted apart, in no kind", t.get("ambiguous") + "|" + t.get("kind.GIVE") + "|" + t.get("kind.ATTEND") + "|" + t.get("closes") + "|" + t.get("opens"), "4|0|0|0|0");
+        Harness.equal("and the rules that disagree are named, most often first", t.topAmbiguous(5).toString(), "{money-out+attend=3, payment-done+bill-due=1}");
+        Map<String, Object> tangledRecord = LoopFacts.fitReported(t);
+        Harness.check("the record names them, and nothing else", tangledRecord.get("ambiguous.money-out+attend").equals(3L) && tangledRecord.get("ambiguous.payment-done+bill-due").equals(1L)
+            && !Json.canonical(tangledRecord).contains("appointment") && !Json.canonical(tangledRecord).contains("EMI"));
+        LoopFit many = new LoopFit();
+        for (int i = 0; i < 30; i++) many.message(new MessagesRules.Message("VM-BRAND" + (char) ('A' + i % 26) + i, "", 1L, 1, "Namaste " + i));
+        Harness.equal("only the largest ten unmapped groups are recorded", LoopFacts.fitReported(many.report()).keySet().stream().filter(k -> k.startsWith("unmapped.")).count(), 10L);
+    }
+
+
+    private static MessagesRules.Message service(String address, String body, String day) {
+        return new MessagesRules.Message(address, "", msOf(day), 1, body);
+    }
+
+    private static LoopFit.Report feed(MessagesRules.Message... all) {
+        LoopFit fit = new LoopFit();
+        for (MessagesRules.Message m : all) fit.message(m);
+        return fit.report();
+    }
+
+    private static void edges() {
+        Harness.suite("closing what was opened: once, after, from the same sender, by the same next mover");
+        String bill = "Your card bill of Rs.1,000.00 is due on 25-Sep-26.";
+        String paid = "Payment of Rs.1,000.00 received towards your credit card ending 0000.";
+        LoopFit.Report twice = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-AAA", paid, "2026-09-05"), service("VM-AAA", paid, "2026-09-06"));
+        Harness.equal("one opening is closed by one closing, not by two", twice.get("match.opens") + "/" + twice.get("match.opensMatched") + "/" + twice.get("match.closes") + "/" + twice.get("match.closesMatched"), "1/1/2/1");
+        LoopFit.Report before = feed(service("VM-AAA", paid, "2026-09-01"), service("VM-AAA", bill, "2026-09-03"));
+        Harness.equal("a payment before the bill does not close it", before.get("match.opensMatched"), 0L);
+        LoopFit.Report sameDay = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-AAA", paid, "2026-09-01"));
+        Harness.equal("the same day does", sameDay.get("match.opensMatched"), 1L);
+        LoopFit.Report late = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-AAA", paid, "2026-11-01"));
+        Harness.equal("two months later is too late (45 days)", late.get("match.opensMatched"), 0L);
+        LoopFit.Report otherSender = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-BBB", paid, "2026-09-05"));
+        Harness.equal("another sender does not close it", otherSender.get("match.opensMatched"), 0L);
+        LoopFit.Report refund = feed(service("VM-SHOP", "Refund of Rs.1,200 has been initiated for your order.", "2026-09-01"), service("VM-SHOP", "Rs.1,200.00 credited to your A/c XX0000 by SHOP.", "2026-09-04"));
+        Harness.equal("a refund begun and then credited is one loop closed (an advance counts as the opening)", refund.get("match.opens") + "/" + refund.get("match.opensMatched"), "1/1");
+        LoopFit.Report wrongWay = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-AAA", "Rs.1,000.00 credited to your A/c XX0000.", "2026-09-04"));
+        Harness.equal("money coming in does not close a bill you owe", wrongWay.get("match.opensMatched"), 0L);
+
+        Harness.suite("how the counts are made");
+        LoopFit.Report advance = feed(service("VM-SHIP", "Your shipment is out for delivery today.", "2026-09-01"));
+        Harness.equal("a message that moves a loop on is counted in its kind and owner", advance.get("advances") + "|" + advance.get("advances.GIVE.them") + "|" + advance.get("kind.GIVE") + "|" + advance.get("kind.GIVE.them") + "|" + advance.get("kind.GIVE.me"), "1|1|1|1|0");
+        LoopFit.Report mix = feed(service("VM-AAA", bill, "2026-09-01"), service("VM-AAA", "Rs.500.00 debited from A/c XX0000.", "2026-09-02"), service("VM-AAA", "Your appointment is scheduled for 08-Oct.", "2026-09-03"),
+            service("VM-AAA", "Rs.1,000.00 credited to your A/c XX0000.", "2026-09-04"));
+        Harness.equal("opens and closes by kind and owner", mix.get("opens.GIVE.me") + "|" + mix.get("closes.GIVE.me") + "|" + mix.get("closes.GIVE.them") + "|" + mix.get("opens.ATTEND.me") + "|" + mix.get("kind.ATTEND"), "1|1|1|1|1");
+        Harness.equal("a message a service sent (kind 2) is still a service message", new LoopLook().sent(), 1L);
+        LoopFit.Report notLoops = feed(service("VM-AAA", "Avl Bal in A/c XX0000 is Rs.100.00.", "2026-09-01"), service("VM-AAA", "Congratulations! Win a prize with this offer.", "2026-09-01"));
+        Harness.check("not a loop is information plus noise", notLoops.notALoop() == 2 && notLoops.say().contains("Not a loop: 2 (1 noise, 1 only information)"));
+        LoopFit.Report ties = feed(service("VM-ZZZ", "Kuch bhi", "2026-09-01"), service("VM-AAA", "Kuch bhi", "2026-09-01"));
+        Harness.equal("brands with the same count are listed by name", ties.topUnmapped(5).toString(), "{AAA=1, ZZZ=1}");
+
+        LoopFit fit = new LoopFit();
+        for (int i = 0; i < 400; i++) fit.message(service("BR" + i, "Kuch bhi", "2026-09-01"));
+        fit.message(service("BR0", "Kuch bhi", "2026-09-01"));
+        fit.message(service("BR400", "Kuch bhi", "2026-09-01"));
+        Map<String, Long> brands = fit.report().topUnmapped(500);
+        Harness.check("past four hundred brands, a new one is lumped as OTHER and a known one still counts as itself", brands.get("BR0") == 2L && brands.get("OTHER") == 1L && !brands.containsKey("BR400"));
+
+        String[] bodies = {
+            "Rs.500.00 debited. Your appointment is scheduled for 08-Oct.", "Rs.500.00 debited. Your appointment is scheduled for 09-Oct.",
+            "Rs.500.00 debited. Your bill of Rs.900.00 is due on 05-Nov.", "Rs.500.00 debited. Your bill of Rs.900.00 is due on 06-Nov.",
+            "Rs.500.00 debited. Your plan validity expires on 12-Oct.", "Rs.500.00 debited. Please approve the mandate.", "Rs.500.00 debited. Your order is confirmed.",
+            "Rs.500.00 debited from A/c 1 and credited to A/c 2.", "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov." };
+        LoopFit many = new LoopFit();
+        for (String b : bodies) many.message(service("VM-AAA", b, "2026-09-01"));
+        LoopFit.Report mine = many.report();
+        Harness.equal("seven pairs of disagreeing rules, ties by name", mine.topAmbiguous(5).toString(),
+            "{money-out+attend=2, money-out+bill-due=2, money-out+approve=1, money-out+money-in=1, money-out+order=1}");
+        Map<String, Object> record = LoopFacts.fitReported(mine);
+        int named = 0;
+        for (String k : record.keySet()) if (k.startsWith("ambiguous.")) named++;
+        Harness.equal("and only five are written down", named, 5);
+        LoopFit conv = new LoopFit();
+        conv.message(new MessagesRules.Message("+919000000001", "", 1L, 1, "hello"));
+        Harness.equal("how many came from numbers is in the record", LoopFacts.fitReported(conv.report()).get("conversational"), 1L);
+    }
+
+    /** One service message of the backup's kind 2 (sent) — the test for how the counts treat it. */
+    private static final class LoopLook {
+        long sent() {
+            LoopFit fit = new LoopFit();
+            fit.message(new MessagesRules.Message("VM-AAA", "", 1L, 2, "Kuch bhi"));
+            return fit.report().service;
+        }
+    }
+
+    private static void journal() throws Exception {
+        Harness.suite("on the phone: the commitments and the protocol read the same way");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-loop").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Commitments.Opened a = Commitments.open(context, journal, null, "Send the GST certificate", "owe", "2026-10-02", null);
+        Commitments.Opened b = Commitments.open(context, journal, null, "Invoice from Arun", "waiting", "2026-10-20", null);
+        List<Commitments.Commitment> before = Commitments.all(context, journal);
+        Commitments.Commitment ca = null;
+        for (Commitments.Commitment c : before) if (c.eventId.equals(a.eventId)) ca = c;
+        Harness.check("both are read", before.size() == 2 && ca != null);
+        Commitments.move(journal, ca, "2026-10-09");
+        Commitments.done(journal, ca);
+        Commitments.reopen(journal, ca);
+        Commitments.drop(journal, ca);
+
+        Map<String, List<LoopRules.Event>> byLoop = new TreeMap<>();
+        for (String line : journal.readLines()) {
+            LoopRules.Event e = LoopRules.parse(line);
+            if (e == null) continue;
+            String id = LoopRules.OPENED.equals(e.type) ? Erasure.eventId(line) : e.about;
+            if (!byLoop.containsKey(id)) byLoop.put(id, new ArrayList<LoopRules.Event>());
+            byLoop.get(id).add(e);
+        }
+        Harness.equal("two loops are found among the commitment events", byLoop.size(), 2);
+        LoopRules.Loop la = LoopRules.fold(a.eventId, byLoop.get(a.eventId));
+        LoopRules.Loop lb = LoopRules.fold(b.eventId, byLoop.get(b.eventId));
+        Harness.check("the one I owe is a DO on me, and ended dropped, after its date was moved", la.kind.equals("DO") && la.owner.equals("me") && la.state("2026-10-12").equals("dropped") && "2026-10-09".equals(la.due));
+        Harness.check("the one I am waiting for is a GIVE owned by them, open", lb.kind.equals("GIVE") && lb.owner.equals("them") && lb.state("2026-10-12").equals("open") && "2026-10-20".equals(lb.due));
+        List<Commitments.Commitment> after = Commitments.all(context, journal);
+        for (Commitments.Commitment c : after) {
+            LoopRules.Loop l = c.eventId.equals(a.eventId) ? la : lb;
+            Harness.equal("the commitment's own state is the loop's, on every day I try", Commitments.status(c, "2026-10-12") + Commitments.status(c, "2026-10-20") + Commitments.status(c, "2026-10-21"),
+                l.state("2026-10-12") + l.state("2026-10-20") + l.state("2026-10-21"));
+        }
+
+        Map<String, Object> opened = LoopFacts.opened("sha256:abc", 40L, "GIVE", "me", "asked", "2026-10-05", "stated", "draft.bill", 1L, "0123456789abcdef");
+        Map<String, Object> made = journal.append(LoopRules.OPENED, opened, Collections.<String>emptyList());
+        Harness.check("a protocol opening can be written", made != null);
+        String id = (String) made.get("id");
+        Harness.check("and a promise is an advance of it", journal.append(LoopRules.ADVANCED, LoopFacts.advanced(null, "promised", null), Arrays.asList(id)) != null);
+        Harness.check("and exact evidence closes it", journal.append(LoopRules.CLOSED, LoopFacts.closedByEvidence("draft.bill"), Arrays.asList(id)) != null);
+        List<LoopRules.Event> events = new ArrayList<>();
+        for (String line : journal.readLines()) {
+            LoopRules.Event e = LoopRules.parse(line);
+            if (e == null) continue;
+            if (LoopRules.OPENED.equals(e.type) && id.equals(Erasure.eventId(line))) events.add(e);
+            else if (id.equals(e.about)) events.add(e);
+        }
+        LoopRules.Loop l = LoopRules.fold(id, events);
+        Harness.check("read back from the journal: GIVE, promised, closed by evidence", l != null && l.kind.equals("GIVE") && l.origin.equals("promised") && l.last.equals("done") && "evidence".equals(l.closedBy) && "2026-10-05".equals(l.due));
+        String all = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no words and no name", !all.contains("GST certificate") && !all.contains("Arun"));
+
+        Harness.check("a fit report is written as counts, and is not a lifecycle event", journal.append(LoopFacts.FIT_REPORTED, LoopFacts.fitReported(new LoopFit().report())) != null
+            && LoopRules.parse(journal.readLines().get(journal.readLines().size() - 1)) == null);
+    }
+}

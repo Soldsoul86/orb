@@ -1,0 +1,396 @@
+{
+ "protocol": "loop/0.1",
+ "fit": "fit/1",
+ "about": "One synthetic service message to the role the draft rules give it. Nothing here is a real message.",
+ "cases": [
+  {
+   "body": "123456 is your OTP for login. Do not share it with anyone.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "code",
+   "tag": "code",
+   "owner": null
+  },
+  {
+   "body": "OTP 998877 for txn of Rs.500 at Test Shop. Do not share.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "code",
+   "tag": "code",
+   "owner": null
+  },
+  {
+   "body": "Your UPI payment of Rs.250.00 to Test Shop failed. Amount not debited.",
+   "role": "advances",
+   "kind": "GIVE",
+   "minor": 25000,
+   "rule": "failed",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Refund of Rs.1,200 for your order has been initiated and will reflect in 5-7 days.",
+   "role": "advances",
+   "kind": "GIVE",
+   "minor": 120000,
+   "rule": "refund-started",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Payment of Rs.8,421.00 received towards your credit card ending 0000. Thank you.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 842100,
+   "rule": "payment-done",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Rs.499.00 debited from A/c XX0000 on 03-10-26 to VPA shop@bank (UPI Ref 1234).",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 49900,
+   "rule": "money-out",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Rs.50,000.00 credited to A/c XX0000 on 01-10-26 by Salary.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 5000000,
+   "rule": "money-in",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Your order #123 is confirmed and will be delivered by Fri, 9 Oct.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 0,
+   "rule": "order",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Your package has been delivered. Rate your experience.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 0,
+   "rule": "delivered",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Your shipment is out for delivery today.",
+   "role": "advances",
+   "kind": "GIVE",
+   "minor": 0,
+   "rule": "in-transit",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Your electricity bill of Rs.1,310.00 is due on 10-Oct-26. Pay by the due date.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 131000,
+   "rule": "bill-due",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Pay Rs.499 only and get cashback; offer valid till last date.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "promo",
+   "tag": "promo",
+   "owner": null
+  },
+  {
+   "body": "Collect request of Rs.300 from Test Shop pending on your UPI app.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 30000,
+   "rule": "collect-request",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Please approve the AutoPay mandate request in your bank app.",
+   "role": "opens",
+   "kind": "DECIDE",
+   "minor": 0,
+   "rule": "approve",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Your mobile plan validity expires on 12-Oct. Recharge to continue.",
+   "role": "opens",
+   "kind": "DO",
+   "minor": 0,
+   "rule": "renew",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Your appointment is scheduled for 08-Oct at 10:30 at Test Clinic.",
+   "role": "opens",
+   "kind": "ATTEND",
+   "minor": 0,
+   "rule": "attend",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "PNR ABC123 Flight TS101 departs 09-Oct 06:00.",
+   "role": "opens",
+   "kind": "ATTEND",
+   "minor": 0,
+   "rule": "attend",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Avl Bal in A/c XX0000 is Rs.12,345.00.",
+   "role": "evidence",
+   "kind": null,
+   "minor": 0,
+   "rule": "balance",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Congratulations! Get 20% off on your next purchase. T&C apply.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "promo",
+   "tag": "promo",
+   "owner": null
+  },
+  {
+   "body": "Your KYC is pending. Visit branch to update.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Namaste, aapka khata update ho gaya hai.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov.",
+   "role": "ambiguous",
+   "kind": null,
+   "minor": 0,
+   "rule": "payment-done+bill-due",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Rs.500.00 debited from A/c XX0000. Your appointment is scheduled for 08-Oct.",
+   "role": "ambiguous",
+   "kind": null,
+   "minor": 0,
+   "rule": "money-out+attend",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Rs.500.00 debited from A/c XX0000. Avl Bal is Rs.9,500.00.",
+   "role": "closes",
+   "kind": "GIVE",
+   "owner": "me",
+   "minor": 50000,
+   "rule": "money-out",
+   "tag": null
+  },
+  {
+   "body": "Rs.2,000.00 refund processed to your account.",
+   "role": "closes",
+   "kind": "GIVE",
+   "owner": "them",
+   "minor": 200000,
+   "rule": "money-in",
+   "tag": null
+  },
+  {
+   "body": "Your payment of Rs.250.00 failed. Amount was not debited.",
+   "role": "advances",
+   "kind": "GIVE",
+   "owner": "me",
+   "minor": 25000,
+   "rule": "failed",
+   "tag": null
+  },
+  {
+   "body": "Your account has been credited.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Flight offer: book your ticket at 50% off.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "promo",
+   "tag": "promo",
+   "owner": null
+  },
+  {
+   "body": "Offer: approve your pre-approved loan today.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "promo",
+   "tag": "promo",
+   "owner": null
+  },
+  {
+   "body": "Win a prize! Renew your plan with this offer.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "promo",
+   "tag": "promo",
+   "owner": null
+  },
+  {
+   "body": "Login failed. Please try again.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Payment of Rs.500.00 confirmed.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Your electricity bill is due soon.",
+   "role": "unmapped",
+   "kind": null,
+   "minor": 0,
+   "rule": "none",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Rs.500.00 debited from A/c 1 and credited to A/c 2.",
+   "role": "ambiguous",
+   "kind": null,
+   "minor": 0,
+   "rule": "money-out+money-in",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "123456 is your OTP for payment of fees.",
+   "role": "noise",
+   "kind": null,
+   "minor": 0,
+   "rule": "code",
+   "tag": "code",
+   "owner": null
+  },
+  {
+   "body": "Rs.500.00 debited. If not you, never share your OTP.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 50000,
+   "rule": "money-out",
+   "tag": null,
+   "owner": "me"
+  }
+ ],
+ "minor": [
+  {
+   "body": "Rs 1,23,456.50 debited",
+   "minor": 12345650
+  },
+  {
+   "body": "INR 5 paid",
+   "minor": 500
+  },
+  {
+   "body": "₹ 10.5 sent",
+   "minor": 1050
+  },
+  {
+   "body": "no amount here",
+   "minor": 0
+  },
+  {
+   "body": "Rs.0.00 debited",
+   "minor": 0
+  }
+ ],
+ "brands": [
+  {
+   "address": "VM-HDFCBK",
+   "brand": "HDFCBK"
+  },
+  {
+   "address": "AX-ICICIB-S",
+   "brand": "ICICIB"
+  },
+  {
+   "address": "JD-AMAZON",
+   "brand": "AMAZON"
+  },
+  {
+   "address": "56767",
+   "brand": "SHORTCODE"
+  },
+  {
+   "address": "HDFCBK",
+   "brand": "HDFCBK"
+  },
+  {
+   "address": "+919000000000",
+   "brand": "OTHER"
+  },
+  {
+   "address": "",
+   "brand": "OTHER"
+  },
+  {
+   "address": "vm-testbk",
+   "brand": "TESTBK"
+  }
+ ]
+}

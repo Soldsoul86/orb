@@ -7759,3 +7759,43 @@ Open in this round: P311 (Play Protect), P312, P313 (shown in the sequence of ev
 
 **P324 and P325 confirmed:** a brief fires at a time chosen after one has already been shown that day, and each has its alarm record then its showing record, on the minute. **P317 (the alarm fires at the chosen time) and P321/P323 are confirmed.** P316 (tap opens Today) was confirmed earlier. **The morning brief is verified on the device** for turning on, changing the time, firing, and turning off. Still not seen in a journal: P326 (a second start the same day writes one `already`), P318 (a quiet day shows nothing), a real next-morning firing, and a firing after a reboot — the next export that spans a night will show them.
 
+
+### 7b94. The Loop protocol — the fit test on your own messages (v57) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v57-loops.apk`. Design `LOOP_PROTOCOL.md` (approved 2026-10-04, DR-41); limits `ARCHITECTURAL_DEBT.md` AD-36. **Nothing about the app's screens changes except one paragraph and one button on the Messages screen.** Your commitments, Today and the morning brief behave as before; underneath, they now read their events through the protocol's one state rule.
+
+#### In plain words
+
+The protocol says what *open* means for anything in your life. Before it is frozen it has to be held against something real, so that what it misses is seen and not guessed. v57 does that with the messages you already know how to show Orb: after **Look**, Orb reads the messages **from banks, shops and services** once, in memory, as the protocol would, and tells you **how many it would call each kind of loop (DO, GIVE — owed by you or owed to you — ATTEND, RESPOND, DECIDE), "not a loop" (noise, or only information), "could not be read", and "ambiguous"** (two rules disagree) — and, of the openings that have an amount, **how many have a closing of the same amount from the same sender**. It keeps nothing. If you tap **Record this fit report**, one record of counts (and the sender codes of the biggest "could not be read" groups, like `HDFCBK`, and the names of the rules that most disagree) goes into the journal so that I can see it in your export. **Messages from people are counted and not read.**
+
+#### What changed
+
+1. **Messages → Look** now shows a paragraph beginning *"Protocol fit (a draft reading of N messages from names and short codes; M from numbers are not read)…"* and a button **Record this fit report (counts only)**. Nothing is recorded unless you tap it.
+2. **Commitments read their events through the protocol's fold** (`LoopRules`); the states (*open*, *due today*, *overdue*, *done*, *dropped*) are the same ones, from the same code the protocol uses.
+3. **The conformance corpus** (`docs/fixtures/loops/`): the protocol's rules as plain files any implementation must pass.
+
+#### Checked before the device
+
+- Phone-side suite: 2819 checks (was 2562); brain (378), TypeScript (600), lint and type-check clean (see the commit).
+- **Mutation checks** on the new rules: 103 mutants, **101 caught**; the first pass found 27 gaps in my tests (rounding, ordering of a closing before its opening, a closing used twice, the cap on named senders, promo words beside a bill, and more), each closed with a test or by removing code that did nothing. The 2 left are equivalent: a guard on the type of an opening that the next check makes redundant, and `!them` where the only other owner is `me`.
+- The draft rules were never run on a real message; they were written from the shape of Indian bank, bill and delivery texts and tested on made-up ones. **Expect them to be wrong in places. That is what this round is for.**
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P327** | **Look** takes about as long as before — **a second or two more at most** on your file — and the screen does not freeze | the Look is much slower, or Orb is closed by Android: tell me how long, and I will cap it |
+| **P328** | The paragraph's **messages from names and short codes + messages from numbers + drafts and other kinds** add up to the file's total (the figure the earlier Look gave) | the numbers do not add up: send a screenshot |
+| **P329** | **A lot is "could not be read"** on the first reading — somewhere around **20–40 % of the messages that are not noise** (the rules are coarse and English-only), and **a smaller number are "ambiguous"** | under 10 %: surprisingly good; over 60 %: a rule is too narrow or the inbox is mostly regional-language text — the export shows which senders |
+| **P330** | Of the openings with an amount, **some but far from all** have a closing of the same amount from the same sender (a small share is normal: many are paid by another route) | none matched, or nearly all: tell me, one of the two is wrong |
+| **P331** | Tapping **Record this fit report** writes **one** `orb.loop.fit.reported` in the export: numbers, `loop/0.1`, `fit/1`, **at most ten** `unmapped.<SENDER>` entries and **at most five** `ambiguous.<rule>+<rule>` entries — **no message text and no phone number** | any word of a message, or a number of a person: stop and tell me |
+| **P332** | Commitments, Today and the morning brief **behave exactly as in v56** (same lists, same overdue wording, the brief still fires) | any difference: that is a regression; tell me which |
+
+#### Protocol
+
+1. Install `orb-app-v57-loops.apk` over v56.
+2. Open **Sources → Messages**, pick the **same backup file as before** (the `.sms` file), tap **Look**. *(P327, P328, P329, P330)*
+3. Read the **Protocol fit** paragraph. Tap **Record this fit report (counts only)**; the button should say it recorded. *(P331)*
+4. Open **Today** and the **Morning brief** card as usual. *(P332)*
+5. **Export and share journal** and send it.
+6. Delete the backup file when you are done, as always.

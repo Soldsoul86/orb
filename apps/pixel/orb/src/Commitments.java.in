@@ -16,8 +16,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Commitments — what you owe, what you are waiting for, and where each stands (`docs/COMMITMENTS_PHONE.md`, DR-30). **A commitment is
@@ -190,22 +188,6 @@ final class Commitments {
 
     // ---- reading them: a projection over the journal
 
-    private static final Pattern PHYSICAL = Pattern.compile("\"physical\":(\\d+)");
-    private static final Pattern DUE = Pattern.compile("\"dueDate\":\"([0-9-]*)\"");
-    private static final Pattern DIRECTION = Pattern.compile("\"direction\":\"([a-z]+)\"");
-
-    private static String field(Pattern pattern, String line) {
-        int payload = line.indexOf("\"payload\":");
-        if (payload < 0) return null;
-        Matcher m = pattern.matcher(line);
-        return m.find(payload) ? m.group(1) : null;
-    }
-
-    private static long physical(String line) {
-        Matcher m = PHYSICAL.matcher(line);
-        return m.find() ? Long.parseLong(m.group(1)) : 0L;
-    }
-
     /** How many commitments are read at most. */
     static final int READ_LIMIT = 500;
 
@@ -216,11 +198,11 @@ final class Commitments {
         Map<String, Erasure.Item> byHash = new LinkedHashMap<>();
         for (Erasure.Item item : Erasure.items(lines)) if (CommitmentFacts.OPENED.equals(item.type)) byHash.put(item.hash, item);
         Map<String, Commitment> byId = new LinkedHashMap<>();
+        Map<String, LoopRules.Loop> loops = new LinkedHashMap<>();
         for (String line : lines) {
-            String type = Journal.typeOf(line);
-            if (type == null || !type.startsWith("orb.commitment.")) continue;
-            List<String> causes = Reminders.causesOf(line);
-            if (CommitmentFacts.OPENED.equals(type)) {
+            LoopRules.Event event = LoopRules.parse(line);
+            if (event == null || !Journal.typeOf(line).startsWith("orb.commitment.")) continue;
+            if (LoopRules.OPENED.equals(event.type)) {
                 String hash = Erasure.envelopeHash(line);
                 Erasure.Item item = hash == null ? null : byHash.get(hash);
                 if (item == null || erased.contains(hash) || byId.size() >= READ_LIMIT) continue;
@@ -232,19 +214,19 @@ final class Commitments {
                     note = null;
                 }
                 if (note == null) continue;
-                String due = field(DUE, line);
-                String direction = field(DIRECTION, line);
-                byId.put(Erasure.eventId(line), new Commitment(Erasure.eventId(line), hash, causes.isEmpty() ? null : causes.get(0), CommitmentFacts.directionOrOwe(direction),
-                    note.words, note.who, due == null || due.isEmpty() ? null : due, physical(line)));
-            } else if (!causes.isEmpty() && byId.containsKey(causes.get(0))) {
-                Commitment c = byId.get(causes.get(0));
-                c.changedAtMs = physical(line);
-                if (CommitmentFacts.MOVED.equals(type)) {
-                    String due = field(DUE, line);
-                    c.dueDate = due == null || due.isEmpty() ? null : due;
-                } else if (CommitmentFacts.DONE.equals(type)) c.last = DONE;
-                else if (CommitmentFacts.DROPPED.equals(type)) c.last = DROPPED;
-                else if (CommitmentFacts.REOPENED.equals(type)) c.last = OPEN;
+                String id = Erasure.eventId(line);
+                LoopRules.Loop loop = LoopRules.begin(id, event);
+                loops.put(id, loop);
+                byId.put(id, new Commitment(id, hash, event.about, CommitmentFacts.directionOrOwe(event.field("direction")),
+                    note.words, note.who, loop.due, event.atMs));
+            } else if (event.about != null && byId.containsKey(event.about)) {
+                // The transition is the protocol's, applied once, here and nowhere else: what a commitment does is what a loop does.
+                Commitment c = byId.get(event.about);
+                LoopRules.Loop loop = loops.get(event.about);
+                loop.apply(event);
+                c.changedAtMs = event.atMs;
+                c.dueDate = loop.due;
+                c.last = loop.last;
             }
         }
         return new ArrayList<>(byId.values());
@@ -280,11 +262,7 @@ final class Commitments {
 
     /** The state today (`YYYY-MM-DD`): what the person last did, else the date against today. */
     static String status(Commitment c, String today) {
-        if (DONE.equals(c.last)) return DONE;
-        if (DROPPED.equals(c.last)) return DROPPED;
-        if (c.dueDate == null) return OPEN;
-        int cmp = c.dueDate.compareTo(today);
-        return cmp < 0 ? OVERDUE : cmp == 0 ? DUE_TODAY : OPEN;
+        return LoopRules.stateOf(CommitmentFacts.WAITING.equals(c.direction) ? LoopRules.GIVE : LoopRules.DO, c.last, c.dueDate, today);
     }
 
     /** Whole days from one `YYYY-MM-DD` date to a later one. */

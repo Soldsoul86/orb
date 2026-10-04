@@ -479,6 +479,18 @@ public final class SourcesActivity extends Activity {
         messageResults.addView(text("Left out, and only counted: " + survey.service + " from names or short codes (banks, offers, codes) \u00b7 " + survey.codes
             + " that look like codes \u00b7 " + survey.outside + " from this month or older than a year \u00b7 " + survey.other + " drafts or other kinds."
             + (found.recognition.cut ? " The file is longer than " + MessagesRules.MAX_MESSAGES + " messages; Orb read the first " + MessagesRules.MAX_MESSAGES + "." : ""), 11, false));
+        final LoopFit.Report fit = found.fit;
+        messageResults.addView(text(fit.say(), 11, false));
+        final Button recordFit = button("Record this fit report (counts only)", null);
+        recordFit.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                Journal now = journal();
+                boolean written = now != null && now.append(LoopFacts.FIT_REPORTED, LoopFacts.fitReported(fit)) != null;
+                recordFit.setText(written ? "Recorded \u2014 counts and sender codes only" : "Could not record it");
+                recordFit.setEnabled(!written);
+            }
+        });
+        messageResults.addView(recordFit);
         final java.util.TimeZone zone = java.util.TimeZone.getDefault();
         for (MessagesRules.Conversation c : rows) {
             CheckBox box = new CheckBox(this);

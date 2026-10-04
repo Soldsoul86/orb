@@ -867,6 +867,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-36 — what the Loop protocol's first slice does not know
+
+**Opened 2026-10-04** (`DECISIONS.md` DR-41). Debts, stated.
+
+1. **The draft reading is a guess, and it is English.** Its rules are keyword patterns over the first amount in a message; Hindi, other scripts and unusual templates fall to *unmapped*, which is the point of the fit test and not a defect to hide. The first amount is not always the amount that matters (a total and a minimum due).
+2. **Matching is by sender brand and exact amount only.** A bill paid in two parts, a payment from another account's sender, or a changed amount will not match; the test says how often.
+3. **A debit is a closing only if an opening of the same amount exists.** Most debits are spending with nothing open; the report counts them as `closes` (a role a message *can* play) and counts matches separately.
+4. **No person is read.** Messages from a number are counted and not read; RESPOND, ASK and PROMISE from conversation need language and are not tested.
+5. **The unmapped sender brands, and the disagreeing rule names, are in the record.** Up to ten service brand codes (`HDFCBK`) and five pairs of rule names appear in the one record you choose to write. That says which services you use; it is the price of seeing what the protocol misses, and it is written only when you tap.
+6. **Nothing opens a loop yet.** The `orb.loop.*` writers exist and are tested; the first real use is the Money adapter.
+7. **A commitment's kind is a lower bound.** The journal knows only *I owe* or *waiting*, so a legacy commitment reads as a DO owned by me, or a GIVE owned by them; it cannot say that an *I owe* is really a GIVE to a person, though its sealed note may name one.
+8. **Parsing reads the line, not the structure.** `LoopRules.parse` takes a short enumerated set of fields from the line with a pattern, as `Commitments` did; a reader of the structured envelope is a later tidy-up.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

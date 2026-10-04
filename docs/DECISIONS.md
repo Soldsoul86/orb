@@ -1413,6 +1413,18 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** people to get back in touch with, calls or messages, a model's summary, an evening review.
 
+## DR-41 — The Loop protocol: one vocabulary for what is open between you and the world
+
+- **Status:** Decided; slice 1 built, **not yet frozen** · **Decided:** 2026-10-04, operator ("Yes to all four, go ahead with the Loop protocol design", then "approve the Loop protocol design" on `LOOP_PROTOCOL.md`; the three questions in §17 were not answered, so their recommended defaults were taken). **Refined by the operator the same day** ("Aligned with above?"): GET is not a second loop; owners are me/them with a resolvable next mover; origins stated/asked/promised; basis observed/stated/inferred; the fit test reports AMBIGUOUS and UNMAPPABLE apart; information is not a loop merely for containing a date, amount, person or imperative-looking words.
+
+**The ruling.** Everything Orb reads is evidence of something open between you and the world, or of one closing. A **Loop** is that: an *interpretation* (a Belief, `contracts/Belief.md`) that cites evidence — **no new kernel contract**; "Action" keeps its meaning of *execution* (`contracts/Action.md`). A loop is the smallest persistent unit of something a human expects to happen, owes, must do, attend, decide, receive, or respond to. It has a **kind** (DO, GIVE, ATTEND, RESPOND, DECIDE), an **owner** who must move next (me or them — one at a time and **always resolvable**, so a refund owed to me is one GIVE owned by them and never a second loop; *get* is a reading of that, not a kind), and an **origin** (stated, asked, promised) that carries the speech acts: ASK and PROMISE are not kinds. Information is not a loop merely because it holds a date, an amount, a person or imperative-looking text. There is **no stored status, no authorization field and no numeric confidence**: the state is a fold over lifecycle events and today's date; authorization stays in Policy and the gate; rule-derived loops carry an ordinal **basis** (observed, stated, inferred) and the id and version of the rule. **Absence of evidence is never closure**; a loop closes only by your tap or by evidence an adapter declared *exact*; evidence that only *suggests* never changes a state. **Proposed loops are computed views and never stored; only a loop you confirm, and your acts on it, are events** — so the journal holds no text, name or amount.
+
+**The condition.** The envelope and invariants freeze **after a fit test** of the draft reading against the operator's real inbox (acceptance in `LOOP_PROTOCOL.md` §13); the vocabulary stays versioned. Money is the first adapter after it.
+
+**Existing history is not rewritten.** `orb.commitment.*` are read as protocol v0; `Commitments` now reads them through the protocol's one fold.
+
+**Not in this ruling:** a writer of `orb.loop.opened`, any adapter beyond the draft reading, recurrence, relations, a model-backed adapter, a Loops screen.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

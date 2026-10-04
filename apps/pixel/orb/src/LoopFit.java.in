@@ -1,0 +1,340 @@
+package @PKG@;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * The fit test (`docs/LOOP_PROTOCOL.md` §13, DR-41): a **draft** reading of service messages — banks, bills, deliveries, bookings — held against the Loop
+ * protocol to see how much of a real inbox it covers, **not** a Money feature. Each service message lands in exactly one role: `opens`, `advances`,
+ * `closes`, `evidence`, `noise` or `unmapped`. Conversations (from a number) are counted and **not read**: they need language, which is out of v0.1.
+ *
+ * **Pure; keeps nothing but counts.** The body is read once, in memory, to choose a role; what is kept is the role, the kind, the amount and the brand of
+ * the sender (`HDFCBK`) — and only to count how many closings match an opening of the same amount. The report is counts; the only names in it are service
+ * brand codes of the largest unmapped groups, so that what the protocol misses can be seen.
+ *
+ * Rules are first-match, in the order below, and every one is a documented guess (`rules()`): the point is the *residue*, not the score.
+ */
+final class LoopFit implements MessagesXml.Sink {
+    static final String VERSION = "fit/1";
+    static final int TOP_UNMAPPED = 10;
+    static final int TOP_AMBIGUOUS = 5;
+    /** Messages with an amount kept (as numbers) to match closings to openings. */
+    static final int MAX_KEPT = 50_000;
+    /** An opening and a closing of the same amount from the same sender, this near, are one loop. */
+    static final int MATCH_DAYS = 45;
+
+    static final String OPENS = "opens";
+    static final String ADVANCES = "advances";
+    static final String CLOSES = "closes";
+    static final String EVIDENCE = "evidence";
+    static final String NOISE = "noise";
+    /** Two or more rules read it as different loops (or as opening and closing). Counted apart, never forced into a kind. */
+    static final String AMBIGUOUS = "ambiguous";
+    static final String UNMAPPED = "unmapped";
+    static final List<String> ROLES = Collections.unmodifiableList(java.util.Arrays.asList(OPENS, ADVANCES, CLOSES, EVIDENCE, NOISE, AMBIGUOUS, UNMAPPED));
+
+    /** What one message was read as. `kind` and `owner` are a protocol kind and next mover for opens/advances/closes, else null; `tag` names why for noise. */
+    static final class Reading {
+        final String role;
+        final String kind;
+        final String owner;
+        /** Integer minor units of the first amount, or 0. */
+        final long minor;
+        final String tag;
+        /** The first rule that matched (for an ambiguous message, the first two joined with `+`). */
+        final String rule;
+
+        Reading(String role, String kind, String owner, long minor, String tag, String rule) {
+            this.role = role;
+            this.kind = kind;
+            this.owner = owner;
+            this.minor = minor;
+            this.tag = tag;
+            this.rule = rule;
+        }
+
+        boolean forms() {
+            return OPENS.equals(role) || ADVANCES.equals(role) || CLOSES.equals(role);
+        }
+
+        String signature() {
+            return role + "." + kind + "." + owner;
+        }
+    }
+
+    private static final String RS = "(?:rs\\.?|inr|\\u20b9)";
+    private static final Pattern AMOUNT = Pattern.compile("(?i)" + RS + "\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)");
+    private static final Pattern FAILED = Pattern.compile("(?i)\\b(fail(?:ed|ure)?|declined|unsuccessful|reversed|could not be processed|insufficient (?:funds|balance))\\b");
+    private static final Pattern FAILED_ABOUT = Pattern.compile("(?i)\\b(payment|transaction|txn|debit|upi|autopay|mandate|emi|transfer)\\b");
+    private static final Pattern WILL_CREDIT = Pattern.compile("(?i)\\b(?:will|to|would|shall) be (?:credited|refunded|processed|reversed)\\b");
+    private static final Pattern REFUND_STARTED = Pattern.compile("(?i)\\brefund\\b.*\\b(?:initiated|in process|processing|raised|will)\\b");
+    private static final Pattern PAYMENT_DONE = Pattern.compile("(?i)\\bpayment\\b.*\\b(?:successful|received|credited|done|confirmed)\\b");
+    private static final Pattern PAYMENT_OF = Pattern.compile("(?i)\\b(?:card|bill|loan|emi|policy|invoice|a/c|account|merchant|towards|upi)\\b");
+    private static final Pattern OUT = Pattern.compile("(?i)\\b(?<!not )(?<!no )(?:debited|withdrawn|deducted|spent|purchase|paid)\\b|\\bsent " + RS);
+    private static final Pattern IN = Pattern.compile("(?i)\\b(?:credited|deposited|salary|refund(?:ed)? (?:processed|credited))\\b|\\breceived " + RS);
+    private static final Pattern WILL_DELIVER = Pattern.compile("(?i)\\b(?:will be delivered|expected (?:delivery|on|by)|estimated delivery|order (?:is )?(?:placed|confirmed|received))\\b");
+    private static final Pattern DELIVERED = Pattern.compile("(?i)\\b(?:has been delivered|was delivered|delivered successfully|delivered)\\b");
+    private static final Pattern TRANSIT = Pattern.compile("(?i)\\b(?:out for delivery|shipped|dispatched|in transit|picked up|arriving|arrives)\\b");
+    private static final Pattern DUE = Pattern.compile("(?i)\\b(?:due|payable|overdue|outstanding|minimum amount|min\\.? ?amt|pay (?:before|by|on)|last date|bill (?:is )?generated|statement (?:is )?generated|emi of)\\b");
+    private static final Pattern RENEW = Pattern.compile("(?i)\\b(?:renew|renewal|expir(?:e|es|ed|y)|validity)\\b");
+    private static final Pattern COLLECT = Pattern.compile("(?i)collect request|requested money|\\brequests? " + RS);
+    private static final Pattern DECIDE = Pattern.compile("(?i)\\b(?:approve|authori[sz]e)\\b");
+    private static final Pattern ATTEND = Pattern.compile("(?i)\\b(?:pnr|boarding|check-?in|appointment|reservation|booking (?:id|confirmed)|e-?ticket|ticket|flight|train|departure|journey|your slot|scheduled (?:for|on))\\b");
+    private static final Pattern BALANCE = Pattern.compile("(?i)\\b(?:avl\\.? ?bal|available (?:balance|bal)|a/c bal|acct bal|closing balance|balance (?:is|:))");
+    private static final Pattern PROMO = Pattern.compile("(?i)\\b(?:offer|discount|cashback|congratulations?|pre-?approved|limited (?:period|time)|sale|win|exclusive|upgrade|reward|coupon|voucher|lucky|free|earn|apply now|t ?& ?c|tnc)\\b|% ?off");
+
+    /** The first amount in the words, in minor units, or 0. */
+    static long minorOf(String body) {
+        Matcher m = AMOUNT.matcher(body);
+        if (!m.find()) return 0L;
+        try {
+            return new BigDecimal(m.group(1).replace(",", "")).movePointRight(2).longValueExact();
+        } catch (ArithmeticException | NumberFormatException tooBig) {
+            return 0L;
+        }
+    }
+
+    /**
+     * Every rule that matches, each judged on its own, in the order below. A waiting-to-receive is a GIVE owned by them, never a kind of its own. An empty
+     * list means no rule read it.
+     */
+    static List<Reading> readAll(String body) {
+        String b = body == null ? "" : body;
+        long minor = minorOf(b);
+        boolean hasAmount = minor > 0;
+        boolean promo = PROMO.matcher(b).find();
+        boolean willDeliver = WILL_DELIVER.matcher(b).find();
+        List<Reading> out = new ArrayList<>();
+        if (MessagesRules.looksLikeCode(b)) out.add(new Reading(NOISE, null, null, 0L, "code", "code"));
+        if (FAILED.matcher(b).find() && FAILED_ABOUT.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.ME, minor, null, "failed"));
+        if (WILL_CREDIT.matcher(b).find() || REFUND_STARTED.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.THEM, minor, null, "refund-started"));
+        if (hasAmount && PAYMENT_DONE.matcher(b).find() && PAYMENT_OF.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.ME, minor, null, "payment-done"));
+        if (hasAmount && OUT.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.ME, minor, null, "money-out"));
+        if (hasAmount && IN.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.THEM, minor, null, "money-in"));
+        if (willDeliver) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.THEM, 0L, null, "order"));
+        if (!willDeliver && DELIVERED.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.THEM, 0L, null, "delivered"));
+        if (TRANSIT.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.THEM, 0L, null, "in-transit"));
+        if (hasAmount && DUE.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.ME, minor, null, "bill-due"));
+        if (COLLECT.matcher(b).find()) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.ME, minor, null, "collect-request"));
+        if (DECIDE.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.DECIDE, LoopRules.ME, 0L, null, "approve"));
+        if (RENEW.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.DO, LoopRules.ME, 0L, null, "renew"));
+        if (ATTEND.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.ATTEND, LoopRules.ME, 0L, null, "attend"));
+        if (BALANCE.matcher(b).find()) out.add(new Reading(EVIDENCE, null, null, 0L, null, "balance"));
+        if (promo) out.add(new Reading(NOISE, null, null, 0L, "promo", "promo"));
+        return out;
+    }
+
+    /**
+     * What one service message is read as. If the rules that form a loop disagree — different kind, different next mover, or one opens what another closes —
+     * it is **ambiguous**, with the first two rules named; otherwise the first rule that matched; if none, **unmapped**. Information alongside a loop (a
+     * balance after a debit) does not make it ambiguous.
+     */
+    static Reading read(String body) {
+        List<Reading> all = readAll(body);
+        if (all.isEmpty()) return new Reading(UNMAPPED, null, null, 0L, null, "none");
+        Reading first = all.get(0);
+        Reading other = null;
+        if (first.forms()) {
+            for (Reading r : all) if (r.forms() && !r.signature().equals(first.signature())) { other = r; break; }
+        } else {
+            for (Reading r : all) if (r.forms()) { first = r; break; }
+            for (Reading r : all) if (r.forms() && !r.signature().equals(first.signature())) { other = r; break; }
+        }
+        if (other != null) return new Reading(AMBIGUOUS, null, null, 0L, null, first.rule + "+" + other.rule);
+        return first;
+    }
+
+    /** The rule names in the order they are tried — for the docs and for a test that every one is reached. */
+    static List<String> rules() {
+        return java.util.Arrays.asList("code", "failed", "refund-started", "payment-done", "money-out", "money-in", "order", "delivered", "in-transit",
+            "bill-due", "collect-request", "approve", "renew", "attend", "balance", "promo", "none");
+    }
+
+    /** The sender's brand: `VM-HDFCBK` and `HDFCBK-S` are `HDFCBK`. A numeric short code is `SHORTCODE`; anything else `OTHER`. */
+    static String brandOf(String address) {
+        String a = address == null ? "" : address.trim().toUpperCase(Locale.ROOT);
+        a = a.replaceFirst("^[A-Z]{2}-", "").replaceFirst("-[A-Z]$", "");
+        if (a.matches("[A-Z0-9]{2,12}") && a.matches(".*[A-Z].*")) return a;
+        if (a.matches("[0-9]{3,8}")) return "SHORTCODE";
+        return "OTHER";
+    }
+
+    // ---- the tally
+
+    private final Map<String, Long> counts = new TreeMap<>();
+    private final Map<String, Long> noiseTags = new TreeMap<>();
+    private final Map<String, Long> unmappedBrands = new HashMap<>();
+    private final Map<String, Long> ambiguousPairs = new HashMap<>();
+    private long messages;
+    private long service;
+    private long conversational;
+    private long other;
+    private long cutKept;
+    /** `brand|owner|minor` -> the days of the openings (or advances) and of the closings with that sender, next mover and amount. */
+    private final Map<String, List<Long>> opens = new HashMap<>();
+    private final Map<String, List<Long>> closes = new HashMap<>();
+    private long keptCount;
+
+    @Override public void message(MessagesRules.Message m) {
+        messages++;
+        if (m.type != MessagesRules.RECEIVED && m.type != MessagesRules.SENT) { other++; return; }
+        if (m.number != null) { conversational++; return; }   // from a number: counted, not read
+        service++;
+        Reading r = read(m.body);
+        bump(counts, r.role);
+        if (r.forms()) {
+            bump(counts, r.role + "." + r.kind + "." + r.owner);
+            bump(counts, "kind." + r.kind);
+            if (LoopRules.GIVE.equals(r.kind)) bump(counts, "kind." + r.kind + "." + r.owner);
+        }
+        if (r.tag != null) bump(noiseTags, r.tag);
+        String brand = brandOf(m.address);
+        if (UNMAPPED.equals(r.role)) bumpCapped(unmappedBrands, brand, 400, "OTHER");
+        if (AMBIGUOUS.equals(r.role)) bumpCapped(ambiguousPairs, r.rule, 200, "other");
+        if (LoopRules.GIVE.equals(r.kind) && r.minor > 0) {
+            if (keptCount >= MAX_KEPT) { cutKept++; return; }
+            keptCount++;
+            Map<String, List<Long>> into = CLOSES.equals(r.role) ? closes : opens;
+            String key = brand + "|" + r.owner + "|" + r.minor;
+            List<Long> days = into.get(key);
+            if (days == null) { days = new ArrayList<>(); into.put(key, days); }
+            days.add(Math.floorDiv(m.dateMs, 86_400_000L));
+        }
+    }
+
+    private static void bump(Map<String, Long> map, String key) {
+        Long n = map.get(key);
+        map.put(key, n == null ? 1L : n + 1L);
+    }
+
+    private static void bumpCapped(Map<String, Long> map, String key, int cap, String rest) {
+        if (map.size() < cap || map.containsKey(key)) bump(map, key);
+        else bump(map, rest);
+    }
+
+    /** The result: counts only. */
+    static final class Report {
+        final long messages, service, conversational, other;
+        private final Map<String, Long> counts;
+        private final Map<String, Long> unmappedBrands;
+        private final Map<String, Long> ambiguousPairs;
+
+        Report(long messages, long service, long conversational, long other, Map<String, Long> counts, Map<String, Long> unmappedBrands, Map<String, Long> ambiguousPairs) {
+            this.messages = messages;
+            this.service = service;
+            this.conversational = conversational;
+            this.other = other;
+            this.counts = counts;
+            this.unmappedBrands = unmappedBrands;
+            this.ambiguousPairs = ambiguousPairs;
+        }
+
+        long get(String name) {
+            Long n = counts.get(name);
+            return n == null ? 0L : n;
+        }
+
+        /** Every count by name: the roles, role.KIND.owner, kind.KIND, noise.TAG, and the matching figures. */
+        Map<String, Long> counts() {
+            return counts;
+        }
+
+        private static Map<String, Long> top(Map<String, Long> all, int n) {
+            List<Map.Entry<String, Long>> sorted = new ArrayList<>(all.entrySet());
+            Collections.sort(sorted, new Comparator<Map.Entry<String, Long>>() {
+                @Override public int compare(Map.Entry<String, Long> a, Map.Entry<String, Long> b) {
+                    int c = Long.compare(b.getValue(), a.getValue());
+                    return c != 0 ? c : a.getKey().compareTo(b.getKey());
+                }
+            });
+            Map<String, Long> out = new LinkedHashMap<>();
+            for (int i = 0; i < Math.min(n, sorted.size()); i++) out.put(sorted.get(i).getKey(), sorted.get(i).getValue());
+            return out;
+        }
+
+        /** The sender brands with most unmapped messages (ties by name), at most `n`. */
+        Map<String, Long> topUnmapped(int n) {
+            return top(unmappedBrands, n);
+        }
+
+        /** The rule pairs that most often disagree (ties by name), at most `n`: names of rules, never words. */
+        Map<String, Long> topAmbiguous(int n) {
+            return top(ambiguousPairs, n);
+        }
+
+        /** Not a loop: information that opens nothing, and noise. */
+        long notALoop() {
+            return get(EVIDENCE) + get(NOISE);
+        }
+
+        /** Service messages that are about the person's obligations: everything except noise. */
+        long nonNoise() {
+            return service - get(NOISE);
+        }
+
+        /** Whole percent of the non-noise service messages that no rule read; 0 when there are none. */
+        long unmappedPercent() {
+            long n = nonNoise();
+            return n == 0 ? 0L : Math.round(100.0 * get(UNMAPPED) / n);
+        }
+
+        /** The counts for the Messages screen, in the protocol's own words. Counts only. */
+        String say() {
+            return "Protocol fit (a draft reading of " + service + " messages from names and short codes; " + conversational + " from numbers are not read). "
+                + "Each can open, move on or close a loop: DO " + get("kind.DO") + " \u00b7 GIVE " + get("kind.GIVE") + " (" + get("kind.GIVE.me") + " owed by you, " + get("kind.GIVE.them")
+                + " owed to you) \u00b7 ATTEND " + get("kind.ATTEND") + " \u00b7 RESPOND " + get("kind.RESPOND") + " \u00b7 DECIDE " + get("kind.DECIDE")
+                + ". Not a loop: " + notALoop() + " (" + get(NOISE) + " noise, " + get(EVIDENCE) + " only information). Could not be read: " + get(UNMAPPED) + " (" + unmappedPercent()
+                + "% of the rest). Ambiguous: " + get(AMBIGUOUS) + ". "
+                + "Of " + get("match.opens") + " openings with an amount, " + get("match.opensMatched") + " have a closing of the same amount from the same sender.";
+        }
+    }
+
+    Report report() {
+        Map<String, Long> out = new TreeMap<>(counts);
+        for (String role : ROLES) if (!out.containsKey(role)) out.put(role, 0L);
+        for (Map.Entry<String, Long> e : noiseTags.entrySet()) out.put("noise." + e.getKey(), e.getValue());
+        long opensN = 0, closesN = 0;
+        for (List<Long> d : opens.values()) opensN += d.size();
+        for (List<Long> d : closes.values()) closesN += d.size();
+        // Match each closing to the earliest opening of the same sender, next mover and amount that came before it (or the same day), within MATCH_DAYS: the
+        // protocol's own `sameLoop`.
+        long matched = 0;
+        for (Map.Entry<String, List<Long>> e : closes.entrySet()) {
+            List<Long> openDays = opens.get(e.getKey());
+            if (openDays == null) continue;
+            List<Long> o = new ArrayList<>(openDays);
+            Collections.sort(o);
+            List<Long> c = new ArrayList<>(e.getValue());
+            Collections.sort(c);
+            boolean[] used = new boolean[o.size()];
+            String[] parts = e.getKey().split("\\|");
+            long minor = Long.parseLong(parts[2]);
+            for (long closeDay : c) {
+                for (int i = 0; i < o.size(); i++) {
+                    if (used[i] || o.get(i) > closeDay) continue;
+                    if (LoopRules.sameLoop(new LoopRules.Seen(parts[0], "payment", minor, o.get(i)), new LoopRules.Seen(parts[0], "payment", minor, closeDay), MATCH_DAYS)) {
+                        used[i] = true;
+                        matched++;
+                        break;
+                    }
+                }
+            }
+        }
+        out.put("match.opens", opensN);
+        out.put("match.opensMatched", matched);
+        out.put("match.closes", closesN);
+        out.put("match.closesMatched", matched);
+        out.put("match.cut", cutKept);
+        return new Report(messages, service, conversational, other, out, new HashMap<>(unmappedBrands), new HashMap<>(ambiguousPairs));
+    }
+}

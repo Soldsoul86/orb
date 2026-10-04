@@ -1,0 +1,116 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * Every record of a loop — built here and nowhere else (`docs/LOOP_PROTOCOL.md` §5, DR-41). **The journal carries only words from the protocol's own
+ * vocabulary, a day, a rule's id and version, and the identity of a sealed note** (the words, the amount and the name live there, and are erased by
+ * destroying its key). Never free text, a name, a number or an amount. The state is **the fold of these events**, read each time; there is no status field.
+ */
+final class LoopFacts {
+    private LoopFacts() {}
+
+    /** The fit report: the draft rules, held against the person's own messages, as counts. */
+    static final String FIT_REPORTED = "orb.loop.fit.reported";
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("version", 1L);
+        p.put("protocol", LoopRules.PROTOCOL);
+        return p;
+    }
+
+    private static void day(Map<String, Object> p, String name, String date) {
+        p.put(name, CommitmentFacts.dateOrNone(date));
+    }
+
+    private static String word(String what, String value, boolean valid) {
+        if (!valid) throw new IllegalArgumentException(what + " is outside the protocol's vocabulary");
+        return value;
+    }
+
+    private static String ruleId(String id) {
+        if (id == null || !id.matches("[a-z0-9.]{1,40}")) throw new IllegalArgumentException("a rule id is a short lower-case name");
+        return id;
+    }
+
+    /**
+     * A loop exists: you confirmed one proposed from evidence, or made it yourself. `counterpartyKey` is a blinded key (or empty), `rule` the adapter rule
+     * that read it (or `user` when you made it). The sealed note holds the words, the amount and the name.
+     */
+    static Map<String, Object> opened(String identity, long bytes, String kind, String owner, String origin, String dueDate, String basis, String rule,
+                                      long ruleVersion, String counterpartyKey) {
+        Map<String, Object> p = base();
+        p.put("attachment", identity);
+        p.put("attachmentBytes", bytes);
+        p.put("kind", word("kind", kind, LoopRules.validKind(kind)));
+        p.put("owner", word("owner", owner, LoopRules.validOwner(owner)));
+        p.put("origin", word("origin", origin, LoopRules.validOrigin(origin)));
+        day(p, "dueDate", dueDate);
+        p.put("basis", word("basis", basis, LoopRules.validBasis(basis)));
+        p.put("rule", ruleId(rule));
+        p.put("ruleVersion", ruleVersion);
+        p.put("counterparty", counterpartyKey == null || !counterpartyKey.matches("[0-9a-f]{16}") ? "" : counterpartyKey);
+        return p;
+    }
+
+    /** The ball moved, or the shape changed. A null argument leaves that part as it was; `""` for a date means none. */
+    static Map<String, Object> advanced(String owner, String origin, String dueDate) {
+        Map<String, Object> p = base();
+        if (owner != null) p.put("owner", word("owner", owner, LoopRules.validOwner(owner)));
+        if (origin != null) p.put("origin", word("origin", origin, LoopRules.validOrigin(origin)));
+        if (dueDate != null) day(p, "dueDate", dueDate);
+        return p;
+    }
+
+    /** A new date, or none (`""`). */
+    static Map<String, Object> moved(String dueDate) {
+        Map<String, Object> p = base();
+        day(p, "dueDate", dueDate);
+        return p;
+    }
+
+    /** You closed it. */
+    static Map<String, Object> closedByYou() {
+        Map<String, Object> p = base();
+        p.put("by", LoopRules.BY_YOU);
+        p.put("class", LoopRules.CLASS_YOU);
+        return p;
+    }
+
+    /** Evidence closed it, and the adapter declared that evidence exact. The cause of the event is the evidence. */
+    static Map<String, Object> closedByEvidence(String rule) {
+        Map<String, Object> p = base();
+        p.put("by", LoopRules.BY_EVIDENCE);
+        p.put("class", LoopRules.CLASS_EXACT);
+        p.put("rule", ruleId(rule));
+        return p;
+    }
+
+    static Map<String, Object> dropped() { return base(); }
+
+    static Map<String, Object> reopened() { return base(); }
+
+    /** You said these two observations (or loops) are the same one. */
+    static Map<String, Object> linked() { return base(); }
+
+    /** You said this is really two. */
+    static Map<String, Object> split() { return base(); }
+
+    /**
+     * The fit report as counts: how the draft rules read the messages in the file you picked. Flat names, numbers only — plus the service **brand codes**
+     * (`HDFCBK`, never a person's number) of the largest unmapped groups, and the names of the rules that most often disagree. Never a word of any message.
+     */
+    static Map<String, Object> fitReported(LoopFit.Report r) {
+        Map<String, Object> p = base();
+        p.put("fit", LoopFit.VERSION);
+        p.put("messages", r.messages);
+        p.put("service", r.service);
+        p.put("conversational", r.conversational);
+        p.put("other", r.other);
+        for (Map.Entry<String, Long> e : r.counts().entrySet()) p.put(e.getKey(), e.getValue());
+        for (Map.Entry<String, Long> e : r.topUnmapped(LoopFit.TOP_UNMAPPED).entrySet()) p.put("unmapped." + e.getKey(), e.getValue());
+        for (Map.Entry<String, Long> e : r.topAmbiguous(LoopFit.TOP_AMBIGUOUS).entrySet()) p.put("ambiguous." + e.getKey(), e.getValue());
+        return p;
+    }
+}

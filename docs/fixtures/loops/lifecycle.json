@@ -1,0 +1,681 @@
+{
+ "protocol": "loop/0.1",
+ "about": "Lifecycle events folded to a state on a given day. Synthetic. A loop needs a valid kind, a next mover (me or them) and an origin; waiting to receive is a GIVE owned by them.",
+ "cases": [
+  {
+   "name": "a commitment I owe, dated ahead, is open and on me",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "a commitment I am waiting for is owned by them and is a GET",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "waiting",
+      "dueDate": ""
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "them",
+    "kind": "GIVE",
+    "origin": "stated",
+    "due": null,
+    "closedBy": null
+   }
+  },
+  {
+   "name": "dated today is due today",
+   "today": "2026-10-10",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "dueToday",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "dated before today and not closed is overdue",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "moved to a later day is open again",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.commitment.moved",
+     "at": 2,
+     "fields": {
+      "dueDate": "2026-10-20"
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-20",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "moved to no date is open",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.commitment.moved",
+     "at": 2,
+     "fields": {
+      "dueDate": ""
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": null,
+    "closedBy": null
+   }
+  },
+  {
+   "name": "a commitment's done is a close by you",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.commitment.done",
+     "at": 2,
+     "fields": {}
+    }
+   ],
+   "expect": {
+    "state": "done",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": "you"
+   }
+  },
+  {
+   "name": "a commitment's dropped is dropped",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.commitment.dropped",
+     "at": 2,
+     "fields": {}
+    }
+   ],
+   "expect": {
+    "state": "dropped",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "reopened after done is open again and no longer closed",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.commitment.opened",
+     "at": 1,
+     "fields": {
+      "direction": "owe",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.commitment.done",
+     "at": 2,
+     "fields": {}
+    },
+    {
+     "type": "orb.commitment.reopened",
+     "at": 3,
+     "fields": {}
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "me",
+    "kind": "DO",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "a protocol opening carries its kind, owner and origin",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-05",
+      "basis": "inferred",
+      "rule": "draft.bill",
+      "counterparty": "0123456789abcdef"
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "asked",
+    "due": "2026-10-05",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "saying yes turns asked into promised, and it is the same loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-05"
+     }
+    },
+    {
+     "type": "orb.loop.advanced",
+     "at": 2,
+     "fields": {
+      "origin": "promised"
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "promised",
+    "due": "2026-10-05",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "the ball moving to them is an advance, not a second loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-05"
+     }
+    },
+    {
+     "type": "orb.loop.advanced",
+     "at": 2,
+     "fields": {
+      "owner": "them"
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "them",
+    "kind": "GIVE",
+    "origin": "asked",
+    "due": "2026-10-05",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "an advance to no date clears the date",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.loop.advanced",
+     "at": 2,
+     "fields": {
+      "dueDate": ""
+     }
+    }
+   ],
+   "expect": {
+    "state": "open",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "asked",
+    "due": null,
+    "closedBy": null
+   }
+  },
+  {
+   "name": "an advance that names nothing leaves the loop as it was",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.loop.advanced",
+     "at": 2,
+     "fields": {}
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "asked",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "exact evidence closes it, and says so",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "stated",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.loop.closed",
+     "at": 2,
+     "fields": {
+      "by": "evidence",
+      "class": "exact",
+      "rule": "draft.bill"
+     }
+    }
+   ],
+   "expect": {
+    "state": "done",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": "evidence"
+   }
+  },
+  {
+   "name": "evidence that only suggests never closes",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "RESPOND",
+      "owner": "me",
+      "origin": "asked",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.loop.closed",
+     "at": 2,
+     "fields": {
+      "by": "evidence",
+      "class": "suggests"
+     }
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "me",
+    "kind": "RESPOND",
+    "origin": "asked",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "evidence with no class never closes",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "origin": "stated",
+      "dueDate": "2026-10-10"
+     }
+    },
+    {
+     "type": "orb.loop.closed",
+     "at": 2,
+     "fields": {
+      "by": "evidence"
+     }
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "me",
+    "kind": "GIVE",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "a closing by you needs no evidence",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "DECIDE",
+      "owner": "me",
+      "origin": "stated"
+     }
+    },
+    {
+     "type": "orb.loop.closed",
+     "at": 2,
+     "fields": {
+      "by": "you",
+      "class": "you"
+     }
+    }
+   ],
+   "expect": {
+    "state": "done",
+    "owner": "me",
+    "kind": "DECIDE",
+    "origin": "stated",
+    "due": null,
+    "closedBy": "you"
+   }
+  },
+  {
+   "name": "an attendance whose time went by is passed, not overdue",
+   "today": "2026-10-12",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "ATTEND",
+      "owner": "me",
+      "origin": "stated",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "passed",
+    "owner": "me",
+    "kind": "ATTEND",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "an attendance today is due today",
+   "today": "2026-10-10",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "ATTEND",
+      "owner": "me",
+      "origin": "stated",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "dueToday",
+    "owner": "me",
+    "kind": "ATTEND",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "a word outside the vocabulary is not believed, so it is not a loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "FOO",
+      "owner": "everyone",
+      "origin": "rumour",
+      "dueDate": "2026-10-05"
+     }
+    }
+   ],
+   "expect": null
+  },
+  {
+   "name": "nothing happening is never done: a long-overdue loop stays overdue",
+   "today": "2027-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "them",
+      "origin": "stated",
+      "dueDate": "2026-10-10"
+     }
+    }
+   ],
+   "expect": {
+    "state": "overdue",
+    "owner": "them",
+    "kind": "GIVE",
+    "origin": "stated",
+    "due": "2026-10-10",
+    "closedBy": null
+   }
+  },
+  {
+   "name": "events with no opening are not a loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.closed",
+     "at": 1,
+     "fields": {
+      "by": "you"
+     }
+    }
+   ],
+   "expect": null
+  },
+  {
+   "name": "an opening with no next mover is not a loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "unknown",
+      "origin": "asked",
+      "dueDate": "2026-10-05"
+     }
+    }
+   ],
+   "expect": null
+  },
+  {
+   "name": "an opening with no kind is not a loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "owner": "me",
+      "origin": "asked"
+     }
+    }
+   ],
+   "expect": null
+  },
+  {
+   "name": "what the old name GET meant is a GIVE owned by them",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GET",
+      "owner": "them",
+      "origin": "stated"
+     }
+    }
+   ],
+   "expect": null
+  },
+  {
+   "name": "an opening with no origin is not a loop",
+   "today": "2026-10-04",
+   "events": [
+    {
+     "type": "orb.loop.opened",
+     "at": 1,
+     "fields": {
+      "kind": "GIVE",
+      "owner": "me",
+      "dueDate": "2026-10-05"
+     }
+    }
+   ],
+   "expect": null
+  }
+ ]
+}

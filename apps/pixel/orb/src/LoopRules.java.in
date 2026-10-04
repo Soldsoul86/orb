@@ -1,0 +1,360 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * The Loop protocol's rules (`docs/LOOP_PROTOCOL.md` v0.1, DR-41): the vocabulary, the one fold that turns lifecycle events into a loop's state, the views
+ * that read it, and the matching form. **Pure: no Android class, no clock, no storage.** A loop is an *interpretation* that cites evidence; it has no stored
+ * status and no authorization — the state is read from the events and today's date every time.
+ *
+ * **One fold.** `Commitments` (the first, smallest exercise of the protocol) reads its events through `Event`/`Loop.apply` here, so a commitment and a
+ * loop can never disagree about what *overdue* means. The `orb.commitment.*` events are protocol-v0 forms of `orb.loop.*`, read as such and never rewritten.
+ */
+final class LoopRules {
+    private LoopRules() {}
+
+    static final String PROTOCOL = "loop/0.1";
+
+    // ---- the vocabulary (a kind is additive in a later minor version; an old loop is never reinterpreted)
+
+    static final String DO = "DO";
+    /** Something passes from one party to another: money, a document, information, an item, access, approval. **Waiting to receive one is a GIVE owned by THEM** — there is no separate GET loop. */
+    static final String GIVE = "GIVE";
+    static final String ATTEND = "ATTEND";
+    static final String RESPOND = "RESPOND";
+    static final String DECIDE = "DECIDE";
+    static final List<String> KINDS = Collections.unmodifiableList(java.util.Arrays.asList(DO, GIVE, ATTEND, RESPOND, DECIDE));
+
+    static final String ME = "me";
+    static final String THEM = "them";
+    /** Who must move next for the loop to progress — always one of these two. A loop with no resolvable next mover is not a loop. */
+    static final List<String> OWNERS = Collections.unmodifiableList(java.util.Arrays.asList(ME, THEM));
+
+    static final String STATED = "stated";
+    static final String ASKED = "asked";
+    static final String PROMISED = "promised";
+    /** How it began. Something you wrote down yourself is `stated` (by you). */
+    static final List<String> ORIGINS = Collections.unmodifiableList(java.util.Arrays.asList(STATED, ASKED, PROMISED));
+
+    /**
+     * How Orb knows it — never a number (Art. XI §43). `observed`: the source shows it happening (a delivery on its way, a failed payment); `stated`: a
+     * source or a person says it in words (a bill with its due date, "I'll send it"); `inferred`: a rule concludes it from shape or convention (a repeating
+     * debit, "Friday" resolved from when it was written). The rule's id and version say which.
+     */
+    static final String OBSERVED = "observed";
+    static final String INFERRED = "inferred";
+    static final List<String> BASES = Collections.unmodifiableList(java.util.Arrays.asList(OBSERVED, STATED, INFERRED));
+
+    /** Who closed it. Only `you` and `exact` evidence close; `suggests` never changes a state. */
+    static final String BY_YOU = "you";
+    static final String BY_EVIDENCE = "evidence";
+    static final String CLASS_YOU = "you";
+    static final String CLASS_EXACT = "exact";
+    static final String CLASS_SUGGESTS = "suggests";
+
+    static boolean validKind(String s) { return KINDS.contains(s); }
+    static boolean validOwner(String s) { return OWNERS.contains(s); }
+    static boolean validOrigin(String s) { return ORIGINS.contains(s); }
+    static boolean validBasis(String s) { return BASES.contains(s); }
+
+    // ---- the state
+
+    /** What the loop is, read with today. These strings are the commitments' own, so one vocabulary is read everywhere. */
+    static final String OPEN = "open";
+    static final String DUE_TODAY = "dueToday";
+    static final String OVERDUE = "overdue";
+    /** An ATTEND whose time went by with no closure — *passed*, never *overdue*. */
+    static final String PASSED = "passed";
+    static final String DONE = "done";
+    static final String DROPPED = "dropped";
+
+    /**
+     * The state today (`YYYY-MM-DD`): what was last done with it, else its date against today. `last` is `open`, `done` or `dropped`. **Absence of evidence
+     * is never closure**: nothing here moves a loop to `done`.
+     */
+    static String stateOf(String kind, String last, String due, String today) {
+        if (DONE.equals(last)) return DONE;
+        if (DROPPED.equals(last)) return DROPPED;
+        if (due == null) return OPEN;
+        int cmp = due.compareTo(today);
+        if (cmp == 0) return DUE_TODAY;
+        if (cmp > 0) return OPEN;
+        return ATTEND.equals(kind) ? PASSED : OVERDUE;
+    }
+
+    /** Something to do or answer now: open, due today or overdue. A passed attendance, a done or a dropped loop is not. */
+    static boolean active(String state) {
+        return OPEN.equals(state) || DUE_TODAY.equals(state) || OVERDUE.equals(state);
+    }
+
+    // ---- the events
+
+    static final String OPENED = "orb.loop.opened";
+    static final String ADVANCED = "orb.loop.advanced";
+    static final String MOVED = "orb.loop.moved";
+    static final String CLOSED = "orb.loop.closed";
+    static final String DROPPED_TYPE = "orb.loop.dropped";
+    static final String REOPENED = "orb.loop.reopened";
+    static final String LINKED = "orb.loop.linked";
+    static final String SPLIT = "orb.loop.split";
+
+    private static final String COMMITMENT_PREFIX = "orb.commitment.";
+    private static final String LOOP_PREFIX = "orb.loop.";
+
+    /** The protocol name of an event type: `orb.commitment.done` is `orb.loop.closed`; a loop type is itself; anything else is null. */
+    static String canonicalType(String type) {
+        if (type == null) return null;
+        if (type.startsWith(LOOP_PREFIX)) {
+            switch (type) {
+                case OPENED: case ADVANCED: case MOVED: case CLOSED: case DROPPED_TYPE: case REOPENED: case LINKED: case SPLIT: return type;
+                default: return null;   // `orb.loop.fit.reported` and the like are not lifecycle events
+            }
+        }
+        if (!type.startsWith(COMMITMENT_PREFIX)) return null;
+        switch (type) {
+            case CommitmentFacts.OPENED: return OPENED;
+            case CommitmentFacts.MOVED: return MOVED;
+            case CommitmentFacts.DONE: return CLOSED;
+            case CommitmentFacts.DROPPED: return DROPPED_TYPE;
+            case CommitmentFacts.REOPENED: return REOPENED;
+            default: return null;
+        }
+    }
+
+    /** One lifecycle event, as the journal shows it: its protocol type and the clear fields the fold reads. */
+    static final class Event {
+        final String type;
+        /** The event this one is about (the opening), or null for an opening. */
+        final String about;
+        final long atMs;
+        final Map<String, String> fields;
+
+        Event(String type, String about, long atMs, Map<String, String> fields) {
+            this.type = type;
+            this.about = about;
+            this.atMs = atMs;
+            this.fields = fields;
+        }
+
+        String field(String name) {
+            return fields.get(name);
+        }
+    }
+
+    private static final Pattern PHYSICAL = Pattern.compile("\"physical\":(\\d+)");
+    private static final String[] READ = {"kind", "owner", "origin", "basis", "dueDate", "direction", "by", "class", "rule"};
+
+    /**
+     * A journal line as a lifecycle event, or null if it is not one. Only the clear, enumerated fields are read — `kind`, `owner`, `origin`, `basis`,
+     * `dueDate`, `direction`, `by`, `class`, `rule` — each a short word or a day, never free text. A line with a value outside its vocabulary yields a
+     * field of null rather than a guess.
+     */
+    static Event parse(String line) {
+        String type = canonicalType(Journal.typeOf(line));
+        if (type == null) return null;
+        int payload = line.indexOf("\"payload\":");
+        Map<String, String> fields = new HashMap<>();
+        if (payload >= 0) {
+            for (String name : READ) {
+                Matcher m = Pattern.compile("\"" + name + "\":\"([A-Za-z0-9._-]*)\"").matcher(line);
+                if (m.find(payload)) fields.put(name, m.group(1));
+            }
+        }
+        List<String> causes = Reminders.causesOf(line);
+        Matcher at = PHYSICAL.matcher(line);
+        return new Event(type, causes.isEmpty() ? null : causes.get(0), at.find() ? Long.parseLong(at.group(1)) : 0L, fields);
+    }
+
+    // ---- the loop, and the one fold
+
+    /** A loop as the events leave it. Mutable only through `apply`. */
+    static final class Loop {
+        final String id;
+        String kind;
+        String owner;
+        String origin;
+        /** `YYYY-MM-DD`, or null for none. */
+        String due;
+        /** `open`, `done` or `dropped` — what was last done with it. */
+        String last = OPEN;
+        /** `you` or `evidence`, when closed. */
+        String closedBy;
+        /** The earliest and latest event times. */
+        long openedAtMs;
+        long changedAtMs;
+        /** Evidence suggests it is closed. An annotation for a view: it never changes the state. */
+        boolean suggestedClosed;
+
+        Loop(String id) {
+            this.id = id;
+        }
+
+        String state(String today) {
+            return stateOf(kind, last, due, today);
+        }
+
+        /**
+         * Applies one lifecycle event, in the order the journal has them. **The only place a loop changes.** Returns whether the event changed anything: an
+         * event that breaks an invariant (closing by evidence without an exact class, a value outside the vocabulary) is ignored, never half-applied.
+         */
+        boolean apply(Event e) {
+            changedAtMs = e.atMs;
+            switch (e.type) {
+                case OPENED: {
+                    String direction = e.field("direction");
+                    if (direction != null) {   // protocol v0: a commitment says only who must move
+                        owner = CommitmentFacts.WAITING.equals(direction) ? THEM : ME;
+                        kind = CommitmentFacts.WAITING.equals(direction) ? GIVE : DO;   // waiting for them: a GIVE they owe; a lower bound, the journal cannot say more
+                        origin = STATED;   // you wrote it down
+                    }
+                    String k = e.field("kind"), o = e.field("owner"), g = e.field("origin");
+                    if (validKind(k)) kind = k;
+                    if (validOwner(o)) owner = o;
+                    if (validOrigin(g)) origin = g;
+                    due = dayOrNull(e.field("dueDate"));
+                    openedAtMs = e.atMs;
+                    return true;
+                }
+                case ADVANCED: {
+                    boolean did = false;
+                    String o = e.field("owner"), g = e.field("origin"), d = e.field("dueDate");
+                    if (validOwner(o)) { owner = o; did = true; }
+                    if (validOrigin(g)) { origin = g; did = true; }
+                    if (d != null) { due = dayOrNull(d); did = true; }
+                    return did;
+                }
+                case MOVED:
+                    due = dayOrNull(e.field("dueDate"));
+                    return true;
+                case CLOSED: {
+                    String by = e.field("by");
+                    if (by == null) by = BY_YOU;   // a commitment's `done` carries no `by`: it was the person's tap
+                    if (BY_YOU.equals(by)) { last = DONE; closedBy = BY_YOU; return true; }
+                    if (BY_EVIDENCE.equals(by) && CLASS_EXACT.equals(e.field("class"))) { last = DONE; closedBy = BY_EVIDENCE; return true; }
+                    return false;   // only you, or exact evidence, close a loop; evidence that merely suggests never does
+                }
+                case DROPPED_TYPE: last = DROPPED; return true;
+                case REOPENED: last = OPEN; closedBy = null; return true;
+                default: return false;
+            }
+        }
+    }
+
+    static String dayOrNull(String s) {
+        return s != null && s.matches("\\d{4}-\\d{2}-\\d{2}") ? s : null;
+    }
+
+    /**
+     * The loop an opening event begins, or null if it is not an opening or **does not name a valid kind, a next mover and an origin** — a loop with no
+     * resolvable next mover is not a loop, and a word outside the vocabulary is not believed, never replaced by a guess.
+     */
+    static Loop begin(String id, Event opening) {
+        if (opening == null || !OPENED.equals(opening.type)) return null;
+        Loop loop = new Loop(id);
+        loop.apply(opening);
+        return loop.kind != null && loop.owner != null && loop.origin != null ? loop : null;
+    }
+
+    /** What the person would call it: a GIVE owned by them is a *get*. A reading, never a stored kind. */
+    static String plain(String kind, String owner) {
+        return GIVE.equals(kind) && THEM.equals(owner) ? "GET" : kind;
+    }
+
+    /** The fold over a loop's events, in order: the first must be the opening. Null if it is not. */
+    static Loop fold(String id, List<Event> events) {
+        if (events.isEmpty()) return null;
+        Loop loop = begin(id, events.get(0));
+        if (loop == null) return null;
+        for (int i = 1; i < events.size(); i++) loop.apply(events.get(i));
+        return loop;
+    }
+
+    // ---- the views (computed, never stored)
+
+    /** Waiting for: active, and the ball is with them. */
+    static boolean waitingFor(Loop l, String today) {
+        return THEM.equals(l.owner) && active(l.state(today));
+    }
+
+    /** On me: active, and the ball is with me. */
+    static boolean onMe(Loop l, String today) {
+        return ME.equals(l.owner) && active(l.state(today));
+    }
+
+    /** A promise whose date has passed with nothing closing it. Said as *still open, 2 days past Friday* — never as a failure. */
+    static boolean saidStillOpen(Loop l, String today) {
+        return PROMISED.equals(l.origin) && OVERDUE.equals(l.state(today));
+    }
+
+    // ---- matching (the form; each adapter supplies the values)
+
+    /** What an adapter hands the protocol to decide whether two observations are one loop. */
+    static final class Seen {
+        final String counterparty;
+        final String objectClass;
+        /** Integer minor units; 0 when there is no amount (then nothing matches on amount, so nothing merges). */
+        final long minor;
+        /** Days since 1970-01-01 (UTC) of the observation. */
+        final long day;
+
+        Seen(String counterparty, String objectClass, long minor, long day) {
+            this.counterparty = counterparty;
+            this.objectClass = objectClass;
+            this.minor = minor;
+            this.day = day;
+        }
+    }
+
+    /**
+     * Whether two observations belong to one loop: **same counterparty, same object class, the same amount to the minor unit (and an amount at all), and
+     * within `toleranceDays`**. Symmetric. **Part of the form is not enough**: the same payee with a different amount does not merge.
+     */
+    static boolean sameLoop(Seen a, Seen b, int toleranceDays) {
+        if (a.minor <= 0 || b.minor <= 0 || a.minor != b.minor) return false;
+        if (a.counterparty == null || b.counterparty == null || !a.counterparty.equals(b.counterparty)) return false;
+        if (a.objectClass == null || b.objectClass == null || !a.objectClass.equals(b.objectClass)) return false;
+        return Math.abs(a.day - b.day) <= toleranceDays;
+    }
+
+    /**
+     * The groups of observations that are one loop — connected components of `sameLoop`, so the groups do not depend on the order the observations arrive
+     * in. Each group lists indexes into `seen`, ascending; the groups are ordered by their first index.
+     */
+    static List<List<Integer>> groups(List<Seen> seen, int toleranceDays) {
+        int n = seen.size();
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++) parent[i] = i;
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (sameLoop(seen.get(i), seen.get(j), toleranceDays)) {
+                    int a = find(parent, i), b = find(parent, j);
+                    if (a != b) parent[Math.max(a, b)] = Math.min(a, b);
+                }
+            }
+        }
+        Map<Integer, List<Integer>> by = new java.util.TreeMap<>();
+        for (int i = 0; i < n; i++) {
+            int root = find(parent, i);
+            List<Integer> g = by.get(root);
+            if (g == null) { g = new ArrayList<>(); by.put(root, g); }
+            g.add(i);
+        }
+        return new ArrayList<>(by.values());
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+        return i;
+    }
+
+    /** The text a blinded loop key is made from: `Attachments.address(context, keyMaterial(...))`, first sixteen hex. The adapter defines class and period. */
+    static String keyMaterial(String kind, String counterpartyKey, String objectClass, String period) {
+        return "loop:" + kind + ":" + counterpartyKey + ":" + objectClass + ":" + period;
+    }
+}

@@ -26,10 +26,13 @@ final class MessagesFlow {
     static final class Look {
         final MessagesXml.Recognition recognition;
         final MessagesRules.Survey survey;
+        /** The same pass read as the Loop protocol would (`LoopFit`): counts only, nothing recorded until the person asks. */
+        final LoopFit.Report fit;
 
-        Look(MessagesXml.Recognition recognition, MessagesRules.Survey survey) {
+        Look(MessagesXml.Recognition recognition, MessagesRules.Survey survey, LoopFit.Report fit) {
             this.recognition = recognition;
             this.survey = survey;
+            this.fit = fit;
         }
 
         /** Messages not offered for keeping: names and short codes, code-like words, the unfinished or older months, other kinds. */
@@ -38,11 +41,17 @@ final class MessagesFlow {
         }
     }
 
-    /** Pass 1. Keeps nothing but counts and a short snippet per conversation. */
+    /** Pass 1. Keeps nothing but counts and a short snippet per conversation; the fit test reads the same stream and keeps counts only. */
     static Look look(Source source, long nowMs, TimeZone zone) throws Exception {
-        MessagesRules.Survey survey = new MessagesRules.Survey(nowMs, zone);
-        MessagesXml.Recognition recognition = source.stream(survey);
-        return new Look(recognition, survey);
+        final MessagesRules.Survey survey = new MessagesRules.Survey(nowMs, zone);
+        final LoopFit fit = new LoopFit();
+        MessagesXml.Recognition recognition = source.stream(new MessagesXml.Sink() {
+            @Override public void message(MessagesRules.Message message) {
+                survey.message(message);
+                fit.message(message);
+            }
+        });
+        return new Look(recognition, survey, fit.report());
     }
 
     static final class Kept {

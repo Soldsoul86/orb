@@ -1,0 +1,255 @@
+{
+ "protocol": "loop/0.1",
+ "about": "Which observations are one loop. Synthetic. Groups are indexes; the grouping must not depend on order.",
+ "cases": [
+  {
+   "name": "same sender, class, amount and near days are one loop",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 110
+    }
+   ],
+   "groups": [
+    [
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "name": "a different amount does not merge",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100100,
+     "day": 101
+    }
+   ],
+   "groups": [
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "a different sender does not merge",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "b",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    }
+   ],
+   "groups": [
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "a different class does not merge",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "refund",
+     "minor": 100000,
+     "day": 100
+    }
+   ],
+   "groups": [
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "too far apart does not merge",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 146
+    }
+   ],
+   "groups": [
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "exactly at the tolerance merges",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 100000,
+     "day": 145
+    }
+   ],
+   "groups": [
+    [
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "name": "no amount never merges",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 0,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 0,
+     "day": 100
+    }
+   ],
+   "groups": [
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "three in a row are one loop however they arrive",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 5000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 5000,
+     "day": 120
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 5000,
+     "day": 140
+    }
+   ],
+   "groups": [
+    [
+     0,
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "name": "two loops stay two",
+   "tolerance": 45,
+   "seen": [
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 5000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 7000,
+     "day": 100
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 5000,
+     "day": 105
+    },
+    {
+     "counterparty": "a",
+     "objectClass": "bill",
+     "minor": 7000,
+     "day": 106
+    }
+   ],
+   "groups": [
+    [
+     0,
+     2
+    ],
+    [
+     1,
+     3
+    ]
+   ]
+  }
+ ]
+}

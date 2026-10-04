@@ -1,0 +1,91 @@
+{
+ "protocol": "loop/0.1",
+ "about": "A small inbox read as a whole: roles, and how many openings have a payment of the same amount from the same sender. Synthetic.",
+ "messages": [
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-10",
+   "type": 1,
+   "body": "Your credit card bill of Rs.1,000.00 is due on 25-Sep-26."
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-20",
+   "type": 1,
+   "body": "Payment of Rs.1,000.00 received towards your credit card ending 0000."
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-10",
+   "type": 1,
+   "body": "Your loan EMI of Rs.2,000.00 is due on 25-Sep-26."
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-12-01",
+   "type": 1,
+   "body": "Rs.2,000.00 debited from A/c XX0000."
+  },
+  {
+   "address": "VM-OTHERB",
+   "day": "2026-09-21",
+   "type": 1,
+   "body": "Payment of Rs.1,000.00 received towards your credit card ending 1111."
+  },
+  {
+   "address": "+919000000001",
+   "day": "2026-09-22",
+   "type": 1,
+   "body": "are we meeting today?"
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-23",
+   "type": 1,
+   "body": "Congratulations! Get 20% off with our offer."
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-24",
+   "type": 1,
+   "body": "123456 is your OTP. Do not share."
+  },
+  {
+   "address": "AD-ODDBNK",
+   "day": "2026-09-25",
+   "type": 1,
+   "body": "Aapka khata update ho gaya hai."
+  },
+  {
+   "address": "VM-TESTBK",
+   "day": "2026-09-26",
+   "type": 3,
+   "body": "Draft"
+  }
+ ],
+ "expect": {
+  "messages": 10,
+  "service": 8,
+  "conversational": 1,
+  "other": 1,
+  "opens": 2,
+  "closes": 3,
+  "noise": 2,
+  "unmapped": 1,
+  "evidence": 0,
+  "advances": 0,
+  "match.opens": 2,
+  "match.opensMatched": 1,
+  "match.closes": 3,
+  "match.closesMatched": 1,
+  "unmapped.ODDBNK": 1,
+  "ambiguous": 0,
+  "kind.DO": 0,
+  "kind.GIVE": 5,
+  "kind.GIVE.me": 5,
+  "kind.GIVE.them": 0,
+  "kind.ATTEND": 0,
+  "opens.GIVE.me": 2,
+  "closes.GIVE.me": 3
+ }
+}
