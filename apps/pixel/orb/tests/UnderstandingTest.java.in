@@ -43,6 +43,7 @@ final class UnderstandingTest {
         plan();
         counts();
         facts();
+        marks();
         guards();
     }
 
@@ -333,6 +334,30 @@ final class UnderstandingTest {
         List<String> ids = new ArrayList<>();
         for (int i = 0; i < 15; i++) p.items.add(item(DocumentsFacts.REFERRER, People.BY_NUMBER, "x" + i));
         Harness.equal("at most ten items are cited", Understanding.subjects(Arrays.asList(p), log).get(0).evidenceIds.size(), 10);
+    }
+
+    private static void marks() throws Exception {
+        Harness.suite("the Messages list marks the people you said you are in regular touch with");
+        Map<String, String> said = new HashMap<>();
+        said.put("regular:" + FIXED.key("regular", "+911"), "confirmed");
+        said.put("regular:" + FIXED.key("regular", "+912"), "rejected");
+        said.put("regular:" + FIXED.key("regular", "+913"), "cleared");
+        said.put("quiet:" + FIXED.key("quiet", "+914"), "confirmed");
+        said.put("many:" + FIXED.key("many", "+915"), "confirmed");
+        java.util.Set<String> close = Understanding.closeNumbers(Arrays.asList("+911", "+912", "+913", "+914", "+915", "+916"), said, FIXED);
+        Harness.equal("only a confirmed regular touch marks a number", new java.util.TreeSet<>(close).toString(), "[+911]");
+        final int[] keyed = {0};
+        UnderstandingRules.Keyer counting = new UnderstandingRules.Keyer() {
+            @Override public String key(String kind, String id) { keyed[0]++; return "0"; }
+        };
+        Harness.check("with no answers on record, nothing is marked and no key is made", Understanding.closeNumbers(Arrays.asList("+911", "+912"), new HashMap<String, String>(), counting).isEmpty() && keyed[0] == 0);
+        Harness.check("a number no answer names is not marked", Understanding.closeNumbers(Arrays.asList("+919"), said, FIXED).isEmpty());
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        String screen = code(new String(Files.readAllBytes(root.resolve("src/SourcesActivity.java.in")), StandardCharsets.UTF_8));
+        String look = screen.substring(screen.indexOf("private void showMessagesLook("), screen.indexOf("private void updateTally("));
+        Harness.check("it marks only when What Orb has noticed is on, and reads no contact", look.indexOf("UnderstandingAccess.granted(this)") > 0 && look.indexOf("UnderstandingAccess.granted(this)") < look.indexOf("Understanding.closeNumbers(")
+            && !screen.contains("ContactsReader") && !screen.contains("ContactsContract"));
+        Harness.check("nothing is ticked for you: the only tick is the button you press", screen.split("setChecked\\(true\\)", -1).length - 1 == 1 && look.contains("Tick those ") && look.indexOf("setChecked(true)") > look.indexOf("Tick those "));
     }
 
     private static Context box(Context[] c, Journal[] j) throws Exception {

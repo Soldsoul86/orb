@@ -207,9 +207,19 @@ final class MessagesRules {
 
         /** The conversations, the most recent first (ties by number), at most `MAX_LISTED`. */
         List<Conversation> listed() {
+            return listed(Collections.<String>emptySet());
+        }
+
+        /**
+         * The same, with the numbers in `first` — the people the person said they are in regular touch with — ahead of the rest (each group most recent first),
+         * so they are listed even when they are not among the newest `MAX_LISTED`.
+         */
+        List<Conversation> listed(final Set<String> first) {
             List<Conversation> all = new ArrayList<>(by.values());
             Collections.sort(all, new Comparator<Conversation>() {
                 @Override public int compare(Conversation a, Conversation b) {
+                    boolean x = first.contains(a.number), y = first.contains(b.number);
+                    if (x != y) return x ? -1 : 1;
                     if (a.last != b.last) return a.last > b.last ? -1 : 1;
                     return a.number.compareTo(b.number);
                 }
@@ -312,11 +322,16 @@ final class MessagesRules {
 
     /** *+91… (name) · 12 messages · Sep 2026 to Mar 2027 · up to 7 items* — the row above a conversation. */
     static String rowLabel(Conversation c, TimeZone zone) {
+        return rowLabel(c, zone, false);
+    }
+
+    /** The same, with a last line when the person said they are in regular touch with this number's owner. */
+    static String rowLabel(Conversation c, TimeZone zone, boolean regularTouch) {
         SimpleDateFormat f = new SimpleDateFormat("MMM yyyy", Locale.ENGLISH);
         f.setTimeZone(zone);
         String from = f.format(new Date(c.first));
         String to = f.format(new Date(c.last));
         return c.label() + "\n" + c.messages + (c.messages == 1 ? " message" : " messages") + " \u00b7 " + (from.equals(to) ? from : from + " to " + to)
-            + " \u00b7 up to " + c.months.size() + (c.months.size() == 1 ? " item" : " items");
+            + " \u00b7 up to " + c.months.size() + (c.months.size() == 1 ? " item" : " items") + (regularTouch ? "\nyou said: in regular touch" : "");
     }
 }

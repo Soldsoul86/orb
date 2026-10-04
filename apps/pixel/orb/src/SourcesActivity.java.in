@@ -463,16 +463,26 @@ public final class SourcesActivity extends Activity {
             return;
         }
         messagesLook = found;
-        List<MessagesRules.Conversation> rows = survey.listed();
+        // People you said you are in regular touch with (What Orb has noticed, if it is on) are marked and listed first. Nothing is ticked for you.
+        java.util.Set<String> close = new java.util.HashSet<>();
+        if (UnderstandingAccess.granted(this)) {
+            try {
+                close = Understanding.closeNumbers(survey.by.keySet(), UnderstandingFacts.verdicts(journal.readLines()), UnderstandingFacts.keyer(this));
+            } catch (Exception cannotTell) {
+                close = new java.util.HashSet<>();   // cannot tell who: nothing is marked rather than a guess
+            }
+        }
+        final java.util.Set<String> closeHere = close;
+        List<MessagesRules.Conversation> rows = survey.listed(close);
         messageResults.addView(text(survey.by.size() + (survey.by.size() == 1 ? " conversation" : " conversations") + " can be kept"
-            + (survey.leftOutConversations() > 0 ? " (the " + MessagesRules.MAX_LISTED + " most recent are listed)" : "") + ".", 13, true));
+            + (survey.leftOutConversations() > 0 ? " (the " + MessagesRules.MAX_LISTED + " most recent are listed" + (close.isEmpty() ? "" : ", with the people you are in regular touch with first") + ")" : "") + ".", 13, true));
         messageResults.addView(text("Left out, and only counted: " + survey.service + " from names or short codes (banks, offers, codes) \u00b7 " + survey.codes
             + " that look like codes \u00b7 " + survey.outside + " from this month or older than a year \u00b7 " + survey.other + " drafts or other kinds."
             + (found.recognition.cut ? " The file is longer than " + MessagesRules.MAX_MESSAGES + " messages; Orb read the first " + MessagesRules.MAX_MESSAGES + "." : ""), 11, false));
         final java.util.TimeZone zone = java.util.TimeZone.getDefault();
         for (MessagesRules.Conversation c : rows) {
             CheckBox box = new CheckBox(this);
-            box.setText(MessagesRules.rowLabel(c, zone));
+            box.setText(MessagesRules.rowLabel(c, zone, closeHere.contains(c.number)));
             box.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
                 @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean checked) { updateTally(); }
             });
@@ -480,6 +490,16 @@ public final class SourcesActivity extends Activity {
             messageResults.addView(text("Last: " + c.snippet, 12, false));
             messageBoxes.add(box);
             messageRows.add(c);
+        }
+        if (!closeHere.isEmpty()) {
+            int shown = 0;
+            for (MessagesRules.Conversation c : rows) if (closeHere.contains(c.number)) shown++;
+            messageResults.addView(text(shown + (shown == 1 ? " listed conversation is" : " listed conversations are") + " with people you said you are in regular touch with.", 12, false));
+            messageResults.addView(button("Tick those " + shown, new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    for (int i = 0; i < messageBoxes.size(); i++) if (closeHere.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);
+                }
+            }));
         }
         tally = text("", 12, true);
         messageResults.addView(tally);

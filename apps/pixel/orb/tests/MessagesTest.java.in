@@ -338,6 +338,19 @@ final class MessagesTest {
             MessagesRules.rowLabel(tie.by.get(RAVI), UTC), RAVI + "\n1 message \u00b7 Sep 2026 \u00b7 up to 1 item");
         MessagesRules.Survey crowd = new MessagesRules.Survey(NOW, UTC);
         for (int i = 0; i < 55; i++) crowd.message(new MessagesRules.Message(String.format("+9190000%05d", i), "", at("2026-09-12T14:05:00") + i * 1000L, 1, "hi"));
+        MessagesRules.Survey close = new MessagesRules.Survey(NOW, UTC);
+        for (int i = 0; i < 55; i++) close.message(new MessagesRules.Message(String.format("+9190000%05d", i), "", at("2026-09-12T14:05:00") + i * 1000L, 1, "hi"));
+        java.util.Set<String> mine = new HashSet<>(Arrays.asList("+919000000000", "+919000000001", "+919000000054"));
+        List<MessagesRules.Conversation> first = close.listed(mine);
+        Harness.check("people you said you are in regular touch with come first even when they are old, each group newest first, and the list is still fifty",
+            first.size() == 50 && first.get(0).number.endsWith("00054") && first.get(1).number.endsWith("00001") && first.get(2).number.endsWith("00000") && first.get(3).number.endsWith("00053"));
+        StringBuilder plain = new StringBuilder(), none = new StringBuilder();
+        for (MessagesRules.Conversation c : close.listed()) plain.append(c.number).append(',');
+        for (MessagesRules.Conversation c : close.listed(new HashSet<String>())) none.append(c.number).append(',');
+        Harness.equal("with none marked, the list is as before", none.toString(), plain.toString());
+        Harness.equal("a marked number that is not in the file adds nothing", close.listed(new HashSet<>(Arrays.asList("+910000000000"))).size(), 50);
+        MessagesRules.Conversation row = s.by.get(RAVI);
+        Harness.check("a marked row says so on a last line; an unmarked one does not", MessagesRules.rowLabel(row, UTC, true).equals(MessagesRules.rowLabel(row, UTC) + "\nyou said: in regular touch") && MessagesRules.rowLabel(row, UTC, false).equals(MessagesRules.rowLabel(row, UTC)));
         Harness.check("at most fifty are listed, newest first, and the rest are counted", crowd.listed().size() == 50 && crowd.leftOutConversations() == 5 && crowd.listed().get(0).number.endsWith("00054"));
 
         Harness.suite("pass 2: what is sealed");

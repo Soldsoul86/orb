@@ -26,6 +26,19 @@ final class Understanding {
         return MONTH.matcher(month).matches() ? month : null;
     }
 
+    /**
+     * Which of these numbers belong to someone the person **confirmed as in regular touch**, by the blinded key of the number alone — no contact is read,
+     * so the Messages list can mark them. A person with several numbers is found by their smallest (the one the answer was keyed on).
+     */
+    static java.util.Set<String> closeNumbers(Collection<String> numbers, Map<String, String> verdicts, UnderstandingRules.Keyer keyer) throws Exception {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        if (verdicts.isEmpty()) return out;
+        for (String number : numbers) {
+            if (UnderstandingFacts.CONFIRMED.equals(verdicts.get(UnderstandingRules.REGULAR + ":" + keyer.key(UnderstandingRules.REGULAR, number)))) out.add(number);
+        }
+        return out;
+    }
+
     /** The smallest of a person's numbers and addresses — stable while they keep them — or null if they have none. */
     static String idOf(People.Person person) {
         TreeSet<String> all = new TreeSet<>();
