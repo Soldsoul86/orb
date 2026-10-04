@@ -1,0 +1,164 @@
+{
+ "domain": "LOOP",
+ "about": "Scenarios (docs/ENGINEERING_SYSTEM.md section 3.2). State is derived from the proof each names; a scenario is never itself proof. PROTOCOL-class: changing this file needs an approval record.",
+ "scenarios": [
+  {
+   "id": "LOOP-001",
+   "name": "A sender mark never touches what the person already accepted",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-008"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Senders.java.in",
+    "apps/pixel/orb/src/SenderFacts.java.in"
+   ],
+   "given": [
+    "a loop and two commitments the person accepted"
+   ],
+   "when": [
+    "the sender it came from is marked quiet, then taken back"
+   ],
+   "then": [
+    "exactly the grant and the answer are added",
+    "every loop and commitment is as it was"
+   ],
+   "mustNot": [
+    "a loop closed, altered or erased by a mark"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "every loop and commitment event is exactly as it was"
+    },
+    {
+     "suite": "phone",
+     "check": "exactly two events were added: the grant and the answer"
+    },
+    {
+     "suite": "phone",
+     "check": "the loop and the commitments are still as accepted"
+    }
+   ]
+  },
+  {
+   "id": "LOOP-002",
+   "name": "Everything from a quiet sender is noise, whatever it says",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-008",
+    "I-015"
+   ],
+   "files": [
+    "apps/pixel/orb/src/LoopFit.java.in"
+   ],
+   "given": [
+    "a bank whose messages would form loops"
+   ],
+   "when": [
+    "it is marked quiet"
+   ],
+   "then": [
+    "all its messages are noise, tagged sender, and the cost is counted"
+   ],
+   "mustNot": [
+    "a loop from a quiet sender",
+    "a hidden cost"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "all three of its messages are noise, tagged sender"
+    },
+    {
+     "suite": "phone",
+     "check": "and the cost is counted: the three that were loops"
+    },
+    {
+     "suite": "phone",
+     "check": "every service message is still in exactly one role"
+    }
+   ]
+  },
+  {
+   "id": "LOOP-003",
+   "name": "Time passing never closes a loop",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-006"
+   ],
+   "files": [
+    "apps/pixel/orb/src/LoopRules.java.in"
+   ],
+   "given": [
+    "an open loop with a date"
+   ],
+   "when": [
+    "a year passes"
+   ],
+   "then": [
+    "it is overdue, not done"
+   ],
+   "mustNot": [
+    "absence read as closure"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a year later it is still overdue: absence is never closure"
+    },
+    {
+     "suite": "phone",
+     "check": "it is overdue the day after"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing in the fold moves a loop to done on its own"
+    }
+   ]
+  },
+  {
+   "id": "LOOP-004",
+   "name": "Evidence that only suggests changes no state",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-010"
+   ],
+   "files": [
+    "apps/pixel/orb/src/LoopRules.java.in",
+    "apps/pixel/orb/src/Interpreter.java.in"
+   ],
+   "given": [
+    "a loop and a closing observation known only by inference"
+   ],
+   "when": [
+    "the loop is folded"
+   ],
+   "then": [
+    "the state is unchanged until the person confirms"
+   ],
+   "mustNot": [
+    "a state change from a suggestion"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "evidence that suggests it is closed does not change the state"
+    },
+    {
+     "suite": "phone",
+     "check": "exact evidence closes it"
+    },
+    {
+     "suite": "phone",
+     "check": "a closing by you is a change"
+    }
+   ]
+  }
+ ]
+}

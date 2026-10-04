@@ -7,10 +7,13 @@ documented like everything else. None of it is part of the product; the product 
 |---|---|---|
 | [`mutate/`](mutate/README.md) | Mutation harness. Breaks the source one small way at a time, runs the suite, and reports which breakages **no test noticed**. | `node tools/mutate/mutate.mjs --list tools/mutate/lists/par2.json` |
 | [`fit/`](fit/README.md) | Real-corpus fit probe. Runs the phone's reading rules over a real message backup and prints **counts only**. | `tools/fit/probe.sh <backup.json>` |
+| [`scenarios/`](scenarios/README.md) | Invariant and scenario registries. A scenario's state is **derived** from the named checks that prove it; `impact` says which invariants a change threatens. | `node tools/scenarios/cli.mjs check --run` |
+| [`governance/`](governance/README.md) | File classes, approval gates and the approval records; flags a gated change without a record. | `node tools/governance/cli.mjs check` |
+| [`slice/`](slice/README.md) | A slice's context pack, budget and generated **change report** (never "ready": blocked, incomplete or review required). | `node tools/slice/cli.mjs report <ID> …` |
 | [`export/`](export/README.md) | Export analyser. Reads a device export: hash chain, builds, faults, counts by type, prediction checks. **Counts and names only.** | `node tools/export/analyse.mjs <export.txt>` |
 
-Claude Code project commands (`/mutate`, `/fit`, `/export`) and two agents live in [`../.claude`](../.claude); the working
-agreement they encode is in [`../docs/AGENT_TOOLING.md`](../docs/AGENT_TOOLING.md).
+Claude Code project commands (`/slice`, `/review`, `/adversary`, `/mutate`, `/fit`, `/export`) and five agents live in [`../.claude`](../.claude); the working
+agreement they encode is in [`../docs/AGENT_TOOLING.md`](../docs/AGENT_TOOLING.md) and the whole system in [`../docs/ENGINEERING_SYSTEM.md`](../docs/ENGINEERING_SYSTEM.md).
 
 ## The two rules every tool here keeps
 

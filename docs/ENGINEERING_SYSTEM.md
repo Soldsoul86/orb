@@ -1,6 +1,6 @@
 # The engineering system — how one person operates Orb with agents
 
-> Status: **proposed — awaiting the operator's approval; nothing in Phase 1 is built.** Written 2026-10-04 in answer to the operator's ten-layer, thirty-point proposal (design → scenario → implementation → proof → device → evidence → review → release → learning). Proposes `DECISIONS.md` DR-45.
+> Status: **approved 2026-10-04 ("Approve DR-45 / ENGINEERING_SYSTEM.md as proposed", with the four decisions in §8); Phase 1 built — see §9.** Written in answer to the operator's ten-layer, thirty-point proposal (design → scenario → implementation → proof → device → evidence → review → release → learning). `DECISIONS.md` DR-45.
 > Governed by `CLAUDE.md` (the workflow and the rule that architecture changes wait for approval) and `AGENT_TOOLING.md` (what already exists). This document changes **no product architecture, kernel contract or protocol**; it adds repository machinery around them.
 
 ## 1. What I take the proposal to be
@@ -101,3 +101,30 @@ Money slice A (in flight) finishes as it is: it predates the system and is the s
 2. **JSON for the registries** (§4)? *Recommendation: yes.*
 3. **Enforcement.** Checks first, blocking hooks only after they have run clean through B and C? *Recommendation: yes.*
 4. **Retroactive seeding.** Seed Money A's scenarios and the existing guards as invariants now (about thirty entries), or start the registries empty and fill them from B onward? *Recommendation: seed — an empty registry teaches nothing about whether the format works.*
+
+## 8. Decisions (2026-10-04)
+
+1. **Phase 1 before Money B — yes.** Money B is the acceptance test of the system, not a feature built after it. Sequence: finish slice A's mutation → Phase 1 → run Money B through it → fix what the system misses → Money C. *Phase 1 is not to be expanded while it is built.*
+2. **JSON registries — yes.** Machine-verifiable and dependency-free matter more than the format. Scenario state is derived from the existence and passing of its named checks.
+3. **Checks before blocking hooks — yes.** Detect → report → learn → stabilise; the first blocking rule only with evidence from B and C that it catches the right things without noise.
+4. **Seed about thirty scenarios now — yes**, from existing proven behaviour and guards, each pointing at an exact check; no scenarios manufactured to reach a number.
+
+**One rule made explicit.** *A scenario is never itself proof.* The chain is scenario → named checks → their passing result → the current commit → the change report. If a test is deleted, renamed, skipped or no longer exercises the behaviour, the scenario becomes unproven (derived state).
+
+**The acceptance test.** The most important outcome of Money B is not whether Money works but whether the system **catches something the agent would otherwise have missed**. If it does, it has earned its place; if not, it is trimmed to what proved its weight.
+
+## 9. As built — Phase 1 (2026-10-04)
+
+| Piece | Where | State |
+| --- | --- | --- |
+| Invariants | `docs/invariants/INVARIANTS.json` — 16, each with the files that threaten it and the named checks that hold it | seeded from guards that already existed |
+| Scenarios | `docs/scenarios/{money,observation,loop,other}.json` — 40: 37 with proof, 3 drafts that name real gaps (a keep that fails part-way; a statement whose balances do not reproduce; payee text never leaving the bundle) | `node tools/scenarios/cli.mjs check --run` |
+| Scenario tooling | `tools/scenarios` — derived state (draft · tested · failing · unproven · regressed), `impact` | 18 tests |
+| File classes and approvals | `docs/FILE_CLASSES.json`, `docs/APPROVALS.json`, `tools/governance` — a manifest gates only when its permissions differ; self-governing files always flagged | 12 tests |
+| Slices | `docs/slices/MONEY-A.json` (written after the code, from it), `tools/slice` — context pack, budget, change report | 15 tests |
+| Decision queue, learnings | `docs/DECISIONS_PENDING.md`, `docs/LEARNINGS.md` — formats held by `npm run lint` | seeded with two learnings |
+| Commands and agents | `/slice` `/review` `/adversary`; `builder` `reviewer` `adversary` (with `mutation-reviewer`, `export-reader`) | prompts |
+
+**Not built (deliberately, §6):** the impact *graph* beyond `impact`, conformance/golden/differential runners, worktrees, the device runner and prediction registry, privacy and permission scanners, the release gate, the artifact registry, the dashboard.
+
+**What running slice A through it already showed** (the first honest account, before B). Two things were caught that a green suite had not shown: (1) trying to name a proof for *"a keep that fails part-way leaves what was there"* (M-019) found there is none — the store is written to do it and nothing tests it, so it is a draft that says so; (2) the mutation round the report requires found fifteen survivors in a ledger whose 3,277 checks all passed (`LEARNINGS.md` L-002). What it did **not** catch: the three amendments to the design that slice A made (corroboration pairs across adapters, not senders; ambiguity is flagged on both sides of a pairing; `information.noted` is not kept) came from measuring the real file and from the mutation round, not from the registries.

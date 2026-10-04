@@ -1453,7 +1453,7 @@ box — **where they are the app's by design, like the number**.
 
 ## DR-45 — The engineering system: scenarios, invariants, slices and a review packet around the existing tools
 
-- **Status:** **Proposed** — awaiting the operator (`ENGINEERING_SYSTEM.md`) · **Proposed:** 2026-10-04, after the operator's thirty-point proposal for a single-builder engineering system.
+- **Status:** **Decided; Phase 1 built** (`ENGINEERING_SYSTEM.md` §8–9) · **Decided:** 2026-10-04, operator ("Approve DR-45 / ENGINEERING_SYSTEM.md as proposed, with the four decisions below": Phase 1 before Money B; JSON registries; checks before blocking hooks; seed about thirty scenarios) · proposed after the operator's thirty-point proposal.
 
 **The proposal.** Phase 1 only: an **invariant registry**, a **scenario registry** whose state is *derived* from the proof it names (never hand-set), a **slice file** and `/slice` command with a budget and stop conditions, a generated **change report**, **file classes** with a diff check against recorded approvals, and a **decision queue** and learnings log. JSON, not YAML; checks before blocking hooks; three agent prompts, not five. It changes no product architecture, contract or protocol. Phases 2–4 (impact graph, conformance/golden/differential runners, worktrees, device runner and prediction registry, privacy and permission scanners, release gate, artifact registry, dashboard) are mapped, not scheduled.
 

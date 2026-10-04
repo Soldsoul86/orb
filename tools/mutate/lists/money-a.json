@@ -108,7 +108,8 @@
   {
    "file": "src/Ledger.java.in",
    "old": "return a.first().id.compareTo(b.first().id);",
-   "new": "return 0;"
+   "new": "return 0;",
+   "equivalent": "Any deterministic tie order of two movements at one instant is correct; both orders are independent of the order the facts arrive in (held by the fingerprint test)."
   },
   {
    "file": "src/Ledger.java.in",
@@ -173,7 +174,8 @@
   {
    "file": "src/Ledger.java.in",
    "old": ".append('|').append(m.pairedByCount);",
-   "new": ".append('|');"
+   "new": ".append('|');",
+   "equivalent": "pairedByCount is derived from the witness structure of the whole set, which the fingerprint already commits to through every witness id."
   },
   {
    "file": "src/Ledger.java.in",

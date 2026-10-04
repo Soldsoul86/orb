@@ -13,6 +13,8 @@ already being done by hand and now has tests; it changes no product architecture
 | Project commands | `.claude/commands` | `/mutate`, `/fit`, `/export` — the above, with the rules for using them. |
 | Project agents | `.claude/agents` | `mutation-reviewer` (triage survivors), `export-reader` (read exports without opening them). |
 
+> **Extended by `ENGINEERING_SYSTEM.md` (DR-45):** scenarios, invariants, file classes with approvals, slices with a budget, and a generated change report now sit around these three tools. This document is still the account of the measuring tools; that one is the system they belong to.
+
 ## The working loop these serve
 
 Design doc (status *proposed*) → operator approval → build with unit tests → **mutation check** → real-data **fit** (counts only)

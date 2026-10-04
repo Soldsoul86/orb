@@ -1,0 +1,813 @@
+{
+ "domain": "MONEY",
+ "about": "Scenarios (docs/ENGINEERING_SYSTEM.md section 3.2). State is derived from the proof each names; a scenario is never itself proof. PROTOCOL-class: changing this file needs an approval record.",
+ "scenarios": [
+  {
+   "id": "M-001",
+   "name": "An unmatched payment is the ledger only",
+   "category": "happy",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Interpreter.java.in",
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "a value.moved observation (out)",
+    "no open obligation of the same amount from the same source"
+   ],
+   "when": [
+    "the observation is interpreted"
+   ],
+   "then": [
+    "a ledger entry exists",
+    "the effect is NONE with the ledger flag"
+   ],
+   "mustNot": [
+    "a loop closes",
+    "a loop opens",
+    "a candidate is proposed"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a payment with no open obligation is the ledger only [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "spending and income with nothing open are the ledger only"
+    }
+   ]
+  },
+  {
+   "id": "M-002",
+   "name": "One adapter has nothing to corroborate",
+   "category": "boundary",
+   "risk": "high",
+   "invariants": [
+    "I-003",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "several value.moved facts from different senders of one adapter",
+    "the same amount on the same day"
+   ],
+   "when": [
+    "the ledger is computed"
+   ],
+   "then": [
+    "each fact is its own movement"
+   ],
+   "mustNot": [
+    "two senders of one adapter are merged into one movement"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "one adapter: every fact is its own movement, even the same amount on the same day from two senders"
+    },
+    {
+     "suite": "phone",
+     "check": "one adapter, nothing to pair: 2 movement(s), witnesses [1, 1], in every order"
+    }
+   ]
+  },
+  {
+   "id": "M-003",
+   "name": "Two adapters seeing one payment make one movement",
+   "category": "happy",
+   "risk": "high",
+   "invariants": [
+    "I-003",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "an SMS fact and a statement fact",
+    "same direction, currency and amount, a day apart"
+   ],
+   "when": [
+    "the ledger is computed"
+   ],
+   "then": [
+    "one movement with two witnesses",
+    "shown under one stable account"
+   ],
+   "mustNot": [
+    "the money is counted twice"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "two adapters, the same direction, currency and amount on the same day: one movement with two witnesses"
+    },
+    {
+     "suite": "phone",
+     "check": "two adapters, same payment: 1 movement(s), witnesses [2], in every order"
+    },
+    {
+     "suite": "phone",
+     "check": "it is shown under the account of its first witness by adapter, so it is always the same account"
+    }
+   ]
+  },
+  {
+   "id": "M-004",
+   "name": "Two real identical payments stay two",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-003",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "two payments of the same amount on one day",
+    "each seen by SMS and by a statement"
+   ],
+   "when": [
+    "the ledger is computed"
+   ],
+   "then": [
+    "two movements, each with two witnesses",
+    "they say they paired by count"
+   ],
+   "mustNot": [
+    "one movement of four witnesses",
+    "one movement dropped"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "two payments, each seen by both: two movements of two witnesses each, not one of four"
+    },
+    {
+     "suite": "phone",
+     "check": "two real identical payments stay two, each seen by both: 2 movement(s), witnesses [2, 2], in every order"
+    },
+    {
+     "suite": "phone",
+     "check": "two seen by SMS and one by the statement: two movements, one witnessed twice and one once"
+    },
+    {
+     "suite": "phone",
+     "check": "a movement holds at most one witness per adapter"
+    }
+   ]
+  },
+  {
+   "id": "M-005",
+   "name": "The pairing window is one day",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-003"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "two adapters stating the same payment"
+   ],
+   "when": [
+    "they are a day apart, and then two days apart"
+   ],
+   "then": [
+    "a day pairs; two days does not"
+   ],
+   "mustNot": [
+    "a pairing across two days"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a day apart still pairs"
+    },
+    {
+     "suite": "phone",
+     "check": "two days apart does not"
+    },
+    {
+     "suite": "phone",
+     "check": "two days apart is two payments: 2 movement(s), witnesses [1, 1], in every order"
+    }
+   ]
+  },
+  {
+   "id": "M-006",
+   "name": "Different amount, direction or currency never pair",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-003",
+    "I-011"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "two adapters, one differing in amount, direction or currency"
+   ],
+   "when": [
+    "the ledger is computed"
+   ],
+   "then": [
+    "they are separate movements"
+   ],
+   "mustNot": [
+    "money out paired with money in",
+    "one currency paired with another"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a different amount does not"
+    },
+    {
+     "suite": "phone",
+     "check": "a different direction does not"
+    },
+    {
+     "suite": "phone",
+     "check": "a different currency does not"
+    },
+    {
+     "suite": "phone",
+     "check": "out and in of the same amount are two: 2 movement(s), witnesses [1, 1], in every order"
+    }
+   ]
+  },
+  {
+   "id": "M-007",
+   "name": "A reference the source gave decides the pairing",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-002",
+    "I-010"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "two facts of different adapters, each with a reference"
+   ],
+   "when": [
+    "the ledger is computed"
+   ],
+   "then": [
+    "equal references pair; different ones never do; an inferred reference is not one"
+   ],
+   "mustNot": [
+    "two differing own references merged"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the same reference pairs them"
+    },
+    {
+     "suite": "phone",
+     "check": "two references that are both the source's own and differ are different payments"
+    },
+    {
+     "suite": "phone",
+     "check": "an inferred reference is not one: it does not stop a pairing"
+    },
+    {
+     "suite": "phone",
+     "check": "references the source gave, and differ: different payments: 2 movement(s), witnesses [1, 1], in every order"
+    }
+   ]
+  },
+  {
+   "id": "M-008",
+   "name": "The ledger does not depend on the order facts arrive in",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-003",
+    "I-004"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "a mixed set of facts from two adapters"
+   ],
+   "when": [
+    "they are given in forty different orders, and twice over"
+   ],
+   "then": [
+    "the same movements every time"
+   ],
+   "mustNot": [
+    "a different pairing for a different order",
+    "a double count when read twice"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the same observations in any order give the same movements"
+    },
+    {
+     "suite": "phone",
+     "check": "and reading everything twice changes nothing"
+    },
+    {
+     "suite": "phone",
+     "check": "the fingerprint is a hash of facts, and moves when a fact moves"
+    }
+   ]
+  },
+  {
+   "id": "M-009",
+   "name": "A month is per account and per currency, in the person's calendar",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-011"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "facts across months, accounts and two currencies"
+   ],
+   "when": [
+    "a month is read"
+   ],
+   "then": [
+    "a line for each account and currency, amounts to the cent",
+    "the month is in the person's zone"
+   ],
+   "mustNot": [
+    "currencies added together",
+    "a fact in the wrong month at midnight"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a line for each account and currency, in a fixed order, amounts in whole units with two places"
+    },
+    {
+     "suite": "phone",
+     "check": "the month is the person's calendar month, not UTC's"
+    },
+    {
+     "suite": "phone",
+     "check": "the months that have a movement, oldest first"
+    }
+   ]
+  },
+  {
+   "id": "M-010",
+   "name": "The ledger screen says moved, never spent or earned",
+   "category": "privacy",
+   "risk": "medium",
+   "invariants": [
+    "I-011"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Ledger.java.in",
+    "apps/pixel/orb/src/LedgerActivity.java.in"
+   ],
+   "given": [
+    "the ledger code and screen"
+   ],
+   "when": [
+    "their source is read"
+   ],
+   "then": [
+    "only the disclaimer names spent and earned"
+   ],
+   "mustNot": [
+    "a total called spending or income"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "it never says spent or earned"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen says spent and earned once each: to say it does not show them"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen is secure like Recall"
+    }
+   ]
+  },
+  {
+   "id": "M-011",
+   "name": "The ledger replayed from sealed facts equals the live one",
+   "category": "recovery",
+   "risk": "high",
+   "invariants": [
+    "I-004",
+    "I-009"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "given": [
+    "facts kept in sealed bundles",
+    "the same facts live"
+   ],
+   "when": [
+    "the ledger is rebuilt from the bundles"
+   ],
+   "then": [
+    "the fingerprints are equal"
+   ],
+   "mustNot": [
+    "a movement lost or invented by keeping"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "replay == live: the ledger from the sealed bundles has the same fingerprint as the ledger from the live facts"
+    },
+    {
+     "suite": "phone",
+     "check": "replay holds every kept fact and not the note"
+    }
+   ]
+  },
+  {
+   "id": "M-012",
+   "name": "A quiet sender's money leaves the ledger and comes back",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-008"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Senders.java.in"
+   ],
+   "given": [
+    "kept facts from two senders"
+   ],
+   "when": [
+    "one is marked quiet, then taken back"
+   ],
+   "then": [
+    "its movements leave the ledger, then return"
+   ],
+   "mustNot": [
+    "its kept bundles erased by the mark"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a quiet sender's money is out of the ledger while it is quiet"
+    },
+    {
+     "suite": "phone",
+     "check": "and back in when taken back"
+    },
+    {
+     "suite": "phone",
+     "check": "marking a source quiet does not erase it"
+    }
+   ]
+  },
+  {
+   "id": "M-013",
+   "name": "Evidence-only facts are not kept",
+   "category": "boundary",
+   "risk": "low",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "an information.noted fact beside a bill and a payment"
+   ],
+   "when": [
+    "facts are offered to keep"
+   ],
+   "then": [
+    "the note is not sealed; the bill and payment are"
+   ],
+   "mustNot": [
+    "evidence-only facts widening what the phone holds"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "information.noted is not kept; the bill is"
+    },
+    {
+     "suite": "phone",
+     "check": "bundles by source and month: BANKA's two months, BANKB's one, the statement's one (the note is evidence only and is not kept)"
+    }
+   ]
+  },
+  {
+   "id": "M-014",
+   "name": "Erasing everything kept is explicit and total",
+   "category": "recovery",
+   "risk": "high",
+   "invariants": [
+    "I-009",
+    "I-013"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/LedgerActivity.java.in"
+   ],
+   "given": [
+    "kept bundles"
+   ],
+   "when": [
+    "the person erases everything"
+   ],
+   "then": [
+    "every key is destroyed; nothing replays",
+    "the record that they were kept stays, empty"
+   ],
+   "mustNot": [
+    "a partial erase",
+    "erasing as a side effect of switching keeping off"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "erasing everything destroys every bundle"
+    },
+    {
+     "suite": "phone",
+     "check": "the record that they were kept stays, with nothing in it"
+    },
+    {
+     "suite": "phone",
+     "check": "erasing is an explicit, confirmed act on the screen, and nothing else erases the kept facts"
+    }
+   ]
+  },
+  {
+   "id": "M-015",
+   "name": "Keeping needs the person's yes, asked first",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-013"
+   ],
+   "files": [
+    "apps/pixel/orb/src/SourcesActivity.java.in",
+    "apps/pixel/orb/src/KeepAccess.java.in"
+   ],
+   "given": [
+    "a Look at a message backup"
+   ],
+   "when": [
+    "the person taps Keep"
+   ],
+   "then": [
+    "a dialog says what is kept and for how long; the yes is recorded; then facts are sealed"
+   ],
+   "mustNot": [
+    "facts kept before the yes",
+    "a second path that keeps"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "one place keeps facts — the Keep dialog on the Sources screen"
+    },
+    {
+     "suite": "phone",
+     "check": "and it asks first, then records the person's yes before it keeps"
+    },
+    {
+     "suite": "phone",
+     "check": "a revoked capability stops keeping: keepFacts is only reached from the dialog, which only the button opens"
+    }
+   ]
+  },
+  {
+   "id": "M-016",
+   "name": "Switching keeping off stops it and erases nothing",
+   "category": "recovery",
+   "risk": "medium",
+   "invariants": [
+    "I-013",
+    "I-008"
+   ],
+   "files": [
+    "apps/pixel/orb/src/KeepAccess.java.in",
+    "apps/pixel/orb/src/MayDoActivity.java.in"
+   ],
+   "given": [
+    "keeping is on and a bundle is kept"
+   ],
+   "when": [
+    "the person switches it off; or a restore brings the grant back without the device flag"
+   ],
+   "then": [
+    "keeping stops, the bundle stays",
+    "the history is made to agree with the device"
+   ],
+   "mustNot": [
+    "erasure by revocation",
+    "a grant the device does not exercise"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "switching off stops it and says so"
+    },
+    {
+     "suite": "phone",
+     "check": "and erases nothing"
+    },
+    {
+     "suite": "phone",
+     "check": "a restore that brings the grant back without the flag is made to agree"
+    },
+    {
+     "suite": "phone",
+     "check": "saying yes twice records one grant"
+    }
+   ]
+  },
+  {
+   "id": "M-017",
+   "name": "The journal holds no amount, sender or account of what was kept",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/ObservationFacts.java.in"
+   ],
+   "given": [
+    "facts kept for real senders and amounts"
+   ],
+   "when": [
+    "the journal is read"
+   ],
+   "then": [
+    "only blinded keys, months and counts"
+   ],
+   "mustNot": [
+    "a sender code, an amount or an account in the journal"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the journal holds no amount, sender code or account: only blinded keys, months and counts"
+    },
+    {
+     "suite": "phone",
+     "check": "the journal holds no sender code, no amount, no id and no fact"
+    },
+    {
+     "suite": "phone",
+     "check": "nor does anything on disk, in the clear"
+    }
+   ]
+  },
+  {
+   "id": "M-018",
+   "name": "Every service message has exactly one disposition",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-015"
+   ],
+   "files": [
+    "apps/pixel/orb/src/LoopFit.java.in"
+   ],
+   "given": [
+    "a small inbox of bills, payments, a refund, a promo, a code and an unreadable message"
+   ],
+   "when": [
+    "the fit report is made"
+   ],
+   "then": [
+    "each message is LOOP, CLOSURE_CANDIDATE, LEDGER_ONLY, NOT_A_LOOP, AMBIGUOUS or UNMAPPABLE, once",
+    "they add up to the service total"
+   ],
+   "mustNot": [
+    "a message counted twice or not at all"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "every service message has exactly one disposition: they add up to the service total"
+    },
+    {
+     "suite": "phone",
+     "check": "the payment that matches the open bill is a closure candidate"
+    },
+    {
+     "suite": "phone",
+     "check": "a payment with nothing open is ledger only"
+    },
+    {
+     "suite": "phone",
+     "check": "a quiet sender's messages are not loops, and the dispositions still add up"
+    }
+   ]
+  },
+  {
+   "id": "M-019",
+   "name": "A keep that fails part-way leaves what was there",
+   "category": "recovery",
+   "risk": "high",
+   "invariants": [
+    "I-004",
+    "I-009"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "an older bundle for a source and month"
+   ],
+   "when": [
+    "sealing the new bundle or recording it fails"
+   ],
+   "then": [
+    "the older bundle is still the live one"
+   ],
+   "mustNot": [
+    "a month with no bundle",
+    "an unrecorded sealed bundle left behind"
+   ],
+   "proof": []
+  },
+  {
+   "id": "M-020",
+   "name": "A statement that does not reproduce its own balances is refused whole",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-005",
+    "I-004"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "a CSV whose rows do not add up to its balance column"
+   ],
+   "when": [
+    "it is imported"
+   ],
+   "then": [
+    "the whole file is refused",
+    "nothing is kept"
+   ],
+   "mustNot": [
+    "a partial import",
+    "a ledger with wrong money"
+   ],
+   "proof": []
+  },
+  {
+   "id": "M-021",
+   "name": "Payee and narration text never leave the sealed bundle",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "a statement row with a payee and narration"
+   ],
+   "when": [
+    "it is imported, kept, exported and probed"
+   ],
+   "then": [
+    "the text exists only inside the sealed bundle"
+   ],
+   "mustNot": [
+    "payee text in the journal, an export, a fit report or a probe line"
+   ],
+   "proof": []
+  }
+ ]
+}

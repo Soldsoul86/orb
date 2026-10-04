@@ -1,0 +1,382 @@
+{
+ "about": "The laws. Each is held by named checks (heldBy) and put at risk by changing the files in threatenedBy. docs/ENGINEERING_SYSTEM.md section 3.1. PROTOCOL-class: changing this file needs an approval record.",
+ "invariants": [
+  {
+   "id": "I-001",
+   "statement": "Evidence is not interpretation: an observation says what happened and nothing of what it means for a person (no kind, owner, origin or status).",
+   "source": "OBSERVATION_SEAM.md §3; CONSTITUTION Art. II",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Observation.java.in",
+    "apps/pixel/orb/src/SmsNormalizer.java.in",
+    "apps/pixel/orb/src/Interpreter.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "an observation has no kind, owner, origin or status of Orb's own"
+    },
+    {
+     "suite": "phone",
+     "check": "the normalizer emits facts, never loop words: it names no kind, owner or origin"
+    }
+   ]
+  },
+  {
+   "id": "I-002",
+   "statement": "Every observation has provenance: a source, an adapter and a tier, and an inferred subject names the rule that inferred it.",
+   "source": "OBSERVATION_SEAM.md §3, §9",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Observation.java.in",
+    "apps/pixel/orb/src/SmsNormalizer.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "every fact is attributed to the sender, by this adapter, at tier T0, naming the rule that read it"
+    }
+   ]
+  },
+  {
+   "id": "I-003",
+   "statement": "The same fact read twice is one fact: observation identity is idempotent, and so is keeping and the ledger.",
+   "source": "OBSERVATION_SEAM.md §3, §12",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Observation.java.in",
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Ledger.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the same fact has the same id, however often it is read"
+    },
+    {
+     "suite": "phone",
+     "check": "and reading everything twice changes nothing"
+    },
+    {
+     "suite": "phone",
+     "check": "the same facts again write nothing"
+    }
+   ]
+  },
+  {
+   "id": "I-004",
+   "statement": "Replay equals live: the ledger and the observations rebuilt from sealed bundles are exactly those computed from the live facts.",
+   "source": "CONSTITUTION Art. I; CLAUDE.md (every feature replayable); MONEY_PHONE.md §12",
+   "threatenedBy": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Ledger.java.in",
+    "apps/pixel/orb/src/Observation.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "replay == live: the ledger from the sealed bundles has the same fingerprint as the ledger from the live facts"
+    },
+    {
+     "suite": "phone",
+     "check": "and decode(encode(x)) is x: same ids, same facts, ordered by when they happened"
+    }
+   ]
+  },
+  {
+   "id": "I-005",
+   "statement": "Raw source text never enters the journal, an export, a probe or a fit report: only counts, blinded keys and names of closed vocabularies.",
+   "source": "CONSTITUTION Art. VII; OBSERVATION_SEAM.md §12; MONEY_PHONE.md §15",
+   "threatenedBy": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/ObservationFacts.java.in",
+    "apps/pixel/orb/src/LoopFacts.java.in",
+    "apps/pixel/orb/src/SourcesActivity.java.in",
+    "tools/fit/**",
+    "tools/export/**"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the journal holds no sender code, no amount, no id and no fact"
+    },
+    {
+     "suite": "phone",
+     "check": "the journal holds no amount, sender code or account: only blinded keys, months and counts"
+    },
+    {
+     "suite": "phone",
+     "check": "no word of any message, and no number of any person"
+    },
+    {
+     "suite": "phone",
+     "check": "the store keeps no raw text: it sees only Observations"
+    },
+    {
+     "suite": "tools",
+     "check": "the probe prints counts that add up and never a word of any message"
+    },
+    {
+     "suite": "tools",
+     "check": "the command line: summary exits 0, a broken chain exits 1, an unreadable file exits 2, and no payload value is printed"
+    }
+   ]
+  },
+  {
+   "id": "I-006",
+   "statement": "Nothing closes without the person: closing is not an effect of any observation, time passing never closes a loop, and evidence that only suggests never changes a state.",
+   "source": "LOOP_PROTOCOL.md §7; OBSERVATION_SEAM.md §5, §7; DR-43, DR-44",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Interpreter.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/LoopRules.java.in",
+    "apps/pixel/orb/src/Commitments.java.in",
+    "apps/pixel/orb/src/LedgerActivity.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "closing is not an effect: no CLOSE, only CLOSURE_CANDIDATE"
+    },
+    {
+     "suite": "phone",
+     "check": "four effects, and closing is not one of them"
+    },
+    {
+     "suite": "phone",
+     "check": "a year later it is still overdue: absence is never closure"
+    },
+    {
+     "suite": "phone",
+     "check": "evidence that suggests it is closed does not change the state"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing in the fold moves a loop to done on its own"
+    }
+   ]
+  },
+  {
+   "id": "I-007",
+   "statement": "The ledger is not a view of loops: money moved is read from value.moved alone; a movement with no loop and a loop with no movement are both possible, and they meet only in correlation.",
+   "source": "MONEY_PHONE.md §15; DR-44",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Ledger.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/Interpreter.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the ledger is not a view of loops: it names no loop, correlator, interpreter or commitment"
+    },
+    {
+     "suite": "phone",
+     "check": "it reads value.moved and nothing else"
+    },
+    {
+     "suite": "phone",
+     "check": "a payment with no open obligation is the ledger only [0]"
+    }
+   ]
+  },
+  {
+   "id": "I-008",
+   "statement": "Quieting a source never rewrites, closes or erases what the person already accepted or what Orb already kept.",
+   "source": "OBSERVATION_SEAM.md §8; DR-42",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Senders.java.in",
+    "apps/pixel/orb/src/SenderRules.java.in",
+    "apps/pixel/orb/src/SenderFacts.java.in",
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "every loop and commitment event is exactly as it was"
+    },
+    {
+     "suite": "phone",
+     "check": "a mark touches no loop or commitment: the marking code names neither"
+    },
+    {
+     "suite": "phone",
+     "check": "marking a source quiet does not erase it"
+    }
+   ]
+  },
+  {
+   "id": "I-009",
+   "statement": "One source's kept observations can be erased without touching another's, and erasing is destroying the key.",
+   "source": "OBSERVATION_SEAM.md §12; ERASURE.md",
+   "threatenedBy": [
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Erase.java.in",
+    "apps/pixel/orb/src/Attachments.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "erasing one source destroys only its bundles"
+    },
+    {
+     "suite": "phone",
+     "check": "the others are untouched"
+    },
+    {
+     "suite": "phone",
+     "check": "erasing everything destroys every bundle"
+    }
+   ]
+  },
+  {
+   "id": "I-010",
+   "statement": "How a subject is known decides how strongly evidence points: a rule's inference only suggests; a reference the source gave is exact; neither closes.",
+   "source": "OBSERVATION_SEAM.md §6–7",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Interpreter.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/Observation.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the evidence class follows how the subject is known"
+    },
+    {
+     "suite": "phone",
+     "check": "the same payment with a reference the source gave is exact evidence — and still only a candidate [0]"
+    }
+   ]
+  },
+  {
+   "id": "I-011",
+   "statement": "The ledger says moved, never spent or earned, and never adds one currency to another.",
+   "source": "MONEY_PHONE.md §5",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Ledger.java.in",
+    "apps/pixel/orb/src/LedgerActivity.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "it never says spent or earned"
+    },
+    {
+     "suite": "phone",
+     "check": "a line for each account and currency, in a fixed order, amounts in whole units with two places"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen says spent and earned once each: to say it does not show them"
+    }
+   ]
+  },
+  {
+   "id": "I-012",
+   "statement": "Declared confidence is metadata: nothing that decides ever reads it as a quantity or compares it with a threshold.",
+   "source": "OBSERVATION_SEAM.md §2, §14.2",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Interpreter.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/SmsNormalizer.java.in",
+    "apps/pixel/orb/src/LoopFit.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "Interpreter never reads confidencePercent as a quantity: it is declared, never compared"
+    },
+    {
+     "suite": "phone",
+     "check": "Correlator never reads confidencePercent as a quantity: it is declared, never compared"
+    },
+    {
+     "suite": "phone",
+     "check": "SmsNormalizer never reads confidencePercent as a quantity: it is declared, never compared"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing that decides compares a confidence with a threshold"
+    }
+   ]
+  },
+  {
+   "id": "I-013",
+   "statement": "Keeping facts is the person's recorded decision, made at the one place that keeps them, and switching it off erases nothing.",
+   "source": "MONEY_PHONE.md §7; CAPABILITY_MODEL.md",
+   "threatenedBy": [
+    "apps/pixel/orb/src/SourcesActivity.java.in",
+    "apps/pixel/orb/src/KeepAccess.java.in",
+    "apps/pixel/orb/src/ObservationStore.java.in",
+    "apps/pixel/orb/src/Capabilities.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "one place keeps facts — the Keep dialog on the Sources screen"
+    },
+    {
+     "suite": "phone",
+     "check": "and it asks first, then records the person's yes before it keeps"
+    },
+    {
+     "suite": "phone",
+     "check": "and erases nothing"
+    },
+    {
+     "suite": "phone",
+     "check": "a revoked capability stops keeping: keepFacts is only reached from the dialog, which only the button opens"
+    }
+   ]
+  },
+  {
+   "id": "I-014",
+   "statement": "A capability's words are frozen with its version: a change to what it says is a different capability.",
+   "source": "CAPABILITY_MODEL.md; GATE_READS_PHONE.md",
+   "threatenedBy": [
+    "apps/pixel/orb/src/Capabilities.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "keeping facts: its words are pinned"
+    },
+    {
+     "suite": "phone",
+     "check": "a change to the declaration is a different capability: this text is pinned"
+    }
+   ]
+  },
+  {
+   "id": "I-015",
+   "statement": "Every service message is counted in exactly one disposition, and the dispositions add up to the service total.",
+   "source": "MONEY_PHONE.md §15; LOOP_PROTOCOL.md §13",
+   "threatenedBy": [
+    "apps/pixel/orb/src/LoopFit.java.in",
+    "tools/fit/**"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "every service message has exactly one disposition: they add up to the service total"
+    },
+    {
+     "suite": "phone",
+     "check": "a quiet sender's messages are not loops, and the dispositions still add up"
+    }
+   ]
+  },
+  {
+   "id": "I-016",
+   "statement": "Orb has no network: the manifest asks for no INTERNET, so nothing it reads can leave the phone by its own act.",
+   "source": "CONSTITUTION Art. I (local first); OBSERVATION_SEAM.md §11",
+   "threatenedBy": [
+    "apps/pixel/orb/AndroidManifest.xml"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the manifest asks for no INTERNET"
+    }
+   ]
+  }
+ ]
+}

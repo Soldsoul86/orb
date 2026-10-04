@@ -1,0 +1,91 @@
+{
+ "id": "MONEY-A",
+ "title": "Money slice A \u2014 keep what Orb read, and the money-moved ledger (SMS only)",
+ "design": "docs/MONEY_PHONE.md",
+ "decisions": [
+  "DR-43",
+  "DR-44"
+ ],
+ "base": "e8ddeda",
+ "scenarios": [
+  "M-001",
+  "M-002",
+  "M-003",
+  "M-004",
+  "M-005",
+  "M-006",
+  "M-007",
+  "M-008",
+  "M-009",
+  "M-010",
+  "M-011",
+  "M-012",
+  "M-013",
+  "M-014",
+  "M-015",
+  "M-016",
+  "M-017",
+  "M-018",
+  "M-019"
+ ],
+ "invariants": [
+  "I-003",
+  "I-004",
+  "I-005",
+  "I-006",
+  "I-007",
+  "I-008",
+  "I-009",
+  "I-011",
+  "I-013",
+  "I-014",
+  "I-015"
+ ],
+ "scope": {
+  "files": [
+   "apps/pixel/orb/**",
+   "docs/MONEY_PHONE.md",
+   "docs/fixtures/money/**",
+   "docs/invariants/**",
+   "tools/fit/**",
+   "tools/scenarios/**",
+   "tools/governance/**",
+   "tools/slice/**",
+   "docs/FILE_CLASSES.json",
+   "docs/APPROVALS.json",
+   "docs/ENGINEERING_SYSTEM.md",
+   "docs/LEARNINGS.md",
+   "docs/DECISIONS_PENDING.md",
+   "package.json",
+   "scripts/lint.mjs",
+   "tools/README.md",
+   ".claude/**",
+   "CLAUDE.md",
+   "docs/AGENT_TOOLING.md"
+  ]
+ },
+ "budget": {
+  "maxFiles": 80,
+  "maxLines": 12000,
+  "maxFailedRuns": 3
+ },
+ "required": [
+  "phone",
+  "tools",
+  "mutation",
+  "fit"
+ ],
+ "proof": [
+  "bash apps/pixel/orb/tests/run.sh",
+  "node --test --test-reporter=spec \"tools/*/tests/*.test.mjs\"",
+  "node tools/mutate/mutate.mjs --list tools/mutate/lists/money-a.json --json artifacts/mutation/money-a.json",
+  "tools/fit/probe.sh <backup>"
+ ],
+ "limitations": [
+  "Slice A predates the engineering system; this slice file and its scenarios were written after the code, from it (M-001\u2026M-018) and from the design (M-019).",
+  "The fit probe reads the inbox the rules were tuned on: coverage, not accuracy.",
+  "The ledger's account is the sender code of the bank's messages; whom the money went to arrives with the statement (slice C).",
+  "A failed keep leaving the older bundle is designed but untested (M-019 is a draft)."
+ ],
+ "expectFitChange": true
+}

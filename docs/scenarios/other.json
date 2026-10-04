@@ -1,0 +1,175 @@
+{
+ "domain": "PRIVACY-AND-TOOLS",
+ "about": "Scenarios (docs/ENGINEERING_SYSTEM.md section 3.2). State is derived from the proof each names; a scenario is never itself proof. PROTOCOL-class: changing this file needs an approval record.",
+ "scenarios": [
+  {
+   "id": "PRIV-001",
+   "name": "Orb asks for no network permission",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-016"
+   ],
+   "files": [
+    "apps/pixel/orb/AndroidManifest.xml"
+   ],
+   "given": [
+    "the manifest"
+   ],
+   "when": [
+    "it is read"
+   ],
+   "then": [
+    "no INTERNET permission"
+   ],
+   "mustNot": [
+    "a network path off the phone"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the manifest asks for no INTERNET"
+    }
+   ]
+  },
+  {
+   "id": "PRIV-002",
+   "name": "The fit report record is numbers only",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "apps/pixel/orb/src/LoopFacts.java.in",
+    "apps/pixel/orb/src/LoopFit.java.in"
+   ],
+   "given": [
+    "a recorded fit report from a real-looking inbox"
+   ],
+   "when": [
+    "the record is read"
+   ],
+   "then": [
+    "numbers, plus protocol and fit names"
+   ],
+   "mustNot": [
+    "a word of any message or any number of a person"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the record is numbers, plus the protocol and fit names"
+    },
+    {
+     "suite": "phone",
+     "check": "no word of any message, and no number of any person"
+    }
+   ]
+  },
+  {
+   "id": "TOOL-001",
+   "name": "The fit probe prints counts and never a message",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005",
+    "I-015"
+   ],
+   "files": [
+    "tools/fit/**"
+   ],
+   "given": [
+    "a backup whose messages carry a canary string and a phone number"
+   ],
+   "when": [
+    "the probe runs"
+   ],
+   "then": [
+    "counts and closed names only; byte-identical on a second run"
+   ],
+   "mustNot": [
+    "the canary or the number in any output"
+   ],
+   "proof": [
+    {
+     "suite": "tools",
+     "check": "the probe prints counts that add up and never a word of any message"
+    },
+    {
+     "suite": "tools",
+     "check": "the probe is deterministic: the same file gives byte-identical output"
+    }
+   ]
+  },
+  {
+   "id": "TOOL-002",
+   "name": "The export analyser prints counts, field names and nothing a person wrote",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "tools/export/**"
+   ],
+   "given": [
+    "an export with a secret planted in a payload"
+   ],
+   "when": [
+    "it is analysed"
+   ],
+   "then": [
+    "the chain, builds and counts; no payload value"
+   ],
+   "mustNot": [
+    "the secret in any output",
+    "a broken chain passing"
+   ],
+   "proof": [
+    {
+     "suite": "tools",
+     "check": "the command line: summary exits 0, a broken chain exits 1, an unreadable file exits 2, and no payload value is printed"
+    },
+    {
+     "suite": "tools",
+     "check": "a clean chain verifies; a removed event, a swapped one and an edited payload are each caught"
+    },
+    {
+     "suite": "tools",
+     "check": "only the latest numeric report is shown, only its numbers, and only for types on the closed list"
+    }
+   ]
+  },
+  {
+   "id": "TOOL-003",
+   "name": "A stale mutant list is not a clean one",
+   "category": "evolution",
+   "risk": "medium",
+   "invariants": [
+    "I-004"
+   ],
+   "files": [
+    "tools/mutate/**"
+   ],
+   "given": [
+    "a mutant list whose text no longer occurs in the source"
+   ],
+   "when": [
+    "the harness runs or verifies it"
+   ],
+   "then": [
+    "the run is not clean"
+   ],
+   "mustNot": [
+    "a list that proves nothing reported as clean"
+   ],
+   "proof": [
+    {
+     "suite": "tools",
+     "check": "a list with a mutant that no longer applies is not clean, and --verify finds it without running the suite"
+    }
+   ]
+  }
+ ]
+}

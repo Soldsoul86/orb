@@ -1,0 +1,9 @@
+{
+  "about": "The engineering system's own suites (tools/scenarios, tools/governance, tools/slice). Mutation-tests the registries' tooling with the tooling's tests. Needs docs/ for the 'own registries are well formed' checks.",
+  "copy": ["tools/scenarios", "tools/governance", "tools/slice", "docs", "CONSTITUTION.md", "MASTER.md", "CLAUDE.md", "apps/pixel/orb/AndroidManifest.xml"],
+  "cwd": ".",
+  "test": "node --test tools/scenarios/tests/scenarios.test.mjs tools/governance/tests/governance.test.mjs tools/slice/tests/slice.test.mjs 2>&1",
+  "pass": "# fail 0",
+  "fail": "# fail [1-9]|^not ok",
+  "build": "SyntaxError"
+}

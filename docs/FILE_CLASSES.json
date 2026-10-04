@@ -1,0 +1,209 @@
+{
+ "about": "File classes (docs/ENGINEERING_SYSTEM.md section 3.5). The first rule whose glob matches a path decides its class; a class may carry a gate; a change to a gated file needs a matching record in docs/APPROVALS.json. This file is itself self-governing.",
+ "classes": {
+  "CONSTITUTIONAL": {
+   "gate": "PROTOCOL_APPROVAL",
+   "about": "What Orb is. Changed only by the operator."
+  },
+  "SECURITY": {
+   "gate": "SECURITY_APPROVAL",
+   "about": "Permissions and keys. A manifest change gates only when its permissions, features or queries differ."
+  },
+  "CONTRACT": {
+   "gate": "DESIGN_APPROVAL",
+   "about": "Kernel contracts."
+  },
+  "PROTOCOL": {
+   "gate": "PROTOCOL_APPROVAL",
+   "about": "Protocols, approved designs, conformance corpora and the registries that hold the laws."
+  },
+  "GENERATED": {
+   "gate": null,
+   "about": "Written by a build or a report; never hand-edited."
+  },
+  "TEST": {
+   "gate": null,
+   "about": "Tests."
+  },
+  "TOOL": {
+   "gate": null,
+   "about": "Tooling, scripts, agent commands."
+  },
+  "DEVICE": {
+   "gate": null,
+   "about": "The device protocol and its results."
+  },
+  "DECISION": {
+   "gate": null,
+   "about": "Decisions, debts, settled findings, learnings, the pending queue."
+  },
+  "DOMAIN": {
+   "gate": null,
+   "about": "Everything else: product code and its documents."
+  }
+ },
+ "rules": [
+  {
+   "glob": "CONSTITUTION.md",
+   "class": "CONSTITUTIONAL"
+  },
+  {
+   "glob": "MASTER.md",
+   "class": "CONSTITUTIONAL"
+  },
+  {
+   "glob": "CLAUDE.md",
+   "class": "CONSTITUTIONAL"
+  },
+  {
+   "glob": "apps/pixel/orb/AndroidManifest.xml",
+   "class": "SECURITY",
+   "watch": "manifest-permissions"
+  },
+  {
+   "glob": "**/*.jks",
+   "class": "SECURITY"
+  },
+  {
+   "glob": "keys/**",
+   "class": "SECURITY"
+  },
+  {
+   "glob": "apps/**/keys/**",
+   "class": "SECURITY"
+  },
+  {
+   "glob": "contracts/**",
+   "class": "CONTRACT"
+  },
+  {
+   "glob": "docs/LOOP_PROTOCOL.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/OBSERVATION_SEAM.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/MONEY_PHONE.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/SENDER_MARKS_PHONE.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/ENGINEERING_SYSTEM.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/CAPABILITY_MODEL.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/ERASURE.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/EVENT_MODEL.md",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/fixtures/**",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/invariants/**",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/scenarios/**",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/slices/**",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/FILE_CLASSES.json",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "docs/APPROVALS.json",
+   "class": "PROTOCOL"
+  },
+  {
+   "glob": "**/*.apk",
+   "class": "GENERATED"
+  },
+  {
+   "glob": "**/build/**",
+   "class": "GENERATED"
+  },
+  {
+   "glob": "**/dist/**",
+   "class": "GENERATED"
+  },
+  {
+   "glob": "artifacts/**",
+   "class": "GENERATED"
+  },
+  {
+   "glob": "**/tests/**",
+   "class": "TEST"
+  },
+  {
+   "glob": "tests/**",
+   "class": "TEST"
+  },
+  {
+   "glob": "tools/**",
+   "class": "TOOL"
+  },
+  {
+   "glob": "scripts/**",
+   "class": "TOOL"
+  },
+  {
+   "glob": ".claude/**",
+   "class": "TOOL"
+  },
+  {
+   "glob": "docs/DEVICE_LOOP.md",
+   "class": "DEVICE"
+  },
+  {
+   "glob": "docs/DECISIONS.md",
+   "class": "DECISION"
+  },
+  {
+   "glob": "docs/DECISIONS_PENDING.md",
+   "class": "DECISION"
+  },
+  {
+   "glob": "docs/SETTLED.md",
+   "class": "DECISION"
+  },
+  {
+   "glob": "docs/ARCHITECTURAL_DEBT.md",
+   "class": "DECISION"
+  },
+  {
+   "glob": "docs/LEARNINGS.md",
+   "class": "DECISION"
+  },
+  {
+   "glob": "**",
+   "class": "DOMAIN"
+  }
+ ],
+ "selfGoverning": [
+  "docs/FILE_CLASSES.json",
+  "docs/APPROVALS.json",
+  "docs/invariants/**",
+  "docs/scenarios/**",
+  "tools/governance/**",
+  "CLAUDE.md",
+  "docs/slices/**"
+ ]
+}

@@ -1,0 +1,354 @@
+{
+ "mutants": [
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "const check = /^ {4}(ok {3}|FAIL )(.*)$/.exec(line);",
+   "new": "const check = /^ {4}(ok {3}|FAIL )(.*)$/.exec(line.trim());"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "ok: check[1].startsWith(\"ok\")",
+   "new": "ok: !check[1].startsWith(\"ok\")"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "else if (heading && !/^\\d+ checks,/.test(heading[1])) group = normalise(heading[1]);",
+   "new": "else if (heading) group = normalise(heading[1]);"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "m[1] === \"\u2714\"",
+   "new": "m[1] === \"\u2716\""
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (proofs.length === 0) return { state: DRAFT, missing: [], failing: [] };",
+   "new": "if (proofs.length === 0) return { state: TESTED, missing: [], failing: [] };"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "let state = failing.length > 0 ? FAILING : missing.length > 0 ? UNPROVEN : TESTED;",
+   "new": "let state = missing.length > 0 ? UNPROVEN : failing.length > 0 ? FAILING : TESTED;"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (state !== TESTED && previous === TESTED) state = REGRESSED;",
+   "new": "if (state !== TESTED) state = REGRESSED;"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (state !== TESTED && previous === TESTED) state = REGRESSED;",
+   "new": "if (state !== TESTED && previous !== undefined) state = REGRESSED;"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "else if (s.failing > 0) failing.push(p.check);",
+   "new": "else if (s.failing > 1) failing.push(p.check);"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (s.found === 0) missing.push(p.check);",
+   "new": "if (s.found === 1) missing.push(p.check);"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!results) return { found: 0, failing: 0, suiteMissing: true };",
+   "new": "if (!results) return { found: 1, failing: 0, suiteMissing: true };"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "(group === undefined || r.group === group)",
+   "new": "(group === undefined || true)"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "highTested: high.filter((d) => d.state === TESTED).length",
+   "new": "highTested: high.length"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "ok: counts[FAILING] + counts[UNPROVEN] + counts[REGRESSED] === 0",
+   "new": "ok: counts[FAILING] + counts[UNPROVEN] === 0"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "ok: counts[FAILING] + counts[UNPROVEN] + counts[REGRESSED] === 0",
+   "new": "ok: counts[FAILING] + counts[UNPROVEN] + counts[REGRESSED] + counts[DRAFT] === 0"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!invariantId.test(inv.id ?? \"\")) errors.push",
+   "new": "if (false) errors.push"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (seen.has(inv.id)) errors.push",
+   "new": "if (false) errors.push"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!Array.isArray(inv.threatenedBy) || inv.threatenedBy.length === 0)",
+   "new": "if (!Array.isArray(inv.threatenedBy))"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!nonEmpty(s.mustNot)) errors.push",
+   "new": "if (false) errors.push"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!invariantIds.has(inv)) errors.push",
+   "new": "if (false) errors.push"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (allIds.has(s.id)) errors.push",
+   "new": "if (false) errors.push"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (!Array.isArray(s.files) || s.files.length === 0)",
+   "new": "if (!Array.isArray(s.files))"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "if (s.device !== undefined && typeof s.device.section !== \"string\")",
+   "new": "if (false)"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "re += \"(?:.*/)?\";",
+   "new": "re += \".*/\";"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "else if (c === \"*\") re += \"[^/]*\";",
+   "new": "else if (c === \"*\") re += \".*\";"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "else if (c === \"?\") re += \"[^/]\";",
+   "new": "else if (c === \"?\") re += \".\";"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "const hit = touches(inv.threatenedBy, files);\n    if (hit.length === 0) continue;",
+   "new": "const hit = touches(inv.threatenedBy, files);"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "held: held.length > 0 && held.every((h) => h.found > 0 && h.failing === 0)",
+   "new": "held: held.every((h) => h.found > 0 && h.failing === 0)"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "held: held.length > 0 && held.every((h) => h.found > 0 && h.failing === 0)",
+   "new": "held: held.length > 0 && held.some((h) => h.found > 0 && h.failing === 0)"
+  },
+  {
+   "file": "tools/scenarios/lib.mjs",
+   "old": "(s.invariants ?? []).some((i) => ids.has(i))",
+   "new": "false"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (r.watch !== undefined && r.watch !== \"manifest-permissions\")",
+   "new": "if (false)"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (!(r.class in (doc.classes ?? {})))",
+   "new": "if (false)"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (!doc.selfGoverning || doc.selfGoverning.length === 0)",
+   "new": "if (!doc.selfGoverning)"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "a.until !== undefined && !/^\\d{4}-\\d{2}-\\d{2}$/.test(a.until)",
+   "new": "false"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (globToRegExp(r.glob).test(file)) return",
+   "new": "if (true) return"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "a.date <= today && (a.until === undefined || a.until >= today)",
+   "new": "a.date <= today"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "a.date <= today && (a.until === undefined || a.until >= today)",
+   "new": "a.date >= today && (a.until === undefined || a.until >= today)"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "a.date <= today && (a.until === undefined || a.until >= today)",
+   "new": "a.date <= today && (a.until === undefined || a.until > today)"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "a.gate === gate &&",
+   "new": "true &&"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (c.class === \"GENERATED\") generated.push(file);",
+   "new": "if (false) generated.push(file);"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (!c.gate) continue;",
+   "new": "if (false) continue;"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "if (c.watch === \"manifest-permissions\" && !ctx.permissionsChanged(file)) continue;",
+   "new": "if (c.watch === \"manifest-permissions\" && ctx.permissionsChanged(file)) continue;"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "(cover.length > 0 ? approved : unapproved).push",
+   "new": "(cover.length > 0 ? unapproved : approved).push"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "const selfGoverning = files.filter((f) => classesDoc.selfGoverning.some((g) => globToRegExp(g).test(f)));",
+   "new": "const selfGoverning = [];"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "ok: unapproved.length === 0 }",
+   "new": "ok: true }"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "const text = manifest.replace(/<!--[\\s\\S]*?-->/g, \"\");",
+   "new": "const text = manifest;"
+  },
+  {
+   "file": "tools/governance/lib.mjs",
+   "old": "return found.sort();",
+   "new": "return found;"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (!Number.isInteger(b[k]) || b[k] <= 0)",
+   "new": "if (!Number.isInteger(b[k]))"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "!/^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*$/.test(slice.id ?? \"\")",
+   "new": "false"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "a === \"-\" ? 0 : Number(a)",
+   "new": "Number(a)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "const counted = changes.filter((c) => !isGenerated(c.file));",
+   "new": "const counted = changes;"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (counted.length > slice.budget.maxFiles)",
+   "new": "if (counted.length >= slice.budget.maxFiles)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (lines > slice.budget.maxLines)",
+   "new": "if (lines >= slice.budget.maxLines)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "const lines = counted.reduce((n, c) => n + c.added + c.removed, 0);",
+   "new": "const lines = counted.reduce((n, c) => n + c.added, 0);"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "over.length === 0 && outside.length === 0",
+   "new": "over.length === 0"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "...(slice.scope.alsoAllowed ?? [])",
+   "new": "...[]"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "let end = lines.findIndex((l, i) => i > start && l.startsWith(\"## \"));",
+   "new": "let end = lines.findIndex((l, i) => i > start && l.startsWith(\"# \"));"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "new RegExp(`^## ${id}\\\\b`)",
+   "new": "new RegExp(`^## ${id}`)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "const body = markdown.split(/\\n## Open\\n/).pop();",
+   "new": "const body = markdown;"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "new RegExp(`\\\\*\\\\*Slice:\\\\*\\\\* ${sliceId}\\\\b`)",
+   "new": "new RegExp(`\\\\*\\\\*Slice:\\\\*\\\\* ${sliceId}`)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (blockers.length) return { status: BLOCKED, reasons: blockers };",
+   "new": "if (false) return { status: BLOCKED, reasons: blockers };"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (missing.length) return { status: INCOMPLETE",
+   "new": "if (false) return { status: INCOMPLETE"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (m.mutation && (m.mutation.alive > 0 || m.mutation.missing > 0))",
+   "new": "if (m.mutation && m.mutation.alive > 0)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "[\"failing\", \"unproven\", \"regressed\"].includes(d.state)",
+   "new": "[\"failing\", \"unproven\"].includes(d.state)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (s && s.failed > 0)",
+   "new": "if (s && s.failed > 1)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (m.permissions && m.permissions.changed)",
+   "new": "if (false)"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "m.slice.expectFitChange !== true &&",
+   "new": "true &&"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "if (m.governance.unapproved.some((u) => u.class === \"CONSTITUTIONAL\" || u.class === \"PROTOCOL\"))",
+   "new": "if (m.governance.unapproved.some((u) => u.class === \"CONSTITUTIONAL\"))"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "for (const k of new Set([...Object.keys(before.counts), ...Object.keys(after.counts)])) out[k] = (after.counts[k] ?? 0) - (before.counts[k] ?? 0);",
+   "new": "for (const k of Object.keys(after.counts)) out[k] = (after.counts[k] ?? 0) - (before.counts[k] ?? 0);"
+  },
+  {
+   "file": "tools/slice/lib.mjs",
+   "old": "(after.counts[k] ?? 0) - (before.counts[k] ?? 0)",
+   "new": "(before.counts[k] ?? 0) - (after.counts[k] ?? 0)"
+  }
+ ]
+}

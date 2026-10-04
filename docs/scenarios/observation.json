@@ -1,0 +1,354 @@
+{
+ "domain": "OBSERVATION",
+ "about": "Scenarios (docs/ENGINEERING_SYSTEM.md section 3.2). State is derived from the proof each names; a scenario is never itself proof. PROTOCOL-class: changing this file needs an approval record.",
+ "scenarios": [
+  {
+   "id": "OBS-001",
+   "name": "Closing is not an effect",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-006"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Interpreter.java.in"
+   ],
+   "given": [
+    "any closing observation with a matching open loop"
+   ],
+   "when": [
+    "it is interpreted"
+   ],
+   "then": [
+    "the effect is CLOSURE_CANDIDATE, never a close"
+   ],
+   "mustNot": [
+    "a CLOSE effect",
+    "a loop that is closed by an observation"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "closing is not an effect: no CLOSE, only CLOSURE_CANDIDATE"
+    },
+    {
+     "suite": "phone",
+     "check": "four effects, and closing is not one of them"
+    },
+    {
+     "suite": "phone",
+     "check": "every closing type needs a match, and none matched is nothing"
+    }
+   ]
+  },
+  {
+   "id": "OBS-002",
+   "name": "A payment before its bill closes nothing",
+   "category": "boundary",
+   "risk": "high",
+   "invariants": [
+    "I-006"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a payment dated before the bill of the same amount"
+   ],
+   "when": [
+    "facts are correlated"
+   ],
+   "then": [
+    "no match"
+   ],
+   "mustNot": [
+    "a candidate from a payment that came first"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a payment before the bill closes nothing [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "a payment before the bill closes no obligation"
+    }
+   ]
+  },
+  {
+   "id": "OBS-003",
+   "name": "The matching window is 45 days",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-010"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a bill and a payment of the same amount from the same source"
+   ],
+   "when": [
+    "they are 45 and then 46 days apart"
+   ],
+   "then": [
+    "45 matches; 46 does not"
+   ],
+   "mustNot": [
+    "a candidate past the window"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "exactly 45 days is [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "too late (46 days) is not the same obligation [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "reminders 45 days apart are one obligation, 46 are two"
+    }
+   ]
+  },
+  {
+   "id": "OBS-004",
+   "name": "One bill is closed by one payment",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-010"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "one bill and two payments of its amount"
+   ],
+   "when": [
+    "facts are correlated"
+   ],
+   "then": [
+    "one candidate"
+   ],
+   "mustNot": [
+    "both payments matched to one bill"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "one bill is closed by one payment, not two [0]"
+    }
+   ]
+  },
+  {
+   "id": "OBS-005",
+   "name": "Money in does not close a bill I owe",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-006"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a bill I owe and money coming in of the same amount"
+   ],
+   "when": [
+    "facts are correlated"
+   ],
+   "then": [
+    "no candidate"
+   ],
+   "mustNot": [
+    "a credit closing a debt of mine"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "money coming in does not close a bill I owe [0]"
+    }
+   ]
+  },
+  {
+   "id": "OBS-006",
+   "name": "A different amount or a different source is not the same obligation",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-010"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a bill and a payment differing in amount, or in source"
+   ],
+   "when": [
+    "facts are correlated"
+   ],
+   "then": [
+    "no candidate"
+   ],
+   "mustNot": [
+    "a loose match"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a different amount is not the same obligation [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "a different source is not the same obligation [0]"
+    }
+   ]
+  },
+  {
+   "id": "OBS-007",
+   "name": "A payment that states its own fulfilment is one payment",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-003"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "one message saying both that money moved and that a card bill was paid"
+   ],
+   "when": [
+    "facts are correlated"
+   ],
+   "then": [
+    "one closing; the money beside it belongs to it"
+   ],
+   "mustNot": [
+    "a double count of the same payment"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a payment that states its own fulfilment is one payment, and its fulfilment is the closer [0]"
+    },
+    {
+     "suite": "phone",
+     "check": "a payment and its own fulfilment are one closing: the fulfilment is the closer, and the money moved beside it belongs to it"
+    }
+   ]
+  },
+  {
+   "id": "OBS-008",
+   "name": "Correlation does not depend on order",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-003"
+   ],
+   "files": [
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a set of openings and closings"
+   ],
+   "when": [
+    "every rotation and the reverse are correlated"
+   ],
+   "then": [
+    "the same obligations and matches"
+   ],
+   "mustNot": [
+    "a result that depends on arrival order"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "every rotation and the reverse give the same obligations and the same matches"
+    },
+    {
+     "suite": "phone",
+     "check": "the closings are taken in the order they happened, whatever order they arrive in: both are matched"
+    }
+   ]
+  },
+  {
+   "id": "OBS-009",
+   "name": "A sealed bundle altered afterwards is not believed",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-004",
+    "I-001"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "a bundle with a line edited after sealing"
+   ],
+   "when": [
+    "it is decoded"
+   ],
+   "then": [
+    "the altered line no longer matches its id and is dropped"
+   ],
+   "mustNot": [
+    "an edited fact believed",
+    "a field that forges another line"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a line altered after it was sealed no longer matches its own id and is not believed"
+    },
+    {
+     "suite": "phone",
+     "check": "a tab, a line break or a backslash in a field cannot split or forge a line"
+    }
+   ]
+  },
+  {
+   "id": "OBS-010",
+   "name": "Retention is a 24-month policy",
+   "category": "evolution",
+   "risk": "medium",
+   "invariants": [
+    "I-009"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ObservationStore.java.in"
+   ],
+   "given": [
+    "bundles of different ages"
+   ],
+   "when": [
+    "a later month arrives"
+   ],
+   "then": [
+    "the oldest ages out, then the next"
+   ],
+   "mustNot": [
+    "retention assumed by the data model"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "retention is a policy: 24 months"
+    },
+    {
+     "suite": "phone",
+     "check": "a later month ages the oldest bundle out (September 2026 is 25 months before October 2028)"
+    },
+    {
+     "suite": "phone",
+     "check": "a month outside the window is not kept"
+    }
+   ]
+  }
+ ]
+}

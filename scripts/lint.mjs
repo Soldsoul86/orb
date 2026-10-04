@@ -38,6 +38,34 @@ if (existsSync(new URL("tools/", repoRoot))) {
   }
 }
 
+// The decision queue and the learnings log keep a fixed shape (docs/ENGINEERING_SYSTEM.md §3.6): an entry that cannot be read by a tool cannot be answered or learned from.
+const PENDING_FIELDS = ["Raised", "Blocks", "Options", "Evidence", "Recommendation", "Needs human approval"];
+const LEARNING_FIELDS = ["Failure", "Root cause", "Fix", "Regression", "Invariant"];
+function entries(file, heading, fields, ruleName) {
+  if (!existsSync(new URL(file, repoRoot))) {
+    report(file, 0, ruleName, `missing ${file}`);
+    return;
+  }
+  const text = readFileSync(new URL(file, repoRoot), "utf8");
+  const body = text.split(/\n## Open\n/).pop();
+  const blocks = (ruleName === "decision-queue" ? body : text).split(/\n(?=## )/).filter((b) => heading.test(b));
+  const seen = new Set();
+  for (const block of blocks) {
+    const id = heading.exec(block)[1];
+    if (seen.has(id)) report(file, 0, ruleName, `${id} appears twice`);
+    seen.add(id);
+    let at = -1;
+    for (const f of fields) {
+      const i = block.indexOf(`**${f}:**`);
+      if (i < 0) report(file, 0, ruleName, `${id} is missing **${f}:**`);
+      else if (i < at) report(file, 0, ruleName, `${id}: **${f}:** is out of order`);
+      else at = i;
+    }
+  }
+}
+entries("docs/DECISIONS_PENDING.md", /^## (PD-\d{3}) \u2014 .+/, PENDING_FIELDS, "decision-queue");
+entries("docs/LEARNINGS.md", /^## (L-\d{3}) \u2014 .+/, LEARNING_FIELDS, "learnings");
+
 /* ------------------------------------------------------------------ *
  * Source rules
  * ------------------------------------------------------------------ */
