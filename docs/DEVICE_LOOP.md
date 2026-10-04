@@ -7826,3 +7826,38 @@ The protocol says what *open* means for anything in your life. Before it is froz
 6. **P327 (time) and P332 (nothing else changed):** no complaint and no crash or fault in the export; the Look and the record came six seconds apart. P331 confirmed: one record, ten sender codes, five rule pairs, no text.
 
 **Verdict.** The protocol is **not frozen** and **not contradicted**. The fit test as built cannot yet answer §13 criterion 3 (does anything need a new kind, a third owner or a field?) because most of the inbox is read by no rule. Next: find out what the big senders *are* without reading words — a **template census** (how many distinct message shapes each sender has, and how much the commonest covers; numbers only) and **relaxed matching** (ignore the sender; widen the window; allow part payments) to see which dimension breaks — plus one privacy-edited example from the biggest clusters if the operator is willing.
+
+#### Second reading — in the container, on the backup file uploaded earlier (counts only; 2026-10-04)
+
+The `.sms` file the operator uploaded on 2026-10-03 is still in the session. Running the same reading over it **reproduced the phone's report exactly** (every count: 23,633 service, 13,329 unread, 1,043 ambiguous, 11 matched), so the rules can now be developed against it **without a phone round-trip**, counts only, nothing committed, no message shown. (A few single-word counts over a closed list of generic words were used to see *shapes*; no sentence was read or kept.)
+
+**What the biggest sender is.** The operator said it is the exchange whose messages are *login OTPs for the CRM portal and trade alerts*, adding that trades are "mostly push notifications". The file shows **both on SMS**: that one sender has 8,697 messages over 547 days (up to 124 in a day), **376 are one-time passwords** (already read as codes) and about **8,100 are "order … filled" alerts** in 336 shapes. The OTP shape from the operator's screenshot was added to the corpus and reads as a code.
+
+**Rules changed (generic, no sender is named in the code), each held by fixture cases and mutation-checked (15 of 15 caught):**
+
+1. **A filled or executed order is information, not a loop** (a completed exchange; nothing is owed or open). *trade-fill* → evidence.
+2. **"Avail Bal" / "Available Balance"** reads as a balance (information).
+3. **A message that names both ends of one transfer** ("debited … payee credited") is about the end it names **first**; one rule no longer fights the other.
+4. **A word about a payment is not a payment**: "not debited", "will be debited", "if already paid, ignore" no longer count as money out.
+5. **A premium that is due and up for renewal is one obligation** (pay it), not a bill plus a renewal.
+6. **"Transfer … from … a/c"** reads as money out.
+
+| Service messages (23,633) | Before | After |
+| --- | --- | --- |
+| could not be read | 13,329 (65 % of the non-noise) | **4,044 (20 %)** |
+| ambiguous | 1,043 | **119** |
+| only information | 65 | 8,785 |
+| closes a loop | 4,915 | 6,114 |
+| opens a loop | 990 | 1,274 |
+| openings with an amount / closed by a same-sender, same-amount payment | 326 / 11 | 610 / 20 |
+
+**Read this honestly.** These rules were written while looking at *this* inbox, so 20 % is the result of rules that have seen it, **not** a held-out measure of how the reading generalises. What it does show is that the first 65 % was one large sender and a handful of wordings, not a gap in the ontology.
+
+**What the rest is.** The 4,044 still unread are mostly marketing and service chatter: telecom plans and recharge offers, property and rental alerts, a driver-booking service, and a long tail of one-offs. Whether any of them holds a loop is a judgement about the sender, not a rule about the words.
+
+**Matching, measured.** The 491 "bill due" messages are only **95 distinct (sender, amount) obligations**, with 36 of them repeated three times or more — reminders. **Ignoring the sender** raises matches from 20 to 70; **widening the window to 90 days changes nothing**. Counting *obligations* rather than messages (reminders within 10 / 20 / 45 days of each other being one), there are **174–344** and only **13–16** are closed by a payment message from the same sender for the same amount. So a payment text from the same sender is **rarely** how an obligation ends: it is paid elsewhere (another app, another sender) and the bill-side messages only nag.
+
+**Consequences for the protocol (nothing changes in the envelope):**
+- The unit is the **obligation**, not the message: the fit report should count loops (reminders collapsed) as well as messages — the protocol's own `groups` already does this; the report does not yet.
+- Closing by a matching payment message is a **minority path**; closure will mostly be *your* tap, or evidence from another source. That makes "you close it" the main path and exact-evidence closing the exception — consistent with §7.
+- A debit with no open loop is an **observed transfer**; Money is a ledger view over evidence, and loops sit on top of it only where an obligation exists.

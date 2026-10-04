@@ -338,3 +338,11 @@ The operator's inbox (25,552 messages; 23,633 from names and short codes) read b
 - **Matching on sender + exact amount + 45 days matched 11 of 326 openings.** Which dimension fails is the next measurement (v58: relaxed matching, counts only).
 - **A message that closes one obligation and opens the next** is suspected in 252 cases (money-out + bill-due). If an example confirms it, recurrence (§12) gets designed with Money; no new kind is implied.
 - **Next:** a template census per large sender (distinct shapes, share of the commonest; numbers only) and the relaxed-matching figures, then the rules for the largest readable senders, then a second fit report.
+
+### 19.1 Second reading (same day, in the container; `DEVICE_LOOP.md` §7b94)
+
+Six generic reading fixes (a filled order is information; "Avail Bal"; the end of a transfer named first; "not/will be/already paid" is not a payment; a premium due and up for renewal is one obligation; "transfer … from … a/c") moved the draft from **65 % unread to 20 %**, and **ambiguity from 1,043 to 119**, on the same inbox — *tuned on it, so not a held-out measure*. The unread remainder is marketing and service chatter, a judgement about the sender.
+
+- **The unit is the obligation.** 491 reminder messages are 95 distinct (sender, amount) obligations. The report should count loops (reminders collapsed by `groups`) as well as messages.
+- **A payment text from the same sender rarely ends an obligation** (13–16 of 174–344 loops). Closure is mostly *your* tap or other evidence. This confirms §7 and makes the closure classes the load-bearing part of the protocol.
+- **Still no kind, owner or field is needed.** The freeze waits for (a) a policy for senders that are not about obligations, (b) a loop-level report, and (c) a reading measured on messages the rules have not seen.

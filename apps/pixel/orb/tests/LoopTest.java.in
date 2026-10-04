@@ -405,12 +405,12 @@ final class LoopTest {
             "Rs.500.00 debited. Your appointment is scheduled for 08-Oct.", "Rs.500.00 debited. Your appointment is scheduled for 09-Oct.",
             "Rs.500.00 debited. Your bill of Rs.900.00 is due on 05-Nov.", "Rs.500.00 debited. Your bill of Rs.900.00 is due on 06-Nov.",
             "Rs.500.00 debited. Your plan validity expires on 12-Oct.", "Rs.500.00 debited. Please approve the mandate.", "Rs.500.00 debited. Your order is confirmed.",
-            "Rs.500.00 debited from A/c 1 and credited to A/c 2.", "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov." };
+            "Your payment of Rs.250.00 failed. Your appointment is scheduled for 08-Oct.", "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov." };
         LoopFit many = new LoopFit();
         for (String b : bodies) many.message(service("VM-AAA", b, "2026-09-01"));
         LoopFit.Report mine = many.report();
         Harness.equal("seven pairs of disagreeing rules, ties by name", mine.topAmbiguous(5).toString(),
-            "{money-out+attend=2, money-out+bill-due=2, money-out+approve=1, money-out+money-in=1, money-out+order=1}");
+            "{money-out+attend=2, money-out+bill-due=2, failed+attend=1, money-out+approve=1, money-out+order=1}");
         Map<String, Object> record = LoopFacts.fitReported(mine);
         int named = 0;
         for (String k : record.keySet()) if (k.startsWith("ambiguous.")) named++;

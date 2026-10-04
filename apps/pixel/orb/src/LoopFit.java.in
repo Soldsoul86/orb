@@ -80,7 +80,8 @@ final class LoopFit implements MessagesXml.Sink {
     private static final Pattern REFUND_STARTED = Pattern.compile("(?i)\\brefund\\b.*\\b(?:initiated|in process|processing|raised|will)\\b");
     private static final Pattern PAYMENT_DONE = Pattern.compile("(?i)\\bpayment\\b.*\\b(?:successful|received|credited|done|confirmed)\\b");
     private static final Pattern PAYMENT_OF = Pattern.compile("(?i)\\b(?:card|bill|loan|emi|policy|invoice|a/c|account|merchant|towards|upi)\\b");
-    private static final Pattern OUT = Pattern.compile("(?i)\\b(?<!not )(?<!no )(?:debited|withdrawn|deducted|spent|purchase|paid)\\b|\\bsent " + RS);
+    /** Money going out. Not "not debited", not "will be debited", and not "if already paid, ignore" — a word about a payment is not a payment. */
+    private static final Pattern OUT = Pattern.compile("(?i)\\b(?<!not )(?<!no )(?<!be )(?<!already )(?<!if )(?:debited|withdrawn|deducted|spent|purchase|paid)\\b|\\bsent " + RS + "|\\btransfer(?:red)?\\b.{0,80}\\bfrom\\b.{0,40}\\b(?:a/c|acct|account)\\b");
     private static final Pattern IN = Pattern.compile("(?i)\\b(?:credited|deposited|salary|refund(?:ed)? (?:processed|credited))\\b|\\breceived " + RS);
     private static final Pattern WILL_DELIVER = Pattern.compile("(?i)\\b(?:will be delivered|expected (?:delivery|on|by)|estimated delivery|order (?:is )?(?:placed|confirmed|received))\\b");
     private static final Pattern DELIVERED = Pattern.compile("(?i)\\b(?:has been delivered|was delivered|delivered successfully|delivered)\\b");
@@ -90,7 +91,8 @@ final class LoopFit implements MessagesXml.Sink {
     private static final Pattern COLLECT = Pattern.compile("(?i)collect request|requested money|\\brequests? " + RS);
     private static final Pattern DECIDE = Pattern.compile("(?i)\\b(?:approve|authori[sz]e)\\b");
     private static final Pattern ATTEND = Pattern.compile("(?i)\\b(?:pnr|boarding|check-?in|appointment|reservation|booking (?:id|confirmed)|e-?ticket|ticket|flight|train|departure|journey|your slot|scheduled (?:for|on))\\b");
-    private static final Pattern BALANCE = Pattern.compile("(?i)\\b(?:avl\\.? ?bal|available (?:balance|bal)|a/c bal|acct bal|closing balance|balance (?:is|:))");
+    private static final Pattern TRADE_FILL = Pattern.compile("(?i)\\border\\b.*\\b(?:filled|executed)\\b|\\b(?:filled|executed)\\b.*\\border\\b");
+    private static final Pattern BALANCE = Pattern.compile("(?i)\\b(?:avl\\.? ?bal|avail(?:able)?\\.? ?bal(?:ance)?|a/c bal|acct bal|closing balance|balance (?:is|:))");
     private static final Pattern PROMO = Pattern.compile("(?i)\\b(?:offer|discount|cashback|congratulations?|pre-?approved|limited (?:period|time)|sale|win|exclusive|upgrade|reward|coupon|voucher|lucky|free|earn|apply now|t ?& ?c|tnc)\\b|% ?off");
 
     /** The first amount in the words, in minor units, or 0. */
@@ -119,16 +121,21 @@ final class LoopFit implements MessagesXml.Sink {
         if (FAILED.matcher(b).find() && FAILED_ABOUT.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.ME, minor, null, "failed"));
         if (WILL_CREDIT.matcher(b).find() || REFUND_STARTED.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.THEM, minor, null, "refund-started"));
         if (hasAmount && PAYMENT_DONE.matcher(b).find() && PAYMENT_OF.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.ME, minor, null, "payment-done"));
-        if (hasAmount && OUT.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.ME, minor, null, "money-out"));
-        if (hasAmount && IN.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.THEM, minor, null, "money-in"));
+        // A message that names both ends of one transfer ("debited … ; payee credited") is about the end it names first.
+        Matcher outAt = OUT.matcher(b), inAt = IN.matcher(b);
+        int outFirst = outAt.find() ? outAt.start() : -1, inFirst = inAt.find() ? inAt.start() : -1;
+        if (hasAmount && outFirst >= 0 && (inFirst < 0 || outFirst < inFirst)) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.ME, minor, null, "money-out"));
+        if (hasAmount && inFirst >= 0 && (outFirst < 0 || inFirst < outFirst)) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.THEM, minor, null, "money-in"));
         if (willDeliver) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.THEM, 0L, null, "order"));
         if (!willDeliver && DELIVERED.matcher(b).find()) out.add(new Reading(CLOSES, LoopRules.GIVE, LoopRules.THEM, 0L, null, "delivered"));
         if (TRANSIT.matcher(b).find()) out.add(new Reading(ADVANCES, LoopRules.GIVE, LoopRules.THEM, 0L, null, "in-transit"));
         if (hasAmount && DUE.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.ME, minor, null, "bill-due"));
         if (COLLECT.matcher(b).find()) out.add(new Reading(OPENS, LoopRules.GIVE, LoopRules.ME, minor, null, "collect-request"));
         if (DECIDE.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.DECIDE, LoopRules.ME, 0L, null, "approve"));
-        if (RENEW.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.DO, LoopRules.ME, 0L, null, "renew"));
+        // "Premium due … renewal" is one obligation (pay it), not a bill and a renewal.
+        if (RENEW.matcher(b).find() && !promo && !(hasAmount && DUE.matcher(b).find())) out.add(new Reading(OPENS, LoopRules.DO, LoopRules.ME, 0L, null, "renew"));
         if (ATTEND.matcher(b).find() && !promo) out.add(new Reading(OPENS, LoopRules.ATTEND, LoopRules.ME, 0L, null, "attend"));
+        if (TRADE_FILL.matcher(b).find()) out.add(new Reading(EVIDENCE, null, null, 0L, null, "trade-fill"));
         if (BALANCE.matcher(b).find()) out.add(new Reading(EVIDENCE, null, null, 0L, null, "balance"));
         if (promo) out.add(new Reading(NOISE, null, null, 0L, "promo", "promo"));
         return out;
@@ -157,7 +164,7 @@ final class LoopFit implements MessagesXml.Sink {
     /** The rule names in the order they are tried — for the docs and for a test that every one is reached. */
     static List<String> rules() {
         return java.util.Arrays.asList("code", "failed", "refund-started", "payment-done", "money-out", "money-in", "order", "delivered", "in-transit",
-            "bill-due", "collect-request", "approve", "renew", "attend", "balance", "promo", "none");
+            "bill-due", "collect-request", "approve", "renew", "attend", "trade-fill", "balance", "promo", "none");
     }
 
     /** The sender's brand: `VM-HDFCBK` and `HDFCBK-S` are `HDFCBK`. A numeric short code is `SHORTCODE`; anything else `OTHER`. */

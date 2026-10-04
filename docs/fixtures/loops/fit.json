@@ -311,12 +311,12 @@
   },
   {
    "body": "Rs.500.00 debited from A/c 1 and credited to A/c 2.",
-   "role": "ambiguous",
-   "kind": null,
-   "minor": 0,
-   "rule": "money-out+money-in",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 50000,
+   "rule": "money-out",
    "tag": null,
-   "owner": null
+   "owner": "me"
   },
   {
    "body": "123456 is your OTP for payment of fees.",
@@ -344,6 +344,114 @@
    "rule": "code",
    "tag": "code",
    "owner": null
+  },
+  {
+   "body": "Your buy order for 10 TOKEN is filled at INR 90 each.",
+   "role": "evidence",
+   "kind": null,
+   "minor": 0,
+   "rule": "trade-fill",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Rs.100.00 credited to A/c XX0000. Payer Test debited.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 10000,
+   "rule": "money-in",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Dear customer, if you have already paid Rs.900.00, please ignore. Your premium is due on 05-Nov.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 90000,
+   "rule": "bill-due",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Rs.300.00 will be debited from your account if you approve the request.",
+   "role": "opens",
+   "kind": "DECIDE",
+   "minor": 0,
+   "rule": "approve",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "A hold of INR 500.00 is placed on your account. Avail Bal INR 9,500.00.",
+   "role": "evidence",
+   "kind": null,
+   "minor": 0,
+   "rule": "balance",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Your premium of Rs.900.00 is due on 05-Nov. Renewal is due.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 90000,
+   "rule": "bill-due",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Your payment of Rs.250.00 failed. Your appointment is scheduled for 08-Oct.",
+   "role": "ambiguous",
+   "kind": null,
+   "minor": 0,
+   "rule": "failed+attend",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "Money Transfer: Rs.750.00 from Test Bank A/c XX0000 to a payee. Not you? Call the bank.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 75000,
+   "rule": "money-out",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Rs.750.00 credited to your A/c XX0000 by NEFT transfer from another account.",
+   "role": "closes",
+   "kind": "GIVE",
+   "minor": 75000,
+   "rule": "money-in",
+   "tag": null,
+   "owner": "them"
+  },
+  {
+   "body": "Filled: your sell order for 5 TOKEN at INR 100.",
+   "role": "evidence",
+   "kind": null,
+   "minor": 0,
+   "rule": "trade-fill",
+   "tag": null,
+   "owner": null
+  },
+  {
+   "body": "If paid, please ignore. Rs.900.00 is due on 05-Nov.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 90000,
+   "rule": "bill-due",
+   "tag": null,
+   "owner": "me"
+  },
+  {
+   "body": "Your unpaid bill of Rs.900.00 is due on 05-Nov.",
+   "role": "opens",
+   "kind": "GIVE",
+   "minor": 90000,
+   "rule": "bill-due",
+   "tag": null,
+   "owner": "me"
   }
  ],
  "minor": [

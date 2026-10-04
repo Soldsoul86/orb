@@ -878,6 +878,9 @@ a second source for the compiler's checksum exists (item 1).
 5. **The unmapped sender brands, and the disagreeing rule names, are in the record.** Up to ten service brand codes (`HDFCBK`) and five pairs of rule names appear in the one record you choose to write. That says which services you use; it is the price of seeing what the protocol misses, and it is written only when you tap.
 6. **Nothing opens a loop yet.** The `orb.loop.*` writers exist and are tested; the first real use is the Money adapter.
 7. **A commitment's kind is a lower bound.** The journal knows only *I owe* or *waiting*, so a legacy commitment reads as a DO owned by me, or a GIVE owned by them; it cannot say that an *I owe* is really a GIVE to a person, though its sealed note may name one.
+9. **The reading was tuned on one inbox.** The 20 % unread after the second round is measured on the messages the rules were written from; it says the first 65 % was one sender and a few wordings, not that the rules generalise. A held-out measure needs messages the rules have not seen.
+10. **Reminders are counted as messages.** 491 "bill due" messages are 95 obligations; the fit report counts messages, so its openings-and-matches figures overstate openings. The protocol's `groups` collapses them; the report should too.
+11. **A sender is a judgement.** The remaining unread messages are mostly marketing and service chatter; whether any holds a loop is a decision about the sender (a recorded "not about my obligations"), not something words can settle.
 8. **Parsing reads the line, not the structure.** `LoopRules.parse` takes a short enumerated set of fields from the line with a pattern, as `Commitments` did; a reader of the structured envelope is a later tidy-up.
 
 ---
