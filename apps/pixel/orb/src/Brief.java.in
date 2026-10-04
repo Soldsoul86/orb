@@ -1,0 +1,132 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+
+/**
+ * The morning brief's gate and its wiring (`docs/MORNING_BRIEF_PHONE.md`, DR-40, `Capability.md`, `Policy.md`). `orb.brief.daily` v1: *shows one
+ * notification each morning, at a time you chose, with counts of what is overdue and ahead.* **Counts only; nothing is sent off the phone.**
+ *
+ * **A standing authorization, and the argument for it is written into the grant** (`CLAIMS.md` §5 Ruling 1): a morning brief exists to appear when you
+ * are not looking; asking you again each morning would be the thing it replaces. **The gate still decides at every release** — it must be on, Android's
+ * notification permission must be there, the day must not already have had its brief, it must not be too late, and there must be something to say —
+ * and every refusal is written.
+ *
+ * **One entry point fires it:** `rearm`, from the alarm, from every start and from a change of time. It shows the brief if it is due and not done, and
+ * sets tomorrow's alarm. The brief is computed from the journal at that moment; nothing is stored beside the grant, the configuration and the records.
+ */
+final class Brief {
+    private Brief() {}
+
+    /** Why a standing authorization is honest here. */
+    static final String URGENCY =
+        "A morning brief exists to appear when you are not looking; asking again each morning would defeat it.";
+
+    /** Posts the brief. Android in the app; a recorder in tests. The only way anything reaches the notification. */
+    interface Notifier {
+        /** `text` is the counts; `words` is the optional first-words line, or null. */
+        void post(String text, String words);
+    }
+
+    /** Sets and clears the one daily alarm. */
+    interface Scheduler {
+        void schedule(long atMs);
+        void cancel();
+    }
+
+    static final String SHOWN = "shown";
+    static final String FAILED = "failed";
+
+    /** What Today would show, computed now. */
+    static Commitments.Today today(Context context, Journal journal, long nowMs, TimeZone zone) throws IOException {
+        List<Commitments.Commitment> all = Commitments.all(context, journal);
+        ComingUp.Result ahead = ComingUp.compute(context, journal, nowMs, zone.getID());
+        return Commitments.today(all, ahead, BriefRules.dayOf(nowMs, zone), nowMs);
+    }
+
+    /**
+     * Decides and, if the gate says yes, shows the brief — once. Returns `shown`, `skipped:<reason>` (written, unless this very skip is already the last on record),
+     * or `failed` (the record could not be written, so nothing was shown).
+     */
+    static String release(Context context, Journal journal, long nowMs, TimeZone zone, boolean permitted, Notifier notifier) throws IOException {
+        List<String> lines = journal.readLines();
+        String day = BriefRules.dayOf(nowMs, zone);
+        long scheduled = BriefRules.scheduledAt(day, BriefConfig.minute(lines), zone);
+        String refusal = BriefRules.gate(BriefConfig.enabled(lines), permitted, day.equals(BriefConfig.lastShownDay(lines)), nowMs, scheduled);
+        Commitments.Today t = null;
+        BriefRules.Counts counts = null;
+        if (refusal == null) {
+            t = today(context, journal, nowMs, zone);
+            counts = BriefRules.counts(t, day, nowMs);
+            if (counts.total() == 0) refusal = BriefRules.NOTHING;
+        }
+        if (refusal != null) {
+            if (!BriefConfig.skipRecorded(lines, day, refusal) && journal.append(BriefFacts.SKIPPED, BriefFacts.skipped(refusal, day)) == null) return FAILED;
+            return "skipped:" + refusal;
+        }
+        boolean withWords = BriefConfig.words(lines);
+        // Recorded first: a brief Orb showed is never missing from history.
+        if (journal.append(BriefFacts.SHOWN, BriefFacts.shown(counts, day, BriefRules.minutesLate(nowMs, scheduled), withWords)) == null) return FAILED;
+        notifier.post(BriefRules.text(counts), withWords ? BriefRules.firstWords(t) : null);
+        return SHOWN;
+    }
+
+    /**
+     * The one entry point: if the brief is on and due today and not done, release it (the gate decides, including how late is too late); then set the next alarm.
+     * If it is off, the alarm is cleared.
+     */
+    static String rearm(Context context, Journal journal, long nowMs, TimeZone zone, boolean permitted, Notifier notifier, Scheduler scheduler) throws IOException {
+        List<String> lines = journal.readLines();
+        if (!BriefConfig.enabled(lines)) {
+            scheduler.cancel();
+            return "off";
+        }
+        int minute = BriefConfig.minute(lines);
+        String day = BriefRules.dayOf(nowMs, zone);
+        String outcome = "waiting";
+        if (nowMs >= BriefRules.scheduledAt(day, minute, zone) && !BriefConfig.handledToday(lines, day)) {
+            outcome = release(context, journal, nowMs, zone, permitted, notifier);
+        }
+        scheduler.schedule(BriefRules.nextFire(nowMs, zone, minute));
+        return outcome;
+    }
+
+    private static final String SCOPE = "one notification each morning at the time you chose, with counts of what is overdue and ahead; nothing leaves the phone";
+
+    /** The person turned the brief on at this time: the standing authorization (with its argument) and the configuration, recorded. */
+    static boolean turnOn(Journal journal, int minuteOfDay, boolean words) {
+        Map<String, Object> grant = Json.obj();
+        grant.put("capability", Capabilities.BRIEF);
+        grant.put("tier", Capabilities.TIER_ACT_REVERSIBLE);
+        grant.put("scope", SCOPE);
+        grant.put("by", "operator");
+        grant.put("standing", URGENCY);
+        if (journal.append(PackageGrants.GRANTED, grant) == null) return false;
+        return configure(journal, minuteOfDay, words);
+    }
+
+    /** The person chose a time and whether the first words may be shown. The last such record counts. */
+    static boolean configure(Journal journal, int minuteOfDay, boolean words) {
+        return journal.append(BriefFacts.CONFIGURED, BriefFacts.configured(minuteOfDay, words)) != null;
+    }
+
+    /** The person turned the brief off: the switch is recorded first, then the alarm is cleared, so a brief that fires in between is refused. */
+    static boolean turnOff(Journal journal, Scheduler scheduler) {
+        Map<String, Object> revoke = Json.obj();
+        revoke.put("capability", Capabilities.BRIEF);
+        revoke.put("tier", Capabilities.TIER_ACT_REVERSIBLE);
+        revoke.put("scope", SCOPE);
+        revoke.put("by", "operator");
+        boolean recorded = journal.append(PackageGrants.REVOKED, revoke) != null;
+        scheduler.cancel();
+        return recorded;
+    }
+
+    static List<String> none() {
+        return Collections.emptyList();
+    }
+}

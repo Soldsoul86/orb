@@ -137,6 +137,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.BRIEF)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.BRIEF);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is on, so no control is offered on a guess.
+            }
+            final boolean briefOn = known;
+            b.setText(briefOn ? "Switch off the morning brief" : "Turn on (opens Today)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (briefOn) {
+                        Brief.turnOff(journal, new BriefAlarms(MayDoActivity.this));
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, TodayActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Capabilities.UNDERSTAND)) {
             boolean known;
             try {

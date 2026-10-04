@@ -330,9 +330,9 @@ final class RemindersTest {
             if (t.contains("AlarmManager")) alarming.add(e.getKey());
             if (t.contains("new ReminderNotifier(")) constructing.add(e.getKey());
         }
-        Harness.equal("only ReminderNotifier touches the notification system", showing.toString(), "[ReminderNotifier]");
-        Harness.equal("only Remind calls the notifier, and only from release", posting.toString(), "[Remind]");
-        Harness.equal("only ReminderAlarms touches the alarm clock", alarming.toString(), "[ReminderAlarms]");
+        Harness.equal("only the two notifiers touch the notification system: the reminder's and the morning brief's", showing.toString(), "[BriefNotifier, ReminderNotifier]");
+        Harness.equal("only Remind and Brief call a notifier, and only from their release", posting.toString(), "[Brief, Remind]");
+        Harness.equal("only the two alarm classes touch the alarm clock", alarming.toString(), "[BriefAlarms, ReminderAlarms]");
         Harness.equal("the notifier is made only where a release is wired: start-up and the alarm's receiver", constructing.toString(), "[Orb, ReminderReceiver]");
         Harness.check("the decision touches no Android", !source.get("Reminders").contains("android.") && !source.get("ActionFacts").contains("android."));
         for (String name : Arrays.asList("Remind", "Reminders", "ReminderNotifier", "ReminderAlarms", "ReminderReceiver", "MayDoActivity", "ReminderNote", "RemindFlow", "ComingUp", "ComingUpActivity")) {

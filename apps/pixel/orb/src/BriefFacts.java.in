@@ -1,0 +1,49 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * What the morning brief writes to the journal (`docs/MORNING_BRIEF_PHONE.md` §5): that it was shown, with **counts**; that it was not, with the **reason** —
+ * the gate's refusals are written, so a brief that did not come is explained; and the time and the words option the person chose. **Never a name, a number
+ * or a word.** The grant and its withdrawal are `PackageGrants` events for `orb.brief.daily`.
+ */
+final class BriefFacts {
+    private BriefFacts() {}
+
+    static final String SHOWN = "orb.brief.shown";
+    static final String SKIPPED = "orb.brief.skipped";
+    static final String CONFIGURED = "orb.brief.configured";
+
+    private static Map<String, Object> base() {
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.BRIEF);
+        p.put("version", Capabilities.BRIEF_VERSION);
+        return p;
+    }
+
+    static Map<String, Object> shown(BriefRules.Counts counts, String day, long minutesLate, boolean withWords) {
+        Map<String, Object> p = base();
+        p.put("day", day);
+        p.put("overdue", (long) counts.overdue);
+        p.put("today", (long) counts.today);
+        p.put("waiting", (long) counts.waiting);
+        p.put("dates", (long) counts.dates);
+        p.put("minutesLate", minutesLate);
+        p.put("withWords", withWords);
+        return p;
+    }
+
+    static Map<String, Object> skipped(String reason, String day) {
+        Map<String, Object> p = base();
+        p.put("day", day);
+        p.put("reason", reason);
+        return p;
+    }
+
+    static Map<String, Object> configured(int minuteOfDay, boolean words) {
+        Map<String, Object> p = base();
+        p.put("minuteOfDay", (long) minuteOfDay);
+        p.put("words", words);
+        return p;
+    }
+}

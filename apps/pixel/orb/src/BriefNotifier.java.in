@@ -1,0 +1,59 @@
+package @PKG@;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+
+/**
+ * Shows the morning brief — reached only through `Brief.release`, after the gate has said yes. **The lock screen says only that the brief is ready:** the
+ * notification is `VISIBILITY_PRIVATE` with a public version that carries no count; the counts appear once the phone is unlocked. By default the counts are
+ * all it says — no name, no number, no word; a first-words line is added only if the person asked for it. Once shown, the Android system holds the
+ * notification's text, as it does for any app's — beyond Orb's reach, and cleared when it is dismissed. It has its own channel, which the person can silence.
+ */
+final class BriefNotifier implements Brief.Notifier {
+    static final String CHANNEL = "orb.brief";
+    private static final int ID = 4101;
+
+    private final Context context;
+
+    BriefNotifier(Context context) {
+        this.context = context;
+    }
+
+    /** Whether the brief can be shown right now: Android's permission is there, notifications are on, and the person has not turned this channel off. */
+    static boolean permitted(Context context) {
+        if (!ReminderNotifier.permitted(context)) return false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return false;
+        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Morning brief", NotificationManager.IMPORTANCE_DEFAULT));
+        NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
+        return channel != null && channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+    }
+
+    @Override
+    public void post(String text, String words) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Morning brief", NotificationManager.IMPORTANCE_DEFAULT));
+        Notification publicVersion = new Notification.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Orb")
+            .setContentText("Your morning brief is ready")
+            .build();
+        PendingIntent open = PendingIntent.getActivity(context, ID, new Intent(context, TodayActivity.class),
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification.Builder shown = new Notification.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle("Orb — your morning brief")
+            .setContentText(text)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicVersion)
+            .setContentIntent(open)
+            .setAutoCancel(true);
+        if (words != null && !words.isEmpty()) shown.setStyle(new Notification.BigTextStyle().bigText(text + "\n" + words));
+        manager.notify(ID, shown.build());
+    }
+}

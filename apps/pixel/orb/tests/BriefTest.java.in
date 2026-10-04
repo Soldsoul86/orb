@@ -1,0 +1,317 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/** The morning brief (`docs/MORNING_BRIEF_PHONE.md`, DR-40): the counts, the words, the time, the gate, the shell that fires it, the records, and the guards. */
+final class BriefTest {
+    private BriefTest() {}
+
+    /** 2026-10-04 08:30 in Asia/Kolkata = 03:00 UTC. */
+    private static final TimeZone IST = TimeZone.getTimeZone("Asia/Kolkata");
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+    private static final long DAY = 86_400_000L;
+    private static final long HOUR = 3_600_000L;
+    private static final long NINE = 8 * 60 + 30;
+
+    private static long at(String iso, TimeZone zone) {
+        return java.time.LocalDateTime.parse(iso).atZone(zone.toZoneId()).toInstant().toEpochMilli();
+    }
+
+    private static Commitments.Commitment commitment(String direction, String words, String due, long openedMs) {
+        return new Commitments.Commitment("e" + words, "h" + words, null, direction, words, new PersonLink.Who(), due, openedMs);
+    }
+
+    private static ComingUp.Day day(String date, int items) {
+        ComingUp.Day d = new ComingUp.Day(date);
+        for (int i = 0; i < items; i++) d.items.add(new ComingUp.Item(new Recall.Entry("h" + i, "i" + i, "id", 0L, "x", "s"), false, false, null, null));
+        return d;
+    }
+
+    private static Brief.Notifier recorder(final List<String> out) {
+        return new Brief.Notifier() {
+            @Override public void post(String text, String words) { out.add(text + "|" + words); }
+        };
+    }
+
+    private static final class Alarm implements Brief.Scheduler {
+        long at = -1L;
+        int cancelled;
+
+        @Override public void schedule(long atMs) { at = atMs; }
+
+        @Override public void cancel() { cancelled++; at = -1L; }
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static String lastOf(Journal journal, String type) throws Exception {
+        String found = null;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) found = l;
+        return found;
+    }
+
+    private static String code(String source) {
+        StringBuilder out = new StringBuilder();
+        for (String line : source.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")) continue;
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    static void run() throws Exception {
+        rules();
+        facts();
+        shell();
+        guards();
+    }
+
+    private static void rules() throws Exception {
+        Harness.suite("the counts");
+        long now = at("2026-10-04T08:30:00", IST);
+        Commitments.Today t = new Commitments.Today();
+        t.overdue.add(commitment("owe", "a", "2026-10-01", now - 3 * DAY));
+        t.overdue.add(commitment("owe", "b", "2026-10-02", now - 3 * DAY));
+        t.today.add(commitment("owe", "c", "2026-10-04", now - DAY));
+        t.waiting.add(commitment("waiting", "w8", null, now - 8 * DAY));
+        t.waiting.add(commitment("waiting", "w7", null, now - 7 * DAY));
+        t.waiting.add(commitment("waiting", "w6", null, now - 6 * DAY));
+        t.waiting.add(commitment("waiting", "wp", "2026-10-03", now - DAY));
+        t.waiting.add(commitment("waiting", "wf", "2026-10-09", now - DAY));
+        t.dates.add(day("2026-10-06", 2));
+        t.dates.add(day("2026-10-08", 1));
+        BriefRules.Counts c = BriefRules.counts(t, "2026-10-04", now);
+        Harness.equal("overdue, due today, waiting (a week, or past its date), dates this week",
+            c.overdue + "|" + c.today + "|" + c.waiting + "|" + c.dates + "|" + c.total(), "2|1|3|3|9");
+        Harness.equal("nothing open, nothing counted", BriefRules.counts(new Commitments.Today(), "2026-10-04", now).total(), 0);
+
+        Harness.suite("the one line the notification says");
+        Harness.equal("all four", BriefRules.text(c), "2 overdue \u00b7 1 due today \u00b7 3 waiting for \u00b7 3 dates this week");
+        BriefRules.Counts one = new BriefRules.Counts();
+        one.dates = 1;
+        Harness.equal("one date is singular", BriefRules.text(one), "1 date this week");
+        one.dates = 0;
+        one.overdue = 1;
+        one.today = 1;
+        Harness.equal("zeros are left out", BriefRules.text(one), "1 overdue \u00b7 1 due today");
+        Harness.equal("and nothing says nothing", BriefRules.text(new BriefRules.Counts()), "");
+
+        Harness.suite("the optional first words");
+        Harness.equal("the first overdue one, with how many more", BriefRules.firstWords(t), "a (+2 more)");
+        Commitments.Today onlyToday = new Commitments.Today();
+        onlyToday.today.add(commitment("owe", "Call the bank", "2026-10-04", now));
+        Harness.equal("else the first due today, alone", BriefRules.firstWords(onlyToday), "Call the bank");
+        Harness.check("and none if neither", BriefRules.firstWords(new Commitments.Today()) == null);
+        StringBuilder longWords = new StringBuilder();
+        for (int i = 0; i < 90; i++) longWords.append('w');
+        Commitments.Today longOne = new Commitments.Today();
+        longOne.overdue.add(commitment("owe", longWords.toString(), "2026-10-01", now));
+        Harness.equal("cut at sixty characters and marked", BriefRules.firstWords(longOne).length(), BriefRules.WORDS_MAX + 1);
+        Harness.check("with the mark", BriefRules.firstWords(longOne).endsWith("\u2026"));
+
+        Harness.suite("when");
+        Harness.equal("the day, in the person's zone", BriefRules.dayOf(at("2026-10-04T23:50:00", UTC), IST) + "|" + BriefRules.dayOf(at("2026-10-04T23:50:00", UTC), UTC), "2026-10-05|2026-10-04");
+        Harness.equal("08:00 in Kolkata is 02:30 UTC", BriefRules.scheduledAt("2026-10-04", 480, IST), at("2026-10-04T02:30:00", UTC));
+        Harness.equal("the same clock time in another zone is another moment", BriefRules.scheduledAt("2026-10-04", 480, UTC), at("2026-10-04T08:00:00", UTC));
+        TimeZone ny = TimeZone.getTimeZone("America/New_York");
+        Harness.check("a time the clock skips (2:30 on the spring-forward day) falls just after the gap, not before",
+            BriefRules.scheduledAt("2026-03-08", 150, ny) >= at("2026-03-08T03:00:00", ny) - 1 && BriefRules.scheduledAt("2026-03-08", 150, ny) <= at("2026-03-08T04:00:00", ny));
+        Harness.equal("on a day 23 hours long, the next morning is still 08:00 local", BriefRules.nextFire(at("2026-03-08T09:00:00", ny), ny, 480), at("2026-03-09T08:00:00", ny));
+        Harness.equal("before the time: today's", BriefRules.nextFire(at("2026-10-04T07:59:00", IST), IST, 480), at("2026-10-04T08:00:00", IST));
+        Harness.equal("exactly at the time: tomorrow's", BriefRules.nextFire(at("2026-10-04T08:00:00", IST), IST, 480), at("2026-10-05T08:00:00", IST));
+        Harness.equal("after the time: tomorrow's", BriefRules.nextFire(at("2026-10-04T08:01:00", IST), IST, 480), at("2026-10-05T08:00:00", IST));
+        Harness.equal("a month end", BriefRules.nextFire(at("2026-10-31T09:00:00", IST), IST, 480), at("2026-11-01T08:00:00", IST));
+        Harness.equal("a clock", BriefRules.clock(480) + "|" + BriefRules.clock(0) + "|" + BriefRules.clock(23 * 60 + 59) + "|" + BriefRules.clock(65), "08:00|00:00|23:59|01:05");
+        Harness.equal("minutes late", BriefRules.minutesLate(1000L + 5 * 60_000L + 59_000L, 1000L) + "|" + BriefRules.minutesLate(500L, 1000L), "5|0");
+        Harness.check("the limits are as designed", BriefRules.DEFAULT_MINUTE == 480 && BriefRules.WAITING_DAYS == 7 && BriefRules.LATE_MS == 3 * HOUR && BriefRules.WORDS_MAX == 60);
+
+        Harness.suite("the gate, in its order");
+        long sched = at("2026-10-04T08:00:00", IST);
+        Harness.equal("off first, whatever else", BriefRules.gate(false, false, true, sched + 9 * HOUR, sched), BriefRules.OFF);
+        Harness.equal("then no permission", BriefRules.gate(true, false, true, sched + 9 * HOUR, sched), BriefRules.NO_PERMISSION);
+        Harness.equal("then already shown today", BriefRules.gate(true, true, true, sched + 9 * HOUR, sched), BriefRules.ALREADY);
+        Harness.equal("then too late", BriefRules.gate(true, true, false, sched + 3 * HOUR + 1, sched), BriefRules.LATE);
+        Harness.check("three hours late exactly is still a morning brief; on time is; a little early is", BriefRules.gate(true, true, false, sched + 3 * HOUR, sched) == null
+            && BriefRules.gate(true, true, false, sched, sched) == null && BriefRules.gate(true, true, false, sched - 1, sched) == null);
+    }
+
+    private static void facts() throws Exception {
+        Harness.suite("what is recorded: counts and reasons, never a word");
+        BriefRules.Counts c = new BriefRules.Counts();
+        c.overdue = 3;
+        c.today = 1;
+        c.waiting = 2;
+        c.dates = 4;
+        Harness.equal("a showing: the day, the counts, how late, and whether words were asked for", new TreeMap<>(BriefFacts.shown(c, "2026-10-04", 7L, true)).toString(),
+            "{capability=orb.brief.daily, dates=4, day=2026-10-04, minutesLate=7, overdue=3, today=1, version=1, waiting=2, withWords=true}");
+        Harness.equal("a skip: the day and the reason", new TreeMap<>(BriefFacts.skipped("late", "2026-10-04")).toString(), "{capability=orb.brief.daily, day=2026-10-04, reason=late, version=1}");
+        Harness.equal("a configuration: the time and the option", new TreeMap<>(BriefFacts.configured(510, false)).toString(), "{capability=orb.brief.daily, minuteOfDay=510, version=1, words=false}");
+
+        Harness.suite("what the journal says, read and not stored");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-brief-facts").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        Harness.check("by default: off, 08:00, no words, nothing shown", !BriefConfig.enabled(journal.readLines()) && BriefConfig.minute(journal.readLines()) == 480 && !BriefConfig.words(journal.readLines())
+            && BriefConfig.lastShownDay(journal.readLines()) == null && BriefConfig.lastSkip(journal.readLines()) == null);
+        Brief.turnOn(journal, 510, true);
+        Harness.check("turned on: on, the chosen time, the words option", BriefConfig.enabled(journal.readLines()) && BriefConfig.minute(journal.readLines()) == 510 && BriefConfig.words(journal.readLines()));
+        Brief.configure(journal, 600, false);
+        Harness.check("the last configuration counts", BriefConfig.minute(journal.readLines()) == 600 && !BriefConfig.words(journal.readLines()));
+        String grant = lastOf(journal, PackageGrants.GRANTED);
+        Harness.check("the grant carries its tier, its scope and the argument for standing in advance", grant.contains("\"capability\":\"orb.brief.daily\"") && grant.contains("\"tier\":\"Act (reversible)\"")
+            && grant.contains("\"standing\":\"" + Brief.URGENCY + "\"") && grant.contains("\"by\":\"operator\""));
+        Brief.configure(journal, 5000, true);
+        Harness.equal("a time outside the day is not believed", BriefConfig.minute(journal.readLines()), 480);
+        journal.append(BriefFacts.SHOWN, BriefFacts.shown(c, "2026-10-04", 0L, false));
+        Harness.check("handled today after a showing", BriefConfig.handledToday(journal.readLines(), "2026-10-04") && !BriefConfig.handledToday(journal.readLines(), "2026-10-05"));
+        journal.append(BriefFacts.SKIPPED, BriefFacts.skipped("noPermission", "2026-10-05"));
+        Harness.check("a skip for no permission is not done: the person may allow it", !BriefConfig.handledToday(journal.readLines(), "2026-10-05") && BriefConfig.skipRecorded(journal.readLines(), "2026-10-05", "noPermission")
+            && !BriefConfig.skipRecorded(journal.readLines(), "2026-10-05", "late") && !BriefConfig.skipRecorded(journal.readLines(), "2026-10-06", "noPermission"));
+        journal.append(BriefFacts.SKIPPED, BriefFacts.skipped("nothing", "2026-10-06"));
+        Harness.check("a skip because there was nothing is done for that day", BriefConfig.handledToday(journal.readLines(), "2026-10-06") && !BriefConfig.handledToday(journal.readLines(), "2026-10-07"));
+        journal.append(BriefFacts.SKIPPED, BriefFacts.skipped("late", "2026-10-07"));
+        Harness.check("a skip because it was late is done for that day", BriefConfig.handledToday(journal.readLines(), "2026-10-07"));
+        journal.append(BriefFacts.SKIPPED, BriefFacts.skipped("off", "2026-10-08"));
+        Harness.check("a skip because it was off is not", !BriefConfig.handledToday(journal.readLines(), "2026-10-08"));
+        Harness.equal("the last skip is the one read", BriefConfig.lastSkip(journal.readLines()), "2026-10-08|off");
+        Brief.turnOff(journal, new Alarm());
+        Harness.check("turned off: off", !BriefConfig.enabled(journal.readLines()));
+
+        Harness.suite("the capability's status");
+        Context[] none = new Context[1];
+        Install.forget();
+        File dir2 = Files.createTempDirectory("orb-brief-status").toFile();
+        Context ctx2 = new Context(dir2);
+        Journal j2 = Journal.open(ctx2, Install.lane(ctx2), Install.id(ctx2));
+        Capabilities.Status never = Capabilities.status(Capabilities.BRIEF, j2.readLines());
+        Harness.check("never turned on, never shown", never.state.startsWith("OFF") && never.lastDetail.equals("never shown"));
+        Brief.turnOn(j2, 480, false);
+        Capabilities.Status on = Capabilities.status(Capabilities.BRIEF, j2.readLines());
+        Harness.check("on at the chosen time", on.state.equals("ON \u2014 at 08:00") && on.lastDetail.equals("never shown"));
+        j2.append(BriefFacts.SHOWN, BriefFacts.shown(c, "2026-10-04", 0L, false));
+        Harness.equal("and what the last showing came to", Capabilities.status(Capabilities.BRIEF, j2.readLines()).lastDetail, "last shown: 3 overdue, 1 due today, 2 waiting for, 4 dates this week");
+        j2.append(BriefFacts.SKIPPED, BriefFacts.skipped("late", "2026-10-05"));
+        Harness.equal("or why the last was not shown", Capabilities.status(Capabilities.BRIEF, j2.readLines()).lastDetail, "last not shown: late");
+        Capabilities.Declaration d = Capabilities.byId(Capabilities.BRIEF);
+        Harness.check("it is Act (reversible), switchable, says counts, the lock screen, and that nothing leaves the phone", d.tier.equals("Act (reversible)") && d.switchable
+            && Capabilities.BRIEF_SAYS.contains("counts only, unless you ask for the first words") && Capabilities.BRIEF_SAYS.contains("On the lock screen it says only that your morning brief is ready") && Capabilities.BRIEF_SAYS.contains("nothing leaves the phone"));
+        Harness.equal("its words are pinned", Attachments.identity(Capabilities.BRIEF_SAYS.getBytes(StandardCharsets.UTF_8)), "sha256:fdaef1ea1d5a39b313b4684593be94878c893e6a6fc100921130254183dd3f0c");
+    }
+
+    private static void shell() throws Exception {
+        Harness.suite("the shell: shown once, refused for a reason, recorded before it is shown");
+        Install.forget();
+        File dir = Files.createTempDirectory("orb-brief").toFile();
+        Context context = new Context(dir);
+        Journal journal = Journal.open(context, Install.lane(context), Install.id(context));
+        long morning = at("2026-10-04T08:00:00", IST);
+        List<String> shown = new ArrayList<>();
+        Brief.Notifier notifier = recorder(shown);
+        Harness.equal("off: refused and written", Brief.release(context, journal, morning, IST, true, notifier) + "|" + count(journal, BriefFacts.SKIPPED) + "|" + shown.size(), "skipped:off|1|0");
+        Harness.equal("the same refusal again is not written again", Brief.release(context, journal, morning + 60_000L, IST, true, notifier) + "|" + count(journal, BriefFacts.SKIPPED), "skipped:off|1");
+        Brief.turnOn(journal, 480, false);
+        Harness.equal("on, but no notification permission: refused and written", Brief.release(context, journal, morning, IST, false, notifier) + "|" + count(journal, BriefFacts.SKIPPED), "skipped:noPermission|2");
+        Harness.equal("on, permitted, and nothing open: no brief on a quiet day", Brief.release(context, journal, morning, IST, true, notifier) + "|" + shown.size() + "|" + BriefConfig.lastSkip(journal.readLines()), "skipped:nothing|0|2026-10-04|nothing");
+        Commitments.open(context, journal, null, "Send the GST certificate", "owe", "2026-10-01", null);
+        Commitments.open(context, journal, null, "Pay the electrician", "owe", "2026-10-04", null);
+        Harness.equal("with something open it is shown, counts only", Brief.release(context, journal, morning + 5 * 60_000L, IST, true, notifier), Brief.SHOWN);
+        Harness.equal("the notifier was given the counts and no words", shown.toString(), "[1 overdue \u00b7 1 due today|null]");
+        String record = lastOf(journal, BriefFacts.SHOWN);
+        Harness.check("the record has the counts, the day, five minutes late, no words", record.contains("\"overdue\":1") && record.contains("\"today\":1") && record.contains("\"day\":\"2026-10-04\"") && record.contains("\"minutesLate\":5")
+            && record.contains("\"withWords\":false") && !record.contains("GST certificate") && !record.contains("Pay the electrician"));
+        Harness.equal("once a day: the second is refused as already", Brief.release(context, journal, morning + 10 * 60_000L, IST, true, notifier) + "|" + shown.size(), "skipped:already|1");
+        long tomorrow = at("2026-10-05T08:00:00", IST);
+        Harness.equal("tomorrow it is shown again", Brief.release(context, journal, tomorrow, IST, true, notifier) + "|" + shown.size(), "shown|2");
+        long late = at("2026-10-06T11:00:01", IST);
+        Harness.equal("more than three hours late: skipped, written, not shown", Brief.release(context, journal, late, IST, true, notifier) + "|" + shown.size() + "|" + BriefConfig.lastSkip(journal.readLines()), "skipped:late|2|2026-10-06|late");
+        Brief.configure(journal, 480, true);
+        long next = at("2026-10-07T08:00:00", IST);
+        List<String> withWords = new ArrayList<>();
+        Brief.release(context, journal, next, IST, true, recorder(withWords));
+        Harness.equal("when asked, the first words go to the notifier — still not into the journal", withWords.toString(), "[2 overdue|Send the GST certificate (+1 more)]");
+        String wordsRecord = lastOf(journal, BriefFacts.SHOWN);
+        Harness.check("the record says words were asked for, and holds none", wordsRecord.contains("\"withWords\":true") && !wordsRecord.contains("GST certificate"));
+
+        Harness.suite("one entry point: due and not done is shown, then tomorrow's alarm is set");
+        Install.forget();
+        File dir2 = Files.createTempDirectory("orb-brief2").toFile();
+        Context ctx2 = new Context(dir2);
+        Journal j2 = Journal.open(ctx2, Install.lane(ctx2), Install.id(ctx2));
+        Alarm alarm = new Alarm();
+        List<String> out2 = new ArrayList<>();
+        Commitments.open(ctx2, j2, null, "Call", "owe", "2026-10-01", null);
+        Harness.equal("off: the alarm is cleared and nothing is written", Brief.rearm(ctx2, j2, morning, IST, true, recorder(out2), alarm) + "|" + alarm.cancelled + "|" + count(j2, BriefFacts.SKIPPED), "off|1|0");
+        Brief.turnOn(j2, 480, false);
+        Harness.equal("on, before the time: nothing shown, today's alarm set", Brief.rearm(ctx2, j2, at("2026-10-04T07:00:00", IST), IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + alarm.at,
+            "waiting|0|" + at("2026-10-04T08:00:00", IST));
+        Harness.equal("the alarm fires at the time: shown, and tomorrow's alarm set", Brief.rearm(ctx2, j2, morning, IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + alarm.at,
+            "shown|1|" + at("2026-10-05T08:00:00", IST));
+        Harness.equal("Orb starts again the same morning: not shown twice", Brief.rearm(ctx2, j2, morning + HOUR, IST, true, recorder(out2), alarm) + "|" + out2.size(), "waiting|1");
+        Harness.equal("a start after the time, not yet shown that day, within three hours: shown now", Brief.rearm(ctx2, j2, at("2026-10-05T10:00:00", IST), IST, true, recorder(out2), alarm) + "|" + out2.size(), "shown|2");
+        Harness.equal("a start five hours late: skipped as late, and the next alarm is still set", Brief.rearm(ctx2, j2, at("2026-10-06T13:00:00", IST), IST, true, recorder(out2), alarm) + "|" + out2.size() + "|" + alarm.at,
+            "skipped:late|2|" + at("2026-10-07T08:00:00", IST));
+        Harness.equal("starting again that day does not write the skip again", Brief.rearm(ctx2, j2, at("2026-10-06T14:00:00", IST), IST, true, recorder(out2), alarm) + "|" + count(j2, BriefFacts.SKIPPED), "waiting|1");
+        Brief.turnOff(j2, alarm);
+        Harness.check("turning it off records the withdrawal and clears the alarm", !BriefConfig.enabled(j2.readLines()) && alarm.at == -1L && lastOf(j2, PackageGrants.REVOKED).contains("orb.brief.daily"));
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("it is held in code");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String name : Arrays.asList("BriefRules", "BriefFacts", "BriefConfig")) {
+            Harness.check(name + " imports no Android class and logs nothing", !source.get(name).contains("import android.") && !source.get(name).contains("Log.") && !source.get(name).contains("System.out"));
+        }
+        String facts = source.get("BriefFacts").replaceFirst("(?m)^package .*$", "");
+        Harness.check("the records take no word, name, number or address", facts.contains("boolean words") && !facts.contains("name") && !facts.contains("number") && !facts.contains("address") && !facts.contains("phone") && !facts.contains("email"));
+        String brief = source.get("Brief");
+        int release = brief.indexOf("static String release(");
+        Harness.check("the gate decides before the counts, and the showing is recorded before it is shown", brief.indexOf("BriefRules.gate(", release) > 0 && brief.indexOf("BriefRules.gate(", release) < brief.indexOf("today(context, journal, nowMs, zone)", release)
+            && brief.indexOf("journal.append(BriefFacts.SHOWN", release) < brief.indexOf("notifier.post(", release));
+        Harness.check("every refusal is written, except one already on record", brief.contains("BriefFacts.skipped(refusal, day)") && brief.contains("!BriefConfig.skipRecorded(lines, day, refusal)"));
+        Harness.check("the brief reads no contact, call or message", !brief.contains("ContactsReader") && !brief.contains("CallsReader") && !brief.contains("Messages") && !brief.contains("People."));
+        Harness.check("the grant carries the argument for a standing authorization", brief.contains("grant.put(\"standing\", URGENCY);"));
+        String notifier = source.get("BriefNotifier");
+        Harness.check("the lock screen carries no count: a public version, and the counts private", notifier.contains("setVisibility(Notification.VISIBILITY_PRIVATE)") && notifier.contains("setPublicVersion(publicVersion)")
+            && notifier.contains("setContentText(\"Your morning brief is ready\")") && notifier.contains("TodayActivity.class"));
+        Harness.check("the notifier names no one: it is given text, never a commitment", !notifier.contains("Commitments") && !notifier.contains("People"));
+        String receiver = source.get("BriefReceiver");
+        Harness.check("the receiver decides nothing: it hands over to the one entry point", receiver.contains("Brief.rearm(") && !receiver.contains("BriefRules."));
+        String alarms = source.get("BriefAlarms");
+        Harness.check("the alarm needs no exact-alarm permission", alarms.contains("setAndAllowWhileIdle") && !alarms.contains("setExact"));
+        String manifest = new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+        Harness.check("the receiver is not exported, and there is still no exact-alarm or network permission", manifest.contains("android:name=\".BriefReceiver\"\n            android:exported=\"false\"")
+            && !manifest.contains("SCHEDULE_EXACT_ALARM") && !manifest.contains("USE_EXACT_ALARM") && !manifest.contains("android.permission.INTERNET"));
+        Harness.check("Orb makes the history and the alarm agree at every start", source.get("Orb").contains("Brief.rearm(this, journal"));
+        Harness.check("What Orb may do can switch it off", source.get("MayDoActivity").contains("Brief.turnOff(journal, new BriefAlarms(MayDoActivity.this))") && source.get("MayDoActivity").contains("Switch off the morning brief"));
+        String today = source.get("TodayActivity");
+        Harness.check("the card is off until turned on, with Cancel the default, and asks Android for notifications only at the turn-on",
+            today.contains("Turn on the morning brief") && today.substring(today.indexOf("private void askBrief(")).contains("card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();")
+            && today.contains("requestPermissions(new String[] {\"android.permission.POST_NOTIFICATIONS\"}, REQUEST_BRIEF)") && today.contains("Brief.turnOn(journal, minute, words)"));
+        Harness.check("the words option is off unless the person ticks it, and says what it exposes", today.contains("askBrief(false, BriefRules.DEFAULT_MINUTE, false)") && today.contains("Also show the first words (they would sit on the lock-screen history)"));
+        Harness.check("the preview shows what would be said and writes nothing", today.substring(today.indexOf("Show me today's brief")).indexOf("journal.append") < 0 || today.indexOf("journal.append") < 0);
+    }
+}

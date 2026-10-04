@@ -70,6 +70,8 @@ final class Capabilities {
     static final long MESSAGES_VERSION = 1L;
     static final String CALLS = "orb.read.calls";
     static final long CALLS_VERSION = 1L;
+    static final String BRIEF = "orb.brief.daily";
+    static final long BRIEF_VERSION = 1L;
     static final String UNDERSTAND = "orb.understand";
     static final long UNDERSTAND_VERSION = 1L;
     static final String DOCUMENTS = "orb.read.documents";
@@ -114,6 +116,11 @@ final class Capabilities {
         + "such as who you are in regular touch with; only while the People screen is open, only on the phone. It uses a source only if that source is on. "
         + "Nothing is kept except your answer to each one; nothing leaves the phone.";
 
+    static final String BRIEF_SAYS =
+        "Shows one notification each morning, at a time you chose, with counts of what is overdue and ahead \u2014 counts only, unless you ask for the first words. "
+        + "It uses only what Orb already holds; nothing leaves the phone. On the lock screen it says only that your morning brief is ready. "
+        + "You can turn it off at any time.";
+
     /** The declarations, in the order the screen shows them. */
     static final List<Declaration> ALL = Collections.unmodifiableList(Arrays.asList(
         new Declaration(PACKAGES, 1L, "Which apps are installed", PACKAGES_SAYS, TIER_OBSERVE,
@@ -153,6 +160,10 @@ final class Capabilities {
             "your grant \u2014 a recorded decision \u2014 and your own answer to each thing it suggests", Arrays.asList(UnderstandingFacts.READ),
             "Switch off What Orb has noticed", true,
             Arrays.asList("UnderstandingAccess", "UnderstandingRules", "UnderstandingFacts", "Understanding")),
+        new Declaration(BRIEF, BRIEF_VERSION, "A morning brief", BRIEF_SAYS, TIER_ACT_REVERSIBLE,
+            "your grant \u2014 a recorded decision, standing because a morning brief exists to appear when you are not looking \u2014 and the gate at each showing", Arrays.asList(BriefFacts.SHOWN),
+            "Switch off the morning brief", true,
+            Arrays.asList("BriefRules", "BriefFacts", "BriefConfig", "Brief", "BriefAlarms", "BriefNotifier", "BriefReceiver")),
         new Declaration(Reminders.CAPABILITY, Reminders.VERSION, "A reminder you set", Reminders.DECLARATION, TIER_ACT_REVERSIBLE,
             "your confirmation of each reminder", Arrays.asList("orb.action.released"),
             "What Orb may do: turn off", true,
@@ -228,6 +239,13 @@ final class Capabilities {
         return payload >= 0 && m.find(payload) ? Long.parseLong(m.group(1)) : -1L;
     }
 
+    private static String word(String line, String key) {
+        if (line == null) return "";
+        int payload = line.indexOf("\"payload\":");
+        Matcher m = Pattern.compile("\"" + Pattern.quote(key) + "\":\"([A-Za-z]+)\"").matcher(line);
+        return payload >= 0 && m.find(payload) ? m.group(1) : "";
+    }
+
     private static boolean flagFalse(String line, String key) {
         return line != null && line.contains("\"" + key + "\":false");
     }
@@ -300,6 +318,23 @@ final class Capabilities {
             String read = lastOfType(lines, CallsFacts.READ);
             String detail = read == null ? "never looked" : number(read, "examined") + " calls examined, " + number(read, "matched") + " with that person, at the last look";
             return new Status(granted ? "ON \u2014 you granted it" : "OFF \u2014 not granted", wallClock(read), detail);
+        }
+        if (BRIEF.equals(id)) {
+            boolean granted;
+            try {
+                granted = PackageGrants.lastIsGrant(lines, BRIEF);
+            } catch (java.io.IOException unreadable) {
+                return new Status("unknown \u2014 the history could not be read", -1L, "");
+            }
+            String shown = lastOfType(lines, BriefFacts.SHOWN);
+            String skipped = lastOfType(lines, BriefFacts.SKIPPED);
+            boolean lastWasShown = shown != null && wallClock(shown) >= wallClock(skipped);
+            String detail;
+            if (shown == null && skipped == null) detail = "never shown";
+            else if (lastWasShown) detail = "last shown: " + number(shown, "overdue") + " overdue, " + number(shown, "today") + " due today, " + number(shown, "waiting") + " waiting for, "
+                + number(shown, "dates") + " dates this week";
+            else detail = "last not shown: " + word(skipped, "reason");
+            return new Status(granted ? "ON \u2014 at " + BriefRules.clock(BriefConfig.minute(lines)) : "OFF \u2014 not turned on", Math.max(wallClock(shown), wallClock(skipped)), detail);
         }
         if (UNDERSTAND.equals(id)) {
             boolean granted;

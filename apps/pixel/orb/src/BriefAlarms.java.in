@@ -1,0 +1,39 @@
+package @PKG@;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+
+/**
+ * Sets and clears the one daily alarm for the morning brief (`docs/MORNING_BRIEF_PHONE.md` §5). **No exact-alarm permission:** `setAndAllowWhileIdle`
+ * needs none, and costs the brief being up to a few minutes late while the phone dozes. The alarm only *wakes `BriefReceiver`*; whether anything is shown is
+ * decided there, at that moment, by the gate. Alarms do not survive a reboot or an update, so `Brief.rearm` sets it again from the journal at every start.
+ */
+final class BriefAlarms implements Brief.Scheduler {
+    static final String FIRE = "orb.brief.fire";
+    private static final int ID = 4101;
+
+    private final Context context;
+
+    BriefAlarms(Context context) {
+        this.context = context;
+    }
+
+    private PendingIntent pending() {
+        Intent intent = new Intent(context, BriefReceiver.class).setAction(FIRE);
+        return PendingIntent.getBroadcast(context, ID, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    @Override
+    public void schedule(long atMs) {
+        AlarmManager alarms = context.getSystemService(AlarmManager.class);
+        if (alarms != null) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pending());
+    }
+
+    @Override
+    public void cancel() {
+        AlarmManager alarms = context.getSystemService(AlarmManager.class);
+        if (alarms != null) alarms.cancel(pending());
+    }
+}

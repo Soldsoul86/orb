@@ -1,0 +1,125 @@
+package @PKG@;
+
+import java.util.Calendar;
+import java.util.TimeZone;
+
+/**
+ * The morning brief's rules (`docs/MORNING_BRIEF_PHONE.md`, DR-40): what the counts are, what the one notification says, when it is due, and the gate's
+ * decision. **Pure: no Android class, no model.** The same journal and the same moment give the same answer, so a replay agrees with the phone.
+ *
+ * Counts only: *overdue*, *due today*, *waiting for*, *dates this week* — never a name, a number or (unless the person asked for it) a word.
+ */
+final class BriefRules {
+    private BriefRules() {}
+
+    /** 08:00 unless the person chose another time. */
+    static final int DEFAULT_MINUTE = 8 * 60;
+    /** *Waiting for* counts when it has waited this long, or its date has passed. */
+    static final int WAITING_DAYS = 7;
+    /** More than this late is not a morning brief: it is skipped and recorded. */
+    static final long LATE_MS = 3L * 60 * 60 * 1000;
+    /** The most characters of a commitment's words the optional first-words line shows. */
+    static final int WORDS_MAX = 60;
+
+    private static final long DAY_MS = 86_400_000L;
+
+    // The gate's answers.
+    static final String OFF = "off";
+    static final String NO_PERMISSION = "noPermission";
+    static final String ALREADY = "already";
+    static final String LATE = "late";
+    static final String NOTHING = "nothing";
+
+    static final class Counts {
+        int overdue;
+        int today;
+        int waiting;
+        int dates;
+
+        int total() {
+            return overdue + today + waiting + dates;
+        }
+    }
+
+    /** The counts from what Today shows: all the open things, as of `today`. */
+    static Counts counts(Commitments.Today t, String today, long nowMs) {
+        Counts c = new Counts();
+        c.overdue = t.overdue.size();
+        c.today = t.today.size();
+        for (Commitments.Commitment w : t.waiting) {
+            if (w.openedAtMs <= nowMs - WAITING_DAYS * DAY_MS || (w.dueDate != null && w.dueDate.compareTo(today) < 0)) c.waiting++;
+        }
+        for (ComingUp.Day day : t.dates) c.dates += day.items.size();
+        return c;
+    }
+
+    /** *3 overdue · 1 due today · 2 waiting for · 4 dates this week* — only the parts that are not zero; empty if there is nothing. */
+    static String text(Counts c) {
+        StringBuilder out = new StringBuilder();
+        part(out, c.overdue, " overdue", " overdue");
+        part(out, c.today, " due today", " due today");
+        part(out, c.waiting, " waiting for", " waiting for");
+        part(out, c.dates, " date this week", " dates this week");
+        return out.toString();
+    }
+
+    private static void part(StringBuilder out, int n, String one, String many) {
+        if (n <= 0) return;
+        if (out.length() > 0) out.append(" · ");
+        out.append(n).append(n == 1 ? one : many);
+    }
+
+    /** The first overdue thing (else the first due today), its words cut short, and how many more — for the optional first-words line. Null if there is none. */
+    static String firstWords(Commitments.Today t) {
+        Commitments.Commitment first = !t.overdue.isEmpty() ? t.overdue.get(0) : !t.today.isEmpty() ? t.today.get(0) : null;
+        if (first == null) return null;
+        int others = t.overdue.size() + t.today.size() - 1;
+        String words = first.words.length() > WORDS_MAX ? first.words.substring(0, WORDS_MAX).trim() + "…" : first.words;
+        return words + (others > 0 ? " (+" + others + " more)" : "");
+    }
+
+    // ---- when
+
+    /** `YYYY-MM-DD` for a moment in a zone. */
+    static String dayOf(long nowMs, TimeZone zone) {
+        return ComingUp.dateOf(nowMs, zone.getID());
+    }
+
+    /** The moment `minuteOfDay` falls on a `YYYY-MM-DD` day in a zone. A time the clock skips that day (daylight saving) falls just after the gap. */
+    static long scheduledAt(String day, int minuteOfDay, TimeZone zone) {
+        String[] p = day.split("-");
+        Calendar c = Calendar.getInstance(zone);
+        c.clear();
+        c.setLenient(true);
+        c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]), minuteOfDay / 60, minuteOfDay % 60, 0);
+        return c.getTimeInMillis();
+    }
+
+    /** The next time the brief is due after `nowMs`: today's time if it is still ahead, else tomorrow's. */
+    static long nextFire(long nowMs, TimeZone zone, int minuteOfDay) {
+        String day = dayOf(nowMs, zone);
+        long today = scheduledAt(day, minuteOfDay, zone);
+        return today > nowMs ? today : scheduledAt(ComingUp.plusDays(day, 1), minuteOfDay, zone);
+    }
+
+    // ---- the gate
+
+    /** Why the brief must not be shown now, or null if nothing so far forbids it. The counts come after: *nothing* is decided on them. */
+    static String gate(boolean on, boolean permitted, boolean shownToday, long nowMs, long scheduledMs) {
+        if (!on) return OFF;
+        if (!permitted) return NO_PERMISSION;
+        if (shownToday) return ALREADY;
+        if (nowMs - scheduledMs > LATE_MS) return LATE;
+        return null;
+    }
+
+    /** How many whole minutes after its time the brief is being shown (0 if on time). */
+    static long minutesLate(long nowMs, long scheduledMs) {
+        return Math.max(0L, (nowMs - scheduledMs) / 60_000L);
+    }
+
+    /** *08:00*. */
+    static String clock(int minuteOfDay) {
+        return String.format(java.util.Locale.ROOT, "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60);
+    }
+}

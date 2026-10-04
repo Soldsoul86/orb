@@ -114,6 +114,13 @@ public final class Orb extends Application {
             // History that cannot be read releases nothing.
         }
 
+        // The morning brief: if it is on and due today and not done, the gate decides; then tomorrow's alarm is set (it does not survive a reboot or an update).
+        try {
+            Brief.rearm(this, journal, System.currentTimeMillis(), java.util.TimeZone.getDefault(), BriefNotifier.permitted(this), new BriefNotifier(this), new BriefAlarms(this));
+        } catch (IOException unreadable) {
+            // History that cannot be read shows nothing. Never blocks launching.
+        }
+
         // Ported from pass 2 B (§7b36). The grant reads cost nothing and run
         // unconditionally; the package scan is gated by `PackageAccess`.
         watch = new Watch(this, journal);

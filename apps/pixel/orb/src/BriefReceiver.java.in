@@ -1,0 +1,26 @@
+package @PKG@;
+
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import java.io.IOException;
+import java.util.TimeZone;
+
+/**
+ * The morning alarm fired. This decides nothing: it hands over to `Brief.rearm`, which asks the gate at this moment, shows the brief or records why not, and
+ * sets tomorrow's alarm. Not exported — only Orb's own alarm reaches it.
+ */
+public final class BriefReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent == null || !BriefAlarms.FIRE.equals(intent.getAction())) return;
+        Orb orb = Orb.get();
+        Journal journal = orb == null ? null : orb.journal();
+        if (journal == null) return;
+        try {
+            Brief.rearm(context, journal, System.currentTimeMillis(), TimeZone.getDefault(), BriefNotifier.permitted(context), new BriefNotifier(context), new BriefAlarms(context));
+        } catch (IOException unreadable) {
+            // History that cannot be read is not history that says "go ahead": nothing is shown. The next start tries again.
+        }
+    }
+}

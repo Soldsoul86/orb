@@ -151,6 +151,11 @@
             android:name=".ReminderReceiver"
             android:exported="false" />
 
+        <!-- The morning brief's alarm (docs/MORNING_BRIEF_PHONE.md). Not exported: only Orb's own alarm reaches it. -->
+        <receiver
+            android:name=".BriefReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".AllowActivity"
             android:exported="false" />

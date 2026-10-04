@@ -1,14 +1,19 @@
 package @PKG@;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.TimePicker;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -48,6 +53,10 @@ public final class TodayActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         commitments.onPermissionResult(code, results);
+        if (code == REQUEST_BRIEF) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) finishTurnOn(pendingMinute, pendingWords);
+            else say("Android did not allow notifications, so the brief could not appear and nothing was turned on.");
+        }
     }
 
     private TextView text(String s, int size, boolean bold) {
@@ -93,6 +102,137 @@ public final class TodayActivity extends Activity {
         }).start();
     }
 
+    // ---- The morning brief (docs/MORNING_BRIEF_PHONE.md, DR-40): off until turned on; counts only unless asked; the gate decides at each showing.
+
+    private static final int REQUEST_BRIEF = 77;
+    private int pendingMinute;
+    private boolean pendingWords;
+
+    private void say(String message) {
+        new AlertDialog.Builder(this).setMessage(message).setPositiveButton("OK", null).show();
+    }
+
+    private void addBriefCard(final List<Commitments.Commitment> all, final ComingUp.Result ahead) {
+        final Journal journal = journal();
+        if (journal == null) return;
+        List<String> lines;
+        boolean on;
+        try {
+            lines = journal.readLines();
+            on = BriefConfig.enabled(lines);
+        } catch (IOException unreadable) {
+            return;   // The history cannot say whether it is on, so no card rather than a guess.
+        }
+        list.addView(text("Morning brief", 15, true));
+        if (!on) {
+            list.addView(text("Off. Orb can show one notification each morning saying how many things are overdue, due today and ahead. "
+                + "Counts only; nothing leaves your phone.", 12, false));
+            Button turnOn = new Button(this);
+            turnOn.setText("Turn on the morning brief\u2026");
+            turnOn.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { askBrief(false, BriefRules.DEFAULT_MINUTE, false); }
+            });
+            list.addView(turnOn);
+        } else {
+            final int minute = BriefConfig.minute(lines);
+            final boolean words = BriefConfig.words(lines);
+            list.addView(text("On \u2014 each morning at " + BriefRules.clock(minute) + (words ? " \u00b7 with the first words" : " \u00b7 counts only"), 12, false));
+            LinearLayout buttons = new LinearLayout(this);
+            buttons.setOrientation(LinearLayout.HORIZONTAL);
+            Button preview = new Button(this);
+            preview.setText("Show me today's brief");
+            preview.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    Commitments.Today t = Commitments.today(all, ahead, CommitmentFlow.today(), System.currentTimeMillis());
+                    String said = BriefRules.text(BriefRules.counts(t, CommitmentFlow.today(), System.currentTimeMillis()));
+                    say(said.isEmpty() ? "Nothing to say today, so no notification would be shown." : said);
+                }
+            });
+            buttons.addView(preview);
+            Button change = new Button(this);
+            change.setText("Change\u2026");
+            change.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) { askBrief(true, minute, words); }
+            });
+            buttons.addView(change);
+            Button off = new Button(this);
+            off.setText("Turn off");
+            off.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    Brief.turnOff(journal, new BriefAlarms(TodayActivity.this));
+                    render();
+                }
+            });
+            buttons.addView(off);
+            list.addView(buttons);
+        }
+    }
+
+    /** The card: what is shown and when, with the time to choose and the words option off. **Cancel is the default.** */
+    private void askBrief(final boolean changing, int minute, boolean words) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(48, 16, 48, 0);
+        form.addView(text("Once each morning Orb shows one notification with counts \u2014 for example \u201c3 overdue \u00b7 1 due today \u00b7 2 dates this week\u201d. "
+            + "No names or words by default. Tap it to see the details here. If it is already past the time today, it is shown at once if that is within "
+            + "3 hours, and skipped otherwise. You can turn it off any time.", 12, false));
+        final TimePicker picker = new TimePicker(this);
+        picker.setHour(minute / 60);
+        picker.setMinute(minute % 60);
+        form.addView(picker);
+        final CheckBox withWords = new CheckBox(this);
+        withWords.setText("Also show the first words (they would sit on the lock-screen history)");
+        withWords.setChecked(words);
+        form.addView(withWords);
+        AlertDialog card = new AlertDialog.Builder(this)
+            .setTitle(changing ? "Change the morning brief" : "Turn on the morning brief?")
+            .setView(form)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(changing ? "Save" : "Turn on", new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int which) {
+                    int chosen = picker.getHour() * 60 + picker.getMinute();
+                    boolean chosenWords = withWords.isChecked();
+                    Journal journal = journal();
+                    if (journal == null) return;
+                    if (changing) {
+                        if (!Brief.configure(journal, chosen, chosenWords)) { say("Orb could not record this, so nothing changed."); return; }
+                        rearm(journal);
+                        render();
+                    } else if (!ReminderNotifier.permitted(TodayActivity.this)) {
+                        pendingMinute = chosen;
+                        pendingWords = chosenWords;
+                        requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, REQUEST_BRIEF);
+                    } else {
+                        finishTurnOn(chosen, chosenWords);
+                    }
+                }
+            })
+            .create();
+        card.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        card.show();
+        card.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus();
+    }
+
+    /** Android allows notifications: now the person's decision is recorded, the alarm is set, and nothing else. */
+    private void finishTurnOn(int minute, boolean words) {
+        Journal journal = journal();
+        if (journal == null) return;
+        if (!Brief.turnOn(journal, minute, words)) {
+            say("Orb could not record this, so it turned nothing on.");
+            return;
+        }
+        rearm(journal);
+        render();
+    }
+
+    private void rearm(Journal journal) {
+        try {
+            Brief.rearm(this, journal, System.currentTimeMillis(), TimeZone.getDefault(), BriefNotifier.permitted(this), new BriefNotifier(this), new BriefAlarms(this));
+        } catch (IOException unreadable) {
+            // History that cannot be read shows nothing; the next start tries again.
+        }
+    }
+
     private void section(String title, List<Commitments.Commitment> items, String today, Runnable refresh) {
         if (items.isEmpty()) return;
         list.addView(text(title + " (" + items.size() + ")", 15, true));
@@ -115,6 +255,7 @@ public final class TodayActivity extends Activity {
         c.clear();
         c.set(Integer.parseInt(ymd[0]), Integer.parseInt(ymd[1]) - 1, Integer.parseInt(ymd[2]));
         list.addView(text(new SimpleDateFormat("EEEE d MMMM yyyy", Locale.getDefault()).format(c.getTime()), 13, false));
+        addBriefCard(all, ahead);
         Button add = new Button(this);
         add.setText("Add a commitment…");
         add.setOnClickListener(new View.OnClickListener() {

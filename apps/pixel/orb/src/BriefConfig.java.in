@@ -1,0 +1,75 @@
+package @PKG@;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * What the journal says about the morning brief — read, never stored (`docs/MORNING_BRIEF_PHONE.md` §5): whether it is on, the time and the words option the
+ * person last chose, and what has already been done today. A projection over the lines, so a reboot, a restore and a replay all agree.
+ */
+final class BriefConfig {
+    private BriefConfig() {}
+
+    private static final Pattern MINUTE = Pattern.compile("\"minuteOfDay\":(\\d+)");
+    private static final Pattern WORDS = Pattern.compile("\"words\":(true|false)");
+    private static final Pattern DAY = Pattern.compile("\"day\":\"(\\d{4}-\\d{2}-\\d{2})\"");
+    private static final Pattern REASON = Pattern.compile("\"reason\":\"([A-Za-z]+)\"");
+
+    /** Whether the person's last decision about the brief was to turn it on. A line whose type cannot be read is an error, not a skip. */
+    static boolean enabled(List<String> lines) throws IOException {
+        return PackageGrants.lastIsGrant(lines, Capabilities.BRIEF);
+    }
+
+    private static String lastOf(List<String> lines, String type) {
+        String found = null;
+        for (String line : lines) if (type.equals(Journal.typeOf(line))) found = line;
+        return found;
+    }
+
+    private static String field(Pattern pattern, String line) {
+        if (line == null) return null;
+        int payload = line.indexOf("\"payload\":");
+        Matcher m = pattern.matcher(line);
+        return payload >= 0 && m.find(payload) ? m.group(1) : null;
+    }
+
+    /** The time the person last chose, as minutes after midnight; `DEFAULT_MINUTE` if none. */
+    static int minute(List<String> lines) {
+        String v = field(MINUTE, lastOf(lines, BriefFacts.CONFIGURED));
+        if (v == null) return BriefRules.DEFAULT_MINUTE;
+        int m = Integer.parseInt(v);
+        return m >= 0 && m < 24 * 60 ? m : BriefRules.DEFAULT_MINUTE;
+    }
+
+    /** Whether the person asked for the first words to be shown; false unless they did. */
+    static boolean words(List<String> lines) {
+        return "true".equals(field(WORDS, lastOf(lines, BriefFacts.CONFIGURED)));
+    }
+
+    /** The day of the last brief shown, or null. */
+    static String lastShownDay(List<String> lines) {
+        return field(DAY, lastOf(lines, BriefFacts.SHOWN));
+    }
+
+    /** The day and reason of the last skip, as `day|reason`, or null. */
+    static String lastSkip(List<String> lines) {
+        String line = lastOf(lines, BriefFacts.SKIPPED);
+        String day = field(DAY, line);
+        String reason = field(REASON, line);
+        return day == null || reason == null ? null : day + "|" + reason;
+    }
+
+    /** The brief for this day is done: shown, or skipped because there was nothing or it was too late. A skip for no permission is not done — the person may allow it. */
+    static boolean handledToday(List<String> lines, String day) {
+        if (day.equals(lastShownDay(lines))) return true;
+        String skip = lastSkip(lines);
+        return skip != null && (skip.equals(day + "|" + BriefRules.NOTHING) || skip.equals(day + "|" + BriefRules.LATE));
+    }
+
+    /** This exact skip is already the last one on record: it is not written again. */
+    static boolean skipRecorded(List<String> lines, String day, String reason) {
+        return (day + "|" + reason).equals(lastSkip(lines));
+    }
+}

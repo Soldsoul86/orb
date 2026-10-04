@@ -34,9 +34,9 @@ final class CapabilitiesTest {
     }
 
     static void run() throws Exception {
-        Harness.suite("eleven capabilities, each declared once and frozen");
+        Harness.suite("twelve capabilities, each declared once and frozen");
         Harness.equal("the ids, in the order the screen shows them", Capabilities.ids(),
-            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.read.calls", "orb.understand", "orb.remind.local", "orb.handoff.communicate"));
+            Arrays.asList("installedPackages.read", "orb.read.screen", "orb.read.grants", "orb.read.contacts", "orb.read.appsecurity", "orb.read.documents", "orb.read.messages", "orb.read.calls", "orb.understand", "orb.brief.daily", "orb.remind.local", "orb.handoff.communicate"));
         Set<String> seen = new HashSet<>();
         for (Capabilities.Declaration d : Capabilities.ALL) {
             Harness.check(d.id + " says, authorizes, records and names its withdrawal",
