@@ -1405,6 +1405,14 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** native crashes and out-of-memory kills, which may leave no note; any upload of a crash anywhere; catching faults on screens other than People.
 
+## DR-40 — The morning brief: one daily notification, counts only, under a standing authorization
+
+- **Status:** Proposed · **Proposed:** 2026-10-04, after the operator said "Yes, go ahead with A, the morning brief" to the project review's first recommendation (`MORNING_BRIEF_PHONE.md`). **Not yet approved for building.**
+
+**The ruling proposed.** A second *Act (reversible)* capability, `orb.brief.daily` v1: once a day at a time the person chose, Orb shows **one notification with counts only** (overdue, due today, waiting, dates this week), computed at that moment from commitments and Coming up. Standing authorization (CLAIMS.md §5 Ruling 1) is argued in the grant — waiting would defeat the purpose of a morning brief — and the gate re-decides at every release (on, permitted, once a day, not too late, something to say), writing every refusal. Nothing is shown on a quiet day; words never appear in the notification by default; the contacts are not read in the background.
+
+**Not in this ruling:** people to get back in touch with, calls or messages, a model's summary, an evening review.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
