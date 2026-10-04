@@ -165,8 +165,8 @@ final class LedgerTest {
         for (int k = 0; k < 12; k++) {
             long amount = 1000L + k;
             Observation early = fact("statement.test", "E" + k, "out", amount, 10L * DAY, "INR", "", "inferred");
-            Observation late = fact("statement.test", "L" + k, "out", amount, 11L * DAY, "INR", "", "inferred");
-            Observation sms = fact("sms", "S" + k, "out", amount, 10L * DAY + 12 * 3_600_000L, "INR", "", "inferred");
+            Observation late = fact("statement.test", "L" + k, "out", amount, 10L * DAY + 6 * 3_600_000L, "INR", "", "inferred");
+            Observation sms = fact("sms", "S" + k, "out", amount, 10L * DAY + 12 * 3_600_000L, "INR", "", "inferred");   // both statements came first: two movements fit
             List<Ledger.Movement> made = Ledger.movements(Arrays.asList(late, sms, early));
             Harness.check("a partner goes to the earliest movement that fits [" + k + "]", withWitness(made, sms) == withWitness(made, early) && withWitness(made, sms) != withWitness(made, late) && made.size() == 2);
         }
@@ -342,6 +342,8 @@ final class LedgerTest {
         KeepAccess.grant(context, journal);
         Harness.equal("saying yes twice records one grant", count(journal, PackageGrants.GRANTED), 1);
         ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", Arrays.asList(sms("BANKA", "out", 500L, day("2026-09-10"))), "2026-10");
+        KeepAccess.reconcile(context, journal);
+        Harness.check("a grant the device does exercise is left alone by a reconcile", KeepAccess.granted(context) && PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP) && count(journal, PackageGrants.REVOKED) == 0);
         KeepAccess.revoke(context, journal);
         Harness.check("switching off stops it and says so", !KeepAccess.granted(context) && !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
         Harness.equal("and erases nothing", ObservationStore.bundles(journal.readLines()), 1);
@@ -412,6 +414,8 @@ final class LedgerTest {
             {"VM-PROMO", "Flat 50% off on everything. Use code SAVE50. Shop now!"},
             {"VM-OTPBK", "123456 is your OTP for login. Do not share it."},
             {"VM-ODDBK", "Zzzz qqq wwww xyxyx."},
+            {"VM-TANGLE", "Rs.500.00 debited from A/c XX0000. Your appointment is scheduled for 08-Oct."},
+            {"VM-PENNY", "Rs.0.01 debited from A/c XX0000 on 01-Oct. UPI Ref 125."},
         };
         long t = 1_790_000_000_000L;
         for (String[] m : messages) fit.message(new MessagesRules.Message(m[0], "", t += 1000L, 1, m[1]));
@@ -422,13 +426,27 @@ final class LedgerTest {
         Harness.equal("every service message has exactly one disposition: they add up to the service total", sum, r.service);
         Harness.equal("a message from a person is counted and not read, so it has none", r.conversational, 1L);
         Harness.equal("the payment that matches the open bill is a closure candidate", r.get("disposition.CLOSURE_CANDIDATE"), 1L);
-        Harness.equal("a payment with nothing open is ledger only", r.get("disposition.LEDGER_ONLY"), 1L);
-        Harness.equal("the refund begun moves a loop on", r.get("disposition.LOOP") + "|" + r.get("disposition.UNMAPPABLE") + "|" + r.get("disposition.AMBIGUOUS"), "2|1|0");
+        Harness.equal("a payment with nothing open is ledger only, and so is one of a single cent", r.get("disposition.LEDGER_ONLY"), 2L);
+        Harness.equal("the refund begun moves a loop on; one message nobody could read; one two rules read differently", r.get("disposition.LOOP") + "|" + r.get("disposition.UNMAPPABLE") + "|" + r.get("disposition.AMBIGUOUS"), "2|1|1");
         Harness.equal("a promotion and a code are not loops", r.get("disposition.NOT_A_LOOP"), 2L);
-        Harness.equal("the figures agree with the ledger's own: closure candidates and ledger-only are the fit report's own", r.get("closure.candidates") + "|" + r.get("ledger.only"), "1|1");
-        LoopFit.Report quiet = fit.report(new SenderRules.Quiet() { @Override public boolean quiet(String id) { return "TESTBK".equals(id); } });
+        Harness.equal("the figures agree with the ledger's own: closure candidates and ledger-only are the fit report's own", r.get("closure.candidates") + "|" + r.get("ledger.only"), "1|2");
+        SenderRules.Quiet testbkQuiet = new SenderRules.Quiet() { @Override public boolean quiet(String id) { return "TESTBK".equals(id); } };
+        boolean leaves = true, keeps = false;
+        for (Observation o : fit.observations(testbkQuiet)) { leaves &= !"TESTBK".equals(o.sourceId); keeps |= "PENNY".equals(o.sourceId); }
+        boolean unmarked = false;
+        for (Observation o : fit.observations(SenderRules.NONE)) unmarked |= "TESTBK".equals(o.sourceId);
+        Harness.check("the facts handed to Keep leave a quiet sender's out, and the others' stay in; unmarked, everyone's are there", leaves && keeps && unmarked);
+        LoopFit.Report quiet = fit.report(testbkQuiet);
         long qsum = 0;
         for (String d : LoopFit.DISPOSITIONS) qsum += quiet.get("disposition." + d);
         Harness.equal("a quiet sender's messages are not loops, and the dispositions still add up", qsum + "|" + quiet.get("disposition.NOT_A_LOOP"), quiet.service + "|5");
+        // A payment that closes something, and the debit alert for the same money sent in the same instant by the same service: both belong to the closure.
+        LoopFit twin = new LoopFit();
+        twin.message(new MessagesRules.Message("VM-PAYBK", "", 1_790_000_000_000L, 1, "Your credit card bill of Rs.1,000.00 is due on 05-Nov."));
+        twin.message(new MessagesRules.Message("VM-PAYBK", "", 1_790_000_100_000L, 1, "Payment of Rs.1,000.00 received towards your card ending 0000. Thank you."));
+        twin.message(new MessagesRules.Message("VM-PAYBK", "", 1_790_000_100_000L, 1, "Rs.1,000.00 debited from A/c XX0000 by UPI Ref 777."));
+        LoopFit.Report tw = twin.report();
+        Harness.equal("a payment and the alert for the same money at the same instant are both the closure candidate; the bill is the loop",
+            tw.get("disposition.CLOSURE_CANDIDATE") + "|" + tw.get("disposition.LEDGER_ONLY") + "|" + tw.get("disposition.LOOP") + "|" + tw.get("closure.candidates"), "2|0|1|1");
     }
 }

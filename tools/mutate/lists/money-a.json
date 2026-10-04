@@ -93,7 +93,8 @@
   {
    "file": "src/Ledger.java.in",
    "old": "a.pairedByCount = true; b.pairedByCount = true;",
-   "new": "a.pairedByCount = true;"
+   "new": "a.pairedByCount = true;",
+   "equivalent": "The post-pass visits every pair of movements in both orders, so setting only `a` on each visit flags both sides in the end."
   },
   {
    "file": "src/Ledger.java.in",
@@ -169,7 +170,8 @@
   {
    "file": "src/Ledger.java.in",
    "old": "sb.append(m.occurredMs()).append('|')",
-   "new": "sb.append('|')"
+   "new": "sb.append('|')",
+   "equivalent": "Every witness id commits to the fact's occurredMs, and the fingerprint lists every witness id."
   },
   {
    "file": "src/Ledger.java.in",
@@ -200,7 +202,8 @@
   {
    "file": "src/LoopFit.java.in",
    "old": "else if (m.loop) d = D_LOOP;\n            else if (m.money) d = D_LEDGER_ONLY;",
-   "new": "else if (m.money) d = D_LEDGER_ONLY;\n            else if (m.loop) d = D_LOOP;"
+   "new": "else if (m.money) d = D_LEDGER_ONLY;\n            else if (m.loop) d = D_LOOP;",
+   "equivalent": "No current rule states a loop-opening or advancing fact together with a movement in one message (a payment states a movement and a fulfilment, which is neither), so the precedence between LOOP and LEDGER_ONLY cannot be observed. If a rule ever does, the precedence needs its own test."
   },
   {
    "file": "src/LoopFit.java.in",
