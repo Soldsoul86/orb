@@ -1,0 +1,105 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Sender marks — the rules (`docs/SENDER_MARKS_PHONE.md`, DR-42). **Pure: no Android class, no clock, no storage.**
+ *
+ * A **sender** is who a service message is from, reduced to one stable identifier: the route prefix (`VM-`) and the one-letter suffix (`-S`) come off, a
+ * name with letters is itself, a numeric short code is itself, and **a phone number is never a sender** — people are not marked here.
+ *
+ * The person says, once per sender, that it is *not about my obligations*; then **every message from that sender is not a loop**, for every reader of
+ * messages (one meaning everywhere — a reader is handed a `Quiet`, and has no way to read without one). A mark changes **only what Orb may infer next**: it
+ * never closes, deletes or alters a loop or a commitment the person has already accepted.
+ */
+final class SenderRules {
+    private SenderRules() {}
+
+    /** Whether the person has said this sender is not about their obligations. The one question every reader of messages must ask. */
+    interface Quiet {
+        boolean quiet(String senderId);
+    }
+
+    /** Nobody is quiet. For tests and diagnostics; a reader of the person's messages is handed their marks, not this. */
+    static final Quiet NONE = new Quiet() {
+        @Override public boolean quiet(String senderId) { return false; }
+    };
+
+    /** At least this many messages, and at least this share of them unread, to be listed first. **Ordering, never eligibility:** anyone can be marked. */
+    static final int CANDIDATE_MESSAGES = 50;
+    static final int CANDIDATE_PERCENT = 90;
+    /** How many senders are tallied in memory; the rest are one row that cannot be marked. */
+    static final int MAX_SENDERS = 2_000;
+
+    /** The sender of a service message, or null if it has none (a phone number, or an address with no usable name). */
+    static String senderId(String address) {
+        if (address == null) return null;
+        String a = address.trim().toUpperCase(Locale.ROOT);
+        a = a.replaceFirst("^[A-Z]{2}-", "").replaceFirst("-[A-Z]$", "");
+        if (a.matches("[A-Z0-9]{2,12}") && a.matches(".*[A-Z].*")) return a;
+        if (a.matches("[0-9]{3,8}")) return a;
+        return null;
+    }
+
+    /** One sender, as the Senders screen lists it. */
+    static final class Row {
+        final String id;
+        final long messages;
+        /** Messages no rule could read. */
+        final long unread;
+        /** Messages the unmarked reading called a loop (opens, moves on or closes one). */
+        final long loops;
+        final boolean quiet;
+
+        Row(String id, long messages, long unread, long loops, boolean quiet) {
+            this.id = id;
+            this.messages = messages;
+            this.unread = unread;
+            this.loops = loops;
+            this.quiet = quiet;
+        }
+
+        /** Whole percent of its messages that no rule could read. */
+        long unreadPercent() {
+            return percent(unread, messages);
+        }
+    }
+
+    static long percent(long part, long whole) {
+        return whole <= 0 ? 0L : Math.round(100.0 * part / whole);
+    }
+
+    /** A candidate: many messages, nearly all unread. A reason to list it first — not a reason to mark it, and not required to mark it. */
+    static boolean candidate(Row r) {
+        return r.messages >= CANDIDATE_MESSAGES && r.unread * 100 >= (long) CANDIDATE_PERCENT * r.messages;
+    }
+
+    /** Candidates first, then by messages (most first), ties by name. */
+    static List<Row> order(List<Row> rows) {
+        List<Row> out = new ArrayList<>(rows);
+        Collections.sort(out, new Comparator<Row>() {
+            @Override public int compare(Row a, Row b) {
+                boolean x = candidate(a), y = candidate(b);
+                if (x != y) return x ? -1 : 1;
+                if (a.messages != b.messages) return a.messages > b.messages ? -1 : 1;
+                return a.id.compareTo(b.id);
+            }
+        });
+        return out;
+    }
+
+    /** *1,240 messages · 97% not read* — the reason a row is where it is, said plainly; no score. */
+    static String reason(Row r) {
+        return String.format(Locale.ROOT, "%,d", r.messages) + (r.messages == 1 ? " message" : " messages") + " · " + r.unreadPercent() + "% not read";
+    }
+
+    /** What marking cost, in the person's terms. Empty when nobody is quiet. */
+    static String costLine(long quietSenders, long hid) {
+        if (quietSenders <= 0) return "";
+        return "Quiet senders (" + quietSenders + ") hid " + String.format(Locale.ROOT, "%,d", hid) + (hid == 1 ? " message" : " messages") + " that would otherwise have been read as loops.";
+    }
+}

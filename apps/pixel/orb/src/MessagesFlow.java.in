@@ -26,13 +26,16 @@ final class MessagesFlow {
     static final class Look {
         final MessagesXml.Recognition recognition;
         final MessagesRules.Survey survey;
-        /** The same pass read as the Loop protocol would (`LoopFit`): counts only, nothing recorded until the person asks. */
-        final LoopFit.Report fit;
+        /**
+         * The same pass read as the Loop protocol would (`LoopFit`): tallies per sender, counts only, held in memory. Read it only with the person's marks —
+         * `tally.report(Senders.quiet(…))` — so that a sender they said is not about them is not read as a loop anywhere.
+         */
+        final LoopFit tally;
 
-        Look(MessagesXml.Recognition recognition, MessagesRules.Survey survey, LoopFit.Report fit) {
+        Look(MessagesXml.Recognition recognition, MessagesRules.Survey survey, LoopFit tally) {
             this.recognition = recognition;
             this.survey = survey;
-            this.fit = fit;
+            this.tally = tally;
         }
 
         /** Messages not offered for keeping: names and short codes, code-like words, the unfinished or older months, other kinds. */
@@ -51,7 +54,7 @@ final class MessagesFlow {
                 fit.message(message);
             }
         });
-        return new Look(recognition, survey, fit.report());
+        return new Look(recognition, survey, fit);
     }
 
     static final class Kept {

@@ -1,0 +1,130 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.util.List;
+
+/**
+ * Senders that are not about your obligations (`docs/SENDER_MARKS_PHONE.md`, DR-42). Lists the **service senders of the file you just looked at** — from
+ * memory, nothing is written for the list — most unread first, and lets you say of any of them *not about my obligations*, or take it back. Anyone can be
+ * marked; the order is only a suggestion and nothing is pre-ticked. **Secure like Recall**: sender codes are on this screen only.
+ *
+ * A mark writes one record (a blinded key, a verdict, two counts) and changes what Orb may infer next. It does not touch a loop or a commitment you have
+ * already accepted.
+ */
+public final class SendersActivity extends Activity {
+    private static final int PAGE = 15;
+
+    private LinearLayout list;
+    private TextView cost;
+    private int shown = PAGE;
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+
+        TextView title = new TextView(this);
+        title.setText("Senders that are not about your obligations");
+        title.setTextSize(17);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(title);
+
+        TextView note = new TextView(this);
+        note.setTextSize(12);
+        note.setText("\nSay it once for a sender, and Orb will not read anything from it as a bill, a plan or a promise. Take it back at any time. "
+            + "This changes what Orb reads next; it does not change anything you have already accepted, and your messages are not touched.\n");
+        root.addView(note);
+
+        cost = new TextView(this);
+        cost.setTextSize(12);
+        cost.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(cost);
+
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        render();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private void render() {
+        list.removeAllViews();
+        Orb orb = Orb.get();
+        final Journal journal = orb == null ? null : orb.journal();
+        final LoopFit tally = SenderSession.held();
+        if (journal == null || tally == null) {
+            cost.setText("");
+            list.addView(text("\nLook at a message backup first: Sources \u2192 Messages \u2192 Look. The senders in that file are listed here.", 13, false));
+            return;
+        }
+        SenderRules.Quiet quiet = Senders.quiet(this, journal);
+        LoopFit.Report report = tally.report(quiet);
+        String line = SenderRules.costLine(report.get("quiet.senders"), report.get("quiet.hid"));
+        cost.setText(line.isEmpty() ? "Nobody is quiet." : line);
+        List<SenderRules.Row> rows = tally.senders(quiet);
+        if (rows.isEmpty()) {
+            list.addView(text("\nThere are no service senders in that file.", 13, false));
+            return;
+        }
+        boolean headedMostly = false, headedRest = false;
+        for (int i = 0; i < rows.size() && i < shown; i++) {
+            final SenderRules.Row row = rows.get(i);
+            boolean candidate = SenderRules.candidate(row);
+            if (candidate && !headedMostly) { list.addView(text("\nMostly not read", 12, true)); headedMostly = true; }
+            if (!candidate && !headedRest && headedMostly) { list.addView(text("\nThe rest", 12, true)); headedRest = true; }
+            list.addView(text("\n" + row.id + (row.quiet ? "  \u2014 quiet" : ""), 14, true));
+            list.addView(text(SenderRules.reason(row) + (row.loops > 0 ? " \u00b7 " + row.loops + " read as loops" : ""), 12, false));
+            Button b = new Button(this);
+            b.setText(row.quiet ? "Take it back" : "Not about my obligations");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    boolean ok = Senders.mark(SendersActivity.this, journal, SenderFacts.keyer(SendersActivity.this), row.id,
+                        row.quiet ? SenderFacts.CLEAR : SenderFacts.QUIET, row.messages, row.unread);
+                    if (!ok) new AlertDialog.Builder(SendersActivity.this).setMessage("Orb could not record that, so nothing changed.").setPositiveButton("OK", null).show();
+                    render();
+                }
+            });
+            list.addView(b);
+        }
+        if (rows.size() > shown) {
+            Button more = new Button(this);
+            more.setText("Show more (" + (rows.size() - shown) + " more senders)");
+            more.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    shown += PAGE;
+                    render();
+                }
+            });
+            list.addView(more);
+        }
+    }
+}

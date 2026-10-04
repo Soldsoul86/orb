@@ -1,0 +1,362 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Sender marks (`docs/SENDER_MARKS_PHONE.md`, DR-42): who a sender is, the order of the list, what a mark records, what a quiet sender changes in the reading,
+ * and — the boundary the operator insisted on — that **a mark never touches a loop or a commitment already accepted**.
+ */
+final class SenderTest {
+    private SenderTest() {}
+
+    private static Object fixture(String name) throws Exception {
+        Path p = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/loops/" + name);
+        return MiniJson.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+    }
+
+    private static long msOf(String iso) {
+        return LocalDate.parse(iso).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() + 12 * 3_600_000L;
+    }
+
+    private static MessagesRules.Message from(String address, String body, String day) {
+        return new MessagesRules.Message(address, "", msOf(day), 1, body);
+    }
+
+    private static final String BILL = "Your card bill of Rs.1,000.00 is due on 25-Sep-26.";
+    private static final String PAID = "Payment of Rs.1,000.00 received towards your credit card ending 0000.";
+
+    /** Three senders: a bank (a bill, then its payment, a debit), a shop (two promotions and a delivery), and a sender nothing reads. */
+    private static LoopFit inbox() {
+        LoopFit fit = new LoopFit();
+        fit.message(from("VM-BANKA", BILL, "2026-09-01"));
+        fit.message(from("VM-BANKA", PAID, "2026-09-05"));
+        fit.message(from("VM-BANKA", "Rs.500.00 debited from A/c XX0000.", "2026-09-06"));
+        fit.message(from("AD-SHOPB-S", "Congratulations! Win a prize with this offer.", "2026-09-02"));
+        fit.message(from("AD-SHOPB-S", "Get 20% off today only.", "2026-09-03"));
+        fit.message(from("AD-SHOPB-S", "Your order is out for delivery today.", "2026-09-04"));
+        fit.message(from("VM-ODDC", "Kuch bhi", "2026-09-01"));
+        fit.message(from("VM-ODDC", "Kuch aur", "2026-09-02"));
+        fit.message(from("+919000000001", "are we meeting today?", "2026-09-02"));
+        return fit;
+    }
+
+    private static SenderRules.Quiet quietOf(final String... ids) {
+        final Set<String> set = new HashSet<>(Arrays.asList(ids));
+        return new SenderRules.Quiet() {
+            @Override public boolean quiet(String id) { return set.contains(id); }
+        };
+    }
+
+    private static int count(Journal journal, String prefix) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) {
+            String t = Journal.typeOf(l);
+            if (t != null && t.startsWith(prefix)) n++;
+        }
+        return n;
+    }
+
+    static void run() throws Exception {
+        who();
+        order();
+        record();
+        reading();
+        journal();
+        guards();
+    }
+
+    private static void who() throws Exception {
+        Harness.suite("who a sender is: the code, without its route; never a phone number");
+        Map<String, Object> corpus = MiniJson.map(fixture("senders.json"));
+        for (Object c : MiniJson.list(corpus.get("ids"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            Harness.equal("“" + MiniJson.str(one.get("address")) + "”", SenderRules.senderId(MiniJson.str(one.get("address"))), MiniJson.str(one.get("id")));
+        }
+        Harness.check("no address is no sender", SenderRules.senderId(null) == null);
+        Harness.equal("the brand for counting lumps numeric short codes and names the rest", LoopFit.brandOf("56767") + "|" + LoopFit.brandOf("VM-HDFCBK") + "|" + LoopFit.brandOf("+919000000000"), "SHORTCODE|HDFCBK|OTHER");
+    }
+
+    private static void order() throws Exception {
+        Harness.suite("the list: nearly-all-unread senders first, by volume; anyone can be marked");
+        Map<String, Object> corpus = MiniJson.map(fixture("senders.json"));
+        for (Object c : MiniJson.list(corpus.get("order"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            List<SenderRules.Row> rows = new ArrayList<>();
+            for (Object r : MiniJson.list(one.get("rows"))) {
+                Map<String, Object> m = MiniJson.map(r);
+                rows.add(new SenderRules.Row(MiniJson.str(m.get("id")), MiniJson.num(m.get("messages")), MiniJson.num(m.get("unread")), 0L, false));
+            }
+            List<String> got = new ArrayList<>();
+            for (SenderRules.Row r : SenderRules.order(rows)) got.add(r.id);
+            List<String> want = new ArrayList<>();
+            for (Object o : MiniJson.list(one.get("order"))) want.add(MiniJson.str(o));
+            Harness.equal(MiniJson.str(one.get("name")), got, want);
+            List<SenderRules.Row> reversed = new ArrayList<>(rows);
+            Collections.reverse(reversed);
+            List<String> again = new ArrayList<>();
+            for (SenderRules.Row r : SenderRules.order(reversed)) again.add(r.id);
+            Harness.equal(MiniJson.str(one.get("name")) + " (whatever order they arrive in)", again, want);
+        }
+        for (Object c : MiniJson.list(corpus.get("reasons"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            Harness.equal("the reason: " + MiniJson.str(one.get("say")), SenderRules.reason(new SenderRules.Row("X", MiniJson.num(one.get("messages")), MiniJson.num(one.get("unread")), 0L, false)), MiniJson.str(one.get("say")));
+        }
+        Harness.check("a candidate is a reason to list first, never a condition to mark: five messages, all irrelevant, are markable", !SenderRules.candidate(new SenderRules.Row("X", 5, 5, 0, false)));
+        Harness.equal("what marking cost is said in the person's terms", SenderRules.costLine(2, 1237), "Quiet senders (2) hid 1,237 messages that would otherwise have been read as loops.");
+        Harness.equal("one message is one message", SenderRules.costLine(1, 1), "Quiet senders (1) hid 1 message that would otherwise have been read as loops.");
+        Harness.equal("nobody quiet, nothing to say", SenderRules.costLine(0, 0), "");
+        Harness.equal("a share of nothing is nothing", SenderRules.percent(3, 0), 0L);
+        Harness.equal("a share is rounded, not cut", SenderRules.percent(3, 7) + "|" + SenderRules.percent(1, 3) + "|" + SenderRules.percent(2, 3), "43|33|67");
+    }
+
+    private static void record() {
+        Harness.suite("the record: a blinded key, a verdict, two counts — no name, no number, no word");
+        Map<String, Object> p = SenderFacts.judged("0123456789abcdef", "quiet", 8697L, 123L);
+        Harness.equal("its fields", new TreeSet<>(p.keySet()).toString(), "[capability, key, messages, unread, verdict, version]");
+        Harness.check("the capability and version are the sender marks'", p.get("capability").equals("orb.messages.senders") && p.get("version").equals(1L));
+        Harness.check("a sender is recorded only by a blinded key", throwsOn(new Runnable() { public void run() { SenderFacts.judged("GIOTTU", "quiet", 1, 1); } })
+            && throwsOn(new Runnable() { public void run() { SenderFacts.judged("0123456789ABCDEF", "quiet", 1, 1); } })
+            && throwsOn(new Runnable() { public void run() { SenderFacts.judged(null, "quiet", 1, 1); } })
+            && throwsOn(new Runnable() { public void run() { SenderFacts.judged("0123456789abcde", "quiet", 1, 1); } }));
+        Harness.check("a verdict is quiet or clear", throwsOn(new Runnable() { public void run() { SenderFacts.judged("0123456789abcdef", "loud", 1, 1); } })
+            && throwsOn(new Runnable() { public void run() { SenderFacts.judged("0123456789abcdef", null, 1, 1); } })
+            && SenderFacts.judged("0123456789abcdef", "clear", 1, 1).get("verdict").equals("clear"));
+        Harness.check("counts below zero are zero", SenderFacts.judged("0123456789abcdef", "quiet", -5, -1).get("messages").equals(0L) && SenderFacts.judged("0123456789abcdef", "quiet", -5, -1).get("unread").equals(0L));
+        Harness.check("the record has no id, name or status field", !p.containsKey("sender") && !p.containsKey("name") && !p.containsKey("status"));
+    }
+
+    private static boolean throwsOn(Runnable r) {
+        try {
+            r.run();
+            return false;
+        } catch (IllegalArgumentException refused) {
+            return true;
+        }
+    }
+
+    private static void reading() {
+        Harness.suite("a quiet sender is not a loop: everything from it, whatever its words say");
+        LoopFit fit = inbox();
+        LoopFit.Report all = fit.report();
+        Harness.equal("the unmarked reading, for comparison: the bank forms loops", all.get("opens") + "|" + all.get("closes") + "|" + all.get("advances"), "1|2|1");
+        Harness.equal("and its bill was paid", all.get("loops.opens") + "/" + all.get("loops.closed"), "1/1");
+        LoopFit.Report bank = fit.report(quietOf("BANKA"));
+        Harness.equal("the bank, quiet: nothing it said forms a loop", bank.get("opens") + "|" + bank.get("closes"), "0|0");
+        Harness.equal("all three of its messages are noise, tagged sender", bank.get("noise.sender") + "|" + bank.get("noise"), "3|5");
+        Harness.equal("and the cost is counted: the three that were loops", bank.get("quiet.hid") + "|" + bank.get("quiet.messages") + "|" + bank.get("quiet.senders"), "3|3|1");
+        Harness.equal("so is the matching", bank.get("match.opens") + "/" + bank.get("loops.opens"), "0/0");
+        Harness.equal("every service message is still in exactly one role", sum(bank), bank.service);
+        LoopFit.Report before = feedTwo(from("VM-BANKA", PAID, "2026-09-01"), from("VM-BANKA", BILL, "2026-09-03"));
+        Harness.equal("a payment before the bill closes no obligation", before.get("loops.opens") + "/" + before.get("loops.closed"), "1/0");
+        Harness.equal("reminders exactly 45 days apart are one obligation; 46 are two", feedTwo(from("VM-BANKA", BILL, "2026-09-01"), from("VM-BANKA", BILL, "2026-10-16")).get("loops.opens") + "|"
+            + feedTwo(from("VM-BANKA", BILL, "2026-09-01"), from("VM-BANKA", BILL, "2026-10-17")).get("loops.opens"), "1|2");
+        Harness.equal("conversations are not touched", bank.conversational, 1L);
+        Harness.check("the sentence says what it cost", bank.say().contains("Quiet senders (1) hid 3 messages that would otherwise have been read as loops."));
+        Harness.check("with nobody quiet it says nothing of the sort", !all.say().contains("Quiet senders"));
+
+        LoopFit.Report shop = fit.report(quietOf("SHOPB"));
+        Harness.equal("the shop, quiet: its delivery is no longer a loop, its promotions are noise either way", shop.get("advances") + "|" + shop.get("quiet.hid") + "|" + shop.get("noise.sender"), "0|1|3");
+        Harness.equal("the bank is untouched by marking the shop", shop.get("opens") + "|" + shop.get("closes"), "1|2");
+        LoopFit.Report odd = fit.report(quietOf("ODDC"));
+        Harness.equal("a sender nothing could read, quiet: no longer unread, nothing hidden that was a loop", odd.get("unmapped") + "|" + odd.get("quiet.hid"), "0|0");
+        Harness.equal("the shop's three messages are noise, whatever they were, and every message is still in one role", shop.get("noise") + "|" + sum(shop) + "|" + shop.service, "3|9|9".replace("9|9", shop.service + "|" + shop.service));
+        Harness.equal("two quiet at once", fit.report(quietOf("BANKA", "SHOPB")).get("quiet.hid") + "|" + fit.report(quietOf("SHOPB", "BANKA")).get("quiet.hid"), "4|4");
+        Harness.equal("take it back: the reading is what it was", fit.report(SenderRules.NONE).counts(), all.counts());
+        Harness.equal("a mark for a sender not in the file changes nothing", fit.report(quietOf("NOBODY")).counts(), all.counts());
+
+        List<SenderRules.Row> rows = fit.senders(quietOf("SHOPB"));
+        StringBuilder ids = new StringBuilder();
+        for (SenderRules.Row r : rows) ids.append(r.id).append(r.quiet ? "*" : "").append(' ');
+        Harness.equal("the list, with marks shown", ids.toString().trim(), "BANKA SHOPB* ODDC");
+        Harness.equal("a row says what was not read", rows.get(2).messages + "|" + rows.get(2).unread + "|" + rows.get(2).unreadPercent() + "|" + rows.get(0).loops, "2|2|100|3");
+        LoopFit nameless = new LoopFit();
+        nameless.message(new MessagesRules.Message("", "", msOf("2026-09-01"), 1, "Kuch bhi"));
+        Harness.check("a message with no usable sender is counted, never listed, and cannot be marked", nameless.senders(SenderRules.NONE).isEmpty()
+            && nameless.report(quietOf("")).get("noise.sender") == 0L && nameless.report(quietOf("")).get("unmapped") == 1L && nameless.report(quietOf("")).get("quiet.senders") == 0L);
+        Harness.check("the unmarkable remainder is never listed", new LoopFit().senders(SenderRules.NONE).isEmpty());
+    }
+
+    /** The source with its comments taken out: a guard is about what the code does, not what it says. */
+    private static String code(String source) {
+        return source.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", "");
+    }
+
+    private static LoopFit.Report feedTwo(MessagesRules.Message a, MessagesRules.Message b) {
+        LoopFit fit = new LoopFit();
+        fit.message(a);
+        fit.message(b);
+        return fit.report();
+    }
+
+    private static long sum(LoopFit.Report r) {
+        long n = 0;
+        for (String role : LoopFit.ROLES) n += r.get(role);
+        return n;
+    }
+
+    private static Journal open(Context[] holder) throws Exception {
+        Install.forget();
+        Context context = new Context(Files.createTempDirectory("orb-senders").toFile());
+        holder[0] = context;
+        return Journal.open(context, Install.lane(context), Install.id(context));
+    }
+
+    private static void journal() throws Exception {
+        Harness.suite("a mark is an event: last wins, take it back, off means ignored");
+        Context[] box = new Context[1];
+        Journal journal = open(box);
+        Context context = box[0];
+        SenderFacts.Keyer keyer = SenderFacts.keyer(context);
+        String keyA = keyer.key("BANKA");
+        Harness.check("a key is sixteen hex and reveals nothing of the sender", keyA.matches("[0-9a-f]{16}") && !keyA.toLowerCase().contains("banka") && !keyer.key("BANKB").equals(keyA) && keyer.key("BANKA").equals(keyA));
+        Harness.check("nobody is quiet before anything is said, and no sender at all is never quiet", !Senders.quiet(context, journal).quiet("BANKA") && !Senders.quiet(context, journal).quiet(null));
+        Harness.check("the first mark is written", Senders.mark(context, journal, keyer, "BANKA", SenderFacts.QUIET, 3, 0));
+        Harness.check("it recorded the grant first, then the answer", count(journal, "grants.capability.granted") == 1 && count(journal, SenderFacts.JUDGED) == 1);
+        Harness.check("the sender is quiet, and another is not", Senders.quiet(context, journal).quiet("BANKA") && !Senders.quiet(context, journal).quiet("SHOPB"));
+        Harness.check("with someone quiet, no sender at all is still never quiet", !Senders.quiet(context, journal).quiet(null));
+        Harness.check("a second mark does not grant again", Senders.mark(context, journal, keyer, "SHOPB", SenderFacts.QUIET, 3, 2) && count(journal, "grants.capability.granted") == 1 && count(journal, SenderFacts.JUDGED) == 2);
+        Harness.equal("two senders are quiet", SenderFacts.quietCount(journal.readLines()), 2);
+        Harness.check("take it back: written, and no longer quiet", Senders.mark(context, journal, keyer, "BANKA", SenderFacts.CLEAR, 3, 0) && !Senders.quiet(context, journal).quiet("BANKA") && Senders.quiet(context, journal).quiet("SHOPB"));
+        Harness.equal("one is quiet now", SenderFacts.quietCount(journal.readLines()), 1);
+        Harness.check("and quiet again: the last word counts", Senders.mark(context, journal, keyer, "BANKA", SenderFacts.QUIET, 3, 0) && Senders.quiet(context, journal).quiet("BANKA"));
+        String all = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no sender name", !all.contains("BANKA") && !all.contains("SHOPB") && !all.contains("Congratulations"));
+        Harness.check("a mark with no sender, no key or an unknown verdict writes nothing", !Senders.mark(context, journal, keyer, null, SenderFacts.QUIET, 1, 1) && !Senders.mark(context, journal, keyer, "", SenderFacts.QUIET, 1, 1)
+            && !Senders.mark(context, journal, keyer, "BANKA", "loud", 1, 1) && !Senders.mark(context, null, keyer, "BANKA", SenderFacts.QUIET, 1, 1));
+        SenderFacts.Keyer broken = new SenderFacts.Keyer() {
+            @Override public String key(String id) throws Exception { throw new IllegalStateException("no key"); }
+        };
+        int before = count(journal, SenderFacts.JUDGED);
+        Harness.check("with no key nothing is written and nobody is hidden on a doubt", !Senders.mark(context, journal, broken, "BANKA", SenderFacts.QUIET, 1, 1) && count(journal, SenderFacts.JUDGED) == before
+            && !SenderFacts.quiet(journal.readLines(), broken, true).quiet("BANKA"));
+
+        Map<String, Object> odd = Json.obj();
+        odd.put("key", keyA);
+        odd.put("verdict", "loud");
+        journal.append(SenderFacts.JUDGED, odd);
+        Harness.check("a verdict this version does not know is ignored: the last word it does know stands", Senders.quiet(context, journal).quiet("BANKA") && SenderFacts.quietCount(journal.readLines()) == 2);
+        final int[] calls = {0};
+        final SenderFacts.Keyer counting = new SenderFacts.Keyer() {
+            @Override public String key(String id) throws Exception { calls[0]++; return SenderFacts.keyer(box[0]).key(id); }
+        };
+        SenderRules.Quiet asked = SenderFacts.quiet(journal.readLines(), counting, true);
+        asked.quiet("BANKA");
+        asked.quiet("BANKA");
+        asked.quiet("SHOPB");
+        Harness.equal("a key is made once per sender, however often it is asked", calls[0], 2);
+        before = count(journal, SenderFacts.JUDGED);
+        SendersAccess.revoke(context, journal);
+        Harness.check("switched off, Orb ignores the marks (the events stay)", !Senders.quiet(context, journal).quiet("BANKA") && count(journal, SenderFacts.JUDGED) == before);
+        Harness.check("clearing while off does not grant", Senders.mark(context, journal, keyer, "BANKA", SenderFacts.CLEAR, 1, 1) && !SendersAccess.granted(context));
+        Harness.check("a new quiet mark turns it on again", Senders.mark(context, journal, keyer, "BANKA", SenderFacts.QUIET, 1, 1) && SendersAccess.granted(context) && Senders.quiet(context, journal).quiet("BANKA"));
+
+        Context[] box0 = new Context[1];
+        Journal j0 = open(box0);
+        Harness.check("granting twice records once", grantTwice(box0[0], j0));
+
+        Harness.suite("marking changes what Orb reads next — it never touches a loop or a commitment already accepted");
+        Context[] box2 = new Context[1];
+        Journal j2 = open(box2);
+        Context c2 = box2[0];
+        Commitments.Opened owe = Commitments.open(c2, j2, null, "Pay the card bill to the bank", "owe", "2026-10-10", null);
+        Commitments.Opened waiting = Commitments.open(c2, j2, null, "Refund from the shop", "waiting", "2026-10-20", null);
+        Map<String, Object> loop = j2.append(LoopRules.OPENED, LoopFacts.opened("sha256:abc", 40L, "GIVE", "me", "stated", "2026-10-12", "stated", "draft.bill", 1L, SenderFacts.keyer(c2).key("BANKA")));
+        Harness.check("a loop and two commitments exist", loop != null && owe.eventId != null && waiting.eventId != null);
+        List<String> frozenLoopEvents = new ArrayList<>();
+        for (String l : j2.readLines()) {
+            String t = Journal.typeOf(l);
+            if (t != null && (t.startsWith("orb.loop.") || t.startsWith("orb.commitment."))) frozenLoopEvents.add(l);
+        }
+        StringBuilder statesBefore = new StringBuilder();
+        for (Commitments.Commitment cm : Commitments.all(c2, j2)) statesBefore.append(Commitments.status(cm, "2026-10-15")).append(cm.dueDate).append(';');
+        int eventsBefore = j2.readLines().size();
+        Harness.check("mark the sender the loop came from", Senders.mark(c2, j2, SenderFacts.keyer(c2), "BANKA", SenderFacts.QUIET, 9, 0));
+        Harness.equal("exactly two events were added: the grant and the answer", j2.readLines().size() - eventsBefore, 2);
+        List<String> after = new ArrayList<>();
+        for (String l : j2.readLines()) {
+            String t = Journal.typeOf(l);
+            if (t != null && (t.startsWith("orb.loop.") || t.startsWith("orb.commitment."))) after.add(l);
+        }
+        Harness.equal("every loop and commitment event is exactly as it was", after, frozenLoopEvents);
+        StringBuilder statesAfter = new StringBuilder();
+        for (Commitments.Commitment cm : Commitments.all(c2, j2)) statesAfter.append(Commitments.status(cm, "2026-10-15")).append(cm.dueDate).append(';');
+        Harness.equal("and their states are what they were", statesAfter.toString(), statesBefore.toString());
+        Harness.check("taking the mark back adds one event and changes nothing else", Senders.mark(c2, j2, SenderFacts.keyer(c2), "BANKA", SenderFacts.CLEAR, 9, 0) && j2.readLines().size() - eventsBefore == 3);
+        List<String> end = new ArrayList<>();
+        for (String l : j2.readLines()) {
+            String t = Journal.typeOf(l);
+            if (t != null && (t.startsWith("orb.loop.") || t.startsWith("orb.commitment."))) end.add(l);
+        }
+        Harness.equal("the loop and the commitments are still as accepted", end, frozenLoopEvents);
+    }
+
+    private static boolean grantTwice(Context context, Journal journal) throws Exception {
+        SendersAccess.grant(context, journal);
+        SendersAccess.grant(context, journal);
+        boolean once = count(journal, "grants.capability.granted") == 1;
+        SendersAccess.revoke(context, journal);
+        return once && !SendersAccess.granted(context);
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("one meaning everywhere: every reader of messages is handed the marks; only one place writes them");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new java.util.TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        List<String> bare = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (!e.getKey().equals("LoopFit") && e.getValue().matches("(?s).*\\.report\\(\\).*")) bare.add(e.getKey());
+        Harness.check("nothing but LoopFit itself reads the tallies without the person's marks " + bare, bare.isEmpty());
+        List<String> readers = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains(".report(Senders.quiet(") || e.getValue().contains("tally.report(quiet)")) readers.add(e.getKey());
+        Harness.equal("the readers of the tallies, each passing the marks", readers, Arrays.asList("SendersActivity", "SourcesActivity"));
+        List<String> writers = new ArrayList<>();
+        for (Map.Entry<String, String> e : source.entrySet()) if (e.getValue().contains("append(SenderFacts.JUDGED")) writers.add(e.getKey());
+        Harness.equal("only one class writes a mark", writers, Arrays.asList("Senders"));
+        Harness.check("only the Senders screen and the Messages screen call it", source.get("SendersActivity").contains("Senders.mark(") && !source.get("SourcesActivity").contains("Senders.mark("));
+        Harness.check("the Senders screen is secure, and exported nowhere", source.get("SendersActivity").contains("FLAG_SECURE")
+            && new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").contains("android:name=\".SendersActivity\"\n            android:exported=\"false\""));
+        Harness.check("a mark touches no loop or commitment: the marking code names neither", !source.get("Senders").contains("Commitment") && !source.get("Senders").contains("LoopRules") && !source.get("Senders").contains("orb.loop") && !source.get("Senders").contains("orb.commitment"));
+        Harness.check("the session holds counts in memory and writes nothing", !source.get("SenderSession").contains("append(") && !source.get("SenderSession").contains("File"));
+        Harness.check("the Senders screen logs nothing and keeps no preference", !source.get("SendersActivity").contains("Log.") && !source.get("SendersActivity").contains("getSharedPreferences") && !source.get("SendersActivity").contains("Toast"));
+
+        Harness.suite("the capability: declared, Observe, switchable, words pinned");
+        Capabilities.Declaration d = Capabilities.byId(Capabilities.SENDERS);
+        Harness.check("declared once, Observe, switchable, and records only the answer", d != null && d.tier.equals("Observe") && d.switchable && d.recordsAs.equals(Arrays.asList("orb.sender.judged")) && d.version == 1L);
+        Harness.equal("its words are pinned: a change is a new capability", Attachments.identity(Capabilities.SENDERS_SAYS.getBytes(StandardCharsets.UTF_8)), SAYS_PIN);
+        Harness.check("it says only the answer is kept, against a key that reveals nothing, that nothing leaves the phone and that any answer can be taken back",
+            Capabilities.SENDERS_SAYS.contains("remembers only your answer") && Capabilities.SENDERS_SAYS.contains("a key that reveals nothing") && Capabilities.SENDERS_SAYS.contains("Nothing leaves the phone")
+            && Capabilities.SENDERS_SAYS.contains("take any answer back"));
+        Context[] box = new Context[1];
+        Journal journal = open(box);
+        Capabilities.Status off = Capabilities.status(Capabilities.SENDERS, journal.readLines());
+        Harness.check("before any mark: off, and nothing marked", off.state.startsWith("OFF") && off.lastDetail.equals("no sender marked"));
+        Senders.mark(box[0], journal, SenderFacts.keyer(box[0]), "BANKA", SenderFacts.QUIET, 1, 0);
+        Senders.mark(box[0], journal, SenderFacts.keyer(box[0]), "SHOPB", SenderFacts.QUIET, 1, 0);
+        Capabilities.Status on = Capabilities.status(Capabilities.SENDERS, journal.readLines());
+        Harness.check("after two marks: on, with a count and no name", on.state.startsWith("ON") && on.lastDetail.equals("2 senders are quiet") && on.lastAtMs > 0);
+        Harness.check("the control in What Orb may do switches it off", source.get("MayDoActivity").contains("Switch off sender marks") && source.get("MayDoActivity").contains("SendersAccess.revoke("));
+    }
+
+    /** The sha256 of `Capabilities.SENDERS_SAYS`. Changing the words is a new capability, never an edit. */
+    private static final String SAYS_PIN = "sha256:baa82ec640c04c9c2d8cfe6b489fa76164e58cec111cb0fe912eae6de5e695a9";
+}

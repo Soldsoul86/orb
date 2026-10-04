@@ -301,7 +301,8 @@ final class DocumentsRulesTest {
         String screen = source.get("SourcesActivity");
         Harness.check("the screen is secure", screen.contains("FLAG_SECURE"));
         Harness.equal("it starts three pickers (a folder, PDF files, a message backup) and nothing else", screen.split("startActivityForResult\\(", -1).length - 1, 3);
-        Harness.check("it opens no activity of its own and sends nothing", !screen.contains("startActivity(") && !screen.contains("ACTION_SEND") && !screen.contains("ACTION_VIEW"));
+        Harness.check("it opens one activity of Orb's own (the Senders screen) and sends nothing", screen.split("startActivity\\(", -1).length - 1 == 1
+            && screen.contains("startActivity(new android.content.Intent(SourcesActivity.this, SendersActivity.class))") && !screen.contains("ACTION_SEND") && !screen.contains("ACTION_VIEW"));
         Harness.check("the folder picker asks for read access only", screen.contains("FLAG_GRANT_READ_URI_PERMISSION") && !screen.contains("FLAG_GRANT_WRITE_URI_PERMISSION"));
         Harness.check("the file picker asks only for PDFs", screen.contains("pick.setType(\"application/pdf\")"));
         int grantedAt = screen.indexOf("if (!DocumentsAccess.granted(this))");

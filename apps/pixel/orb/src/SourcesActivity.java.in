@@ -76,7 +76,24 @@ public final class SourcesActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (!looking) render();
+        if (looking) return;
+        // Coming back from the Senders screen (or anywhere): draw the screen again, and then the last Look again, with the ticks the person had, so that
+        // their sender marks are reflected at once and nothing they were doing is lost.
+        java.util.Set<String> ticks = new java.util.HashSet<>();
+        for (int i = 0; i < messageBoxes.size() && i < messageRows.size(); i++) if (messageBoxes.get(i).isChecked()) ticks.add(messageRows.get(i).number);
+        render();
+        if (!looking && messagesLook != null && messageResults != null) {
+            messageBoxes.clear();
+            messageRows.clear();
+            showMessagesLook(messagesLook, null);
+            for (int i = 0; i < messageBoxes.size(); i++) if (ticks.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (isFinishing()) SenderSession.clear();
     }
 
     private TextView text(String s, int size, boolean bold) {
@@ -366,6 +383,21 @@ public final class SourcesActivity extends Activity {
     private boolean lookMessages;
     private LinearLayout messageResults;
     private MessagesFlow.Look messagesLook;
+    /** Recomputes the fit paragraph from the tallies with the person's marks as they are now. */
+    private void showFit() {
+        if (messagesLook == null || fitText == null) return;
+        currentFit = messagesLook.tally.report(Senders.quiet(this, journal()));
+        fitText.setText(currentFit.say());
+        if (recordFit != null) {
+            recordFit.setText("Record this fit report (counts only)");
+            recordFit.setEnabled(true);
+        }
+    }
+
+    /** The fit paragraph and its record button; recomputed from the tallies whenever the person's sender marks may have changed. */
+    private TextView fitText;
+    private Button recordFit;
+    private LoopFit.Report currentFit;
     private final List<CheckBox> messageBoxes = new ArrayList<>();
     private final List<MessagesRules.Conversation> messageRows = new ArrayList<>();
     private TextView tally;
@@ -405,6 +437,7 @@ public final class SourcesActivity extends Activity {
                 MessagesAccess.revoke(SourcesActivity.this, journal);
                 messagesFile = null;
                 messagesLook = null;
+                SenderSession.clear();
                 render();
             }
         }));
@@ -417,7 +450,10 @@ public final class SourcesActivity extends Activity {
         }
     }
 
+    private boolean lookRecorded;
+
     private void startMessagesLook(final Uri file) {
+        lookRecorded = false;
         messageResults.removeAllViews();
         messageBoxes.clear();
         messageRows.clear();
@@ -457,7 +493,10 @@ public final class SourcesActivity extends Activity {
             return;
         }
         MessagesRules.Survey survey = found.survey;
-        if (journal != null) journal.append(MessagesFacts.LOOKED_TYPE, MessagesFacts.looked(survey.by.size(), survey.total, found.leftOut()));
+        if (journal != null && !lookRecorded) {
+            journal.append(MessagesFacts.LOOKED_TYPE, MessagesFacts.looked(survey.by.size(), survey.total, found.leftOut()));
+            lookRecorded = true;   // drawing the same Look again (after the Senders screen) is not a second look
+        }
         if (!found.recognition.recognised()) {
             messageResults.addView(text(found.recognition.describe(), 13, true));
             return;
@@ -479,18 +518,23 @@ public final class SourcesActivity extends Activity {
         messageResults.addView(text("Left out, and only counted: " + survey.service + " from names or short codes (banks, offers, codes) \u00b7 " + survey.codes
             + " that look like codes \u00b7 " + survey.outside + " from this month or older than a year \u00b7 " + survey.other + " drafts or other kinds."
             + (found.recognition.cut ? " The file is longer than " + MessagesRules.MAX_MESSAGES + " messages; Orb read the first " + MessagesRules.MAX_MESSAGES + "." : ""), 11, false));
-        final LoopFit.Report fit = found.fit;
-        messageResults.addView(text(fit.say(), 11, false));
-        final Button recordFit = button("Record this fit report (counts only)", null);
+        SenderSession.hold(found.tally);
+        fitText = text("", 11, false);
+        messageResults.addView(fitText);
+        recordFit = button("Record this fit report (counts only)", null);
         recordFit.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View view) {
                 Journal now = journal();
-                boolean written = now != null && now.append(LoopFacts.FIT_REPORTED, LoopFacts.fitReported(fit)) != null;
+                boolean written = now != null && currentFit != null && now.append(LoopFacts.FIT_REPORTED, LoopFacts.fitReported(currentFit)) != null;
                 recordFit.setText(written ? "Recorded \u2014 counts and sender codes only" : "Could not record it");
                 recordFit.setEnabled(!written);
             }
         });
         messageResults.addView(recordFit);
+        messageResults.addView(button("Senders\u2026 (mark those that are not about your obligations)", new View.OnClickListener() {
+            @Override public void onClick(View view) { startActivity(new android.content.Intent(SourcesActivity.this, SendersActivity.class)); }
+        }));
+        showFit();
         final java.util.TimeZone zone = java.util.TimeZone.getDefault();
         for (MessagesRules.Conversation c : rows) {
             CheckBox box = new CheckBox(this);

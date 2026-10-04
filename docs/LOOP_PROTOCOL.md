@@ -111,6 +111,7 @@ Loop {
 7. **Understanding does not authorize.** No loop causes an action by existing.
 8. **A loop has a resolvable next mover** — `me` or `them` — so Today, Waiting for, Overdue, follow-up, reminders, delegation and the brief are all *views of one fact* and not separate concepts.
 9. **Information is not a loop merely because it contains a date, an amount, a person or imperative-looking text.** A loop exists only when there is a human-relevant unresolved obligation or expectation. An OTP, a balance and a discount are evidence; "your insurance expires on 15 October" may become a loop, and only because its meaning is an obligation or a decision.
+10. **A source-level preference changes what Orb may infer next; it never rewrites what the person has already accepted.** A sender mark (§20) does not close, delete or alter an existing loop.
 
 ## 5. Lifecycle — events, and the state they fold to
 
@@ -346,3 +347,7 @@ Six generic reading fixes (a filled order is information; "Avail Bal"; the end o
 - **The unit is the obligation.** 491 reminder messages are 95 distinct (sender, amount) obligations. The report should count loops (reminders collapsed by `groups`) as well as messages.
 - **A payment text from the same sender rarely ends an obligation** (13–16 of 174–344 loops). Closure is mostly *your* tap or other evidence. This confirms §7 and makes the closure classes the load-bearing part of the protocol.
 - **Still no kind, owner or field is needed.** The freeze waits for (a) a policy for senders that are not about obligations, (b) a loop-level report, and (c) a reading measured on messages the rules have not seen.
+
+## 20. Sender marks are an input to adapters (2026-10-04, DR-42)
+
+A person's answer *this sender is not about my obligations* is **history** (an event, `SENDER_MARKS_PHONE.md`); reading is **interpretation** that depends on it. Every adapter that reads messages receives the marks (`SenderRules.Quiet`) and treats a quiet sender's messages as `not a loop` — the same meaning in every reader. It adds no kind, owner or field. **A mark changes what may be inferred next; it never closes, deletes or alters a loop already accepted** — the removal of an existing loop is a separate act of the person. This is invariant 10 of the envelope.

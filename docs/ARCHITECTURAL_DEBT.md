@@ -885,6 +885,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-37 — what sender marks do not know
+
+**Opened 2026-10-04** (`DECISIONS.md` DR-42). Debts, stated.
+
+1. **A sender is a code, not a company.** `HDFCBK` and `HDFCBN` are two senders; Orb does not know they are one company, and a lookalike using the same code is hidden with the real one.
+2. **Only the Messages reading uses marks today.** Today, the brief and commitments do not read messages. "One meaning everywhere" is enforced by the type — a reader must be handed `Quiet` — and by a guard on the tallies; a future reader that gets messages some other way must be added to that guard, or it will not be held.
+3. **Marks are per phone.** They are events, so a restore brings them back and reconciles the grant; they are not shared with another device.
+4. **The cost line counts messages the unmarked reading called a loop**, not ambiguous ones and not information. A sender that mostly sends information the person does want is still quiet when marked; the line cannot say what was wanted.
+5. **Marks are listed from the file just looked at.** A sender marked quiet that is not in the next file has no row to take back; it stays marked until it reappears. (A list of all marks, from the journal alone, would show only blinded keys; the useful list needs the file.)
+6. **Candidates are few.** On the operator's file only 6 of 539 senders meet the 50 / 90 % line; the rest is a long tail of senders with a handful of messages each, which only the person can judge one by one.
+7. **Tallies are in memory only** — at most 2,000 senders; a 2,001st goes to an unmarkable remainder; they are cleared when the Sources screen closes or the Messages source is switched off.
+8. **The Messages screen redraws its Look when it resumes**, keeping ticks; it does not read the file again, so a file changed meanwhile is not noticed until the next Look.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

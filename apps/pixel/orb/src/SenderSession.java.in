@@ -1,0 +1,24 @@
+package @PKG@;
+
+/**
+ * The tallies of the file the person last looked at, held in memory so the Senders screen can list and apply marks without reading the file again
+ * (`docs/SENDER_MARKS_PHONE.md` §5). Sender codes and counts only; never a word of any message. **Nothing is written anywhere**; it is cleared when the
+ * Sources screen closes and when the Messages source is switched off.
+ */
+final class SenderSession {
+    private SenderSession() {}
+
+    private static LoopFit tally;
+
+    static synchronized void hold(LoopFit looked) {
+        tally = looked;
+    }
+
+    static synchronized LoopFit held() {
+        return tally;
+    }
+
+    static synchronized void clear() {
+        tally = null;
+    }
+}

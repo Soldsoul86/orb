@@ -1,0 +1,100 @@
+package @PKG@;
+
+import android.content.Context;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * What a sender mark writes to the journal (`docs/SENDER_MARKS_PHONE.md` §3, DR-42): the person's **answer** — a blinded key for the sender, the verdict
+ * (`quiet`, or `clear` to take it back) and the two counts it rested on. **Never a sender's name, a number, an address or a word of any message.** The key
+ * is a keyed hash made with Orb's own secret, so it reveals nothing and cannot be reversed. The verdict that counts is the **last** event for a key, so a
+ * restore and a replay agree. The grant is a `PackageGrants` event written by `SendersAccess`.
+ */
+final class SenderFacts {
+    private SenderFacts() {}
+
+    static final String JUDGED = "orb.sender.judged";
+
+    static final String QUIET = "quiet";
+    static final String CLEAR = "clear";
+
+    /** The blinded key of a sender. */
+    interface Keyer {
+        String key(String senderId) throws Exception;
+    }
+
+    static Map<String, Object> judged(String key, String verdict, long messages, long unread) {
+        if (key == null || !key.matches("[0-9a-f]{16}")) throw new IllegalArgumentException("a sender is recorded by its blinded key");
+        if (!QUIET.equals(verdict) && !CLEAR.equals(verdict)) throw new IllegalArgumentException("a sender is quiet or cleared");
+        Map<String, Object> p = Json.obj();
+        p.put("capability", Capabilities.SENDERS);
+        p.put("version", Capabilities.SENDERS_VERSION);
+        p.put("key", key);
+        p.put("verdict", verdict);
+        p.put("messages", Math.max(0L, messages));
+        p.put("unread", Math.max(0L, unread));
+        return p;
+    }
+
+    static Keyer keyer(final Context context) {
+        return new Keyer() {
+            @Override public String key(String senderId) throws Exception {
+                return Attachments.address(context, "snd:" + senderId).substring(0, 16);
+            }
+        };
+    }
+
+    private static final Pattern KEY = Pattern.compile("\"key\":\"([0-9a-f]{16})\"");
+    private static final Pattern VERDICT = Pattern.compile("\"verdict\":\"([a-z]+)\"");
+
+    /** `key` → the last verdict recorded for it (`quiet` or `clear`). */
+    static Map<String, String> verdicts(List<String> lines) {
+        Map<String, String> out = new HashMap<>();
+        for (String line : lines) {
+            if (!JUDGED.equals(Journal.typeOf(line))) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0) continue;
+            Matcher key = KEY.matcher(line), verdict = VERDICT.matcher(line);
+            if (key.find(payload) && verdict.find(payload) && (QUIET.equals(verdict.group(1)) || CLEAR.equals(verdict.group(1)))) out.put(key.group(1), verdict.group(1));
+        }
+        return out;
+    }
+
+    /** How many senders are quiet now: the keys whose last verdict is `quiet`. A count, never a name. */
+    static int quietCount(List<String> lines) {
+        int n = 0;
+        for (String v : verdicts(lines).values()) if (QUIET.equals(v)) n++;
+        return n;
+    }
+
+    /**
+     * **The one way any reader of messages learns who is quiet.** Nobody is quiet unless the person has granted sender marks (a switch that is off makes Orb
+     * ignore the marks — the events stay, they are history). A sender whose key cannot be made is not quiet: a doubt never hides a message.
+     */
+    static SenderRules.Quiet quiet(final List<String> lines, final Keyer keyer, boolean granted) {
+        if (!granted) return SenderRules.NONE;
+        final Set<String> keys = new HashSet<>();
+        for (Map.Entry<String, String> e : verdicts(lines).entrySet()) if (QUIET.equals(e.getValue())) keys.add(e.getKey());
+        final Map<String, Boolean> memo = new HashMap<>();
+        return new SenderRules.Quiet() {
+            @Override public boolean quiet(String senderId) {
+                if (senderId == null) return false;
+                Boolean known = memo.get(senderId);
+                if (known != null) return known;
+                boolean q;
+                try {
+                    q = keys.contains(keyer.key(senderId));
+                } catch (Exception cannotMakeKey) {
+                    q = false;
+                }
+                memo.put(senderId, q);
+                return q;
+            }
+        };
+    }
+}

@@ -7861,3 +7861,48 @@ The `.sms` file the operator uploaded on 2026-10-03 is still in the session. Run
 - The unit is the **obligation**, not the message: the fit report should count loops (reminders collapsed) as well as messages — the protocol's own `groups` already does this; the report does not yet.
 - Closing by a matching payment message is a **minority path**; closure will mostly be *your* tap, or evidence from another source. That makes "you close it" the main path and exact-evidence closing the exception — consistent with §7.
 - A debit with no open loop is an **observed transfer**; Money is a ledger view over evidence, and loops sit on top of it only where an obligation exists.
+
+### 7b95. Sender marks — "this sender is not about my obligations" (v58) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v58-senders.apk`. Design `SENDER_MARKS_PHONE.md` (approved 2026-10-04 with the operator's three refinements; DR-42; AD-37). v58 also carries the second round of reading fixes from §7b94 (65 % → 20 % unread on your file) and counts **obligations** (reminders counted once) as well as messages.
+
+#### In plain words
+
+After **Look** on the Messages screen there is a new button, **Senders…**. It lists the companies in your file — banks, shops, telecoms, the exchange — with how many messages each sent and how many of those Orb **could not read**. For any of them you can tap **Not about my obligations**: from then on **nothing from that sender is read as a bill, a plan or a promise** — here and in anything else that reads your messages. You can tap **Take it back** at any time, and the reading returns **at once**. Your messages are never touched, and **anything you had already accepted (a commitment, a loop) is left exactly as it was**. Orb never marks a sender for you; it only lists first the ones where nearly everything went unread (at least 50 messages, 90 % unread) — and you can mark any sender, big or small.
+
+#### What changed
+
+1. **Messages → Look → Senders…** (secure window). *Mostly not read* first, then *The rest*; each row `SENDER · N messages · P% not read`; 15 at a time.
+2. **The cost is always visible:** *"Quiet senders (2) hid 37 messages that would otherwise have been read as loops."*
+3. A new entry in **What Orb may do**, *Senders that are not about your obligations*, with **Switch off sender marks** (switching off makes Orb ignore the marks; they are not erased).
+4. The fit paragraph now reads *"Of N obligations with an amount (reminders counted once), J were closed by a payment of the same amount from the same sender."* and includes the cost line when anyone is quiet.
+5. Coming back from the Senders screen redraws your Look with the ticks you had, and does **not** record a second look.
+
+#### Checked before the device
+
+- Phone-side suite: 2966 checks (was 2562 at v56); brain (378), TypeScript (600), lint and type-check clean (see the commit).
+- **The boundary you asked for is a test:** marking a sender adds exactly the grant and the answer to the journal, **every loop and commitment event and state is unchanged — and so is it after taking the mark back.**
+- **Mutation checks** on the new rules: about 70 mutants in three rounds. Every survivor was either a missing test (rounding of a share, a key made once per sender, an unknown verdict ignored, a payment before its bill, the cap on sender names, a noise count that differed from the message count) or code that did nothing (removed). One equivalent mutant remains: a null-journal guard whose absence the exception path catches.
+- On your file, in the container (counts only): **539 service senders; 6 candidates**; marking the six moves *could not be read* from **4,044 (20 %) to 3,451 (17 %)** and hides **14** messages that had been read as loops.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P333** | **Look** shows the new sentence, with about **185 obligations** and about **13 closed** (reminders counted once), and the old figures: **4,044 could not be read (20 %)**, **119 ambiguous**, **8,785 only information** | different figures: send a screenshot — the rules there are the container's rules |
+| **P334** | **Senders…** opens a list of about **539** senders; under *Mostly not read* there are **six** senders, with **50 to 203 messages each and 91–100 % not read** | a different count: tell me what you see |
+| **P335** | Tap **Not about my obligations** on one: the row says *quiet*, the cost line appears, and going **Back** to Messages the paragraph's *could not be read* has fallen by about that sender's unread count | no change in the paragraph |
+| **P336** | Mark all six: *could not be read* **3,451 (17 %)** and the cost line says **14 messages** | different numbers: tell me |
+| **P337** | **Take it back** on one: the figure returns **at once**, without looking again | it needs a new Look |
+| **P338** | **Today, your commitments and the morning brief look exactly as before** after marking — nothing is closed, dropped or changed | any difference: that is a regression |
+| **P339** | **Export:** one `grants.capability.granted` for `orb.messages.senders` at the first mark; one `orb.sender.judged` per tap with a **16-hex key**, `quiet` or `clear`, and two counts; **no sender name anywhere** | a name, a number or a word: stop and tell me |
+| **P340** | **What Orb may do** lists thirteen capabilities, the new one *ON* after the first mark, "N senders are quiet", with **Switch off sender marks** | missing or wrong |
+
+#### Protocol
+
+1. Install `orb-app-v58-senders.apk` over v57.
+2. **Sources → Messages**, pick the same backup, tap **Look**; read the paragraph. *(P333)*
+3. Tap **Senders…**. *(P334)* Mark one sender; go back. *(P335)* Mark the other five. *(P336)* Take one back. *(P337)*
+4. Open **Today** and the morning brief card. *(P338)*
+5. **What Orb may do**. *(P340)*
+6. **Export and share journal** and send it. *(P339)* Delete the backup file when you are done, as always.

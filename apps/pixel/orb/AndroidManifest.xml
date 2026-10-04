@@ -141,6 +141,11 @@
             android:name=".SourcesActivity"
             android:exported="false" />
 
+        <!-- Senders: which services are not about your obligations (docs/SENDER_MARKS_PHONE.md). Not exported; secure like Recall. -->
+        <activity
+            android:name=".SendersActivity"
+            android:exported="false" />
+
         <!-- Today: what matters now. Not exported; secure like Recall. -->
         <activity
             android:name=".TodayActivity"

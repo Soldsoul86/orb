@@ -167,29 +167,38 @@ final class LoopFit implements MessagesXml.Sink {
             "bill-due", "collect-request", "approve", "renew", "attend", "trade-fill", "balance", "promo", "none");
     }
 
-    /** The sender's brand: `VM-HDFCBK` and `HDFCBK-S` are `HDFCBK`. A numeric short code is `SHORTCODE`; anything else `OTHER`. */
+    /** The sender's brand for counting: `VM-HDFCBK` and `HDFCBK-S` are `HDFCBK`. A numeric short code is `SHORTCODE`; anything else `OTHER`. */
     static String brandOf(String address) {
-        String a = address == null ? "" : address.trim().toUpperCase(Locale.ROOT);
-        a = a.replaceFirst("^[A-Z]{2}-", "").replaceFirst("-[A-Z]$", "");
-        if (a.matches("[A-Z0-9]{2,12}") && a.matches(".*[A-Z].*")) return a;
-        if (a.matches("[0-9]{3,8}")) return "SHORTCODE";
-        return "OTHER";
+        return brandOfSender(SenderRules.senderId(address));
+    }
+
+    static String brandOfSender(String senderId) {
+        if (senderId == null || senderId.isEmpty()) return "OTHER";
+        return senderId.matches("[0-9]+") ? "SHORTCODE" : senderId;
     }
 
     // ---- the tally
 
-    private final Map<String, Long> counts = new TreeMap<>();
-    private final Map<String, Long> noiseTags = new TreeMap<>();
-    private final Map<String, Long> unmappedBrands = new HashMap<>();
-    private final Map<String, Long> ambiguousPairs = new HashMap<>();
+    /** Everything counted for one sender, so that a mark can be applied (or taken back) without reading the file again. Counts only. */
+    private static final class Tally {
+        long messages;
+        /** Messages the unmarked reading called a loop: it opens, moves on or closes one. */
+        long formed;
+        long unmapped;
+        final Map<String, Long> counts = new TreeMap<>();
+        final Map<String, Long> noiseTags = new TreeMap<>();
+        final Map<String, Long> ambiguousPairs = new HashMap<>();
+        /** `owner|minor` -> the days of the openings (and advances) and of the closings with that next mover and amount. */
+        final Map<String, List<Long>> opens = new HashMap<>();
+        final Map<String, List<Long>> closes = new HashMap<>();
+    }
+
+    private final Map<String, Tally> senders = new HashMap<>();
     private long messages;
     private long service;
     private long conversational;
     private long other;
     private long cutKept;
-    /** `brand|owner|minor` -> the days of the openings (or advances) and of the closings with that sender, next mover and amount. */
-    private final Map<String, List<Long>> opens = new HashMap<>();
-    private final Map<String, List<Long>> closes = new HashMap<>();
     private long keptCount;
 
     @Override public void message(MessagesRules.Message m) {
@@ -197,22 +206,30 @@ final class LoopFit implements MessagesXml.Sink {
         if (m.type != MessagesRules.RECEIVED && m.type != MessagesRules.SENT) { other++; return; }
         if (m.number != null) { conversational++; return; }   // from a number: counted, not read
         service++;
-        Reading r = read(m.body);
-        bump(counts, r.role);
-        if (r.forms()) {
-            bump(counts, r.role + "." + r.kind + "." + r.owner);
-            bump(counts, "kind." + r.kind);
-            if (LoopRules.GIVE.equals(r.kind)) bump(counts, "kind." + r.kind + "." + r.owner);
+        String id = SenderRules.senderId(m.address);
+        if (id == null) id = "";
+        Tally t = senders.get(id);
+        if (t == null) {
+            if (senders.size() >= SenderRules.MAX_SENDERS) { id = ""; t = senders.get(id); }
+            if (t == null) { t = new Tally(); senders.put(id, t); }
         }
-        if (r.tag != null) bump(noiseTags, r.tag);
-        String brand = brandOf(m.address);
-        if (UNMAPPED.equals(r.role)) bumpCapped(unmappedBrands, brand, 400, "OTHER");
-        if (AMBIGUOUS.equals(r.role)) bumpCapped(ambiguousPairs, r.rule, 200, "other");
+        Reading r = read(m.body);
+        t.messages++;
+        bump(t.counts, r.role);
+        if (r.forms()) {
+            t.formed++;
+            bump(t.counts, r.role + "." + r.kind + "." + r.owner);
+            bump(t.counts, "kind." + r.kind);
+            if (LoopRules.GIVE.equals(r.kind)) bump(t.counts, "kind." + r.kind + "." + r.owner);
+        }
+        if (r.tag != null) bump(t.noiseTags, r.tag);
+        if (UNMAPPED.equals(r.role)) t.unmapped++;
+        if (AMBIGUOUS.equals(r.role)) bumpCapped(t.ambiguousPairs, r.rule, 40, "other");
         if (LoopRules.GIVE.equals(r.kind) && r.minor > 0) {
             if (keptCount >= MAX_KEPT) { cutKept++; return; }
             keptCount++;
-            Map<String, List<Long>> into = CLOSES.equals(r.role) ? closes : opens;
-            String key = brand + "|" + r.owner + "|" + r.minor;
+            Map<String, List<Long>> into = CLOSES.equals(r.role) ? t.closes : t.opens;
+            String key = r.owner + "|" + r.minor;
             List<Long> days = into.get(key);
             if (days == null) { days = new ArrayList<>(); into.put(key, days); }
             days.add(Math.floorDiv(m.dateMs, 86_400_000L));
@@ -220,8 +237,12 @@ final class LoopFit implements MessagesXml.Sink {
     }
 
     private static void bump(Map<String, Long> map, String key) {
-        Long n = map.get(key);
-        map.put(key, n == null ? 1L : n + 1L);
+        add(map, key, 1L);
+    }
+
+    private static void add(Map<String, Long> map, String key, long n) {
+        Long old = map.get(key);
+        map.put(key, old == null ? n : old + n);
     }
 
     private static void bumpCapped(Map<String, Long> map, String key, int cap, String rest) {
@@ -251,7 +272,7 @@ final class LoopFit implements MessagesXml.Sink {
             return n == null ? 0L : n;
         }
 
-        /** Every count by name: the roles, role.KIND.owner, kind.KIND, noise.TAG, and the matching figures. */
+        /** Every count by name: the roles, role.KIND.owner, kind.KIND, noise.TAG, the matching figures and what quiet senders hid. */
         Map<String, Long> counts() {
             return counts;
         }
@@ -279,7 +300,7 @@ final class LoopFit implements MessagesXml.Sink {
             return top(ambiguousPairs, n);
         }
 
-        /** Not a loop: information that opens nothing, and noise. */
+        /** Not a loop: information that opens nothing, and noise (including what quiet senders sent). */
         long notALoop() {
             return get(EVIDENCE) + get(NOISE);
         }
@@ -297,51 +318,99 @@ final class LoopFit implements MessagesXml.Sink {
 
         /** The counts for the Messages screen, in the protocol's own words. Counts only. */
         String say() {
+            String cost = SenderRules.costLine(get("quiet.senders"), get("quiet.hid"));
             return "Protocol fit (a draft reading of " + service + " messages from names and short codes; " + conversational + " from numbers are not read). "
                 + "Each can open, move on or close a loop: DO " + get("kind.DO") + " \u00b7 GIVE " + get("kind.GIVE") + " (" + get("kind.GIVE.me") + " owed by you, " + get("kind.GIVE.them")
                 + " owed to you) \u00b7 ATTEND " + get("kind.ATTEND") + " \u00b7 RESPOND " + get("kind.RESPOND") + " \u00b7 DECIDE " + get("kind.DECIDE")
                 + ". Not a loop: " + notALoop() + " (" + get(NOISE) + " noise, " + get(EVIDENCE) + " only information). Could not be read: " + get(UNMAPPED) + " (" + unmappedPercent()
                 + "% of the rest). Ambiguous: " + get(AMBIGUOUS) + ". "
-                + "Of " + get("match.opens") + " openings with an amount, " + get("match.opensMatched") + " have a closing of the same amount from the same sender.";
+                + "Of " + get("loops.opens") + " obligations with an amount (reminders counted once), " + get("loops.closed") + " were closed by a payment of the same amount from the same sender."
+                + (cost.isEmpty() ? "" : " " + cost);
         }
     }
 
+    /** The senders, as the Senders screen lists them: ordered, with the person's marks applied. Counts and sender codes, held in memory only. */
+    List<SenderRules.Row> senders(SenderRules.Quiet quiet) {
+        List<SenderRules.Row> rows = new ArrayList<>();
+        for (Map.Entry<String, Tally> e : senders.entrySet()) {
+            if (e.getKey().isEmpty()) continue;   // the unmarkable remainder
+            rows.add(new SenderRules.Row(e.getKey(), e.getValue().messages, e.getValue().unmapped, e.getValue().formed, quiet.quiet(e.getKey())));
+        }
+        return SenderRules.order(rows);
+    }
+
+    /** The reading with nobody quiet. For tests and diagnostics: a reader of the person's messages calls `report(Quiet)` with their marks. */
     Report report() {
-        Map<String, Long> out = new TreeMap<>(counts);
-        for (String role : ROLES) if (!out.containsKey(role)) out.put(role, 0L);
-        for (Map.Entry<String, Long> e : noiseTags.entrySet()) out.put("noise." + e.getKey(), e.getValue());
-        long opensN = 0, closesN = 0;
-        for (List<Long> d : opens.values()) opensN += d.size();
-        for (List<Long> d : closes.values()) closesN += d.size();
-        // Match each closing to the earliest opening of the same sender, next mover and amount that came before it (or the same day), within MATCH_DAYS: the
-        // protocol's own `sameLoop`.
-        long matched = 0;
-        for (Map.Entry<String, List<Long>> e : closes.entrySet()) {
-            List<Long> openDays = opens.get(e.getKey());
-            if (openDays == null) continue;
-            List<Long> o = new ArrayList<>(openDays);
-            Collections.sort(o);
-            List<Long> c = new ArrayList<>(e.getValue());
-            Collections.sort(c);
-            boolean[] used = new boolean[o.size()];
-            String[] parts = e.getKey().split("\\|");
-            long minor = Long.parseLong(parts[2]);
-            for (long closeDay : c) {
-                for (int i = 0; i < o.size(); i++) {
-                    if (used[i] || o.get(i) > closeDay) continue;
-                    if (LoopRules.sameLoop(new LoopRules.Seen(parts[0], "payment", minor, o.get(i)), new LoopRules.Seen(parts[0], "payment", minor, closeDay), MATCH_DAYS)) {
-                        used[i] = true;
-                        matched++;
-                        break;
+        return report(SenderRules.NONE);
+    }
+
+    /**
+     * The reading with the person's marks: **every message from a quiet sender is not a loop** (noise, tagged `sender`), whatever its words say; what that cost
+     * is counted (`quiet.hid`: messages the unmarked reading called a loop). Marks change only this reading; no loop or commitment is touched.
+     */
+    Report report(SenderRules.Quiet quiet) {
+        Map<String, Long> out = new TreeMap<>();
+        Map<String, Long> tags = new TreeMap<>();
+        Map<String, Long> brands = new HashMap<>();
+        Map<String, Long> pairs = new HashMap<>();
+        long hid = 0, quietMessages = 0, quietSenders = 0, matchOpens = 0, matchCloses = 0, matched = 0, loops = 0, loopsClosed = 0;
+        for (Map.Entry<String, Tally> e : senders.entrySet()) {
+            Tally t = e.getValue();
+            if (!e.getKey().isEmpty() && quiet.quiet(e.getKey())) {
+                quietSenders++;
+                quietMessages += t.messages;
+                hid += t.formed;
+                add(out, NOISE, t.messages);
+                add(tags, "sender", t.messages);
+                continue;
+            }
+            for (Map.Entry<String, Long> c : t.counts.entrySet()) add(out, c.getKey(), c.getValue());
+            for (Map.Entry<String, Long> c : t.noiseTags.entrySet()) add(tags, c.getKey(), c.getValue());
+            for (Map.Entry<String, Long> c : t.ambiguousPairs.entrySet()) add(pairs, c.getKey(), c.getValue());
+            if (t.unmapped > 0) add(brands, brandOfSender(e.getKey()), t.unmapped);
+            for (List<Long> d : t.opens.values()) matchOpens += d.size();
+            for (List<Long> d : t.closes.values()) matchCloses += d.size();
+            // Match each closing to the earliest opening with the same next mover and amount that came before it (or the same day), within MATCH_DAYS: the protocol's own
+            // `sameLoop`. And count obligations, not messages: openings within MATCH_DAYS of each other are one obligation, however many reminders it had.
+            for (Map.Entry<String, List<Long>> o : t.opens.entrySet()) {
+                long minor = Long.parseLong(o.getKey().substring(o.getKey().indexOf('|') + 1));
+                List<Long> openDays = new ArrayList<>(o.getValue());
+                Collections.sort(openDays);
+                List<Long> closeDays = t.closes.containsKey(o.getKey()) ? new ArrayList<>(t.closes.get(o.getKey())) : new ArrayList<Long>();
+                Collections.sort(closeDays);
+                boolean[] used = new boolean[openDays.size()];
+                for (long closeDay : closeDays) {
+                    for (int i = 0; i < openDays.size(); i++) {
+                        if (used[i] || openDays.get(i) > closeDay) continue;
+                        if (LoopRules.sameLoop(new LoopRules.Seen(e.getKey(), "payment", minor, openDays.get(i)), new LoopRules.Seen(e.getKey(), "payment", minor, closeDay), MATCH_DAYS)) {
+                            used[i] = true;
+                            matched++;
+                            break;
+                        }
                     }
+                }
+                int start = 0;
+                for (int i = 1; i <= openDays.size(); i++) {
+                    if (i < openDays.size() && openDays.get(i) - openDays.get(i - 1) <= MATCH_DAYS) continue;
+                    loops++;
+                    long first = openDays.get(start), last = openDays.get(i - 1);
+                    for (long c : closeDays) if (c >= first && c - last <= MATCH_DAYS) { loopsClosed++; break; }
+                    start = i;
                 }
             }
         }
-        out.put("match.opens", opensN);
+        for (String role : ROLES) if (!out.containsKey(role)) out.put(role, 0L);
+        for (Map.Entry<String, Long> c : tags.entrySet()) out.put("noise." + c.getKey(), c.getValue());
+        out.put("match.opens", matchOpens);
         out.put("match.opensMatched", matched);
-        out.put("match.closes", closesN);
+        out.put("match.closes", matchCloses);
         out.put("match.closesMatched", matched);
         out.put("match.cut", cutKept);
-        return new Report(messages, service, conversational, other, out, new HashMap<>(unmappedBrands), new HashMap<>(ambiguousPairs));
+        out.put("loops.opens", loops);
+        out.put("loops.closed", loopsClosed);
+        out.put("quiet.senders", quietSenders);
+        out.put("quiet.messages", quietMessages);
+        out.put("quiet.hid", hid);
+        return new Report(messages, service, conversational, other, out, brands, pairs);
     }
 }

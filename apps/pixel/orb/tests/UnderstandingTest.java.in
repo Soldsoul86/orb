@@ -362,7 +362,9 @@ final class UnderstandingTest {
             && look.contains("if (!closeHere.isEmpty()) {") && look.contains("for (MessagesRules.Conversation c : rows) if (closeHere.contains(c.number)) shown++;")
             && look.contains("if (closeHere.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);"));
         Harness.check("when it cannot tell who, no one is marked rather than a guess", look.contains("close = new java.util.HashSet<>();   // cannot tell who"));
-        Harness.check("nothing is ticked for you: the only tick is the button you press", screen.split("setChecked\\(true\\)", -1).length - 1 == 1 && look.contains("Tick those ") && look.indexOf("setChecked(true)") > look.indexOf("Tick those "));
+        Harness.check("nothing is ticked for you: a tick is the button you press, or one you had already made when the screen is drawn again",
+            screen.split("setChecked\\(true\\)", -1).length - 1 == 2 && look.contains("Tick those ") && look.indexOf("setChecked(true)") > look.indexOf("Tick those ")
+            && screen.contains("if (messageBoxes.get(i).isChecked()) ticks.add(messageRows.get(i).number);") && screen.contains("if (ticks.contains(messageRows.get(i).number)) messageBoxes.get(i).setChecked(true);"));
     }
 
     private static Context box(Context[] c, Journal[] j) throws Exception {

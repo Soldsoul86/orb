@@ -1425,6 +1425,14 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** a writer of `orb.loop.opened`, any adapter beyond the draft reading, recurrence, relations, a model-backed adapter, a Loops screen.
 
+## DR-42 — Sender marks: "this sender is not about my obligations" is the person's answer, an event, with one meaning everywhere
+
+- **Status:** Decided and built · **Decided:** 2026-10-04, operator ("Yes, go ahead with the sender design", then "Yes — go ahead with the build, with two refinements" on `SENDER_MARKS_PHONE.md`).
+
+**The ruling.** Once per service sender, the person can say it is *not about my obligations*, and take it back. The answer is an event (`orb.sender.judged`: a blinded key, `quiet` or `clear`, and two counts; last wins) — never a name, a number or a word. **A quiet sender's messages are not loops, for every reader of messages**: a reader is handed the marks (`SenderRules.Quiet`) and the build fails if one reads the tallies without them. **A mark changes what Orb may infer next; it never closes, deletes or alters a loop or a commitment the person has already accepted** (held by a test). The cost is stated, not hidden: *"Quiet senders hid N messages that would otherwise have been read as loops."* Ordering candidates (≥ 50 messages, ≥ 90 % unread) is **a suggestion, not an eligibility rule**: anyone can be marked. Orb never marks for the person. A new capability, `orb.messages.senders` v1 (Observe, switchable, words pinned), because a recorded answer is a different kind of record from the counts `orb.read.messages` v1 promises.
+
+**Not in this ruling:** marking by word or pattern, marking people, sharing marks between phones, automatic marking, a positive verdict.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

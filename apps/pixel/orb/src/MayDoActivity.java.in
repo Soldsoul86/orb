@@ -156,6 +156,25 @@ public final class MayDoActivity extends Activity {
                     }
                 }
             });
+        } else if (d.id.equals(Capabilities.SENDERS)) {
+            boolean known;
+            try {
+                known = PackageGrants.lastIsGrant(lines, Capabilities.SENDERS);
+            } catch (IOException unreadable) {
+                return;   // The history cannot say whether it is on, so no control is offered on a guess.
+            }
+            final boolean sendersOn = known;
+            b.setText(sendersOn ? "Switch off sender marks" : "Turn on (opens Sources)");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    if (sendersOn) {
+                        SendersAccess.revoke(MayDoActivity.this, journal);
+                        render();
+                    } else {
+                        startActivity(new android.content.Intent(MayDoActivity.this, SourcesActivity.class));
+                    }
+                }
+            });
         } else if (d.id.equals(Capabilities.UNDERSTAND)) {
             boolean known;
             try {

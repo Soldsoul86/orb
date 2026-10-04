@@ -315,7 +315,7 @@ final class LoopTest {
         Harness.equal("so the roles and the other counts add to all messages", sum + r.conversational + r.other, r.messages);
         Harness.equal("the unmapped share of the rest", r.unmappedPercent(), Math.round(100.0 * 1 / 6));
         Harness.check("the screen's sentence says the counts", r.say().contains("of 8 messages") && r.say().contains("1 from numbers") && r.say().contains("GIVE 5 (5 owed by you, 0 owed to you)") && r.say().contains("Not a loop: 2 (2 noise, 0 only information)")
-            && r.say().contains("Could not be read: 1 (17%") && r.say().contains("Ambiguous: 0") && r.say().contains("Of 2 openings with an amount, 1 have a closing"));
+            && r.say().contains("Could not be read: 1 (17%") && r.say().contains("Ambiguous: 0") && r.say().contains("Of 2 obligations with an amount (reminders counted once), 1 were closed"));
 
         List<MessagesRules.Message> flipped = new ArrayList<>(all);
         Collections.reverse(flipped);
@@ -324,7 +324,7 @@ final class LoopTest {
         Harness.equal("the file's order does not change the report", other.report().counts(), r.counts());
 
         MessagesFlow.Look look = MessagesFlow.look(source(all), msOf("2026-10-01"), java.util.TimeZone.getTimeZone("UTC"));
-        Harness.equal("the Look carries the same report", look.fit.counts(), r.counts());
+        Harness.equal("the Look carries the same report", look.tally.report().counts(), r.counts());
         Harness.check("and the survey is what it was: one number conversation, the rest from names", look.survey.by.size() == 1 && look.survey.service == 8 && look.survey.other == 1);
 
         Map<String, Object> payload = LoopFacts.fitReported(r);
@@ -395,11 +395,12 @@ final class LoopTest {
         Harness.equal("brands with the same count are listed by name", ties.topUnmapped(5).toString(), "{AAA=1, ZZZ=1}");
 
         LoopFit fit = new LoopFit();
-        for (int i = 0; i < 400; i++) fit.message(service("BR" + i, "Kuch bhi", "2026-09-01"));
+        for (int i = 0; i < SenderRules.MAX_SENDERS; i++) fit.message(service("BR" + i, "Kuch bhi", "2026-09-01"));
         fit.message(service("BR0", "Kuch bhi", "2026-09-01"));
-        fit.message(service("BR400", "Kuch bhi", "2026-09-01"));
-        Map<String, Long> brands = fit.report().topUnmapped(500);
-        Harness.check("past four hundred brands, a new one is lumped as OTHER and a known one still counts as itself", brands.get("BR0") == 2L && brands.get("OTHER") == 1L && !brands.containsKey("BR400"));
+        fit.message(service("BRNEW", "Kuch bhi", "2026-09-01"));
+        Map<String, Long> brands = fit.report().topUnmapped(5000);
+        Harness.check("past the most senders held, a new one is lumped as OTHER and a known one still counts as itself", brands.get("BR0") == 2L && brands.get("OTHER") == 1L && !brands.containsKey("BRNEW"));
+        Harness.check("and the lump is not offered for marking", fit.senders(SenderRules.NONE).size() == SenderRules.MAX_SENDERS);
 
         String[] bodies = {
             "Rs.500.00 debited. Your appointment is scheduled for 08-Oct.", "Rs.500.00 debited. Your appointment is scheduled for 09-Oct.",

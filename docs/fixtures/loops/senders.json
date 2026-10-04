@@ -1,0 +1,211 @@
+{
+ "protocol": "loop/0.1",
+ "about": "Who a sender is, and how the Senders screen orders them. Synthetic.",
+ "ids": [
+  {
+   "address": "VM-HDFCBK",
+   "id": "HDFCBK"
+  },
+  {
+   "address": "HDFCBK-S",
+   "id": "HDFCBK"
+  },
+  {
+   "address": "AD-GIOTTU-S",
+   "id": "GIOTTU"
+  },
+  {
+   "address": "AX-ICICIB-S",
+   "id": "ICICIB"
+  },
+  {
+   "address": "vm-testbk",
+   "id": "TESTBK"
+  },
+  {
+   "address": "JD-AMAZON",
+   "id": "AMAZON"
+  },
+  {
+   "address": "AB",
+   "id": "AB"
+  },
+  {
+   "address": "VM-AB",
+   "id": "AB"
+  },
+  {
+   "address": "56767",
+   "id": "56767"
+  },
+  {
+   "address": "VM-12",
+   "id": null
+  },
+  {
+   "address": "12",
+   "id": null
+  },
+  {
+   "address": "TOOLONGSENDERNAME",
+   "id": null
+  },
+  {
+   "address": "+919000000000",
+   "id": null
+  },
+  {
+   "address": "",
+   "id": null
+  },
+  {
+   "address": "   ",
+   "id": null
+  },
+  {
+   "address": "VM-HDFC BK",
+   "id": null
+  },
+  {
+   "address": "A",
+   "id": null
+  },
+  {
+   "address": "123456789",
+   "id": null
+  },
+  {
+   "address": "12345678",
+   "id": "12345678"
+  },
+  {
+   "address": "123",
+   "id": "123"
+  },
+  {
+   "address": "9000000000",
+   "id": null
+  },
+  {
+   "address": "ABCDEFGHIJKL",
+   "id": "ABCDEFGHIJKL"
+  },
+  {
+   "address": "ABCDEFGHIJKLM",
+   "id": null
+  }
+ ],
+ "order": [
+  {
+   "name": "candidates first, then by volume",
+   "rows": [
+    {
+     "id": "A",
+     "messages": 10,
+     "unread": 0
+    },
+    {
+     "id": "B",
+     "messages": 60,
+     "unread": 59
+    },
+    {
+     "id": "C",
+     "messages": 500,
+     "unread": 100
+    },
+    {
+     "id": "D",
+     "messages": 50,
+     "unread": 45
+    }
+   ],
+   "order": [
+    "B",
+    "D",
+    "C",
+    "A"
+   ]
+  },
+  {
+   "name": "ties by name",
+   "rows": [
+    {
+     "id": "Z",
+     "messages": 5,
+     "unread": 0
+    },
+    {
+     "id": "Y",
+     "messages": 5,
+     "unread": 0
+    }
+   ],
+   "order": [
+    "Y",
+    "Z"
+   ]
+  },
+  {
+   "name": "49 messages is not a candidate however unread",
+   "rows": [
+    {
+     "id": "A",
+     "messages": 49,
+     "unread": 49
+    },
+    {
+     "id": "B",
+     "messages": 50,
+     "unread": 44
+    }
+   ],
+   "order": [
+    "B",
+    "A"
+   ]
+  },
+  {
+   "name": "50 messages and 90 percent is the line",
+   "rows": [
+    {
+     "id": "A",
+     "messages": 50,
+     "unread": 45
+    },
+    {
+     "id": "B",
+     "messages": 500,
+     "unread": 449
+    },
+    {
+     "id": "C",
+     "messages": 60,
+     "unread": 10
+    }
+   ],
+   "order": [
+    "A",
+    "B",
+    "C"
+   ]
+  }
+ ],
+ "reasons": [
+  {
+   "messages": 1240,
+   "unread": 1203,
+   "say": "1,240 messages · 97% not read"
+  },
+  {
+   "messages": 1,
+   "unread": 0,
+   "say": "1 message · 0% not read"
+  },
+  {
+   "messages": 0,
+   "unread": 0,
+   "say": "0 messages · 0% not read"
+  }
+ ]
+}

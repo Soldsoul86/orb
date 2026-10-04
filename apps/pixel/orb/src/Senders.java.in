@@ -1,0 +1,37 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.IOException;
+import java.util.Map;
+
+/**
+ * Making or taking back one sender mark (`docs/SENDER_MARKS_PHONE.md`, DR-42). **Pure of any screen** so that what a tap does can be tested: the first mark
+ * records the grant, then the person's answer is recorded — and **that is all**. A mark changes what Orb may infer next; it writes nothing to, and reads
+ * nothing from, a loop or a commitment the person has already accepted.
+ */
+final class Senders {
+    private Senders() {}
+
+    /** Records the answer for one sender. Returns whether it was written. `messages` and `unread` are the two counts the answer rested on. */
+    static boolean mark(Context context, Journal journal, SenderFacts.Keyer keyer, String senderId, String verdict, long messages, long unread) {
+        if (journal == null || senderId == null || senderId.isEmpty()) return false;
+        try {
+            String key = keyer.key(senderId);
+            Map<String, Object> payload = SenderFacts.judged(key, verdict, messages, unread);
+            if (SenderFacts.QUIET.equals(verdict) && !SendersAccess.granted(context)) SendersAccess.grant(context, journal);
+            return journal.append(SenderFacts.JUDGED, payload) != null;
+        } catch (Exception notRecorded) {
+            return false;   // no key, no grant, no journal: nothing is claimed
+        }
+    }
+
+    /** The marks the person has made, as every reader of messages must receive them. Nobody is quiet if the history cannot be read. */
+    static SenderRules.Quiet quiet(Context context, Journal journal) {
+        if (journal == null) return SenderRules.NONE;
+        try {
+            return SenderFacts.quiet(journal.readLines(), SenderFacts.keyer(context), SendersAccess.granted(context));
+        } catch (IOException unreadable) {
+            return SenderRules.NONE;
+        }
+    }
+}

@@ -37,6 +37,7 @@ public final class Tests {
         FaultsTest.run();
         BriefTest.run();
         LoopTest.run();
+        SenderTest.run();
         AssistGuardTest.run();
         System.exit(Harness.report());
     }
