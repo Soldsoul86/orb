@@ -1441,6 +1441,14 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** the public SDK, any pull adapter, models and language, Money's categories and recurrence, wiring `ObservationStore.keep` to a screen.
 
+## DR-44 — Money is an adapter and a view on the Observation seam, not a module
+
+- **Status:** **Proposed** — awaiting the operator (`MONEY_PHONE.md`) · **Proposed:** 2026-10-04, after the operator's direction "design Money as a Money adapter over the Observation seam; the first experiment is whether Orb can turn financial observations into ledger entries and correlate only the subset that corresponds to known Loops".
+
+**The proposal.** Money adds **no Observation type, no Interpreter effect and no kernel contract**. It adds a **statement adapter** (a second source of `value.moved`, with the bank's own references, read from a CSV the person picks; the phone gains no network permission), **corroboration** (a computed, order-independent rule so a payment seen by two sources is one movement in the ledger), a read-only **ledger view that says "moved", never "spent"**, the first caller of `ObservationStore.keep` behind one new capability, and the person's answer to a `CLOSURE_CANDIDATE` (*Mark paid* · *Not this* · *Already paid*) as the instrument that measures correlation. Success measures are stated before anything is built (§12). The app-facing API stays unbuilt until three unlike sources share the seam (§10).
+
+**Not in this proposal:** categories and budgets, recurrence, trade fills (`value.exchanged`), XLSX/PDF statements, a notification listener, the public API.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
