@@ -7594,3 +7594,11 @@ Same install and steps as above (install over v46 or v45; **Show when we last sp
 5. Optional: switch What Orb has noticed off, pick the file again, and look. Switch it back on. *(P308)*
 6. **Export and share journal** and send it. Delete the backup file when you are done. *(P310)*
 
+#### Result — export `orb-20261004-110355` (operator, 2026-10-04)
+
+855 events; v53 (`29851522`) started once, after `package.updated` (the install). **No `orb.process.crashed`, no `orb.fault.caught`, no second start** in this stretch. Nothing in the journal names a person or holds a word.
+
+- **The real backup was looked at twice** (146 conversations, as before) and **one Keep followed: 50 months kept** — `orb.shared` × 50 and `orb.observation` × 50, **from 50 different conversations, one month each, spread over twelve months (Oct 2025 to Sep 2026)**, each recorded as **`application/json`** (the v50 fix confirmed). 50 is the most the list shows; the journal cannot say how many of the 50 were the marked ones and how many the operator ticked by hand.
+- **Then What Orb has noticed was opened** (`asked: 17, confirmed: 12, rejected: 0`): the twelve earlier answers stand; seventeen questions are waiting (it was 23 before the messages came in).
+- **Not in the journal, so open:** P304 (Play Protect), P305–P307 (that the marked rows came first, how many, that Tick those N ticked exactly them), P309 (whether the *Because* lines now include *messages kept from N of the last 6 months*), P308 (not tried). The save-then-remove steps that crashed v51 were not repeated in this stretch.
+
