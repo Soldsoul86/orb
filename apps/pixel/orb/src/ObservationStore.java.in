@@ -1,0 +1,290 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Normalized observations, kept (`docs/OBSERVATION_SEAM.md` §12, DR-43). **One sealed bundle per source × calendar month**, so one source can be erased or
+ * reprocessed without touching another. A bundle is:
+ *
+ * - **content-addressed and immutable** once sealed — its identity is the hash of its bytes;
+ * - **deterministically ordered** — by when it happened, then by id — so the same facts always make the same bytes (and a re-import of the same month is
+ *   recognised and writes nothing);
+ * - **independently deletable** — it has its own key; erasing a source or a month destroys only those keys;
+ * - **replayable** — `decode(encode(x))` is `x`, and `load` returns the observation set the journal's live bundles hold;
+ * - **explicit about its source and month** — in the one journal event, `orb.observations.kept`, by a blinded source key.
+ *
+ * **Never raw text.** What is sealed is the normalized fact. The retention window is a policy, `RETENTION_MONTHS`, not a property of the data. A quiet source
+ * is not kept; what was kept before it was marked stays, is left out of what `load` returns while it is quiet, and is erased only by an explicit `eraseSource`.
+ */
+final class ObservationStore {
+    private ObservationStore() {}
+
+    static final String HEADER = "orb.observations.v1";
+    /** The policy: how many months back observations are kept. A change here changes the policy, not the data model. */
+    static final int RETENTION_MONTHS = 24;
+
+    // ---- the bundle's bytes
+
+    private static final String[] COLUMNS = {"id", "type", "sourceKind", "sourceId", "tier", "adapterId", "adapterVersion", "occurredMs", "seenMs", "bearer", "direction",
+        "stage", "objectClass", "minor", "currency", "counterparty", "subjectClass", "subjectRef", "subjectBasis", "ruleId", "ruleVersion", "readRule", "confidencePercent"};
+
+    private static String escape(String v) {
+        if (v == null) return "";
+        return v.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r");
+    }
+
+    private static String unescape(String v) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c != '\\' || i + 1 >= v.length()) { out.append(c); continue; }
+            char n = v.charAt(++i);
+            out.append(n == 't' ? '\t' : n == 'n' ? '\n' : n == 'r' ? '\r' : n);
+        }
+        return out.toString();
+    }
+
+    private static String[] fields(Observation o) {
+        return new String[] {o.id, o.type, o.sourceKind, o.sourceId, o.tier, o.adapterId, Long.toString(o.adapterVersion), Long.toString(o.occurredMs), Long.toString(o.seenMs),
+            o.bearer, o.direction, o.stage, o.objectClass, Long.toString(o.minor), o.currency, o.counterparty, o.subjectClass, o.subjectRef, o.subjectBasis, o.ruleId,
+            Long.toString(o.ruleVersion), o.readRule, Integer.toString(o.confidencePercent)};
+    }
+
+    /** The same facts always make the same bytes: ordered by when they happened, then by id. */
+    static byte[] encode(List<Observation> observations) {
+        List<Observation> sorted = new ArrayList<>(observations);
+        Collections.sort(sorted, new Comparator<Observation>() {
+            @Override public int compare(Observation a, Observation b) {
+                if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;
+                return a.id.compareTo(b.id);
+            }
+        });
+        StringBuilder out = new StringBuilder(HEADER).append('\n').append(Observation.PROTOCOL).append('\n');
+        for (int i = 0; i < COLUMNS.length; i++) out.append(i == 0 ? "" : "\t").append(COLUMNS[i]);
+        out.append('\n');
+        for (Observation o : sorted) {
+            String[] f = fields(o);
+            for (int i = 0; i < f.length; i++) out.append(i == 0 ? "" : "\t").append(escape(f[i]));
+            out.append('\n');
+        }
+        return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The observations in these bytes, or null if they are not a bundle. A line that cannot be read is skipped, never guessed. */
+    static List<Observation> decode(byte[] bytes) {
+        String s = new String(bytes, StandardCharsets.UTF_8);
+        String prefix = HEADER + "\n" + Observation.PROTOCOL + "\n";
+        if (!s.startsWith(prefix)) return null;
+        String[] lines = s.substring(prefix.length()).split("\n", -1);
+        List<Observation> out = new ArrayList<>();
+        for (int n = 1; n < lines.length; n++) {   // line 0 names the columns
+            if (lines[n].isEmpty()) continue;
+            String[] f = lines[n].split("\t", -1);
+            if (f.length != COLUMNS.length) continue;
+            try {
+                Observation.Builder b = Observation.of(unescape(f[1])).source(unescape(f[2]), unescape(f[3]), unescape(f[4])).adapter(unescape(f[5]), Long.parseLong(f[6]))
+                    .times(Long.parseLong(f[7]), Long.parseLong(f[8])).bearer(unescape(f[9])).stage(f[11].isEmpty() ? null : unescape(f[11]))
+                    .object(unescape(f[12]), Long.parseLong(f[13]), unescape(f[14])).counterparty(unescape(f[15]))
+                    .subject(unescape(f[16]), unescape(f[17]), unescape(f[18]), unescape(f[19]), Long.parseLong(f[20])).read(unescape(f[21])).confidence(Integer.parseInt(f[22]));
+                if (!f[10].isEmpty()) b.direction(unescape(f[10]));
+                Observation o = b.build();
+                if (o.id.equals(f[0])) out.add(o);   // a line whose id does not match its facts has been altered: it is not believed
+            } catch (RuntimeException unreadable) {
+                // skipped
+            }
+        }
+        return out;
+    }
+
+    // ---- months, sources
+
+    static String monthOf(long ms, TimeZone zone) {
+        return MessagesRules.monthOf(ms, zone);
+    }
+
+    /** Within the retention window: not after `current`, and no more than `RETENTION_MONTHS` before it. */
+    static boolean inRetention(String month, String current) {
+        return month.compareTo(current) <= 0 && month.compareTo(MessagesRules.minusMonths(current, RETENTION_MONTHS)) >= 0;
+    }
+
+    /** The blinded key of a source in the journal: a keyed hash made with Orb's own secret, so it reveals nothing and cannot be reversed. */
+    static String sourceKey(Context context, String kind, String id) throws Exception {
+        return Attachments.address(context, "obs:" + kind + ":" + id).substring(0, 16);
+    }
+
+    // ---- keeping
+
+    static final String KEPT = "kept";
+    static final String HELD = "held";
+    static final String QUIET = "quiet";
+    static final String OUTSIDE = "outside";
+    static final String EMPTY = "empty";
+    static final String FAILED = "failed";
+
+    /** What `keep` did for each source × month it was handed. */
+    static final class Kept {
+        int kept;
+        int held;
+        int quiet;
+        int outside;
+        int failed;
+    }
+
+    private static final Pattern SOURCE_KEY = Pattern.compile("\"sourceKey\":\"([0-9a-f]{16})\"");
+    private static final Pattern MONTH = Pattern.compile("\"month\":\"(\\d{4}-\\d{2})\"");
+
+    private static final class Live {
+        final String eventHash;
+        final String sourceKey;
+        final String month;
+        final String identity;
+
+        Live(String eventHash, String sourceKey, String month, String identity) {
+            this.eventHash = eventHash;
+            this.sourceKey = sourceKey;
+            this.month = month;
+            this.identity = identity;
+        }
+    }
+
+    private static List<Live> live(List<String> lines) {
+        Set<String> erased = Erasure.erasedHashes(lines);
+        Map<String, Erasure.Item> byHash = new LinkedHashMap<>();
+        for (Erasure.Item item : Erasure.items(lines)) if (ObservationFacts.KEPT.equals(item.type)) byHash.put(item.hash, item);
+        List<Live> out = new ArrayList<>();
+        for (String line : lines) {
+            if (!ObservationFacts.KEPT.equals(Journal.typeOf(line))) continue;
+            String hash = Erasure.envelopeHash(line);
+            Erasure.Item item = hash == null ? null : byHash.get(hash);
+            if (item == null || erased.contains(hash)) continue;
+            int payload = line.indexOf("\"payload\":");
+            Matcher key = SOURCE_KEY.matcher(line), month = MONTH.matcher(line);
+            if (payload < 0 || !key.find(payload) || !month.find(payload)) continue;
+            out.add(new Live(hash, key.group(1), month.group(1), item.identity));
+        }
+        return out;
+    }
+
+    /**
+     * Seals one source's month. The same facts as the live bundle write nothing (`held`). Otherwise the new bundle is sealed, then recorded, and only then is the
+     * older bundle for the same source × month erased — so a failure at any point leaves what was there. A quiet source is not kept; a month outside the
+     * retention window is not kept.
+     */
+    static String keep(Context context, Journal journal, SenderRules.Quiet quiet, String sourceKind, String sourceId, String month, List<Observation> observations, String currentMonth) {
+        if (observations.isEmpty()) return EMPTY;
+        if (SmsNormalizer.SOURCE_KIND.equals(sourceKind) && quiet.quiet(sourceId)) return QUIET;
+        if (!inRetention(month, currentMonth)) return OUTSIDE;
+        try {
+            String key = sourceKey(context, sourceKind, sourceId);
+            byte[] bytes = encode(observations);
+            String identity = Attachments.identity(bytes);
+            List<Live> before = new ArrayList<>();
+            for (Live l : live(journal.readLines())) if (l.sourceKey.equals(key) && l.month.equals(month)) before.add(l);
+            for (Live l : before) if (l.identity.equals(identity)) return HELD;
+            Attachments.Stored stored = Attachments.store(context, new ByteArrayInputStream(bytes));
+            if (stored.identity == null) return FAILED;
+            boolean sealedNow = "stored".equals(stored.outcome);
+            if (journal.append(ObservationFacts.KEPT, ObservationFacts.kept(sourceKind, key, month, observations.size(), stored.identity, stored.bytes)) == null) {
+                if (sealedNow) {
+                    try {
+                        Attachments.discard(context, stored.identity);
+                    } catch (Exception leftBehind) {
+                        // Nothing cites it.
+                    }
+                }
+                return FAILED;
+            }
+            for (Live l : before) Erase.execute(context, journal, l.eventHash);
+            return KEPT;
+        } catch (Exception failed) {
+            return FAILED;
+        }
+    }
+
+    /** Groups observations by source × calendar month (in `zone`) and keeps each. Counts only. */
+    static Kept keepAll(Context context, Journal journal, SenderRules.Quiet quiet, List<Observation> observations, TimeZone zone, String currentMonth) {
+        Map<String, List<Observation>> groups = new TreeMap<>();
+        for (Observation o : observations) {
+            String k = o.sourceKind + "\u0000" + o.sourceId + "\u0000" + monthOf(o.occurredMs, zone);
+            List<Observation> g = groups.get(k);
+            if (g == null) { g = new ArrayList<>(); groups.put(k, g); }
+            g.add(o);
+        }
+        Kept result = new Kept();
+        for (Map.Entry<String, List<Observation>> e : groups.entrySet()) {
+            String[] parts = e.getKey().split("\u0000", -1);
+            String outcome = keep(context, journal, quiet, parts[0], parts[1], parts[2], e.getValue(), currentMonth);
+            if (KEPT.equals(outcome)) result.kept++;
+            else if (HELD.equals(outcome)) result.held++;
+            else if (QUIET.equals(outcome)) result.quiet++;
+            else if (OUTSIDE.equals(outcome)) result.outside++;
+            else if (FAILED.equals(outcome)) result.failed++;
+        }
+        return result;
+    }
+
+    /**
+     * Every observation the live bundles hold — **replayable**: the same set the bundles were made from. A quiet source's observations are left out while it is
+     * quiet (take it back and they return); they are not erased. A bundle that cannot be opened is skipped, never guessed at.
+     */
+    static List<Observation> load(Context context, Journal journal, SenderRules.Quiet quiet) throws IOException {
+        Map<String, Observation> byId = new LinkedHashMap<>();
+        for (Live l : live(journal.readLines())) {
+            List<Observation> bundle = null;
+            try {
+                byte[] bytes = Attachments.open(context, l.identity);
+                bundle = bytes == null ? null : decode(bytes);
+            } catch (Exception unreadable) {
+                bundle = null;
+            }
+            if (bundle == null) continue;
+            for (Observation o : bundle) {
+                if (SmsNormalizer.SOURCE_KIND.equals(o.sourceKind) && quiet.quiet(o.sourceId)) continue;
+                byId.put(o.id, o);
+            }
+        }
+        return new ArrayList<>(byId.values());
+    }
+
+    /** The one destructive act: erases every bundle kept from this source (their keys are destroyed). Returns how many. Marking a source quiet never does this. */
+    static int eraseSource(Context context, Journal journal, String sourceKind, String sourceId) throws Exception {
+        String key = sourceKey(context, sourceKind, sourceId);
+        int n = 0;
+        for (Live l : live(journal.readLines())) {
+            if (!l.sourceKey.equals(key)) continue;
+            Erase.Result done = Erase.execute(context, journal, l.eventHash);
+            if (Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome)) n++;
+        }
+        return n;
+    }
+
+    /** Applies the retention policy: erases bundles older than the window. Returns how many. */
+    static int expire(Context context, Journal journal, String currentMonth) throws IOException {
+        int n = 0;
+        for (Live l : live(journal.readLines())) {
+            if (inRetention(l.month, currentMonth)) continue;
+            Erase.Result done = Erase.execute(context, journal, l.eventHash);
+            if (Erase.DESTROYED.equals(done.outcome) || Erase.KEPT_BY_OTHERS.equals(done.outcome)) n++;
+        }
+        return n;
+    }
+
+    /** How many live bundles there are: a count, for the capability's status and for tests. */
+    static int bundles(List<String> lines) {
+        return live(lines).size();
+    }
+}

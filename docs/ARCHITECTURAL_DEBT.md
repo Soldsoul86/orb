@@ -900,6 +900,21 @@ a second source for the compiler's checksum exists (item 1).
 
 ---
 
+## AD-38 — what the Observation seam does not know
+
+**Opened 2026-10-04** (`DECISIONS.md` DR-43). Debts, stated.
+
+1. **Every SMS subject is inferred.** The normalizer extracts no reference (a card's last digits, an invoice number), so correlation is by sender, amount and window. That is why 20 of 6,094 payments look like the end of anything. A rule that reads the *stated* references would make some of them `exact`.
+2. **The reading class survives inside the normalizer.** It exists only to keep the regression exact (two rules that disagree are ambiguous); it is a legacy of the fit report and should become "facts that cannot both be true" when the next adapter needs the idea.
+3. **`obligation.progressed` with no known loop is `ADVANCE`, not `OPEN`.** The design allows opening one when the world plainly says something is on its way; the fit counted these as advances, and the regression kept it.
+4. **`ObservationStore` is not wired.** `keep` is tested and unused by any screen; the first caller will be Money. Until then the facts live in memory for the length of a Look.
+5. **Retention is by month of the fact, not of the import**, and `expire` is called by nobody yet.
+6. **The tallies hold facts, not only counts.** `LoopFit` keeps up to 50,000 normalized observations in memory per Look; they are cleared with the Sources screen. They contain no message words.
+7. **Source marks are still sender marks.** The generalisation (`orb.source.judged` with a kind) waits for the first non-SMS source, together with a capability version.
+8. **`confidencePercent` constants are proposals** (60–90), declared by one author and never calibrated against ground truth. They decide nothing; a reader must not take them for probabilities.
+
+---
+
 ## AD-20 — what closing AD-7 did not build
 
 **Opened 2026-10-02** (`DECISIONS.md` DR-22). Debts, stated.

@@ -7922,3 +7922,42 @@ After **Look** on the Messages screen there is a new button, **Senders…**. It 
 **What it confirms.** P339: one grant at the first mark, then one record per tap — a 16-hex key, the verdict, two counts; **no sender name, number or word anywhere**; the same sender has the same key every time. The counts equal the container's for the same file (203/202 and 200/187 are the housing site and the property broker; the 5,096-message sender is a bank, 2 % unread). Nothing opened, closed or changed a commitment or a loop (P338, as far as a journal can show: no `orb.commitment.*` or `orb.loop.*` event was written). Marking and taking back both worked, including **marking the bank and undoing it within a second** — the case the cost line is there for.
 
 **Not visible in a journal** (needs the operator's eyes): P334 (the six under *Mostly not read*), P335–P337 (the paragraph's figure falling and returning at once), P340 (thirteen capabilities). **Left quiet at the end: one sender** (the 203-message one).
+
+### 7b96. The Observation seam — the SMS path rebuilt behind it, and the first honest ledger count (v59) — 2026-10-04
+
+**Status: built, awaiting the device.** `orb-app-v59-seam.apk`. Design `OBSERVATION_SEAM.md` (approved 2026-10-04 with the operator's amendments; DR-43; AD-38). **Nothing on screen changes except one sentence in the fit paragraph.** Your commitments, Today, the brief and your sender marks are untouched.
+
+#### In plain words
+
+Until now Orb read a bank text and decided on the spot "this closes a bill". The first two fit rounds showed that was wrong: **a payment is money moving**, and whether it ended anything is a separate question. v59 separates the two. Every message is first turned into a plain **fact** ("₹500 went out", "a bill of ₹1,000 is due", "the order was delivered") — the words are read once and dropped. Then Orb's own table decides what a fact means for you: it can **open** something, **move it on**, do **nothing**, or say **"this looks like the end of something open"** — a *candidate* that you will one day be asked to confirm. **Orb never closes anything on its own.** The money goes into a **ledger**; most of it opens and closes nothing, and that is correct.
+
+#### What changed
+
+1. The fit paragraph gains a sentence: *"Money moved: N out, M in; K of those look like the end of something open (suggestions only), L are the ledger only."*
+2. Underneath: the reading is now **Normalizer → Observation → Interpreter**, with a correlator between. **Every figure the paragraph already showed is unchanged** — that was the test.
+3. Not on screen yet: normalized facts can be sealed **per source and month** and replayed (`ObservationStore`) — built and tested, **not called by any screen**. It waits for Money.
+
+#### Checked before the device
+
+- Phone-side suite: 3,189 checks (was 2,966 before the seam's own fixtures), brain (378), TypeScript (600), lint and type-check clean.
+- **The regression is exact on your real backup** (container, counts only): 23,633 service messages · **4,044** unread · **119** ambiguous · **1,274** open · 105 move on · 6,114 "closes" · 8,785 information · 3,192 noise · **185** obligations, **13** closed · 20 matched · with the six candidate senders quiet **3,451** unread and **14** hidden.
+- **What the seam adds on that file:** 6,094 payments (5,460 out, 634 in); **20 look like the end of something open; 6,074 (99.7 %) are the ledger only.** The old "6,114 closes" was never six thousand closings.
+- **Mutation checks** on the new classes: about 90 mutants in two rounds. Every survivor was a missing test (the direction in a fact's identity, a payment request's owner, the order closings are taken in, a progress with no one to move, the currency of an amount-less fact, two rules of one kind both stating their facts, the cap on facts held) or code that did nothing; all were closed. One equivalent mutant remains: an unreadable bundle skipped versus read as empty.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P341** | **Look** shows the same figures as v58: **4,044 could not be read (20 %)**, **119 ambiguous**, **8,785 only information**, about **185 obligations** and **13 closed** | any difference: that is a regression — send a screenshot |
+| **P342** | The new sentence reads **"Money moved: 5,460 out, 634 in; 20 of those look like the end of something open (suggestions only), 6,074 are the ledger only."** | different numbers: tell me what you see |
+| **P343** | Sender marks work as in v58: mark the six, *could not be read* → **3,451 (17 %)**, cost line **14**; take one back and it returns at once | any difference |
+| **P344** | Today, your commitments and the morning brief look exactly as before | any difference: a regression |
+| **P345** | If you tap **Record this fit report**, the export gets one `orb.loop.fit.reported` with the old keys **and** new numeric ones (`obs.*`, `effect.*`, `discard.*`, `ledger.*`, `closure.candidates`) — numbers and at most ten unmapped sender codes and five rule pairs, **no text** | a word or a number of a person: stop and tell me |
+
+#### Protocol
+
+1. Install `orb-app-v59-seam.apk` over v58.
+2. **Sources → Messages**, pick the same backup, tap **Look**; read the paragraph. *(P341, P342)*
+3. **Senders…**: mark the candidates, then take one back. *(P343)*
+4. Open **Today** and the morning brief. *(P344)*
+5. Optional: **Record this fit report**, then **Export and share journal**. *(P345)*

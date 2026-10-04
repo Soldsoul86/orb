@@ -1,0 +1,36 @@
+package @PKG@;
+
+import java.util.Map;
+
+/**
+ * What keeping observations writes to the journal (`docs/OBSERVATION_SEAM.md` §12, DR-43): **one Event per source × month**, an Observation of an *import* in the
+ * kernel's sense (`contracts/Observation.md` §5: a new observation payload kind, `observation.bundle.v1`). It carries the source kind, a **blinded source
+ * key**, the month, how many observations, and the sealed bundle's identity and size. **Never an amount, a name, a sender code, an id or a word** — those are
+ * inside the sealed bundle.
+ *
+ * `confidencePercent` is 100 here for the kernel's sake and means only that the import happened; it is declared metadata like every other.
+ */
+final class ObservationFacts {
+    private ObservationFacts() {}
+
+    static final String KEPT = "orb.observations.kept";
+    static final String SCHEMA = "observation.bundle.v1";
+
+    static Map<String, Object> kept(String sourceKind, String sourceKey, String month, long count, String identity, long bytes) {
+        if (sourceKey == null || !sourceKey.matches("[0-9a-f]{16}")) throw new IllegalArgumentException("a source is recorded by its blinded key");
+        if (month == null || !month.matches("\\d{4}-\\d{2}")) throw new IllegalArgumentException("a bundle is for a calendar month");
+        if (sourceKind == null || !sourceKind.matches("[a-z.]{1,24}")) throw new IllegalArgumentException("a source kind is a short lower-case name");
+        Map<String, Object> p = Json.obj();
+        p.put("version", 1L);
+        p.put("schema", SCHEMA);
+        p.put("protocol", Observation.PROTOCOL);
+        p.put("sourceKind", sourceKind);
+        p.put("sourceKey", sourceKey);
+        p.put("month", month);
+        p.put("count", Math.max(0L, count));
+        p.put("attachment", identity);
+        p.put("attachmentBytes", bytes);
+        p.put("confidencePercent", 100L);
+        return p;
+    }
+}

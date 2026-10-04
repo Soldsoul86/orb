@@ -1,0 +1,593 @@
+{
+ "protocol": "obs/0.1",
+ "about": "One synthetic service message to the observations the SMS normalizer states (never kind/owner/origin), or why nothing was kept. Generated from the fit corpus by hand-written mapping; nothing here is a real message.",
+ "cases": [
+  {
+   "body": "123456 is your OTP for login. Do not share it with anyone.",
+   "discarded": "code",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "OTP 998877 for txn of Rs.500 at Test Shop. Do not share.",
+   "discarded": "code",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Your UPI payment of Rs.250.00 to Test Shop failed. Amount not debited.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "bearer": "me",
+     "direction": null,
+     "stage": "failed",
+     "objectClass": "money",
+     "minor": 25000
+    }
+   ]
+  },
+  {
+   "body": "Refund of Rs.1,200 for your order has been initiated and will reflect in 5-7 days.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "bearer": "them",
+     "direction": null,
+     "stage": "refund-started",
+     "objectClass": "money",
+     "minor": 120000
+    }
+   ]
+  },
+  {
+   "body": "Payment of Rs.8,421.00 received towards your credit card ending 0000. Thank you.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 842100
+    },
+    {
+     "type": "obligation.fulfilled",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 842100
+    }
+   ]
+  },
+  {
+   "body": "Rs.499.00 debited from A/c XX0000 on 03-10-26 to VPA shop@bank (UPI Ref 1234).",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 49900
+    }
+   ]
+  },
+  {
+   "body": "Rs.50,000.00 credited to A/c XX0000 on 01-10-26 by Salary.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "in",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 5000000
+    }
+   ]
+  },
+  {
+   "body": "Your order #123 is confirmed and will be delivered by Fri, 9 Oct.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "them",
+     "direction": null,
+     "stage": null,
+     "objectClass": "item",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your package has been delivered. Rate your experience.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.fulfilled",
+     "bearer": "them",
+     "direction": null,
+     "stage": null,
+     "objectClass": "item",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your shipment is out for delivery today.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "bearer": "them",
+     "direction": null,
+     "stage": "in-transit",
+     "objectClass": "item",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your electricity bill of Rs.1,310.00 is due on 10-Oct-26. Pay by the due date.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 131000
+    }
+   ]
+  },
+  {
+   "body": "Pay Rs.499 only and get cashback; offer valid till last date.",
+   "discarded": "promo",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Collect request of Rs.300 from Test Shop pending on your UPI app.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "request.received",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 30000
+    }
+   ]
+  },
+  {
+   "body": "Please approve the AutoPay mandate request in your bank app.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "decision.requested",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your mobile plan validity expires on 12-Oct. Recharge to continue.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "act",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your appointment is scheduled for 08-Oct at 10:30 at Test Clinic.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "attendance.scheduled",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "PNR ABC123 Flight TS101 departs 09-Oct 06:00.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "attendance.scheduled",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Avl Bal in A/c XX0000 is Rs.12,345.00.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "information.noted",
+     "bearer": "unknown",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Congratulations! Get 20% off on your next purchase. T&C apply.",
+   "discarded": "promo",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Your KYC is pending. Visit branch to update.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Namaste, aapka khata update ho gaya hai.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Payment of Rs.1,000.00 received towards your card ending 0000. Your next EMI of Rs.1,000.00 is due on 05-Nov.",
+   "discarded": "ambiguous",
+   "detail": "payment-done+bill-due",
+   "observations": []
+  },
+  {
+   "body": "Rs.500.00 debited from A/c XX0000. Your appointment is scheduled for 08-Oct.",
+   "discarded": "ambiguous",
+   "detail": "money-out+attend",
+   "observations": []
+  },
+  {
+   "body": "Rs.500.00 debited from A/c XX0000. Avl Bal is Rs.9,500.00.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 50000
+    }
+   ]
+  },
+  {
+   "body": "Rs.2,000.00 refund processed to your account.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "in",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 200000
+    }
+   ]
+  },
+  {
+   "body": "Your payment of Rs.250.00 failed. Amount was not debited.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "bearer": "me",
+     "direction": null,
+     "stage": "failed",
+     "objectClass": "money",
+     "minor": 25000
+    }
+   ]
+  },
+  {
+   "body": "Your account has been credited.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Flight offer: book your ticket at 50% off.",
+   "discarded": "promo",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Offer: approve your pre-approved loan today.",
+   "discarded": "promo",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Win a prize! Renew your plan with this offer.",
+   "discarded": "promo",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Login failed. Please try again.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Payment of Rs.500.00 confirmed.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Your electricity bill is due soon.",
+   "discarded": "unreadable",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Rs.500.00 debited from A/c 1 and credited to A/c 2.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 50000
+    }
+   ]
+  },
+  {
+   "body": "123456 is your OTP for payment of fees.",
+   "discarded": "code",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Rs.500.00 debited. If not you, never share your OTP.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 50000
+    }
+   ]
+  },
+  {
+   "body": "123456 is your One Time Password for CRM Log In. Regards Testco",
+   "discarded": "code",
+   "detail": null,
+   "observations": []
+  },
+  {
+   "body": "Your buy order for 10 TOKEN is filled at INR 90 each.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "information.noted",
+     "bearer": "unknown",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Rs.100.00 credited to A/c XX0000. Payer Test debited.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "in",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 10000
+    }
+   ]
+  },
+  {
+   "body": "Dear customer, if you have already paid Rs.900.00, please ignore. Your premium is due on 05-Nov.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 90000
+    }
+   ]
+  },
+  {
+   "body": "Rs.300.00 will be debited from your account if you approve the request.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "decision.requested",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "A hold of INR 500.00 is placed on your account. Avail Bal INR 9,500.00.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "information.noted",
+     "bearer": "unknown",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "Your premium of Rs.900.00 is due on 05-Nov. Renewal is due.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 90000
+    }
+   ]
+  },
+  {
+   "body": "Your payment of Rs.250.00 failed. Your appointment is scheduled for 08-Oct.",
+   "discarded": "ambiguous",
+   "detail": "failed+attend",
+   "observations": []
+  },
+  {
+   "body": "Money Transfer: Rs.750.00 from Test Bank A/c XX0000 to a payee. Not you? Call the bank.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "out",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 75000
+    }
+   ]
+  },
+  {
+   "body": "Rs.750.00 credited to your A/c XX0000 by NEFT transfer from another account.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "value.moved",
+     "bearer": "unknown",
+     "direction": "in",
+     "stage": null,
+     "objectClass": "money",
+     "minor": 75000
+    }
+   ]
+  },
+  {
+   "body": "Filled: your sell order for 5 TOKEN at INR 100.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "information.noted",
+     "bearer": "unknown",
+     "direction": null,
+     "stage": null,
+     "objectClass": "other",
+     "minor": 0
+    }
+   ]
+  },
+  {
+   "body": "If paid, please ignore. Rs.900.00 is due on 05-Nov.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 90000
+    }
+   ]
+  },
+  {
+   "body": "Your unpaid bill of Rs.900.00 is due on 05-Nov.",
+   "discarded": null,
+   "detail": null,
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "bearer": "me",
+     "direction": null,
+     "stage": null,
+     "objectClass": "money",
+     "minor": 90000
+    }
+   ]
+  }
+ ]
+}

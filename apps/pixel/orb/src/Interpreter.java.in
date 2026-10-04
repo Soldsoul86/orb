@@ -1,0 +1,84 @@
+package @PKG@;
+
+/**
+ * The Interpreter (`docs/OBSERVATION_SEAM.md` §5, DR-43): **what an observation means for a person**, as a loop effect. Orb-owned, versioned, deterministic, and
+ * the only place that says so: a pure function of *(one observation, whether it matches something already open)* — it reads no words, calls no model, looks at
+ * no clock. A new version recomputes; no observation is rewritten.
+ *
+ * **Four effects, and closing is never one of them.** `OPEN` and `ADVANCE` change what is open; `NONE` changes nothing; `CLOSURE_CANDIDATE` says *this looks like
+ * the end of something open* — and a person confirms it (*Looks like this was paid* · *Mark paid* · *Not this*). An observation can be exact and Orb's reading of
+ * a person's state is still conservative. `value.moved` always also belongs to the **ledger**, whatever it does to loops.
+ */
+final class Interpreter {
+    private Interpreter() {}
+
+    static final String VERSION = "interp/1";
+
+    static final String NONE = "NONE";
+    static final String OPEN = "OPEN";
+    static final String ADVANCE = "ADVANCE";
+    static final String CLOSURE_CANDIDATE = "CLOSURE_CANDIDATE";
+
+    /** What an observation does to loops. For `OPEN`, the loop it begins: kind, next mover, origin. */
+    static final class Effect {
+        final String type;
+        final String kind;
+        final String owner;
+        final String origin;
+        /** The money went into the ledger (a view over `value.moved`). */
+        final boolean ledger;
+        /** For a closure candidate: how strongly the evidence points — see `closureClass`. */
+        final String evidence;
+
+        Effect(String type, String kind, String owner, String origin, boolean ledger, String evidence) {
+            this.type = type;
+            this.kind = kind;
+            this.owner = owner;
+            this.origin = origin;
+            this.ledger = ledger;
+            this.evidence = evidence;
+        }
+    }
+
+    private static final Effect NOTHING = new Effect(NONE, null, null, null, false, null);
+
+    private static String kindOf(Observation o) {
+        return Observation.ACT.equals(o.objectClass) ? LoopRules.DO : LoopRules.GIVE;
+    }
+
+    /**
+     * How strongly a closing observation points at a loop, by **how the subject is known** (never by a score): a reference the source gave or the words stated is
+     * `exact`; one a rule inferred only `suggests`. Either way the effect is a candidate for the person to confirm.
+     */
+    static String closureClass(Observation o) {
+        return LoopRules.INFERRED.equals(o.subjectBasis) ? LoopRules.CLASS_SUGGESTS : LoopRules.CLASS_EXACT;
+    }
+
+    /** `matched`: the correlation found an open loop this observation is about. */
+    static Effect effectOf(Observation o, boolean matched) {
+        switch (o.type) {
+            case Observation.OBLIGATION_STATED:
+                return LoopRules.validOwner(o.bearer) ? new Effect(OPEN, kindOf(o), o.bearer, LoopRules.STATED, false, null) : NOTHING;
+            case Observation.OBLIGATION_PROGRESSED:
+                return LoopRules.validOwner(o.bearer) ? new Effect(ADVANCE, LoopRules.GIVE, o.bearer, LoopRules.STATED, false, null) : NOTHING;
+            case Observation.ATTENDANCE_SCHEDULED:
+                return new Effect(OPEN, LoopRules.ATTEND, LoopRules.ME, LoopRules.STATED, false, null);
+            case Observation.ATTENDANCE_CHANGED:
+                return new Effect(ADVANCE, LoopRules.ATTEND, LoopRules.ME, LoopRules.STATED, false, null);
+            case Observation.REQUEST_RECEIVED:
+                return new Effect(OPEN, kindOf(o), LoopRules.ME, LoopRules.ASKED, false, null);
+            case Observation.DECISION_REQUESTED:
+                return new Effect(OPEN, LoopRules.DECIDE, LoopRules.ME, LoopRules.STATED, false, null);
+            case Observation.OBLIGATION_FULFILLED:
+            case Observation.OBLIGATION_WITHDRAWN:
+            case Observation.ATTENDANCE_CANCELLED:
+            case Observation.REQUEST_ANSWERED:
+            case Observation.DECISION_MADE:
+                return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, false, closureClass(o)) : NOTHING;
+            case Observation.VALUE_MOVED:
+                return matched ? new Effect(CLOSURE_CANDIDATE, null, null, null, true, closureClass(o)) : new Effect(NONE, null, null, null, true, null);
+            default:
+                return NOTHING;   // information.noted, and anything a later version adds: evidence only
+        }
+    }
+}

@@ -351,3 +351,7 @@ Six generic reading fixes (a filled order is information; "Avail Bal"; the end o
 ## 20. Sender marks are an input to adapters (2026-10-04, DR-42)
 
 A person's answer *this sender is not about my obligations* is **history** (an event, `SENDER_MARKS_PHONE.md`); reading is **interpretation** that depends on it. Every adapter that reads messages receives the marks (`SenderRules.Quiet`) and treats a quiet sender's messages as `not a loop` — the same meaning in every reader. It adds no kind, owner or field. **A mark changes what may be inferred next; it never closes, deletes or alters a loop already accepted** — the removal of an existing loop is a separate act of the person. This is invariant 10 of the envelope.
+
+## 21. The Observation seam sits beneath this protocol (2026-10-04, DR-43)
+
+The Loop protocol's `kind`, `owner` and `origin` are **Orb's interpretation**, produced by the Interpreter (`OBSERVATION_SEAM.md` §5) from neutral Observations; a source never states them. Closing is **never an effect**: even exact evidence yields a `CLOSURE_CANDIDATE` the person confirms, which is the closure class `suggests`/`exact` of §7 applied conservatively for v0.1. The fit report's "closes" counted payments; the seam separates them (`value.moved`, the ledger) from the few that look like the end of something open.

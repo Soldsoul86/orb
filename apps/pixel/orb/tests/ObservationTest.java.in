@@ -1,0 +1,393 @@
+package @PKG@;
+
+import android.content.Context;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.TreeMap;
+
+/**
+ * The Observation seam (`docs/OBSERVATION_SEAM.md`, DR-43): the observation and its identity, the SMS normalizer (the first reference implementation), the
+ * Interpreter — held with **no adapter in sight** — the correlation, and the sealed source × month bundles.
+ */
+final class ObservationTest {
+    private ObservationTest() {}
+
+    private static final long DAY = 86_400_000L;
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+
+    private static Object fixture(String name) throws Exception {
+        Path p = Paths.get(System.getProperty("orb.root", "."), "../../../docs/fixtures/loops/" + name);
+        return MiniJson.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8));
+    }
+
+    private static Observation moved(String source, String direction, long minor, long day) {
+        return Observation.of(Observation.VALUE_MOVED).source("sms.sender", source, Observation.T0).times(day * DAY + 12 * 3_600_000L, day * DAY + 12 * 3_600_000L)
+            .direction(direction).object(Observation.MONEY, minor, "INR").confidence(90).build();
+    }
+
+    private static Observation stated(String source, String bearer, long minor, long day) {
+        return Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", source, Observation.T0).times(day * DAY + 12 * 3_600_000L, day * DAY + 12 * 3_600_000L)
+            .bearer(bearer).object(Observation.MONEY, minor, "INR").confidence(80).build();
+    }
+
+    static void run() throws Exception {
+        observation();
+        normalizer();
+        interpreter();
+        correlation();
+        store();
+        ledger();
+        cap();
+        guards();
+    }
+
+    private static boolean throwsOn(Runnable r) {
+        try {
+            r.run();
+            return false;
+        } catch (IllegalArgumentException refused) {
+            return true;
+        }
+    }
+
+    private static void observation() {
+        Harness.suite("an observation: a fact with provenance — and none of Orb's meaning");
+        Observation a = stated("BANKA", "me", 842100L, 100L);
+        Observation again = stated("BANKA", "me", 842100L, 100L);
+        Harness.check("the same fact has the same id, however often it is read", a.id.equals(again.id) && a.id.matches("[0-9a-f]{32}"));
+        Observation seenLater = Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", "BANKA", Observation.T0).times(100 * DAY + 12 * 3_600_000L, 999L)
+            .bearer("me").object(Observation.MONEY, 842100L, "INR").confidence(10).build();
+        Harness.check("when Orb saw it, and the declared confidence, are not part of what the fact is", seenLater.id.equals(a.id));
+        Harness.check("a different amount, source, day, bearer or type is a different fact", !stated("BANKA", "me", 842101L, 100L).id.equals(a.id) && !stated("BANKB", "me", 842100L, 100L).id.equals(a.id)
+            && !stated("BANKA", "me", 842100L, 101L).id.equals(a.id) && !stated("BANKA", "them", 842100L, 100L).id.equals(a.id) && !moved("BANKA", "out", 842100L, 100L).id.equals(a.id));
+        Harness.equal("thirteen types, no more", Observation.TYPES.size(), 13);
+        Harness.check("money out and money in, the same amount on the same day from the same source, are two facts", !moved("A", "out", 5L, 1L).id.equals(moved("A", "in", 5L, 1L).id));
+        Harness.check("a confidence of 0 and of 100 are both declarable", Observation.of(Observation.OBLIGATION_STATED).confidence(0).build().confidencePercent == 0 && Observation.of(Observation.OBLIGATION_STATED).confidence(100).build().confidencePercent == 100);
+        Harness.check("the bundle's event names its schema and a blinded source, a month and counts — and refuses anything else",
+            ObservationFacts.kept("sms.sender", "0123456789abcdef", "2026-09", 4L, "sha256:x", 99L).get("schema").equals("observation.bundle.v1")
+            && ObservationFacts.kept("sms.sender", "0123456789abcdef", "2026-09", -3L, "sha256:x", 99L).get("count").equals(0L)
+            && throwsOn(new Runnable() { public void run() { ObservationFacts.kept("sms.sender", "HDFCBK", "2026-09", 1L, "x", 1L); } })
+            && throwsOn(new Runnable() { public void run() { ObservationFacts.kept("sms.sender", "0123456789abcdef", "September", 1L, "x", 1L); } })
+            && throwsOn(new Runnable() { public void run() { ObservationFacts.kept("SMS Sender", "0123456789abcdef", "2026-09", 1L, "x", 1L); } }));
+        Harness.check("it is T0 here, attributed, and says how its subject is known — never by a score", a.tier.equals("T0") && a.sourceId.equals("BANKA") && a.subjectBasis.equals("inferred")
+            && a.ruleId.isEmpty());
+        Harness.check("a type outside the vocabulary is refused", throwsOn(new Runnable() { public void run() { Observation.of("loop.opened").build(); } }));
+        Harness.check("so is a bearer, a basis, a tier or a confidence outside theirs", throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).bearer("everyone").build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).subject("x", "", "guessed", "", 1).build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", "A", "T9").build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).confidence(101).build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).confidence(-1).build(); } }));
+        Harness.check("an amount is not negative; a direction belongs to value.moved alone", throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).object("money", -1L, "INR").build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.VALUE_MOVED).build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.OBLIGATION_STATED).direction("out").build(); } })
+            && throwsOn(new Runnable() { public void run() { Observation.of(Observation.VALUE_MOVED).direction("sideways").build(); } }));
+        Harness.check("moved and information are not stateful; a statement is", !moved("A", "out", 1L, 1L).stateful() && a.stateful());
+    }
+
+    private static String signature(Observation o) {
+        return o.type + "|" + o.bearer + "|" + o.direction + "|" + o.stage + "|" + o.objectClass + "|" + o.minor;
+    }
+
+    private static void normalizer() throws Exception {
+        Harness.suite("the SMS normalizer: one message to the facts it states, or why none");
+        Map<String, Object> corpus = MiniJson.map(fixture("normalizer.json"));
+        List<Object> cases = MiniJson.list(corpus.get("cases"));
+        Harness.check("the corpus is there", cases.size() >= 50);
+        for (Object c : cases) {
+            Map<String, Object> one = MiniJson.map(c);
+            SmsNormalizer.Result r = SmsNormalizer.normalize("TESTBK", MiniJson.str(one.get("body")), 100L * DAY, 100L * DAY);
+            List<String> got = new ArrayList<>();
+            for (Observation o : r.observations) got.add(signature(o));
+            Collections.sort(got);
+            List<String> want = new ArrayList<>();
+            for (Object w : MiniJson.list(one.get("observations"))) {
+                Map<String, Object> m = MiniJson.map(w);
+                want.add(MiniJson.str(m.get("type")) + "|" + MiniJson.str(m.get("bearer")) + "|" + MiniJson.str(m.get("direction")) + "|" + MiniJson.str(m.get("stage")) + "|" + MiniJson.str(m.get("objectClass")) + "|" + MiniJson.num(m.get("minor")));
+            }
+            Collections.sort(want);
+            String why = MiniJson.str(one.get("body"));
+            Harness.equal("facts: " + why, got, want);
+            Harness.equal("kept nothing because: " + why, r.discarded + "|" + r.detail, MiniJson.str(one.get("discarded")) + "|" + MiniJson.str(one.get("detail")));
+        }
+        SmsNormalizer.Result paid = SmsNormalizer.normalize("TESTBK", "Rs.500.00 debited from A/c XX0000.", 100L * DAY, 100L * DAY + 5L);
+        Observation o = paid.observations.get(0);
+        Harness.check("every fact is attributed to the sender, by this adapter, at tier T0, naming the rule that read it", o.sourceKind.equals("sms.sender") && o.sourceId.equals("TESTBK") && o.tier.equals("T0")
+            && o.adapterId.equals("sms") && o.readRule.equals("money-out") && o.counterparty.equals("TESTBK") && o.subjectBasis.equals("inferred") && o.ruleId.equals("sms.payment.correlation") && o.seenMs == 100L * DAY + 5L);
+        Map<String, Integer> declared = new TreeMap<>();
+        for (String[] kv : new String[][] {{"failed", "80"}, {"refund-started", "70"}, {"payment-done", "90"}, {"money-out", "90"}, {"money-in", "90"}, {"order", "80"}, {"delivered", "80"}, {"in-transit", "80"},
+            {"bill-due", "80"}, {"collect-request", "80"}, {"approve", "60"}, {"renew", "60"}, {"attend", "60"}, {"trade-fill", "80"}, {"balance", "90"}}) declared.put(kv[0], Integer.parseInt(kv[1]));
+        boolean allDeclared = true;
+        Set<String> seenRules = new HashSet<>();
+        for (Object c : cases) {
+            for (Observation ob : SmsNormalizer.normalize("T", MiniJson.str(MiniJson.map(c).get("body")), 1L, 1L).observations) {
+                seenRules.add(ob.readRule);
+                if (!declared.containsKey(ob.readRule) || declared.get(ob.readRule) != ob.confidencePercent) allDeclared = false;
+            }
+        }
+        Harness.check("every rule declares its own confidence, as metadata, and the fixture reaches every one", allDeclared && seenRules.equals(declared.keySet()));
+        Harness.check("the same message read twice makes the same facts", paid.observations.get(0).id.equals(SmsNormalizer.normalize("TESTBK", "Rs.500.00 debited from A/c XX0000.", 100L * DAY, 7L).observations.get(0).id));
+        Harness.check("the words are not in the fact", !new String(ObservationStore.encode(paid.observations), StandardCharsets.UTF_8).toLowerCase().contains("debited"));
+        SmsNormalizer.Result both = SmsNormalizer.normalize("T", "Refund of Rs.100 initiated. Your shipment is out for delivery.", 1L, 1L);
+        Set<String> stages = new HashSet<>();
+        for (Observation ob : both.observations) stages.add(ob.stage);
+        Harness.check("two rules of one kind both state their facts: a refund begun and a parcel on its way", both.observations.size() == 2 && stages.equals(new HashSet<>(Arrays.asList("refund-started", "in-transit"))));
+        Observation noAmount = SmsNormalizer.normalize("T", "Your UPI payment failed. Please try again.", 1L, 1L).observations.get(0);
+        Harness.check("with no amount there is no currency and the object is not money", noAmount.minor == 0L && noAmount.currency.isEmpty() && noAmount.objectClass.equals("other"));
+        Harness.check("with one, it is rupees", SmsNormalizer.normalize("T", "Rs.500.00 debited from A/c XX0000.", 1L, 1L).observations.get(0).currency.equals("INR"));
+        Harness.check("a message whose rules disagree states nothing", SmsNormalizer.normalize("T", "Rs.500.00 debited. Your appointment is scheduled for 08-Oct.", 1L, 1L).observations.isEmpty());
+    }
+
+    private static void interpreter() throws Exception {
+        Harness.suite("the Interpreter: observations to effects — no adapter anywhere");
+        Map<String, Object> corpus = MiniJson.map(fixture("interpreter.json"));
+        for (Object c : MiniJson.list(corpus.get("cases"))) {
+            Map<String, Object> one = MiniJson.map(c);
+            List<Observation> obs = new ArrayList<>();
+            for (Object o : MiniJson.list(one.get("observations"))) {
+                Map<String, Object> m = MiniJson.map(o);
+                long day = MiniJson.num(m.get("day"));
+                Observation.Builder b = Observation.of(MiniJson.str(m.get("type"))).source("fixture.source", MiniJson.str(m.get("source")), Observation.T0).adapter("fixture", 1L)
+                    .times(day * DAY + 12 * 3_600_000L, day * DAY + 12 * 3_600_000L).bearer(MiniJson.str(m.get("bearer"))).object(MiniJson.str(m.get("objectClass")), MiniJson.num(m.get("minor")), "INR")
+                    .subject("fixture", MiniJson.str(m.get("ref")), MiniJson.str(m.get("basis")), "fixture.rule", 1L).confidence(50);
+                if (m.get("direction") != null) b.direction(MiniJson.str(m.get("direction")));
+                if (m.get("stage") != null) b.stage(MiniJson.str(m.get("stage")));
+                obs.add(b.build());
+            }
+            Correlator.Result matched = Correlator.run(obs);
+            for (Object e : MiniJson.list(one.get("expect"))) {
+                Map<String, Object> w = MiniJson.map(e);
+                int i = (int) MiniJson.num(w.get("index"));
+                Interpreter.Effect got = Interpreter.effectOf(obs.get(i), matched.matched.contains(obs.get(i).id));
+                String want = MiniJson.str(w.get("effect")) + "|" + MiniJson.str(w.get("kind")) + "|" + MiniJson.str(w.get("owner")) + "|" + MiniJson.str(w.get("origin")) + "|" + w.get("ledger") + "|" + MiniJson.str(w.get("evidence"));
+                Harness.equal(MiniJson.str(one.get("name")) + " [" + i + "]", got.type + "|" + got.kind + "|" + got.owner + "|" + got.origin + "|" + got.ledger + "|" + got.evidence, want);
+            }
+        }
+        Harness.equal("four effects, and closing is not one of them", Arrays.asList(Interpreter.NONE, Interpreter.OPEN, Interpreter.ADVANCE, Interpreter.CLOSURE_CANDIDATE).toString(), "[NONE, OPEN, ADVANCE, CLOSURE_CANDIDATE]");
+        Harness.check("the evidence class follows how the subject is known", Interpreter.closureClass(moved("A", "out", 1L, 1L)).equals("suggests")
+            && Interpreter.closureClass(Observation.of(Observation.VALUE_MOVED).direction("out").subject("x", "r", "observed", "", 1L).build()).equals("exact")
+            && Interpreter.closureClass(Observation.of(Observation.VALUE_MOVED).direction("out").subject("x", "r", "stated", "", 1L).build()).equals("exact"));
+        Harness.check("every closing type needs a match, and none matched is nothing", Interpreter.effectOf(Observation.of(Observation.OBLIGATION_WITHDRAWN).build(), false).type.equals("NONE")
+            && Interpreter.effectOf(Observation.of(Observation.OBLIGATION_WITHDRAWN).build(), true).type.equals("CLOSURE_CANDIDATE")
+            && Interpreter.effectOf(Observation.of(Observation.ATTENDANCE_CANCELLED).build(), true).type.equals("CLOSURE_CANDIDATE")
+            && Interpreter.effectOf(Observation.of(Observation.REQUEST_ANSWERED).build(), true).type.equals("CLOSURE_CANDIDATE")
+            && Interpreter.effectOf(Observation.of(Observation.DECISION_MADE).build(), true).type.equals("CLOSURE_CANDIDATE")
+            && Interpreter.effectOf(Observation.of(Observation.INFORMATION_NOTED).build(), true).type.equals("NONE"));
+        Harness.check("an act asked of me is a DO, a thing a GIVE", Interpreter.effectOf(Observation.of(Observation.REQUEST_RECEIVED).object(Observation.ACT, 0L, "").build(), false).kind.equals("DO")
+            && Interpreter.effectOf(Observation.of(Observation.REQUEST_RECEIVED).object(Observation.DOCUMENT, 0L, "").build(), false).kind.equals("GIVE"));
+    }
+
+    private static void correlation() {
+        Harness.suite("correlation: the same, in any order");
+        List<Observation> set = new ArrayList<>(Arrays.asList(stated("A", "me", 500L, 100L), stated("A", "me", 500L, 120L), moved("A", "out", 500L, 125L), stated("A", "me", 700L, 100L),
+            moved("A", "out", 700L, 99L), moved("B", "out", 500L, 126L)));
+        Correlator.Result base = Correlator.run(set);
+        Harness.equal("two reminders are one obligation, closed by a payment; the 700 was paid before it was asked", base.obligations + "/" + base.obligationsClosed + "/" + base.candidates, "2/1/1");
+        boolean same = true;
+        List<Observation> rotated = new ArrayList<>(set);
+        for (int i = 0; i < set.size(); i++) {
+            Collections.rotate(rotated, 1);
+            Correlator.Result r = Correlator.run(rotated);
+            if (r.obligations != base.obligations || r.obligationsClosed != base.obligationsClosed || !r.matched.equals(base.matched)) same = false;
+        }
+        List<Observation> reversed = new ArrayList<>(set);
+        Collections.reverse(reversed);
+        Correlator.Result rr = Correlator.run(reversed);
+        Harness.check("every rotation and the reverse give the same obligations and the same matches", same && rr.matched.equals(base.matched) && rr.obligations == base.obligations);
+        Observation paidMoved = moved("A", "out", 9L, 200L);
+        Observation paidFulfilled = Observation.of(Observation.OBLIGATION_FULFILLED).source("sms.sender", "A", Observation.T0).times(200L * DAY + 12 * 3_600_000L, 0L).bearer("me").object(Observation.MONEY, 9L, "INR").build();
+        Correlator.Result pair = Correlator.run(Arrays.asList(stated("A", "me", 9L, 190L), paidMoved, paidFulfilled));
+        Harness.check("a payment and its own fulfilment are one closing: the fulfilment is the closer, and the money moved beside it belongs to it", pair.closers == 1 && pair.candidates == 1
+            && pair.matched.contains(paidFulfilled.id) && !pair.matched.contains(paidMoved.id) && pair.closing.contains(paidMoved.id) && pair.closing.contains(paidFulfilled.id));
+        Observation req = Observation.of(Observation.REQUEST_RECEIVED).source("sms.sender", "A", Observation.T0).times(100L * DAY + 12 * 3_600_000L, 0L).object(Observation.MONEY, 300L, "INR").build();
+        Correlator.Result asked = Correlator.run(Arrays.asList(req, moved("A", "out", 300L, 102L)));
+        Harness.check("a payment request is always of me, whatever its bearer says, and a payment out closes it", asked.openers == 1 && asked.candidates == 1);
+        Observation o100 = stated("A", "me", 700L, 100L), o110 = stated("A", "me", 700L, 110L), c112 = moved("A", "out", 700L, 112L), c105 = moved("A", "out", 700L, 105L);
+        Harness.equal("the closings are taken in the order they happened, whatever order they arrive in: both are matched", Correlator.run(Arrays.asList(o100, o110, c112, c105)).candidates
+            + "|" + Correlator.run(Arrays.asList(c105, c112, o110, o100)).candidates, "2|2");
+        Harness.equal("an empty set is nothing", Correlator.run(new ArrayList<Observation>()).obligations, 0L);
+        Harness.check("an observation with no amount never opens or closes", Correlator.run(Arrays.asList(stated("A", "me", 0L, 1L), moved("A", "out", 0L, 2L))).openers == 0
+            && Correlator.run(Arrays.asList(stated("A", "me", 0L, 1L), moved("A", "out", 0L, 2L))).closers == 0);
+        Harness.check("an opening whose bearer is unknown is no obligation of anyone", Correlator.run(Arrays.asList(stated("A", "unknown", 500L, 1L))).openers == 0);
+        Harness.equal("reminders 45 days apart are one obligation, 46 are two", Correlator.run(Arrays.asList(stated("A", "me", 5L, 1L), stated("A", "me", 5L, 46L))).obligations
+            + "|" + Correlator.run(Arrays.asList(stated("A", "me", 5L, 1L), stated("A", "me", 5L, 47L))).obligations, "1|2");
+        Harness.equal("a payment before its bill closes no obligation", Correlator.run(Arrays.asList(moved("A", "out", 5L, 1L), stated("A", "me", 5L, 3L))).obligationsClosed, 0L);
+    }
+
+    private static LoopFit.Report feed(MessagesRules.Message... all) {
+        LoopFit fit = new LoopFit();
+        for (MessagesRules.Message m : all) fit.message(m);
+        return fit.report();
+    }
+
+    private static MessagesRules.Message sms(String address, String body, long day) {
+        return new MessagesRules.Message(address, "", day * DAY + 12 * 3_600_000L, 1, body);
+    }
+
+    private static void cap() {
+        Harness.suite("the facts held in memory are bounded");
+        LoopFit fit = new LoopFit();
+        for (int i = 0; i < LoopFit.MAX_KEPT + 3; i++) fit.message(new MessagesRules.Message("VM-BANKA", "", i * 1000L, 1, "Rs.5.00 debited from A/c XX0000."));
+        LoopFit.Report r = fit.report();
+        Harness.equal("past the cap the facts are not kept, and the report says so", r.get("match.cut") + "|" + r.get("ledger.out") + "|" + r.service, "3|" + LoopFit.MAX_KEPT + "|" + (LoopFit.MAX_KEPT + 3));
+    }
+
+    private static void ledger() {
+        Harness.suite("the fit report reads facts: a payment is the ledger, and only sometimes a candidate");
+        String bill = "Your card bill of Rs.1,000.00 is due on 25-Sep-26.";
+        String paid = "Payment of Rs.1,000.00 received towards your credit card ending 0000.";
+        LoopFit.Report closed = feed(sms("VM-BANKA", bill, 100L), sms("VM-BANKA", paid, 105L));
+        Harness.equal("a bill then its payment: one candidate, nothing ledger-only", closed.get("closure.candidates") + "|" + closed.get("ledger.out") + "|" + closed.get("ledger.only") + "|" + closed.get("effect.CLOSURE_CANDIDATE"), "1|1|0|1");
+        LoopFit.Report spend = feed(sms("VM-BANKA", "Rs.500.00 debited from A/c XX0000.", 100L), sms("VM-BANKA", "Rs.90.00 credited to your A/c XX0000.", 101L));
+        Harness.equal("spending and income with nothing open are the ledger only", spend.get("ledger.out") + "|" + spend.get("ledger.in") + "|" + spend.get("ledger.only") + "|" + spend.get("closure.candidates") + "|" + spend.get("effect.CLOSURE_CANDIDATE"), "1|1|2|0|0");
+        Harness.equal("the facts are counted by type and the opens by effect", closed.get("obs.obligation.stated") + "|" + closed.get("obs.value.moved") + "|" + closed.get("obs.obligation.fulfilled") + "|" + closed.get("effect.OPEN") + "|" + closed.get("effect.ADVANCE"), "1|1|1|1|0");
+        LoopFit.Report thrown = feed(sms("VM-BANKA", "123456 is your OTP. Do not share.", 100L), sms("AD-SHOPB-S", "Congratulations! Win a prize with this offer.", 100L), sms("VM-ODDC", "Kuch bhi", 100L),
+            sms("VM-BANKA", "Rs.500.00 debited. Your appointment is scheduled for 08-Oct.", 100L));
+        Harness.equal("what is not kept is counted by why", thrown.get("discard.code") + "|" + thrown.get("discard.promo") + "|" + thrown.get("discard.unreadable") + "|" + thrown.get("discard.ambiguous"), "1|1|1|1");
+        Harness.check("and the sentence says what money moved", closed.say().contains("Money moved: 1 out, 0 in; 1 of those look like the end of something open (suggestions only), 0 are the ledger only."));
+    }
+
+    private static Journal open(Context[] holder) throws Exception {
+        Install.forget();
+        Context context = new Context(Files.createTempDirectory("orb-observations").toFile());
+        holder[0] = context;
+        return Journal.open(context, Install.lane(context), Install.id(context));
+    }
+
+    private static boolean contains(File dir, byte[] needle) throws Exception {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) { if (contains(child, needle)) return true; continue; }
+            byte[] hay = Files.readAllBytes(child.toPath());
+            outer:
+            for (int i = 0; i + needle.length <= hay.length; i++) {
+                for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static SenderRules.Quiet quietOf(final String... ids) {
+        final Set<String> set = new HashSet<>(Arrays.asList(ids));
+        return new SenderRules.Quiet() {
+            @Override public boolean quiet(String id) { return set.contains(id); }
+        };
+    }
+
+    private static void store() throws Exception {
+        Harness.suite("a bundle: immutable, ordered, replayable, per source and month");
+        List<Observation> two = Arrays.asList(moved("BANKA", "out", 500L, 100L), stated("BANKA", "me", 842100L, 50L));
+        byte[] bytes = ObservationStore.encode(two);
+        byte[] reversed = ObservationStore.encode(Arrays.asList(two.get(1), two.get(0)));
+        Harness.check("the same facts make the same bytes, whatever order they come in", Arrays.equals(bytes, reversed));
+        List<Observation> back = ObservationStore.decode(bytes);
+        Harness.check("and decode(encode(x)) is x: same ids, same facts, ordered by when they happened", back != null && back.size() == 2 && back.get(0).id.equals(two.get(1).id) && back.get(1).id.equals(two.get(0).id)
+            && back.get(0).minor == 842100L && back.get(1).direction.equals("out") && back.get(0).readRule.equals("") && back.get(0).confidencePercent == 80);
+        Harness.check("other bytes are not a bundle", ObservationStore.decode("hello".getBytes(StandardCharsets.UTF_8)) == null);
+        Observation tabbed = Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", "A\tB\nC\\D", Observation.T0).times(1L, 1L).bearer("me").build();
+        List<Observation> tb = ObservationStore.decode(ObservationStore.encode(Arrays.asList(tabbed)));
+        Harness.check("a tab, a line break or a backslash in a field cannot split or forge a line", tb != null && tb.size() == 1 && tb.get(0).sourceId.equals("A\tB\nC\\D") && tb.get(0).id.equals(tabbed.id));
+        String doctored = new String(bytes, StandardCharsets.UTF_8).replace("842100", "999999");
+        List<Observation> altered = ObservationStore.decode(doctored.getBytes(StandardCharsets.UTF_8));
+        Harness.check("a line altered after it was sealed no longer matches its own id and is not believed", altered != null && altered.size() == 1);
+
+        Context[] box = new Context[1];
+        Journal journal = open(box);
+        Context context = box[0];
+        final String current = "2026-10";
+        Observation sept = moved("BANKA", "out", 500L, java.time.LocalDate.parse("2026-09-10").toEpochDay());
+        Observation oct = moved("BANKA", "out", 600L, java.time.LocalDate.parse("2026-10-02").toEpochDay());
+        Observation otherSource = moved("SHOPB", "out", 700L, java.time.LocalDate.parse("2026-09-12").toEpochDay());
+        Harness.equal("a source and month are kept", ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", Arrays.asList(sept), current), ObservationStore.KEPT);
+        Harness.equal("the same facts again write nothing", ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", Arrays.asList(sept), current), ObservationStore.HELD);
+        Harness.equal("one bundle, one event", ObservationStore.bundles(journal.readLines()) + "|" + count(journal, ObservationFacts.KEPT), "1|1");
+        ObservationStore.Kept all = ObservationStore.keepAll(context, journal, SenderRules.NONE, Arrays.asList(sept, oct, otherSource), UTC, current);
+        Harness.equal("three more by source × month: two new, the held one recognised", all.kept + "|" + all.held, "2|1");
+        Harness.equal("three bundles in all: BANKA's two months and SHOPB's one", ObservationStore.bundles(journal.readLines()), 3);
+        Harness.equal("replay: the observation set is what was kept", ids(ObservationStore.load(context, journal, SenderRules.NONE)), ids(Arrays.asList(sept, oct, otherSource)));
+
+        Observation sept2 = moved("BANKA", "out", 550L, java.time.LocalDate.parse("2026-09-11").toEpochDay());
+        Harness.equal("a month with new facts is a new bundle", ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", Arrays.asList(sept, sept2), current), ObservationStore.KEPT);
+        Harness.equal("and replaces the old one: still one per source × month", ObservationStore.bundles(journal.readLines()), 3);
+        Harness.equal("replay now has the new facts", ids(ObservationStore.load(context, journal, SenderRules.NONE)), ids(Arrays.asList(sept, sept2, oct, otherSource)));
+
+        Harness.equal("a quiet source is not kept", ObservationStore.keep(context, journal, quietOf("NEWCO"), "sms.sender", "NEWCO", "2026-09", Arrays.asList(moved("NEWCO", "out", 1L, 1L)), current), ObservationStore.QUIET);
+        Harness.equal("a month outside the window is not kept", ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2024-01", Arrays.asList(moved("BANKA", "out", 1L, 1L)), current), ObservationStore.OUTSIDE);
+        Harness.equal("nor is an empty one", ObservationStore.keep(context, journal, SenderRules.NONE, "sms.sender", "BANKA", "2026-09", new ArrayList<Observation>(), current), ObservationStore.EMPTY);
+        Harness.equal("while a source is quiet its kept facts are left out of the set — and not erased", ids(ObservationStore.load(context, journal, quietOf("SHOPB"))), ids(Arrays.asList(sept, sept2, oct)));
+        Harness.equal("take it back and they return", ids(ObservationStore.load(context, journal, SenderRules.NONE)), ids(Arrays.asList(sept, sept2, oct, otherSource)));
+
+        String text = String.join("\n", journal.readLines());
+        Harness.check("the journal holds no sender code, no amount, no id and no fact", !text.contains("BANKA") && !text.contains("SHOPB") && !text.contains("sept") && !text.contains(sept.id) && !text.contains("\"minor\"")
+            && text.contains("\"sourceKey\"") && text.contains("observation.bundle.v1"));
+        Harness.check("nor does anything on disk, in the clear", !contains(box[0].getFilesDir(), "BANKA".getBytes(StandardCharsets.UTF_8)) && !contains(box[0].getFilesDir(), sept.id.getBytes(StandardCharsets.UTF_8)));
+
+        Harness.equal("erasing one source destroys only its bundles", ObservationStore.eraseSource(context, journal, "sms.sender", "SHOPB"), 1);
+        Harness.equal("the others are untouched", ids(ObservationStore.load(context, journal, SenderRules.NONE)), ids(Arrays.asList(sept, sept2, oct)));
+        Harness.equal("and erasing it again finds nothing", ObservationStore.eraseSource(context, journal, "sms.sender", "SHOPB"), 0);
+        Harness.equal("marking a source quiet does not erase it", ObservationStore.bundles(journal.readLines()), 2);
+        Harness.equal("retention is a policy: 24 months", ObservationStore.RETENTION_MONTHS, 24);
+        Harness.check("the window", ObservationStore.inRetention("2026-10", "2026-10") && ObservationStore.inRetention("2024-10", "2026-10") && !ObservationStore.inRetention("2024-09", "2026-10") && !ObservationStore.inRetention("2026-11", "2026-10"));
+        Harness.equal("a later month ages the oldest bundle out (September 2026 is 25 months before October 2028)", ObservationStore.expire(context, journal, "2028-10"), 1);
+        Harness.equal("October 2026 is still inside the window", ids(ObservationStore.load(context, journal, SenderRules.NONE)), ids(Arrays.asList(oct)));
+        Harness.equal("a month later it goes too", ObservationStore.expire(context, journal, "2028-11"), 1);
+        Harness.equal("after which nothing is left to replay", ObservationStore.load(context, journal, SenderRules.NONE).size(), 0);
+    }
+
+    private static int count(Journal journal, String type) throws Exception {
+        int n = 0;
+        for (String l : journal.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static List<String> ids(List<Observation> all) {
+        List<String> out = new ArrayList<>();
+        for (Observation o : all) out.add(o.id);
+        Collections.sort(out);
+        return out;
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("the boundaries of the seam are held by the source");
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        Map<String, String> source = new TreeMap<>();
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (name.endsWith(".java.in")) source.put(name.replace(".java.in", ""), code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)));
+            }
+        }
+        for (String decider : Arrays.asList("Interpreter", "Correlator", "SmsNormalizer")) {
+            Harness.check(decider + " never reads confidencePercent as a quantity: it is declared, never compared", !source.get(decider).contains(".confidencePercent"));
+        }
+        Harness.check("nothing that decides compares a confidence with a threshold", !source.get("LoopFit").contains("confidencePercent") && !source.get("Interpreter").contains("confidencePercent"));
+        Harness.check("the Interpreter is pure: no pattern, no clock, no storage, no Android", !source.get("Interpreter").contains("Pattern") && !source.get("Interpreter").contains("currentTimeMillis")
+            && !source.get("Interpreter").contains("Context") && !source.get("Interpreter").contains("import android"));
+        Harness.check("the Correlator is pure too", !source.get("Correlator").contains("Pattern") && !source.get("Correlator").contains("currentTimeMillis") && !source.get("Correlator").contains("Context"));
+        Harness.check("closing is not an effect: no CLOSE, only CLOSURE_CANDIDATE", !source.get("Interpreter").matches("(?s).*\\bCLOSE\\b.*") && source.get("Interpreter").contains("CLOSURE_CANDIDATE"));
+        Harness.check("an observation has no kind, owner, origin or status of Orb's own", !source.get("Observation").contains("String kind;") && !source.get("Observation").contains("String owner;")
+            && !source.get("Observation").contains("String origin;") && !source.get("Observation").contains("String status;"));
+        Harness.check("the normalizer emits facts, never loop words: it names no kind, owner or origin", !source.get("SmsNormalizer").contains("Observation.of(\"") && !source.get("SmsNormalizer").contains("LoopRules.STATED")
+            && !source.get("SmsNormalizer").contains("LoopRules.ASKED"));
+        Harness.check("only the store writes the bundle event", source.get("ObservationStore").contains("append(ObservationFacts.KEPT") && !source.get("LoopFit").contains("append(") && !source.get("Interpreter").contains("append("));
+        Harness.check("the store keeps no raw text: it sees only Observations", !source.get("ObservationStore").contains("MessagesRules.Message") && !source.get("ObservationStore").contains(".body"));
+        Harness.check("the app-facing entry point is specified, not built: nothing exports a receiver or service for observations",
+            !new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").toLowerCase().contains("observe"));
+    }
+
+    private static String code(String source) {
+        return source.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", "");
+    }
+}

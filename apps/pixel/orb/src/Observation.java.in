@@ -1,0 +1,201 @@
+package @PKG@;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * An Observation (`docs/OBSERVATION_SEAM.md` §3, DR-43): **a fact about the world, with provenance** — what happened, never what it means for a person. It
+ * carries no `kind`, `owner`, `origin` or `status`: those are the Loop protocol's, decided by the `Interpreter`. A normalizer says *what happened*; Orb says
+ * what it means.
+ *
+ * **`confidencePercent` is declared rule metadata**, kept because the kernel `Observation` contract requires it: not an estimate of truth, and never
+ * compared, thresholded, shown as a probability, or used by correlation or interpretation. The only epistemic marker the Interpreter reads is the ordinal
+ * `subjectBasis` (`observed`, `stated`, `inferred`) with its rule.
+ *
+ * Immutable. The `id` is deterministic: the same fact imported twice is one fact.
+ */
+final class Observation {
+    static final String PROTOCOL = "obs/0.1";
+
+    static final String OBLIGATION_STATED = "obligation.stated";
+    static final String OBLIGATION_PROGRESSED = "obligation.progressed";
+    static final String OBLIGATION_FULFILLED = "obligation.fulfilled";
+    static final String OBLIGATION_WITHDRAWN = "obligation.withdrawn";
+    static final String ATTENDANCE_SCHEDULED = "attendance.scheduled";
+    static final String ATTENDANCE_CHANGED = "attendance.changed";
+    static final String ATTENDANCE_CANCELLED = "attendance.cancelled";
+    static final String REQUEST_RECEIVED = "request.received";
+    static final String REQUEST_ANSWERED = "request.answered";
+    static final String DECISION_REQUESTED = "decision.requested";
+    static final String DECISION_MADE = "decision.made";
+    static final String VALUE_MOVED = "value.moved";
+    static final String INFORMATION_NOTED = "information.noted";
+    static final List<String> TYPES = Collections.unmodifiableList(Arrays.asList(OBLIGATION_STATED, OBLIGATION_PROGRESSED, OBLIGATION_FULFILLED, OBLIGATION_WITHDRAWN,
+        ATTENDANCE_SCHEDULED, ATTENDANCE_CHANGED, ATTENDANCE_CANCELLED, REQUEST_RECEIVED, REQUEST_ANSWERED, DECISION_REQUESTED, DECISION_MADE, VALUE_MOVED, INFORMATION_NOTED));
+
+    /** Provenance authenticity — never truth (`OBSERVATION_SEAM.md` §9). */
+    static final String T0 = "T0";
+    static final String T1 = "T1";
+    static final String T2 = "T2";
+    static final List<String> TIERS = Collections.unmodifiableList(Arrays.asList(T0, T1, T2));
+
+    static final String BEARER_UNKNOWN = "unknown";
+    static final String OUT = "out";
+    static final String IN = "in";
+
+    /** What a thing is: used by the Interpreter to choose GIVE or DO, and nothing else. */
+    static final String MONEY = "money";
+    static final String ITEM = "item";
+    static final String DOCUMENT = "document";
+    static final String ACT = "act";
+    static final String OTHER = "other";
+
+    final String id;
+    final String type;
+    final String sourceKind;
+    final String sourceId;
+    final String tier;
+    final String adapterId;
+    final long adapterVersion;
+    final long occurredMs;
+    final long seenMs;
+    /** For a statement: who must move (`me`, `them`, or `unknown`). */
+    final String bearer;
+    /** `out` or `in` for `value.moved`; otherwise null. */
+    final String direction;
+    /** For `obligation.progressed`: a short word (`failed`, `in-transit`, `refund-started`); otherwise null. */
+    final String stage;
+    final String objectClass;
+    /** Integer minor units, or 0 for none. */
+    final long minor;
+    final String currency;
+    final String counterparty;
+    final String subjectClass;
+    final String subjectRef;
+    /** How Orb knows it is the same subject: `observed`, `stated` or `inferred` — a kind of knowing, never a score. */
+    final String subjectBasis;
+    final String ruleId;
+    final long ruleVersion;
+    /** The normalizer rule that read it (`bill-due`, `money-out`): provenance for the *Why is Orb showing this?* screen. Not part of the fact's identity. */
+    final String readRule;
+    /** Declared by the normalizer, 0–100. Compatibility with the kernel contract only. */
+    final int confidencePercent;
+
+    private Observation(Builder b) {
+        this.type = b.type;
+        this.sourceKind = b.sourceKind;
+        this.sourceId = b.sourceId;
+        this.tier = b.tier;
+        this.adapterId = b.adapterId;
+        this.adapterVersion = b.adapterVersion;
+        this.occurredMs = b.occurredMs;
+        this.seenMs = b.seenMs;
+        this.bearer = b.bearer;
+        this.direction = b.direction;
+        this.stage = b.stage;
+        this.objectClass = b.objectClass;
+        this.minor = b.minor;
+        this.currency = b.currency;
+        this.counterparty = b.counterparty;
+        this.subjectClass = b.subjectClass;
+        this.subjectRef = b.subjectRef;
+        this.subjectBasis = b.subjectBasis;
+        this.ruleId = b.ruleId;
+        this.ruleVersion = b.ruleVersion;
+        this.readRule = b.readRule;
+        this.confidencePercent = b.confidencePercent;
+        this.id = identity(this);
+    }
+
+    private static String s(String v) {
+        return v == null ? "" : v;
+    }
+
+    /** The same fact, wherever and however often it is read: not the time Orb saw it, not the declared confidence. */
+    private static String identity(Observation o) {
+        String basis = String.join("|", o.adapterId, Long.toString(o.adapterVersion), o.sourceKind, o.sourceId, o.type, s(o.bearer), s(o.direction), s(o.stage),
+            s(o.objectClass), Long.toString(o.minor), s(o.subjectRef), Long.toString(o.occurredMs));
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(basis.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < 16; i++) out.append(String.format(Locale.ROOT, "%02x", digest[i]));
+            return out.toString();
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    /** True for a type that says something is owed or expected, or asked, or to be attended or decided: it can open a loop. */
+    boolean stateful() {
+        return !INFORMATION_NOTED.equals(type) && !VALUE_MOVED.equals(type);
+    }
+
+    static Builder of(String type) {
+        return new Builder(type);
+    }
+
+    static final class Builder {
+        private final String type;
+        private String sourceKind = "sms.sender";
+        private String sourceId = "";
+        private String tier = T0;
+        private String adapterId = "sms";
+        private long adapterVersion = 1L;
+        private long occurredMs;
+        private long seenMs;
+        private String bearer = BEARER_UNKNOWN;
+        private String direction;
+        private String stage;
+        private String objectClass = OTHER;
+        private long minor;
+        private String currency = "";
+        private String counterparty = "";
+        private String subjectClass = "";
+        private String subjectRef = "";
+        private String subjectBasis = LoopRules.INFERRED;
+        private String ruleId = "";
+        private long ruleVersion = 1L;
+        private String readRule = "";
+        private int confidencePercent;
+
+        private Builder(String type) {
+            this.type = type;
+        }
+
+        Builder source(String kind, String id, String tier) { this.sourceKind = kind; this.sourceId = id; this.tier = tier; return this; }
+        Builder adapter(String id, long version) { this.adapterId = id; this.adapterVersion = version; return this; }
+        Builder times(long occurredMs, long seenMs) { this.occurredMs = occurredMs; this.seenMs = seenMs; return this; }
+        Builder bearer(String bearer) { this.bearer = bearer; return this; }
+        Builder direction(String direction) { this.direction = direction; return this; }
+        Builder stage(String stage) { this.stage = stage; return this; }
+        Builder object(String objectClass, long minor, String currency) { this.objectClass = objectClass; this.minor = minor; this.currency = currency == null ? "" : currency; return this; }
+        Builder counterparty(String counterparty) { this.counterparty = counterparty == null ? "" : counterparty; return this; }
+        Builder subject(String subjectClass, String reference, String basis, String ruleId, long ruleVersion) {
+            this.subjectClass = subjectClass == null ? "" : subjectClass;
+            this.subjectRef = reference == null ? "" : reference;
+            this.subjectBasis = basis;
+            this.ruleId = ruleId == null ? "" : ruleId;
+            this.ruleVersion = ruleVersion;
+            return this;
+        }
+        Builder read(String rule) { this.readRule = rule == null ? "" : rule; return this; }
+        Builder confidence(int percent) { this.confidencePercent = percent; return this; }
+
+        Observation build() {
+            if (!TYPES.contains(type)) throw new IllegalArgumentException("a type outside the vocabulary");
+            if (!TIERS.contains(tier)) throw new IllegalArgumentException("a tier outside the vocabulary");
+            if (!LoopRules.validOwner(bearer) && !BEARER_UNKNOWN.equals(bearer)) throw new IllegalArgumentException("a bearer is me, them or unknown");
+            if (!LoopRules.validBasis(subjectBasis)) throw new IllegalArgumentException("a subject is known by observed, stated or inferred");
+            if (confidencePercent < 0 || confidencePercent > 100) throw new IllegalArgumentException("confidencePercent is 0 to 100");
+            if (minor < 0) throw new IllegalArgumentException("an amount is not negative");
+            if (VALUE_MOVED.equals(type) != (direction != null)) throw new IllegalArgumentException("only value.moved has a direction");
+            if (direction != null && !OUT.equals(direction) && !IN.equals(direction)) throw new IllegalArgumentException("a direction is out or in");
+            if (sourceId == null || sourceKind == null || adapterId == null) throw new IllegalArgumentException("an observation is always attributed");
+            return new Observation(this);
+        }
+    }
+}

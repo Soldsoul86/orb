@@ -1,0 +1,1000 @@
+{
+ "protocol": "obs/0.1",
+ "about": "Observations to loop effects. No adapter appears: any source that emits these observations is interpreted the same way. A payment is the ledger; closing is only ever a candidate.",
+ "cases": [
+  {
+   "name": "a bill states an obligation of mine: it opens a GIVE I owe",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "an act I owe opens a DO",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "act",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "DO",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a refund pending is a GIVE owned by them",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "them",
+     "direction": null,
+     "minor": 120000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "them",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a statement with no one to move is not a loop",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "unknown",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a shipment on its way advances",
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "them",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "item",
+     "basis": "inferred",
+     "stage": "in-transit",
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "ADVANCE",
+     "kind": "GIVE",
+     "owner": "them",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a payment request is asked of me",
+   "observations": [
+    {
+     "type": "request.received",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "unknown",
+     "direction": null,
+     "minor": 30000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "asked",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "an appointment opens an attendance",
+   "observations": [
+    {
+     "type": "attendance.scheduled",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "ATTEND",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a change of time advances it",
+   "observations": [
+    {
+     "type": "attendance.changed",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "ADVANCE",
+     "kind": "ATTEND",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a decision requested opens a DECIDE",
+   "observations": [
+    {
+     "type": "decision.requested",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "DECIDE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "information changes nothing",
+   "observations": [
+    {
+     "type": "information.noted",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "unknown",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a delivery with nothing open is nothing",
+   "observations": [
+    {
+     "type": "obligation.fulfilled",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "them",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "item",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a payment with no open obligation is the ledger only",
+   "observations": [
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 49900,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a payment of the same amount from the same source after a bill is a closure candidate, suggested only (inferred)",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 110,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": "suggests"
+    }
+   ]
+  },
+  {
+   "name": "the same payment with a reference the source gave is exact evidence — and still only a candidate",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "observed",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 110,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "observed",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": "exact"
+    }
+   ]
+  },
+  {
+   "name": "a different amount is not the same obligation",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 110,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a different source is not the same obligation",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "OTHER",
+     "day": 110,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a payment before the bill closes nothing",
+   "observations": [
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 90,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "too late (46 days) is not the same obligation",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 146,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "exactly 45 days is",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 145,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 842100,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": "suggests"
+    }
+   ]
+  },
+  {
+   "name": "one bill is closed by one payment, not two",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 500,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 101,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 500,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 102,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 500,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": "suggests"
+    },
+    {
+     "index": 2,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "money coming in does not close a bill I owe",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 500,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 101,
+     "bearer": "unknown",
+     "direction": "in",
+     "minor": 500,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a refund credited closes a refund pending (owned by them)",
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "them",
+     "direction": null,
+     "minor": 120000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 104,
+     "bearer": "unknown",
+     "direction": "in",
+     "minor": 120000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "ADVANCE",
+     "kind": "GIVE",
+     "owner": "them",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": "suggests"
+    }
+   ]
+  },
+  {
+   "name": "a payment that states its own fulfilment is one payment, and its fulfilment is the closer",
+   "observations": [
+    {
+     "type": "obligation.stated",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 1000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "value.moved",
+     "source": "ACME",
+     "day": 105,
+     "bearer": "unknown",
+     "direction": "out",
+     "minor": 1000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "obligation.fulfilled",
+     "source": "ACME",
+     "day": 105,
+     "bearer": "me",
+     "direction": null,
+     "minor": 1000,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "OPEN",
+     "kind": "GIVE",
+     "owner": "me",
+     "origin": "stated",
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": true,
+     "evidence": null
+    },
+    {
+     "index": 2,
+     "effect": "CLOSURE_CANDIDATE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": "suggests"
+    }
+   ]
+  },
+  {
+   "name": "a cancellation or a decision made is a candidate only when something is open",
+   "observations": [
+    {
+     "type": "decision.made",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    },
+    {
+     "type": "attendance.cancelled",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "me",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "money",
+     "basis": "inferred",
+     "stage": null,
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    },
+    {
+     "index": 1,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "name": "a progress with no one to move is nothing, as a statement is",
+   "observations": [
+    {
+     "type": "obligation.progressed",
+     "source": "ACME",
+     "day": 100,
+     "bearer": "unknown",
+     "direction": null,
+     "minor": 0,
+     "objectClass": "item",
+     "basis": "inferred",
+     "stage": "in-transit",
+     "ref": ""
+    }
+   ],
+   "expect": [
+    {
+     "index": 0,
+     "effect": "NONE",
+     "kind": null,
+     "owner": null,
+     "origin": null,
+     "ledger": false,
+     "evidence": null
+    }
+   ]
+  }
+ ]
+}

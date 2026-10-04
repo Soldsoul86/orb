@@ -1,0 +1,129 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Correlation (`docs/OBSERVATION_SEAM.md` §6): **is this observation about something already open?** A pure function of a set of observations — order does not
+ * matter (they are sorted by when they happened, then by id) — that says which closing observations match an opening one, and how many distinct obligations the
+ * openings make.
+ *
+ * Today every subject is known by **inference** (`sms.payment.correlation`): the same source, the same next mover, the same amount to the minor unit, the
+ * closing on or after the opening and within `WINDOW_DAYS`. When a source gives a reference of its own, the match is by reference and the subject is `observed`
+ * or `stated`. Ambiguity never merges; a closing is matched to at most one opening, the earliest unused.
+ */
+final class Correlator {
+    private Correlator() {}
+
+    /** An opening and a closing of the same amount from the same source, this near, are one obligation. */
+    static final int WINDOW_DAYS = 45;
+
+    static final class Result {
+        /** Ids of closing observations that match an open obligation. */
+        final Set<String> matched = new HashSet<>();
+        /** The same, and also the money-moved observation that is the same payment as a matched fulfilment: everything that is part of a payment that looks like a closing. */
+        final Set<String> closing = new HashSet<>();
+        /** Openings with an amount, and the closings that could close them. */
+        long openers;
+        long closers;
+        /** Distinct obligations (reminders within the window are one), and how many of them have a matching closing. */
+        long obligations;
+        long obligationsClosed;
+        /** Closers that matched: each is a closure candidate. */
+        long candidates;
+    }
+
+    private static long day(Observation o) {
+        return Math.floorDiv(o.occurredMs, 86_400_000L);
+    }
+
+    /** Whom the opening is waiting on: the bearer (a request is always of me). */
+    private static String openerOwner(Observation o) {
+        return Observation.REQUEST_RECEIVED.equals(o.type) ? LoopRules.ME : o.bearer;
+    }
+
+    private static boolean opener(Observation o) {
+        return o.minor > 0 && (Observation.OBLIGATION_STATED.equals(o.type) || Observation.OBLIGATION_PROGRESSED.equals(o.type) || Observation.REQUEST_RECEIVED.equals(o.type))
+            && LoopRules.validOwner(openerOwner(o));
+    }
+
+    private static boolean closer(Observation o) {
+        return o.minor > 0 && (Observation.VALUE_MOVED.equals(o.type) || Observation.OBLIGATION_FULFILLED.equals(o.type))
+            && (Observation.VALUE_MOVED.equals(o.type) || LoopRules.validOwner(o.bearer));
+    }
+
+    private static String closerOwner(Observation o) {
+        if (Observation.VALUE_MOVED.equals(o.type)) return Observation.OUT.equals(o.direction) ? LoopRules.ME : LoopRules.THEM;
+        return o.bearer;
+    }
+
+    static Result run(List<Observation> all) {
+        List<Observation> sorted = new ArrayList<>(all);
+        Collections.sort(sorted, new Comparator<Observation>() {
+            @Override public int compare(Observation a, Observation b) {
+                if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;
+                return a.id.compareTo(b.id);
+            }
+        });
+        // A payment that states its own fulfilment is one payment: the fulfilment is the closer, and the money moved beside it is the same event.
+        Set<String> paired = new HashSet<>();
+        for (Observation o : sorted) if (Observation.OBLIGATION_FULFILLED.equals(o.type) && o.minor > 0) paired.add(o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor);
+        Map<String, List<Observation>> pairedMoves = new HashMap<>();
+        Map<String, List<Observation>> openers = new HashMap<>();
+        Map<String, List<Observation>> closers = new HashMap<>();
+        Result r = new Result();
+        for (Observation o : sorted) {
+            if (opener(o)) {
+                r.openers++;
+                add(openers, o.sourceKind + "|" + o.sourceId + "|" + openerOwner(o) + "|" + o.minor, o);
+            } else if (closer(o)) {
+                if (Observation.VALUE_MOVED.equals(o.type) && paired.contains(o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor)) {
+                    add(pairedMoves, o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor, o);
+                    continue;
+                }
+                r.closers++;
+                add(closers, o.sourceKind + "|" + o.sourceId + "|" + closerOwner(o) + "|" + o.minor, o);
+            }
+        }
+        for (Map.Entry<String, List<Observation>> e : openers.entrySet()) {
+            List<Observation> open = e.getValue();
+            List<Observation> close = closers.containsKey(e.getKey()) ? closers.get(e.getKey()) : new ArrayList<Observation>();
+            boolean[] used = new boolean[open.size()];
+            for (Observation c : close) {
+                for (int i = 0; i < open.size(); i++) {
+                    if (used[i] || day(open.get(i)) > day(c)) continue;
+                    if (day(c) - day(open.get(i)) <= WINDOW_DAYS) {
+                        used[i] = true;
+                        r.matched.add(c.id);
+                        r.closing.add(c.id);
+                        List<Observation> sameMoney = pairedMoves.get(c.sourceKind + "|" + c.sourceId + "|" + c.occurredMs + "|" + c.minor);
+                        if (sameMoney != null) for (Observation m : sameMoney) r.closing.add(m.id);
+                        r.candidates++;
+                        break;
+                    }
+                }
+            }
+            int start = 0;
+            for (int i = 1; i <= open.size(); i++) {
+                if (i < open.size() && day(open.get(i)) - day(open.get(i - 1)) <= WINDOW_DAYS) continue;
+                r.obligations++;
+                long first = day(open.get(start)), last = day(open.get(i - 1));
+                for (Observation c : close) if (day(c) >= first && day(c) - last <= WINDOW_DAYS) { r.obligationsClosed++; break; }
+                start = i;
+            }
+        }
+        return r;
+    }
+
+    private static void add(Map<String, List<Observation>> map, String key, Observation o) {
+        List<Observation> list = map.get(key);
+        if (list == null) { list = new ArrayList<>(); map.put(key, list); }
+        list.add(o);
+    }
+}

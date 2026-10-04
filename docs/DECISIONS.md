@@ -1433,6 +1433,14 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** marking by word or pattern, marking people, sharing marks between phones, automatic marking, a positive verdict.
 
+## DR-43 — The Observation seam: one way in for everything the world tells Orb
+
+- **Status:** Decided; the SMS path is built behind it (v59) · **Decided:** 2026-10-04, operator ("Yes, I agree with the five decisions", then "Approve the Observation seam design" on `OBSERVATION_SEAM.md`, with six answers and one addition).
+
+**The ruling.** Everything Orb is told — an SMS, a calendar entry, a bank feed, an app — becomes an **Observation**: *a fact about the world*, with provenance, through a per-source **Normalizer**; only Orb's own, versioned, deterministic **Interpreter** says what it means for a person (`NONE`, `OPEN`, `ADVANCE` or `CLOSURE_CANDIDATE`). **A payment is money moved (a ledger view), not a closure**, unless a matching open loop exists — and even then it is a candidate the person confirms; **there is no `CLOSE` effect in v0.1**. A subject is known by `observed` / `stated` / `inferred(rule)` — a kind of knowing, never a score; trust tiers T0/T1/T2 are **provenance authenticity, never truth**. `confidencePercent` is kept for the kernel `Observation` contract as **declared rule metadata**, and never influences correlation or interpretation. Normalized observations (never raw text) are sealed **per source × calendar month**, 24 months, quiet **without** erasure; pull adapters live off the phone, a write-only local app API is specified and not built; *Pay* is a handoff. Sender marks generalise to **source marks**. `value.exchanged` is deferred to Money.
+
+**Not in this ruling:** the public SDK, any pull adapter, models and language, Money's categories and recurrence, wiring `ObservationStore.keep` to a screen.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
