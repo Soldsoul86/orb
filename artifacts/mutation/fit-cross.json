@@ -1,0 +1,280 @@
+{
+ "summary": {
+  "killed": 15,
+  "alive": 5,
+  "missing": 0,
+  "invalid": 0,
+  "equivalent": 2,
+  "attempted": 22,
+  "total": 22
+ },
+ "results": [
+  {
+   "index": 0,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+    "new": "if (age < 0 || age > Correlator.WINDOW_DAYS + 1) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 1,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+    "new": "if (age <= 0 || age > Correlator.WINDOW_DAYS) continue;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 2,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+    "new": "if (age > Correlator.WINDOW_DAYS) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 3,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+    "new": "if (age < 0 || age >= Correlator.WINDOW_DAYS) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 4,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (sourceOf(ob.first()).equals(sourceOf(pay))) continue;",
+    "new": "if (false) continue;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 5,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (usedOpeners.contains(o.id) || !openerOwner(o)",
+    "new": "if (!openerOwner(o)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 6,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "|| !openerOwner(o).equals(closerOwner(pay))",
+    "new": "|| false"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 7,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "|| o.minor != pay.minor ||",
+    "new": "|| false ||"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 8,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "|| !o.currency.equals(pay.currency)) continue;",
+    "new": ") continue;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 9,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "} else if (candidates.size() == 1) {",
+    "new": "} else if (candidates.size() <= 2) {"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 10,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "} else if (candidates.size() == 1) {",
+    "new": "} else if (candidates.size() >= 1) {"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 11,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (matchedPayments.contains(pay.id)) {",
+    "new": "if (false) {"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 12,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (Observation.VALUE_MOVED.equals(o.type) && fulfilled.contains(twinKey(o))) continue;",
+    "new": "if (false) continue;",
+    "equivalent": "Not reachable from an SMS backup alone in the synthetic corpus: a fulfilment and its twin come from one message, and the self-check 'payments equal the correlator's' (printed as 'drifted' if they differ) guards the definition on the real one."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 13,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "for (Correlator.Obligation ob : r.list) {\n            boolean mine",
+    "new": "for (Correlator.Obligation ob : r.list) {\n            if (out.obligations > 8) break;\n            boolean mine"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 14,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (hasSame.contains(ob)) {",
+    "new": "if (false) {"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 15,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "} else if (hasCross.contains(ob)) {",
+    "new": "} else if (false) {"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 16,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "hasCross.add(e.getKey());\n                    add(out.crossPairs",
+    "new": "add(out.crossPairs"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 17,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "add(out.crossPairs, brand(e.getValue()) + \" -> \" + brand(pay));",
+    "new": "add(out.crossPairs, brand(pay) + \" -> \" + brand(e.getValue()));"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart",
+    "# fail 1"
+   ]
+  },
+  {
+   "index": 18,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "int c = Long.compare(b.getValue(), a.getValue());",
+    "new": "int c = Long.compare(a.getValue(), b.getValue());"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 19,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "for (int i = 0; i < rows.size() && i < n; i++)",
+    "new": "for (int i = 0; i < rows.size() && i < n - 1; i++)",
+    "equivalent": "The report asks for 25 rows and the synthetic backup has two: only a corpus with 25 pairs would see an off-by-one at the cap."
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 20,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (!payment(o)) continue;\n            if (Observation.VALUE_MOVED",
+    "new": "if (Observation.VALUE_MOVED"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  },
+  {
+   "index": 21,
+   "mutant": {
+    "file": "tools/fit/CrossSender.java.in",
+    "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;\n                    through = o;",
+    "new": "through = o;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "not ok 1 - cross-sender: payments and bills are classified as constructed, and the totals add up",
+    "not ok 2 - cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart"
+   ]
+  }
+ ]
+}

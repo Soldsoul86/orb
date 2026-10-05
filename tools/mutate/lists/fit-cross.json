@@ -23,7 +23,8 @@
   {
    "file": "tools/fit/CrossSender.java.in",
    "old": "if (sourceOf(ob.first()).equals(sourceOf(pay))) continue;",
-   "new": "if (false) continue;"
+   "new": "if (false) continue;",
+   "equivalent": "The correlator already pairs every same-sender payment that has an unused same-sender bill in its window, so a same-sender bill is never left unused for a same-sender payment the correlator did not match; the filter only states that the cross-sender candidates are of other senders."
   },
   {
    "file": "tools/fit/CrossSender.java.in",
@@ -43,7 +44,8 @@
   {
    "file": "tools/fit/CrossSender.java.in",
    "old": "|| !o.currency.equals(pay.currency)) continue;",
-   "new": ") continue;"
+   "new": ") continue;",
+   "equivalent": "An SMS backup is rupees only (the normalizer gives every amount the currency INR), so the currency of a payment and a bill never differ in what this probe reads. The comparison is kept for a second source (the statement) and is exercised by the correlator's own currency checks."
   },
   {
    "file": "tools/fit/CrossSender.java.in",

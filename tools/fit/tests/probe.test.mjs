@@ -73,6 +73,7 @@ test("a missing file or no argument is refused before anything is compiled", () 
 const DAY = 86_400_000;
 const T0 = 1_790_000_000_000;
 const bill = (sender, amount, day) => message(`VM-${sender}`, `${CANARY} Your credit card bill of Rs.${amount} is due on 05-Nov.`, T0 + day * DAY);
+const credit = (sender, amount, day) => message(`VM-${sender}`, `${CANARY} Rs ${amount} credited to a/c XX1234 on 01-Oct-26 info UPI`, T0 + day * DAY);
 const debit = (sender, amount, day) => message(`VM-${sender}`, `${CANARY} Rs ${amount} debited from a/c XX1234 on 01-Oct-26 info UPI`, T0 + day * DAY);
 
 /** Ten payments and ten bills whose classification is known by construction. */
@@ -95,6 +96,11 @@ function crossSynthetic() {
       // I: the payment is before the bill; J: a different amount.
       debit("EARLPY", "9,000.00", 0), bill("EARLBK", "9,000.00", 1),
       bill("AMTBKX", "10,000.00", 0), debit("AMTPYX", "10,500.00", 1),
+      // K: the payment is on the same day as the bill — inside the window. L: money that came in is not the end of a bill you owe.
+      bill("SAMEDY", "11,000.00", 0), debit("SAMEPY", "11,000.00", 0),
+      bill("INBILL", "12,000.00", 0), credit("INPAYX", "12,000.00", 1),
+      // M: the same pair of senders twice, so the pair counts differ and the order of the pairs is tested.
+      bill("TWOBK", "14,000.00", 0), debit("TWOPY", "14,000.00", 1), bill("TWOBK", "15,000.00", 0), debit("TWOPY", "15,000.00", 1),
     ],
   };
 }
@@ -114,14 +120,14 @@ function runCross() {
 
 test("cross-sender: payments and bills are classified as constructed, and the totals add up", opts, () => {
   const out = runCross().stdout;
-  assert.match(out, /^cross-sender: payments 10 = same sender 2 \+ different sender \(one candidate\) 2 \+ ambiguous 1 \+ unmatched 5 ok$/m);
-  assert.match(out, /^cross-sender: obligations 10 = with a same-sender payment 2 \+ a different-sender candidate only 4 \+ none 4 ok$/m);
-  assert.match(out, /^cross-sender: of the obligations you owe 10: same sender 2, different-sender candidate only 4, none 4$/m);
+  assert.match(out, /^cross-sender: payments 14 = same sender 2 \+ different sender \(one candidate\) 5 \+ ambiguous 1 \+ unmatched 6 ok$/m);
+  assert.match(out, /^cross-sender: obligations 14 = with a same-sender payment 2 \+ a different-sender candidate only 7 \+ none 5 ok$/m);
+  assert.match(out, /^cross-sender: of the obligations you owe 14: same sender 2, different-sender candidate only 7, none 5$/m);
 });
 
 test("cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart", opts, () => {
   const out = runCross().stdout;
-  assert.match(out, /^cross-sender pairs \(bill sender -> payment sender\), one candidate: EDGEBK -> EDGEPY 1, ONEBKX -> PAYBKX 1$/m);
+  assert.match(out, /^cross-sender pairs \(bill sender -> payment sender\), one candidate: TWOBK -> TWOPY 2, EDGEBK -> EDGEPY 1, ONEBKX -> PAYBKX 1, SAMEDY -> SAMEPY 1$/m);
   assert.match(out, /^cross-sender pairs inside an ambiguous payment: AMBAAA -> AMBCCC 1, AMBBBB -> AMBCCC 1$/m);
 });
 
