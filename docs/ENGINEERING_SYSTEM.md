@@ -131,9 +131,10 @@ Money slice A (in flight) finishes as it is: it predates the system and is the s
 
 ## 10. First acceptance evidence: Money B (2026-10-05)
 
-The question was whether the system would catch something the agent would otherwise have missed. On slice B it did, three times, none of them by the green suite:
+The question was whether the system would catch something the agent would otherwise have missed. On slice B it did, four times, none of them by the green suite:
 1. **The registry caught two stale proofs** (a check renamed while fixing a mutation survivor, twice): the report said `UNPROVEN` before anything shipped.
 2. **The independent `reviewer` found the build not ready** with a suite of 3,371 green checks, a clean first mutation run and 49 of 52 scenarios proven: the one function that writes the person's answer was outside the suite, the proof that "an answer changes nothing" was greps, and a design consequence (chains of reminders: 13 of 20 candidates) made the unit of a label wrong. All three are fixed and recorded (`LEARNINGS.md` L-005).
-3. **The decision queue stopped a build** on a real semantic gap (`PD-001`: does *Mark paid* close a loop that does not exist?) instead of improvising.
+3. **The `adversary` found 16 more breaks in a build the reviewer had passed through** — a screen that did not compile (outside the suite), a key that moved when an older reminder was sealed later, a reader looser than its writer (`L-006`). The reviewer reads what exists; the adversary asks what a hostile input does, and the two found different things.
+4. **The decision queue stopped a build** on a real semantic gap (`PD-001`: does *Mark paid* close a loop that does not exist?) instead of improvising.
 
 What did **not** help: the file-class gate and the budget, which had nothing to catch (every change was approved and in scope); they have earned no blocking rule yet. The honest reading: the *registries and the independent reviewer* earned their place; *governance* has yet to.

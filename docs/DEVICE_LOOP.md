@@ -8072,3 +8072,38 @@ If you switch **keeping facts** off, Orb now keeps nothing until you turn it on 
 #### Result — export `orb-20261005-081724` (operator, 2026-10-05): v61 on the device
 
 1,274 events (+11 since the v60 export); chain intact; **v61 (`29852800`) started once**; **no crash, no fault**. The journal's sequence for keeping, in order: **grant** (Turn on keeping facts, dialog, yes) → a Look → **revocation** (switched off) → a Look → **grant** again. **P360 confirmed** (a grant is recorded by the dialog's yes, not by a Keep). **P361 confirmed by absence:** between the revocation and the next grant there is a Look and **no `orb.observations.kept`**, and there is none after v60's 327 — a Keep that was refused writes nothing. **P362** cannot be told from a journal (an unchanged Keep writes nothing either way). **P358 and P359** (the button's text, the dialog, *Not now* changing nothing) are visible only on the phone; the operator sent the export without objection. The operator's v60 finding is closed: keeping can now be switched off and on, and off means off.
+
+### 7b99. Money B — review what looks paid (v62) — 2026-10-05
+
+**Status: built, awaiting the device.** `orb-app-v62-review.apk` (over v61). Slice B of Money (`MONEY_PHONE.md` §17, §17a, §17b; DR-46).
+
+#### In plain words
+
+**Money moved** has a new button, **Review what looks paid**. It lists payments that look like the end of a bill ("Looks like this was paid") and recent bills with no payment in view. You answer **Mark paid / Not this** on a payment, or **Already paid** on a bill. **Your answer is only a note for Orb to learn from**: it does not close anything, change Today, or touch your commitments. Orb counts how often it was right, and says "insufficient sample" until you have given 20 answers. It never uses the percentage for anything.
+
+#### Checked before the device
+
+3,472 phone-side checks, 0 failed; scenarios REV-001…REV-018 (59 in the registry: 56 with proof, 3 honest drafts); independent `reviewer` and `adversary` agents (16 breaks found and fixed, `LEARNINGS.md` L-005, L-006); mutation run of the review code in `artifacts/mutation/money-b.json`. On the first real backup (container, counts only): 184 obligations, 71 of them chains of 2+ reminders; 20 candidate pairs, 13 inside a chain; about 30 items the review would show now.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P363** | **Money moved** shows **Review what looks paid**; it opens a screen titled *Review what looks paid*, with the counts line `0 marked paid · 0 said not this · 0 already paid`, *Precision: insufficient sample (0 of 20 answers)* and *Missed correlations: 0 of 0* | no button or an empty screen with facts kept |
+| **P364** | Candidates appear first (about 20 or fewer shown), each with the bill and the payment on one line; bills with no payment follow under their own heading | only one kind shown |
+| **P365** | Tap **Mark paid** on one: a line says *Noted… nothing was closed*, that candidate disappears, the counts say `1 marked paid` | it stays, or Today changes |
+| **P366** | Tap **Not this** on another: it disappears; the counts say `1 said not this` | it returns |
+| **P367** | Tap **Already paid** on a bill: it disappears; the counts say `1 already paid`; a *Missed correlations* count may be 0 or more | it stays |
+| **P368** | **Today and commitments are exactly as before** (nothing newly closed or opened) | anything changed |
+| **P369** | **Export** gains one `orb.candidate.judged` event per answer (3 in total) — and **no other new event type**; the payloads hold only 16-hex keys, the verdict and a rule name, **no amount, name or word** | another event, or readable content |
+| **P370** | Close and reopen the review: the answered ones stay gone | they come back |
+
+#### Protocol
+
+1. Install `orb-app-v62-review.apk` over v61.
+2. **Money moved → Review what looks paid**. *(P363, P364)*
+3. Answer **three** items: one **Mark paid**, one **Not this**, one **Already paid**. Answer only what you actually know; if none looks right, skip it. *(P365–P367)*
+4. Look at Today / commitments. *(P368)*
+5. Leave the screen and come back. *(P370)*
+6. **Export and share journal** and send it. *(P369)*
+

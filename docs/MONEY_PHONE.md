@@ -183,3 +183,15 @@ An independent reviewer (the `reviewer` agent, read-only) read the first build a
 - **A rule is named by a closed vocabulary** (`[a-z.]{0,64}`), never free text.
 - **The screen** says after each tap that it only teaches Orb, shows candidates and open bills in separate caps (so candidates cannot crowd out *Already paid*), and explains that a *miss* means a payment of the same amount that Orb did not link, not that it was the person's.
 - **Stated, not fixed:** an answer is about a *rule version* (a normalizer version bump changes an observation's id and so an obligation's key, and the review asks again); matching and windows use UTC days while the screen shows local days; *missed* is computed from raw movements and should use the ledger's corroborated movements once a second source exists (slice C).
+
+### 17b. Refinements from the adversary on slice B (2026-10-05)
+
+An `adversary` agent attacked the built slice with hostile synthetic input and found **16 breaks**; each is now a failing-then-passing check (`AdversaryReviewTest`, scenarios REV-012…REV-018). What changed the design:
+
+- **A question is identified by its payment.** A payment id does not change when an older reminder of the chain is sealed later or one leaves the kept facts; the reminder it was matched to can. So `pairKey` is the payment's blinded key only; the **obligation key** of a candidate is the newest reminder of its chain **not after the payment** (reminders restated before the payment are the same bill; one after it, next month's rent, is a new bill and a new question). An **open** question is about the newest reminder of the chain: answered, it stays answered; a newer reminder is a new question.
+- **The reader is as strict as the writer.** One flat object of the known fields of the known schema, passing the same checks the writer applies; anything else (nested, duplicated or unknown fields, an unknown schema, a value the writer would refuse) is skipped. **One label per question, the last in the journal's order** — an answer changed or repeated counts once. The writer cannot write an invalid label (`record` returns false); the review never shows a question whose answer could not be written (`answerable`).
+- **Currency and direction are part of the key and of the match** (a payment of 500 INR and 500 USD are not the same payment); the rule name vocabulary allows digits, `_` and `-`.
+- ***Missed* is attributed to one bill.** One stray movement is a miss for the earliest bill it fits, never for two; movements the correlator matched are never a miss.
+- **Duplicates are one fact** (the same observation id twice) in the correlator.
+- **A compile check no suite gives:** the first adversary run found `ReviewActivity` did not compile (Activities are not in the phone suite); the APK build is now named as a proof in the slice file.
+

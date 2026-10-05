@@ -51,3 +51,12 @@
 - **Fix:** `ReviewFacts.record` is the one write and is in the suite; end-to-end tests (record, fold, rebuild, commitments unchanged); the label is per pair; set-based counts; a closed vocabulary for the rule name. Stated limits are in `MONEY_PHONE.md` §17a and the slice file.
 - **Regression:** scenarios REV-002, REV-004, REV-006, REV-007; invariant I-017 now says which parts are held by behaviour and which by tripwires; `tools/mutate/lists/money-b.json` (60 mutants).
 - **Invariant:** I-017, I-018.
+
+## L-006 — The reviewed build did not compile, and an answer's key moved when an older reminder was sealed later
+
+- **Failure:** after L-005's fixes, 3,472 checks passed. The adversary found 16 breaks: `ReviewActivity` still read fields that no longer existed (it would not have built — Activities are not in the phone suite; my find-and-replace silently missed lines containing literal non-ASCII); a label keyed by the first reminder (then by the pair's opener) changed when an older reminder was sealed later, so a given answer was lost and the question came back; the reader accepted what the writer would refuse (nested or duplicated fields, an unknown schema), and two answers to one question both counted.
+- **Root cause:** I edited by text replacement over sources containing non-ASCII and trusted the suite as the compile check for everything; and I chose a key from what the reminders looked like today, not from what is stable under re-reading the same journal in another order.
+- **Fix:** a question is identified by its payment; the reader is strict and last-wins; the writer cannot write an invalid label; new sources use `\uXXXX` escapes; the APK build is a named proof of the slice.
+- **Regression:** scenarios REV-012…REV-018; `AdversaryReviewTest`; `tools/mutate/lists/money-b.json` (80 mutants).
+- **Invariant:** I-017, I-018.
+
