@@ -84,6 +84,8 @@ public final class FitProbe {
         for (Correlator.Pair p : corr.pairs) if (byOpener.get(p.opener.id).openers.size() > 1) chainPairs++;
         long reviewable = ReviewRules.build(facts, new ReviewFacts.Judged(), new ReviewFacts.Keyer() { @Override public String key(String n) { return Integer.toHexString(n.hashCode()) + "0000000000000000".substring(0, 8); } }, latest).size();
         System.out.println("review: obligations " + corr.list.size() + " of which chains of 2+ reminders " + chains + "; candidate pairs " + candidatePairs + " of which in a chain " + chainPairs + "; items the review would show now " + reviewable);
+        // Cross-sender: what the same-sender rule leaves behind (docs/slices/FIT-XSENDER.json). A measurement; nothing reads it.
+        for (String xs : CrossSender.report(CrossSender.measure(facts))) System.out.println(xs);
         // What keeping would make: sealed bundles, one per source x month (docs/MONEY_PHONE.md section 7). Counts of groups, by what they hold.
         java.util.TimeZone zone = java.util.TimeZone.getTimeZone("UTC");
         long newest = 0;

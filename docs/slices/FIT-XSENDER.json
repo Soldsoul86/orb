@@ -1,0 +1,57 @@
+{
+  "id": "FIT-XSENDER",
+  "title": "Cross-sender measurement — how often is a bill paid through another sender (counts only)",
+  "design": "docs/MONEY_PHONE.md",
+  "decisions": [
+    "DR-44",
+    "DR-48"
+  ],
+  "base": "19f82d7",
+  "scenarios": [
+    "XS-001",
+    "XS-002",
+    "XS-003"
+  ],
+  "invariants": [
+    "I-005",
+    "I-006"
+  ],
+  "scope": {
+    "files": [
+      "tools/fit/**",
+      "tools/mutate/**",
+      "docs/scenarios/**",
+      "docs/slices/FIT-XSENDER.json",
+      "docs/MONEY_PHONE.md",
+      "docs/DECISIONS.md",
+      "docs/APPROVALS.json",
+      "docs/DEVICE_LOOP.md",
+      "docs/STATE.md",
+      "docs/DECISIONS_PENDING.md",
+      "artifacts/**"
+    ]
+  },
+  "budget": {
+    "maxFiles": 20,
+    "maxLines": 1500,
+    "maxFailedRuns": 3
+  },
+  "required": [
+    "tools",
+    "mutation",
+    "fit"
+  ],
+  "proof": [
+    "node --test --test-reporter=spec \"tools/*/tests/*.test.mjs\"",
+    "node tools/mutate/mutate.mjs --list tools/mutate/lists/fit-cross.json --config tools/mutate/tools-fit-cross.json --json artifacts/mutation/fit-cross.json",
+    "tools/fit/probe.sh <backup>"
+  ],
+  "limitations": [
+    "A measurement of one inbox, the one the rules were developed on: coverage, not precision, and not held-out.",
+    "A candidate is exact amount, direction, currency and 0–45 days: the number of cross-sender candidates is an upper bound on real cross-sender payments, because coincidences of amount are counted. The probe does not estimate the coincidence rate.",
+    "The 'unmatched' payments are mostly ordinary spending that no bill announced; the bill side (obligations) is the meaningful denominator.",
+    "The payment definition is replicated from the correlator (it keeps its own); the probe prints a warning when the counts stop agreeing.",
+    "It changes no rule: the correlator is untouched and nothing in the app reads this."
+  ],
+  "expectFitChange": true
+}

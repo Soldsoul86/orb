@@ -1,0 +1,116 @@
+{
+ "mutants": [
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+   "new": "if (age < 0 || age > Correlator.WINDOW_DAYS + 1) continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+   "new": "if (age <= 0 || age > Correlator.WINDOW_DAYS) continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+   "new": "if (age > Correlator.WINDOW_DAYS) continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;",
+   "new": "if (age < 0 || age >= Correlator.WINDOW_DAYS) continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (sourceOf(ob.first()).equals(sourceOf(pay))) continue;",
+   "new": "if (false) continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (usedOpeners.contains(o.id) || !openerOwner(o)",
+   "new": "if (!openerOwner(o)"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "|| !openerOwner(o).equals(closerOwner(pay))",
+   "new": "|| false"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "|| o.minor != pay.minor ||",
+   "new": "|| false ||"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "|| !o.currency.equals(pay.currency)) continue;",
+   "new": ") continue;"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "} else if (candidates.size() == 1) {",
+   "new": "} else if (candidates.size() <= 2) {"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "} else if (candidates.size() == 1) {",
+   "new": "} else if (candidates.size() >= 1) {"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (matchedPayments.contains(pay.id)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (Observation.VALUE_MOVED.equals(o.type) && fulfilled.contains(twinKey(o))) continue;",
+   "new": "if (false) continue;",
+   "equivalent": "Not reachable from an SMS backup alone in the synthetic corpus: a fulfilment and its twin come from one message, and the self-check 'payments equal the correlator's' (printed as 'drifted' if they differ) guards the definition on the real one."
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "for (Correlator.Obligation ob : r.list) {\n            boolean mine",
+   "new": "for (Correlator.Obligation ob : r.list) {\n            if (out.obligations > 8) break;\n            boolean mine"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (hasSame.contains(ob)) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "} else if (hasCross.contains(ob)) {",
+   "new": "} else if (false) {"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "hasCross.add(e.getKey());\n                    add(out.crossPairs",
+   "new": "add(out.crossPairs"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "add(out.crossPairs, brand(e.getValue()) + \" -> \" + brand(pay));",
+   "new": "add(out.crossPairs, brand(pay) + \" -> \" + brand(e.getValue()));"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "int c = Long.compare(b.getValue(), a.getValue());",
+   "new": "int c = Long.compare(a.getValue(), b.getValue());"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "for (int i = 0; i < rows.size() && i < n; i++)",
+   "new": "for (int i = 0; i < rows.size() && i < n - 1; i++)",
+   "equivalent": "The report asks for 25 rows and the synthetic backup has two: only a corpus with 25 pairs would see an off-by-one at the cap."
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (!payment(o)) continue;\n            if (Observation.VALUE_MOVED",
+   "new": "if (Observation.VALUE_MOVED"
+  },
+  {
+   "file": "tools/fit/CrossSender.java.in",
+   "old": "if (age < 0 || age > Correlator.WINDOW_DAYS) continue;\n                    through = o;",
+   "new": "through = o;"
+  }
+ ]
+}

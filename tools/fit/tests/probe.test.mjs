@@ -67,3 +67,72 @@ test("a missing file or no argument is refused before anything is compiled", () 
   assert.equal(spawnSync("bash", [probe], { encoding: "utf8" }).status, 64);
   assert.equal(spawnSync("bash", [probe, "/no/such/file"], { encoding: "utf8" }).status, 66);
 });
+
+// ---------------------------------------------------------------------------- cross-sender measurement (docs/slices/FIT-XSENDER.json)
+
+const DAY = 86_400_000;
+const T0 = 1_790_000_000_000;
+const bill = (sender, amount, day) => message(`VM-${sender}`, `${CANARY} Your credit card bill of Rs.${amount} is due on 05-Nov.`, T0 + day * DAY);
+const debit = (sender, amount, day) => message(`VM-${sender}`, `${CANARY} Rs ${amount} debited from a/c XX1234 on 01-Oct-26 info UPI`, T0 + day * DAY);
+
+/** Ten payments and ten bills whose classification is known by construction. */
+function crossSynthetic() {
+  return {
+    listSms: [
+      // A: a bill paid from its own sender — same sender.
+      bill("SAMEBK", "2,000.00", 0), debit("SAMEBK", "2,000.00", 2),
+      // B: a bill from one sender, paid through another — one cross-sender candidate.
+      bill("ONEBKX", "1,000.00", 0), debit("PAYBKX", "1,000.00", 3),
+      // C: two senders announce the same amount; a third pays it — ambiguous.
+      bill("AMBAAA", "3,000.00", 0), bill("AMBBBB", "3,000.00", 0), debit("AMBCCC", "3,000.00", 2),
+      // D: a payment nobody announced; E: a bill nobody paid.
+      debit("LONEBK", "4,000.00", 1), bill("LONEBL", "5,000.00", 0),
+      // F: a bill already used by a same-sender payment is not a candidate for another sender's payment of the same amount.
+      bill("CONSBK", "6,000.00", 0), debit("CONSBK", "6,000.00", 1), debit("OTHBKX", "6,000.00", 2),
+      // G: one day past the 45-day window; H: exactly on the edge (45 days), inside it.
+      bill("LATEBK", "7,000.00", 0), debit("LATEPY", "7,000.00", 46),
+      bill("EDGEBK", "8,000.00", 0), debit("EDGEPY", "8,000.00", 45),
+      // I: the payment is before the bill; J: a different amount.
+      debit("EARLPY", "9,000.00", 0), bill("EARLBK", "9,000.00", 1),
+      bill("AMTBKX", "10,000.00", 0), debit("AMTPYX", "10,500.00", 1),
+    ],
+  };
+}
+
+function runCross() {
+  const dir = mkdtempSync(join(tmpdir(), "orb-fit-"));
+  try {
+    const file = join(dir, "backup.sms");
+    writeFileSync(file, JSON.stringify(crossSynthetic()));
+    const run = spawnSync("bash", [probe, file], { encoding: "utf8", timeout: 240_000 });
+    assert.equal(run.status, 0, run.stderr.slice(-2000));
+    return run;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("cross-sender: payments and bills are classified as constructed, and the totals add up", opts, () => {
+  const out = runCross().stdout;
+  assert.match(out, /^cross-sender: payments 10 = same sender 2 \+ different sender \(one candidate\) 2 \+ ambiguous 1 \+ unmatched 5 ok$/m);
+  assert.match(out, /^cross-sender: obligations 10 = with a same-sender payment 2 \+ a different-sender candidate only 4 \+ none 4 ok$/m);
+  assert.match(out, /^cross-sender: of the obligations you owe 10: same sender 2, different-sender candidate only 4, none 4$/m);
+});
+
+test("cross-sender: the sender pairs are named by brand, one candidate and ambiguous apart", opts, () => {
+  const out = runCross().stdout;
+  assert.match(out, /^cross-sender pairs \(bill sender -> payment sender\), one candidate: EDGEBK -> EDGEPY 1, ONEBKX -> PAYBKX 1$/m);
+  assert.match(out, /^cross-sender pairs inside an ambiguous payment: AMBAAA -> AMBCCC 1, AMBBBB -> AMBCCC 1$/m);
+});
+
+test("cross-sender: no message text, account number or amount is printed, and the output is deterministic", opts, () => {
+  const a = runCross();
+  const b = runCross();
+  assert.equal(a.stdout, b.stdout);
+  for (const line of a.stdout.split("\n").filter((l) => l.startsWith("cross-sender"))) {
+    assert.ok(!line.includes(CANARY), "message text leaked");
+    assert.ok(!line.includes("XX1234"), "an account number leaked");
+    assert.ok(!/\d,\d{3}/.test(line), "an amount leaked");
+  }
+  assert.ok(!a.stdout.includes("drifted"), "the replicated payment definition no longer agrees with the correlator");
+});

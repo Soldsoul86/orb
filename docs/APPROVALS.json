@@ -99,6 +99,19 @@
       "by": "operator",
       "date": "2026-10-05",
       "note": "The multi-agent operating instruction: AGENTS.md is the shared constitution for any agent; CLAUDE.md points to it."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/slices/FIT-XSENDER.json",
+        "docs/scenarios/other.json",
+        "docs/DECISIONS.md",
+        "docs/APPROVALS.json"
+      ],
+      "ref": "DR-48",
+      "by": "operator",
+      "date": "2026-10-05",
+      "note": "The cross-sender measurement slice and its scenarios (XS-001..003)."
     }
   ]
 }

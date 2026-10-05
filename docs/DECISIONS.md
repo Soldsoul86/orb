@@ -1475,6 +1475,14 @@ box — **where they are the app's by design, like the number**.
 
 **Consequences accepted.** The final report of a slice uses the fixed order in `AGENTS.md` §24 (limitations first, evidence reported as *implemented · tested · mutation-tested · fit-tested · device-tested · reviewed*, separately). Another agent may review any slice from its change report and slice file alone. A second agent works on its own branch or worktree.
 
+## DR-48 — Measure cross-sender matching (counts only) before the statement adapter
+
+- **Status:** **Decided; measured** (`docs/slices/FIT-XSENDER.json`, `MONEY_PHONE.md` §18) · **Decided:** 2026-10-05, operator ("Cross-sender matching: Yes, measure it now … Don't let the cross-sender experiment grow into a full correlation redesign yet").
+
+**The ruling.** Before the statement witness is built, measure on the real inbox how often a payment is read from a different sender than the bill it pays: payments matched to a bill of the same sender, to a different sender (one candidate), ambiguous, and unmatched; the same for obligations; and the sender-pair counts. Counts and brand codes only: no message text, payee, narration, account number or personal identifier. **A measurement, not a rule:** the correlator is not changed, nothing in the app reads the result, and whether the correlation model needs another architectural change is decided afterwards, on the numbers, not inside this slice.
+
+**The order the operator set:** cross-sender counts → statement CSV header → statement adapter → SMS ↔ statement corroboration → the Money experiment's result → then decide whether correlation needs to change.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

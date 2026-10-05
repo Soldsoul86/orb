@@ -1,0 +1,185 @@
+package @PKG@;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * A measurement, not a rule (`docs/slices/FIT-XSENDER.json`): when a payment is read from one sender and the bill it pays was announced by **another**, how often
+ * does that happen, and between which senders? `Correlator` matches a payment to a bill only from the same sender; this asks what that leaves behind. It changes
+ * nothing, decides nothing, and is never read by the app.
+ *
+ * It looks only at facts the app already holds: amount, currency, direction (who moves), day and the sender's brand. **No text of any kind.** A sender is named by its
+ * brand (`LoopFit.brandOfSender`: a brand code, `SHORTCODE` or `OTHER`), never by a number or a name.
+ *
+ * For each payment the correlation did not match to a bill of its own sender, the other senders' bills that *could* have been it are the ones with the same
+ * next mover, amount and currency, that were announced no later than the payment and no more than `Correlator.WINDOW_DAYS` before it, and that no same-sender
+ * match has used. Exactly one such bill is a *cross-sender candidate*; more than one is *ambiguous*; none is *unmatched*. Reminders of one bill (a chain) are one
+ * bill, so a chain is never ambiguity with itself.
+ */
+final class CrossSender {
+    private CrossSender() {}
+
+    static final class Result {
+        /** The payment side: every payment the correlator counts (a fulfilment and the money moved beside it are one). */
+        long payments, paymentsSame, paymentsCross, paymentsAmbiguous, paymentsUnmatched;
+        /** The bill side: every obligation (a chain of reminders is one), and what could pay it. */
+        long obligations, obligationsSame, obligationsCrossOnly, obligationsNone;
+        /** Of the obligations the person owes: how many, and the same three ways. */
+        long owed, owedSame, owedCrossOnly, owedNone;
+        /** `brand -> brand` counts of cross-sender candidates, and of the pairs inside an ambiguous payment. */
+        final Map<String, Long> crossPairs = new TreeMap<>();
+        final Map<String, Long> ambiguousPairs = new TreeMap<>();
+        /** The payments counted here are the payments the correlator counts: a self-check on the replicated definition. */
+        boolean consistent;
+    }
+
+    private static long day(Observation o) {
+        return Math.floorDiv(o.occurredMs, 86_400_000L);
+    }
+
+    private static String sourceOf(Observation o) {
+        return o.sourceKind + "|" + o.sourceId;
+    }
+
+    private static String openerOwner(Observation o) {
+        return Observation.REQUEST_RECEIVED.equals(o.type) ? LoopRules.ME : o.bearer;
+    }
+
+    private static String closerOwner(Observation o) {
+        if (Observation.VALUE_MOVED.equals(o.type)) return Observation.OUT.equals(o.direction) ? LoopRules.ME : LoopRules.THEM;
+        return o.bearer;
+    }
+
+    private static boolean payment(Observation o) {
+        return o.minor > 0 && (Observation.VALUE_MOVED.equals(o.type) || (Observation.OBLIGATION_FULFILLED.equals(o.type) && LoopRules.validOwner(o.bearer)));
+    }
+
+    private static String twinKey(Observation o) {
+        return sourceOf(o) + "|" + o.occurredMs + "|" + o.minor + "|" + closerOwner(o);
+    }
+
+    private static String brand(Observation o) {
+        return LoopFit.brandOfSender(o.sourceId);
+    }
+
+    private static void add(Map<String, Long> counts, String key) {
+        Long n = counts.get(key);
+        counts.put(key, n == null ? 1L : n + 1L);
+    }
+
+    static Result measure(List<Observation> all) {
+        Correlator.Result r = Correlator.run(all);
+        Result out = new Result();
+        Set<String> seen = new HashSet<>();
+        List<Observation> facts = new ArrayList<>();
+        for (Observation o : all) if (seen.add(o.id)) facts.add(o);
+        Set<String> fulfilled = new HashSet<>();
+        for (Observation o : facts) if (Observation.OBLIGATION_FULFILLED.equals(o.type) && payment(o)) fulfilled.add(twinKey(o));
+        List<Observation> payments = new ArrayList<>();
+        for (Observation o : facts) {
+            if (!payment(o)) continue;
+            if (Observation.VALUE_MOVED.equals(o.type) && fulfilled.contains(twinKey(o))) continue;   // the same payment, stated twice
+            payments.add(o);
+        }
+        out.consistent = payments.size() == r.closers;
+
+        Map<String, Correlator.Obligation> byOpener = new HashMap<>();
+        for (Correlator.Obligation ob : r.list) for (Observation o : ob.openers) byOpener.put(o.id, ob);
+        Set<String> usedOpeners = new HashSet<>();
+        Set<String> matchedPayments = new HashSet<>();
+        Set<Correlator.Obligation> hasSame = new HashSet<>();
+        for (Correlator.Pair p : r.pairs) {
+            usedOpeners.add(p.opener.id);
+            matchedPayments.add(p.closer.id);
+            Correlator.Obligation ob = byOpener.get(p.opener.id);
+            if (ob != null) hasSame.add(ob);
+        }
+
+        Set<Correlator.Obligation> hasCross = new HashSet<>();
+        for (Observation pay : payments) {
+            out.payments++;
+            if (matchedPayments.contains(pay.id)) {
+                out.paymentsSame++;
+                continue;
+            }
+            // The other senders' bills this payment could be: distinct bills, each named by its newest reminder that is not after the payment.
+            Map<Correlator.Obligation, Observation> candidates = new HashMap<>();
+            for (Correlator.Obligation ob : r.list) {
+                if (sourceOf(ob.first()).equals(sourceOf(pay))) continue;
+                Observation through = null;
+                for (Observation o : ob.openers) {
+                    if (usedOpeners.contains(o.id) || !openerOwner(o).equals(closerOwner(pay)) || o.minor != pay.minor || !o.currency.equals(pay.currency)) continue;
+                    long age = day(pay) - day(o);
+                    if (age < 0 || age > Correlator.WINDOW_DAYS) continue;
+                    through = o;
+                }
+                if (through != null) candidates.put(ob, through);
+            }
+            if (candidates.isEmpty()) {
+                out.paymentsUnmatched++;
+            } else if (candidates.size() == 1) {
+                out.paymentsCross++;
+                for (Map.Entry<Correlator.Obligation, Observation> e : candidates.entrySet()) {
+                    hasCross.add(e.getKey());
+                    add(out.crossPairs, brand(e.getValue()) + " -> " + brand(pay));
+                }
+            } else {
+                out.paymentsAmbiguous++;
+                for (Map.Entry<Correlator.Obligation, Observation> e : candidates.entrySet()) {
+                    hasCross.add(e.getKey());
+                    add(out.ambiguousPairs, brand(e.getValue()) + " -> " + brand(pay));
+                }
+            }
+        }
+
+        for (Correlator.Obligation ob : r.list) {
+            boolean mine = LoopRules.ME.equals(openerOwner(ob.first()));
+            out.obligations++;
+            if (mine) out.owed++;
+            if (hasSame.contains(ob)) {
+                out.obligationsSame++;
+                if (mine) out.owedSame++;
+            } else if (hasCross.contains(ob)) {
+                out.obligationsCrossOnly++;
+                if (mine) out.owedCrossOnly++;
+            } else {
+                out.obligationsNone++;
+                if (mine) out.owedNone++;
+            }
+        }
+        return out;
+    }
+
+    /** The largest `n` entries by count (ties by name), as `A -> B 17, C -> D 9`. */
+    static String top(Map<String, Long> counts, int n) {
+        List<Map.Entry<String, Long>> rows = new ArrayList<>(counts.entrySet());
+        java.util.Collections.sort(rows, new java.util.Comparator<Map.Entry<String, Long>>() {
+            @Override public int compare(Map.Entry<String, Long> a, Map.Entry<String, Long> b) {
+                int c = Long.compare(b.getValue(), a.getValue());
+                return c != 0 ? c : a.getKey().compareTo(b.getKey());
+            }
+        });
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < rows.size() && i < n; i++) sb.append(i == 0 ? "" : ", ").append(rows.get(i).getKey()).append(' ').append(rows.get(i).getValue());
+        return rows.isEmpty() ? "none" : sb.toString();
+    }
+
+    /** The report, as lines. Counts and brand names only. */
+    static List<String> report(Result r) {
+        List<String> lines = new ArrayList<>();
+        lines.add("cross-sender: payments " + r.payments + " = same sender " + r.paymentsSame + " + different sender (one candidate) " + r.paymentsCross + " + ambiguous " + r.paymentsAmbiguous
+            + " + unmatched " + r.paymentsUnmatched + (r.payments == r.paymentsSame + r.paymentsCross + r.paymentsAmbiguous + r.paymentsUnmatched ? " ok" : " MISMATCH")
+            + (r.consistent ? "" : "  (payment count differs from the correlator's: the definition here has drifted)"));
+        lines.add("cross-sender: obligations " + r.obligations + " = with a same-sender payment " + r.obligationsSame + " + a different-sender candidate only " + r.obligationsCrossOnly
+            + " + none " + r.obligationsNone + (r.obligations == r.obligationsSame + r.obligationsCrossOnly + r.obligationsNone ? " ok" : " MISMATCH"));
+        lines.add("cross-sender: of the obligations you owe " + r.owed + ": same sender " + r.owedSame + ", different-sender candidate only " + r.owedCrossOnly + ", none " + r.owedNone);
+        lines.add("cross-sender pairs (bill sender -> payment sender), one candidate: " + top(r.crossPairs, 25));
+        lines.add("cross-sender pairs inside an ambiguous payment: " + top(r.ambiguousPairs, 25));
+        return lines;
+    }
+}

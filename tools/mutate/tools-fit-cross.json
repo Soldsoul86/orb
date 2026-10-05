@@ -1,0 +1,9 @@
+{
+  "about": "The cross-sender measurement (tools/fit/CrossSender.java.in): runs only its three tests of the fit probe, on the synthetic backup with answers known by construction.",
+  "copy": ["apps/pixel/orb", "apps/pixel/pass1", "runtime/brain", "docs/fixtures", "scripts", "tools/fit"],
+  "cwd": ".",
+  "test": "node --test --test-name-pattern=\"cross-sender\" tools/fit/tests/probe.test.mjs 2>&1",
+  "pass": "# fail 0",
+  "fail": "# fail [1-9]|^not ok",
+  "build": ": error:"
+}

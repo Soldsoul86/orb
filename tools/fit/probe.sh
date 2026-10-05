@@ -9,5 +9,5 @@ here="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$1" ] || { echo "probe.sh: no such file" >&2; exit 66; }
 file="$(realpath "$1")"
 
-ORB_EXTRA_SOURCES="$here/FitProbe.java.in" ORB_MAIN=FitProbe \
+ORB_EXTRA_SOURCES="$here/CrossSender.java.in $here/FitProbe.java.in" ORB_MAIN=FitProbe \
   bash "$here/../../apps/pixel/orb/tests/run.sh" "$file"

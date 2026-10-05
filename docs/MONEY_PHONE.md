@@ -195,3 +195,37 @@ An `adversary` agent attacked the built slice with hostile synthetic input and f
 - **Duplicates are one fact** (the same observation id twice) in the correlator.
 - **A compile check no suite gives:** the first adversary run found `ReviewActivity` did not compile (Activities are not in the phone suite); the APK build is now named as a proof in the slice file.
 
+## 18. The cross-sender measurement (2026-10-05, DR-48)
+
+**Question (operator):** the correlation matches a payment to a bill only from the **same sender**. Is that assumption true on a real inbox? A measurement only (`tools/fit/CrossSender.java.in`, `docs/slices/FIT-XSENDER.json`); the correlator is unchanged and nothing in the app reads it. A *candidate* is a bill of another sender with the same next mover, amount and currency, announced 0–45 days before the payment and not already used by a same-sender match; one candidate is *different sender*, more than one is *ambiguous*, none is *unmatched*. Reminders of one bill are one bill.
+
+**Result on the first inbox** (container backup, counts and brand codes only; coverage of the inbox the rules were developed on, **not accuracy and not held-out**):
+
+| Payments (6,094) | | Obligations (184) | | Of the 176 you owe | |
+| --- | ---: | --- | ---: | --- | ---: |
+| matched, same sender | 20 | with a same-sender payment | 13 | same sender | 13 |
+| different sender, one candidate | 53 | a different-sender candidate only | 47 | different-sender candidate only | 41 |
+| ambiguous | 9 | none | 124 | none | 122 |
+| unmatched | 6,012 | | | | |
+
+**Sender pairs, bill sender → payment sender (one candidate):** PHONPE→HDFCBK 19 · PHONPE→ICICIT 18 · AIRBIL→HDFCBK 4 · ICICIT→HDFCBK 4 · SWIGGY→HDFCBK 3 · ZEPTON→HDFCBK 3 · IONEMG→HDFCBK 1 · PHONPE→POLBAZ 1. **Inside an ambiguous payment:** AIRBIL→HDFCBK 4 · ICICIB→HDFCBK 3 · ICICIT→HDFCBK 3 · AIRCOL→HDFCBK 2 · AIRDUE→HDFCBK 2 · ACTFBN→HDFCBK 1 · ACTGRP→HDFCBK 1 · HDFCBK→ICICIT 1 · PHONPE→ICICIT 1.
+
+**What it says.**
+- The assumption *"the sender that tells you a bill exists is the one that tells you it was paid"* **does not hold on this inbox**: of the 82 payments that have any candidate, **20 are same-sender (24%), 53 a single different-sender candidate (65%), 9 ambiguous (11%)**. Of the 176 bills you owe, 13 have a same-sender payment; **41 more have a different-sender candidate and nothing else**.
+- The pairs are structured, not scattered: **the announcer is, by its code, a payment app or a biller (PHONPE, AIRBIL, SWIGGY, ZEPTON, IONEMG), the reporter a bank (HDFCBK, ICICIT).** 37 of the 53 single candidates are a payment app followed by a bank's debit; bank→bank pairs are the minority (ICICIT→HDFCBK 4 — the case the operator saw on the phone).
+- So **sender-only is not sufficient here; sender + amount + time finds candidates; and the ambiguity (9 payments; the largest group is a biller family whose codes begin AIR, each against HDFCBK) says a reference or subject from a second source would settle some of them** — which is what the statement witness is for.
+
+**What it does not say (limits, stated).** (1) A candidate is an **exact amount, direction, currency and 0–45 days**; amount coincidences are counted, so 53 + 9 is an **upper bound** on real cross-sender payments. The probe does not estimate the coincidence rate (a possible next measurement, if the operator wants it). (2) The 6,012 *unmatched* payments are mostly ordinary spending nobody announced; the **obligation side is the meaningful denominator**. (3) One inbox, the one the rules were developed on. (4) Matching across senders would be a **rule change** (more candidates, never closing); it is not made here. It would be proposed and measured on the operator's answers — the 20-answer review (§17) is exactly the instrument — and decided after the statement witness, in the order the operator set: **cross-sender counts → statement CSV header → statement adapter → SMS ↔ statement corroboration → the Money experiment's result → then decide whether correlation needs another architectural change.**
+
+### Money B — status, said exactly (operator, `AGENTS.md` §23)
+
+| | |
+| --- | --- |
+| Implemented | yes |
+| Unit tested | yes (3,476 phone checks) |
+| Mutation tested | yes (73 killed, 7 documented equivalent, 0 alive) |
+| Independent review | yes (reviewer; adversary) |
+| Device built | yes (v62, v63) |
+| Device verified | **partial** (6 answers recorded, the journal as predicted; precision not reportable below 20 answers; the wording finding fixed in v63, not yet re-verified) |
+| Statement witness | **pending** |
+
