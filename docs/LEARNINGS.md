@@ -43,3 +43,11 @@
 - **Fix:** keeping is refused, before anything is shown, while the last record is a revocation (a doubt about the history counts as switched off); What Orb may do turns it on again by a dialog with the pinned words and a yes, and keeps nothing itself. v61.
 - **Regression:** scenario M-022; five new checks incl. the guard that the refusal precedes the dialog and returns; mutation list `money-a2` (8 killed).
 - **Invariant:** I-013 (restated: switched off means nothing is kept until it is turned on again with a yes).
+
+## L-005 — The answer path of the review was unproven, and one answer would have hidden questions never asked
+
+- **Failure:** the first build of Money B had 3,371 passing checks, a clean mutation run on its rules and 49 of 52 scenarios proven. The independent reviewer found (1) the function that writes an answer, `ReviewActivity.answer`, was not compiled into the suite at all: swapping the obligation key for the payment key there would have passed everything; (2) the proof of "an answer changes nothing" was greps for names (a write wrapped in a helper would pass) and a test that counted events it had appended itself; (3) a *Mark paid* settled a whole obligation, but on the real inbox 71 of 184 obligations are chains of reminders and 13 of the 20 candidate pairs sit in one.
+- **Root cause:** I wrote the tests around the pure rules and let the screen hold the one write; the scenarios' proofs were structural. The chain data was available (the fit probe) and I did not look before choosing the unit of a label.
+- **Fix:** `ReviewFacts.record` is the one write and is in the suite; end-to-end tests (record, fold, rebuild, commitments unchanged); the label is per pair; set-based counts; a closed vocabulary for the rule name. Stated limits are in `MONEY_PHONE.md` §17a and the slice file.
+- **Regression:** scenarios REV-002, REV-004, REV-006, REV-007; invariant I-017 now says which parts are held by behaviour and which by tripwires; `tools/mutate/lists/money-b.json` (60 mutants).
+- **Invariant:** I-017, I-018.

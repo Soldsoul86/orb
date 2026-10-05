@@ -68,6 +68,8 @@ Multiple currencies are **never summed together**; each is its own line.
 
 ## 6. Candidate review — the instrument that measures correlation
 
+> **Superseded for slice B by §17 (DR-46):** *Mark paid* is a label, not `orb.loop.closed`; the text below is the original design.
+
 The seam already yields `CLOSURE_CANDIDATE`. v1 adds the only thing missing: the person's answer, as events, on the loop row (Coming up / Waiting): **Looks like this was paid — *Mark paid* · *Not this***.
 
 - **Mark paid** → the existing `orb.loop.closed` (`LOOP_PROTOCOL.md` §6–7), `by: you`, carrying the observation key as the evidence the person confirmed. Nothing closes without this tap.
@@ -122,7 +124,7 @@ Each step ends in the tests, a mutation list, and — where the phone is involve
 
 | Measure | Source | Bar |
 | --- | --- | --- |
-| No automatic closing | source guard | **hard: zero** — `CLOSE` is not an effect, a candidate only becomes `closed` by the person's tap |
+| No automatic closing | source guard | **hard: zero** — `CLOSE` is not an effect; in slice B a candidate is only ever *labelled* by the person's tap (§17) and nothing is closed |
 | Counted once | fixtures | **hard:** a payment seen by two sources is one movement in every order; two real identical payments stay two |
 | Replay | tests + device | **hard:** the ledger replayed from sealed bundles equals the ledger computed live |
 | Statement read right | balance chain | **hard:** a file whose rows do not reproduce its balances is refused |
@@ -171,3 +173,13 @@ The first export showed 327 bundles kept (3,723 facts, 93 senders, 25 months, on
 ## 17. Slice B as decided (2026-10-05, DR-46)
 
 The review's answers are **labels**: `orb.candidate.judged` `{schema, obligation, payment, verdict: paid | notThis | alreadyPaid, shown: candidate | open, missed, ruleId, ruleVersion, windowDays}` with blinded keys (`cand:ob:`, `cand:pay:`) — no amount, sender, day or word. **Nothing opens, closes or changes**: not a loop, a commitment or the ledger. *Mark paid* and *Not this* answer a **candidate** (a payment that looks like the end of a bill, or — for money owed to the person — that it arrived); *Not this* hides that pair only; *Mark paid* and *Already paid* settle the obligation for the review. *Already paid* is offered on an **open obligation of the last 60 days** (`Review.OPEN_WINDOW_DAYS`, a policy constant) that has no candidate, and records `missed: true` when the ledger holds a movement of that amount and direction inside the obligation's window that the correlator did **not** match to it. The screen reports **precision (paid ÷ paid + not this)** only from 20 answers (`insufficient sample` below) and **nothing reads it but the screen**. §6's `orb.loop.closed` is superseded by this for slice B; *Track this* is a later design. Reached from **Money moved**; secure like Recall; reads only the kept facts.
+
+### 17a. Refinements from the independent review of slice B (2026-10-05)
+
+An independent reviewer (the `reviewer` agent, read-only) read the first build against this design and found it **not ready**; the findings that changed the build:
+
+- **The unit of a label is the pair, not the obligation.** Measured on the first inbox (container, counts only): **71 of 184 obligations are chains of two or more reminders, and 13 of the 20 candidate pairs sit in one.** Settling a whole obligation on one *Mark paid* would have hidden questions that were never asked. So *Mark paid* and *Not this* each answer **one pair** (this bill, this payment); a bill with a payment marked paid, or answered *Already paid*, is **settled** and not offered as open again; the next payment of a chain is still asked. This refines §17 without changing DR-46's intent (labels, nothing closed).
+- **Answers are read back as sets** (a duplicated or restored journal counts an answer once). **The answer path is one function** (`ReviewFacts.record`: one event, nothing else) and is tested end to end: recorded, read back, the question gone, the commitments exactly as they were.
+- **A rule is named by a closed vocabulary** (`[a-z.]{0,64}`), never free text.
+- **The screen** says after each tap that it only teaches Orb, shows candidates and open bills in separate caps (so candidates cannot crowd out *Already paid*), and explains that a *miss* means a payment of the same amount that Orb did not link, not that it was the person's.
+- **Stated, not fixed:** an answer is about a *rule version* (a normalizer version bump changes an observation's id and so an obligation's key, and the review asks again); matching and windows use UTC days while the screen shows local days; *missed* is computed from raw movements and should use the ledger's corroborated movements once a second source exists (slice C).
