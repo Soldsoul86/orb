@@ -1,0 +1,582 @@
+{
+ "summary": {
+  "killed": 34,
+  "alive": 13,
+  "missing": 0,
+  "invalid": 0,
+  "equivalent": 0,
+  "attempted": 47,
+  "total": 47
+ },
+ "results": [
+  {
+   "index": 0,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "static final int OPEN_WINDOW_DAYS = 60;",
+    "new": "static final int OPEN_WINDOW_DAYS = 61;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL an obligation 61 days old is not",
+    "    FAIL the window is a policy constant, not data"
+   ]
+  },
+  {
+   "index": 1,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (age > OPEN_WINDOW_DAYS || age < 0) continue;",
+    "new": "if (age >= OPEN_WINDOW_DAYS || age < 0) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL an obligation 60 days old is offered Already paid",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 2,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (age > OPEN_WINDOW_DAYS || age < 0) continue;",
+    "new": "if (age > OPEN_WINDOW_DAYS) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL an obligation dated in the future is not offered either",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 3,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "long age = today - day(ob.last());",
+    "new": "long age = today - day(ob.first());"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 4,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;",
+    "new": "if (shown.contains(ob)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL and nothing owed to the person is offered Already paid",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 5,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;",
+    "new": "if (!LoopRules.ME.equals(ownerOf(ob.first()))) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a bill and the payment that matches it: one candidate, shown with the bill and the payment",
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled"
+   ]
+  },
+  {
+   "index": 6,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
+    "new": "if (judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Mark paid settles the obligation: neither it nor its payment is listed again",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 7,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
+    "new": "if (judged.settled.contains(obKey)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 8,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "            if (judged.settled.contains(obKey)) continue;\n            open.add",
+    "new": "            open.add"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Mark paid settles the obligation: neither it nor its payment is listed again",
+    "    FAIL Already paid settles the obligation: it is not offered again"
+   ]
+  },
+  {
+   "index": 9,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "            shown.add(ob);\n",
+    "new": "            \n"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a bill and the payment that matches it: one candidate, shown with the bill and the payment",
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled"
+   ]
+  },
+  {
+   "index": 10,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "keyer.key(\"cand:ob:\" + ob.first().id);\n                payKey",
+    "new": "keyer.key(\"cand:ob:\" + ob.last().id);\n                payKey"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 11,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "payKey = keyer.key(\"cand:pay:\" + p.closer.id);",
+    "new": "payKey = keyer.key(\"cand:pay:\" + p.opener.id);"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 12,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (a.closer.occurredMs != b.closer.occurredMs) return a.closer.occurredMs > b.closer.occurredMs ? -1 : 1;",
+    "new": "if (a.closer.occurredMs != b.closer.occurredMs) return a.closer.occurredMs > b.closer.occurredMs ? 1 : -1;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL candidates come newest payment first, then open obligations newest first",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 13,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (a.last.occurredMs != b.last.occurredMs) return a.last.occurredMs > b.last.occurredMs ? -1 : 1;",
+    "new": "if (a.last.occurredMs != b.last.occurredMs) return a.last.occurredMs > b.last.occurredMs ? 1 : -1;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL and the open ones, newest bill first: D then C",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 14,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "return a.closer.id.compareTo(b.closer.id);",
+    "new": "return 0;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 15,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "return a.obligationKey.compareTo(b.obligationKey);",
+    "new": "return 0;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 16,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "List<Item> out = new ArrayList<>(candidates);\n        out.addAll(open);",
+    "new": "List<Item> out = new ArrayList<>(open);\n        out.addAll(candidates);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+    "    FAIL candidates come newest payment first, then open obligations newest first"
+   ]
+  },
+  {
+   "index": 17,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "long to = day(ob.last()) + Correlator.WINDOW_DAYS;",
+    "new": "long to = day(ob.last()) + Correlator.WINDOW_DAYS + 1;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement of another amount, the other way, or outside the window is not a miss",
+    "    FAIL a movement exactly 45 days after the last reminder is inside the window; the 46th day is not"
+   ]
+  },
+  {
+   "index": 18,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "long from = day(ob.first());",
+    "new": "long from = day(ob.first()) - 1;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement of another amount, the other way, or outside the window is not a miss",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 19,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "String direction = LoopRules.ME.equals(ownerOf(ob.first())) ? Observation.OUT : Observation.IN;",
+    "new": "String direction = Observation.OUT;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 20,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "|| f.minor != ob.first().minor || !f.currency.equals(ob.first().currency)) continue;",
+    "new": "|| !f.currency.equals(ob.first().currency)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement of another amount, the other way, or outside the window is not a miss",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 21,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (day(f) < from || day(f) > to || matchedMovements.contains(f.id)) continue;",
+    "new": "if (day(f) < from || day(f) > to) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a movement already matched to another obligation is not a miss for this one",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 22,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "return Observation.REQUEST_RECEIVED.equals(opener.type) ? LoopRules.ME : opener.bearer;",
+    "new": "return opener.bearer;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 23,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "return LoopRules.ME.equals(item.owner) ? \"Looks like this was paid\" : \"Looks like this arrived\";",
+    "new": "return \"Looks like this was paid\";"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL money owed to the person is asked about as having arrived",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 24,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "return LoopRules.ME.equals(item.owner) ? \"Mark paid\" : \"Mark arrived\";",
+    "new": "return \"Mark paid\";"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL money owed to the person is asked about as having arrived",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 25,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (item.closer == null) return head;",
+    "new": "if (false) return head;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 26,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "(owedByMe ? \"a bill of \" : \"something owed to you, \")",
+    "new": "\"a bill of \""
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 27,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "} catch (Exception cannotKey) {\n                continue;\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add",
+    "new": "} catch (Exception cannotKey) {\n                obKey = \"0000000000000000\";\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a fact whose key cannot be made is not listed: a doubt never asks a question the journal cannot hold the answer to",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 28,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (obligation == null || !obligation.matches(\"[0-9a-f]{16}\"))",
+    "new": "if (obligation == null)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a key that is not a blinded key is refused: nothing is recorded by name",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 29,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (candidate && (payment == null || !payment.matches(\"[0-9a-f]{16}\")))",
+    "new": "if (candidate && payment == null)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a key that is not a blinded key is refused: nothing is recorded by name",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 30,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (!candidate && payment != null && !payment.isEmpty())",
+    "new": "if (false)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 31,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (candidate ? !(PAID.equals(verdict) || NOT_THIS.equals(verdict)) : !ALREADY_PAID.equals(verdict))",
+    "new": "if (false)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL a verdict must fit what was shown: paid and not this answer a candidate, already paid answers an open obligation",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 32,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (missed && !ALREADY_PAID.equals(verdict))",
+    "new": "if (false)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 33,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (!candidate && !OPEN.equals(shown))",
+    "new": "if (false)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 34,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (candidate) p.put(\"payment\", payment);",
+    "new": "p.put(\"payment\", payment == null ? \"\" : payment);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL an open answer carries no payment key at all",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 35,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (n < MIN_ANSWERS) return",
+    "new": "if (n <= MIN_ANSWERS) return"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL from 20 it is reported, as a percentage of the answers",
+    "    FAIL and it rounds to a whole percent"
+   ]
+  },
+  {
+   "index": 36,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "static final int MIN_ANSWERS = 20;",
+    "new": "static final int MIN_ANSWERS = 21;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL below 20 answers it says so",
+    "    FAIL from 20 it is reported, as a percentage of the answers"
+   ]
+  },
+  {
+   "index": 37,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "Math.round(100.0 * paid / n)",
+    "new": "(100 * paid / n)"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL and it rounds to a whole percent",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 38,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (PAID.equals(verdict)) {\n                out.settled.add(ob.group(1));\n                out.paid++;",
+    "new": "if (PAID.equals(verdict)) {\n                out.paid++;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 39,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "out.settled.add(ob.group(1));\n                out.alreadyPaid++;",
+    "new": "out.alreadyPaid++;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 40,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "} else if (NOT_THIS.equals(verdict) && pay.find(payload)) {",
+    "new": "} else if (NOT_THIS.equals(verdict)) {"
+   },
+   "outcome": "killed",
+   "evidence": []
+  },
+  {
+   "index": 41,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (m.find(payload) && \"true\".equals(m.group(1))) out.missed++;",
+    "new": "out.missed++;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 42,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "out.refused.add(pairKey(ob.group(1), pay.group(1)));\n                out.notThis++;",
+    "new": "out.refused.add(pairKey(ob.group(1), pay.group(1)));"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid",
+    "  3371 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 43,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (!JUDGED.equals(Journal.typeOf(line))) continue;\n            int payload",
+    "new": "int payload"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 44,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "return obligation + \"|\" + payment;",
+    "new": "return obligation;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 45,
+   "mutant": {
+    "file": "src/Correlator.java.in",
+    "old": "r.pairs.add(new Pair(open.get(i), c));",
+    "new": "r.pairs.add(new Pair(open.get(0), c));"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+    "    FAIL a verdict about another obligation does not hide this one"
+   ]
+  },
+  {
+   "index": 46,
+   "mutant": {
+    "file": "src/Correlator.java.in",
+    "old": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, i)), could));",
+    "new": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, open.size())), could));"
+   },
+   "outcome": "alive",
+   "evidence": []
+  }
+ ]
+}

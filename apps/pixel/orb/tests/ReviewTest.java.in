@@ -134,6 +134,41 @@ final class ReviewTest {
         }
         Harness.check("the same facts in any order give the same review", same);
 
+        // What the first mutation round of this slice found: behaviours with no test.
+        List<ReviewRules.Item> grown = review(Arrays.asList(bill("BANKA", "me", 4400L, 120L), bill("BANKA", "me", 4400L, 160L)));
+        Harness.check("an obligation of two reminders is as old as its last reminder: 80 days since the first, 40 since the last, is still asked about", grown.size() == 1 && ReviewFacts.OPEN.equals(grown.get(0).kind));
+        Harness.equal("and it counts as one obligation, keyed by its first reminder", ReviewFacts.OPEN + "|" + grown.get(0).obligationKey, ReviewFacts.OPEN + "|" + KEYER.key("cand:ob:" + grown.get(0).opener.id));
+        List<ReviewRules.Item> alone = review(Arrays.asList(bill("BANKA", "me", 4400L, 160L)));
+        List<ReviewRules.Item> later = review(Arrays.asList(bill("BANKA", "me", 4400L, 160L), bill("BANKA", "me", 4400L, 175L)));
+        Harness.equal("a later reminder does not change the key of the obligation, so an answer given before it still holds", alone.get(0).obligationKey, later.get(0).obligationKey);
+        List<ReviewRules.Item> pairs = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), bill("BANKA", "me", 4400L, 170L), moved("BANKA", "out", 4400L, 175L), moved("BANKA", "out", 4400L, 176L)));
+        Harness.check("one obligation, two payments matched to its two reminders: two candidates, each keyed by its own payment and the first reminder",
+            pairs.size() == 2 && !pairs.get(0).paymentKey.equals(pairs.get(1).paymentKey) && pairs.get(0).obligationKey.equals(pairs.get(1).obligationKey)
+            && pairs.get(0).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(0).closer.id)) && pairs.get(1).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(1).closer.id)));
+        ReviewFacts.Judged oneRefused = new ReviewFacts.Judged();
+        oneRefused.refused.add(ReviewFacts.pairKey(pairs.get(0).obligationKey, pairs.get(0).paymentKey));
+        List<ReviewRules.Item> remaining = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), bill("BANKA", "me", 4400L, 170L), moved("BANKA", "out", 4400L, 175L), moved("BANKA", "out", 4400L, 176L)), oneRefused);
+        Harness.check("refusing one payment of an obligation leaves its other payment to be asked about", remaining.size() == 1 && remaining.get(0).paymentKey.equals(pairs.get(1).paymentKey));
+        Observation request = Observation.of(Observation.REQUEST_RECEIVED).source("sms.sender", "UPIAPP", Observation.T0).times(190L * DAY, 190L * DAY).bearer("them").object(Observation.MONEY, 3300L, "INR").build();
+        List<ReviewRules.Item> asked = review(Arrays.asList(request, moved("UPIAPP", "out", 3300L, 192L)));
+        Harness.check("a payment request is always of the person, whatever its bearer says: the question is about paying", asked.size() == 1 && LoopRules.ME.equals(asked.get(0).owner) && "Looks like this was paid".equals(ReviewRules.question(asked.get(0))));
+        List<ReviewRules.Item> openLine = review(Arrays.asList(bill("BANKA", "me", 5000L, 190L)));
+        Harness.check("an open obligation's line is the bill alone, with no payment in it", ReviewRules.line(openLine.get(0), UTC).contains("BANKA: a bill of \u20b950.00") && !ReviewRules.line(openLine.get(0), UTC).contains("payment"));
+        List<ReviewRules.Item> arrived = review(Arrays.asList(bill("SHOP", "them", 120000L, 190L), moved("SHOP", "in", 120000L, 192L)));
+        Harness.check("money owed to the person reads as owed to them and as money that came", ReviewRules.line(arrived.get(0), UTC).contains("SHOP: something owed to you, \u20b91,200.00") && ReviewRules.line(arrived.get(0), UTC).contains("money of \u20b91,200.00 on"));
+        List<Observation> ties = new ArrayList<>(Arrays.asList(bill("BANKE", "me", 6100L, 150L), moved("BANKE", "out", 6100L, 152L), bill("BANKF", "me", 6200L, 150L), moved("BANKF", "out", 6200L, 152L),
+            bill("BANKG", "me", 6300L, 190L), bill("BANKH", "me", 6400L, 190L)));
+        String tieWant = keysOf(review(ties));
+        boolean tieSame = true;
+        for (int seed = 0; seed < 25; seed++) {
+            List<Observation> shuffled = new ArrayList<>(ties);
+            Collections.shuffle(shuffled, new Random(100 + seed));
+            tieSame &= keysOf(review(shuffled)).equals(tieWant);
+        }
+        Harness.check("payments at the same moment, and bills on the same day, are put in the same order whatever order the facts come in", tieSame);
+        Correlator.Result twoClusters = Correlator.run(both);
+        Harness.equal("two bills far apart are two obligations of one reminder each", twoClusters.list.size() + "|" + twoClusters.list.get(0).openers.size() + "|" + twoClusters.list.get(1).openers.size(), "2|1|1");
+
         // Money owed to the person is judged as having arrived, and has no open list.
         List<ReviewRules.Item> owed = review(Arrays.asList(bill("SHOP", "them", 120000L, 190L), moved("SHOP", "in", 120000L, 192L)));
         Harness.equal("money owed to the person is asked about as having arrived", owed.size() + "|" + ReviewRules.question(owed.get(0)) + "|" + ReviewRules.yes(owed.get(0)), "1|Looks like this arrived|Mark arrived");
@@ -198,6 +233,12 @@ final class ReviewTest {
         Harness.equal("paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid", f1.settled.size() + "|" + f1.refused.size() + "|" + f1.paid + "|" + f1.notThis + "|" + f1.alreadyPaid + "|" + f1.missed, "2|1|1|1|1|1");
         Harness.equal("an answer is one event and nothing else is written", count(j1, ReviewFacts.JUDGED) + "|" + j1.readLines().size(), "3|" + (3 + countOthers(j1)));
         Harness.check("an event of another type, or a payload with no obligation, is not an answer", ReviewFacts.fold(Arrays.asList()).settled.isEmpty());
+        Context[] h3 = new Context[1];
+        Journal j3 = open(h3);
+        j3.append("orb.something.else", ReviewFacts.judged(ob, pay, ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "", 1L, 45L));
+        Harness.check("a record of another kind that happens to carry the same fields is not an answer", ReviewFacts.fold(j3.readLines()).settled.isEmpty() && ReviewFacts.fold(j3.readLines()).paid == 0);
+        j3.append(ReviewFacts.JUDGED, ReviewFacts.judged(ob2, "", ReviewFacts.ALREADY_PAID, ReviewFacts.OPEN, false, "", 1L, 45L));
+        Harness.equal("an already-paid answer that missed nothing counts as already paid and not as missed", ReviewFacts.fold(j3.readLines()).alreadyPaid + "|" + ReviewFacts.fold(j3.readLines()).missed, "1|0");
     }
 
     private static int countOthers(Journal j) throws Exception {

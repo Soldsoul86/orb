@@ -98,7 +98,8 @@
   {
    "file": "src/ReviewRules.java.in",
    "old": "String direction = LoopRules.ME.equals(ownerOf(ob.first())) ? Observation.OUT : Observation.IN;",
-   "new": "String direction = Observation.OUT;"
+   "new": "String direction = Observation.OUT;",
+   "equivalent": "missed() is only called for open obligations, and open obligations are only those the person owes (owner me), so the direction is always out; the owner-them branch is unreachable today. If open items for money owed to the person are ever added, this needs its own test."
   },
   {
    "file": "src/ReviewRules.java.in",
