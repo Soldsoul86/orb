@@ -312,6 +312,17 @@ final class ReviewTest {
         doubled.addAll(journal.readLines().subList(linesBefore.size(), journal.readLines().size()));
         ReviewFacts.Judged twice = ReviewFacts.fold(doubled);
         Harness.equal("the same answers read twice count once", twice.paid() + "|" + twice.notThis() + "|" + twice.alreadyPaid() + "|" + twice.missed(), "1|1|1|1");
+        // One label per question, the last one in the journal's order; and a line the writer could not have written is not read.
+        String paidLine = null;
+        for (String l : journal.readLines()) if (ReviewFacts.JUDGED.equals(Journal.typeOf(l)) && l.contains("\"verdict\":\"paid\"")) paidLine = l;
+        Harness.check("there is a recorded paid answer to change", paidLine != null);
+        String changedLine = paidLine.replace("\"verdict\":\"paid\"", "\"verdict\":\"notThis\"");
+        ReviewFacts.Judged changed = ReviewFacts.fold(Arrays.asList(paidLine, changedLine));
+        ReviewFacts.Judged changedBack = ReviewFacts.fold(Arrays.asList(changedLine, paidLine));
+        Harness.equal("an answer changed later counts once, as the later one (paid then not this)", changed.paid() + "|" + changed.notThis(), "0|1");
+        Harness.equal("and the other way round (not this, then paid)", changedBack.paid() + "|" + changedBack.notThis(), "1|0");
+        String doubledKey = paidLine.replace("\"verdict\":\"paid\"", "\"verdict\":\"notThis\",\"verdict\":\"paid\"");
+        Harness.check("a payload that names a field twice is not an answer the writer could have written, and is not read", !doubledKey.equals(paidLine) && ReviewFacts.fold(Arrays.asList(doubledKey)).paid() == 0);
 
         // Only what was kept, and only what is not quiet.
         Context[] h2 = new Context[1];

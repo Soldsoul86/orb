@@ -1,12 +1,12 @@
 {
  "summary": {
-  "killed": 54,
-  "alive": 3,
+  "killed": 71,
+  "alive": 6,
   "missing": 0,
   "invalid": 0,
   "equivalent": 3,
-  "attempted": 60,
-  "total": 60
+  "attempted": 80,
+  "total": 80
  },
  "results": [
   {
@@ -32,7 +32,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL an obligation 60 days old is offered Already paid",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: the 60-day window is by UTC calendar day: a bill of day 140 is open until the last millisecond of day 200 and gone at the first of day 201; held by '60 days old / 61 days old' at noon only"
    ]
   },
   {
@@ -45,7 +45,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL an obligation dated in the future is not offered either",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -70,7 +70,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL and nothing owed to the person is offered Already paid",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: money in does not close a bill the person owes, and out does not close a refund; held by the owner in the group key of Correlator.run"
    ]
   },
   {
@@ -90,8 +90,8 @@
    "index": 6,
    "mutant": {
     "file": "src/ReviewRules.java.in",
-    "old": "            if (judged.settled.contains(obKey)) continue;\n            open.add",
-    "new": "            open.add"
+    "old": "if (judged.settled.contains(obKey)) continue;\n            Item item = new Item(ReviewFacts.OPEN",
+    "new": "Item item = new Item(ReviewFacts.OPEN"
    },
    "outcome": "killed",
    "evidence": [
@@ -116,13 +116,13 @@
    "index": 8,
    "mutant": {
     "file": "src/ReviewRules.java.in",
-    "old": "keyer.key(\"cand:ob:\" + ob.first().id);\n                payKey",
-    "new": "keyer.key(\"cand:ob:\" + ob.last().id);\n                payKey"
+    "old": "obKey = keyer.key(\"cand:ob:\" + through.id);",
+    "new": "obKey = keyer.key(\"cand:ob:\" + ob.last().id);"
    },
    "outcome": "killed",
    "evidence": [
-    "    FAIL a candidate is keyed by the first reminder of its obligation, so a later reminder does not change the question already answered",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: a chain of five with a payment for each is five questions, each with its own payment key and its own reminder key, and the namespaces cannot collide; held by 'one obligation, two payments' at length two",
+    "    FAIL adversary (was a break, fixed): marking the first month's payment paid hides the two later monthly bills, which have no payment in view, from Already paid (the chain is settled by its first reminder)"
    ]
   },
   {
@@ -134,8 +134,8 @@
    },
    "outcome": "killed",
    "evidence": [
-    "    FAIL one obligation, two payments matched to its two reminders: two candidates, each keyed by its own payment and the first reminder",
-    "  3403 checks, 1 failed"
+    "    FAIL one chain, two payments matched to its two reminders: two candidates, each keyed by its own payment, both about the chain's newest reminder",
+    "    FAIL adversary (was a break, fixed): an EARLIER reminder of the same bill kept after the answer (an older month sealed later, a re-keep) changes the chain's first reminder, so the key changes and the answered pair is asked again"
    ]
   },
   {
@@ -148,7 +148,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL candidates come newest payment first, then open obligations newest first",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -161,7 +161,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL and the open ones, newest bill first: D then C",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: a payment whose key cannot be made leaves its bill to be asked about as open, not as a question about a payment the journal cannot name; held by accident"
    ]
   },
   {
@@ -222,7 +222,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a movement of another amount, the other way, or outside the window is not a miss",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -246,20 +246,20 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a movement of another amount, the other way, or outside the window is not a miss",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
    "index": 19,
    "mutant": {
     "file": "src/ReviewRules.java.in",
-    "old": "if (day(f) < from || day(f) > to || matchedMovements.contains(f.id)) continue;",
-    "new": "if (day(f) < from || day(f) > to) continue;"
+    "old": "if (day(f) < from || day(f) > to || matchedMovements.contains(f.id) || attributed.contains(f.id)) continue;",
+    "new": "if (day(f) < from || day(f) > to || attributed.contains(f.id)) continue;"
    },
    "outcome": "killed",
    "evidence": [
     "    FAIL a movement already matched to another obligation is not a miss for this one",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: two bills of one amount from two senders and one payment from the second: one candidate, for the second; the first stays open; held by 'a movement already matched to another obligation is not a miss' only partly"
    ]
   },
   {
@@ -272,7 +272,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a payment request is always of the person, whatever its bearer says: the question is about paying",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: a payment request with bearer them is of the person and is asked as a payment (one candidate, none open); held by 'a payment request is always of the person' for bearer them only"
    ]
   },
   {
@@ -285,7 +285,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL money owed to the person is asked about as having arrived",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: a refund restated three times and then arriving: one question, in the words for money that came, and never offered as Already paid; held by 'money owed to the person' in ReviewTest"
    ]
   },
   {
@@ -298,7 +298,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL money owed to the person is asked about as having arrived",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -321,20 +321,20 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL money owed to the person reads as owed to them and as money that came",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
    "index": 25,
    "mutant": {
     "file": "src/ReviewRules.java.in",
-    "old": "} catch (Exception cannotKey) {\n                continue;\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add",
-    "new": "} catch (Exception cannotKey) {\n                obKey = \"0000000000000000\";\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add"
+    "old": "} catch (Exception cannotKey) {\n                continue;\n            }\n            if (judged.settled",
+    "new": "} catch (Exception cannotKey) {\n                obKey = \"0000000000000000\";\n            }\n            if (judged.settled"
    },
    "outcome": "killed",
    "evidence": [
     "    FAIL a fact whose key cannot be made is not listed: a doubt never asks a question the journal cannot hold the answer to",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: a key that cannot be made for one bill leaves only that bill out; the others are still asked, in order; held by accident (ReviewTest breaks every key at once)"
    ]
   },
   {
@@ -347,7 +347,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a key that is not a blinded key is refused: nothing is recorded by name",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -360,7 +360,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a key that is not a blinded key is refused: nothing is recorded by name",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -373,7 +373,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -386,7 +386,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a verdict must fit what was shown: paid and not this answer a candidate, already paid answers an open obligation",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary (was a break, fixed): a line the writer would refuse (already paid, but shown as a candidate with a payment) is believed on read and settles the obligation: write validates, read does not"
    ]
   },
   {
@@ -399,7 +399,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -412,7 +412,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -425,7 +425,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL an open answer carries no payment key at all",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -464,43 +464,46 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL and it rounds to a whole percent",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
    "index": 36,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "} else if (NOT_THIS.equals(verdict) && pay.find(payload)) {",
-    "new": "} else if (NOT_THIS.equals(verdict)) {"
+    "old": "} else if (NOT_THIS.equals(a.verdict)) {",
+    "new": "} else if (!PAID.equals(a.verdict) && !ALREADY_PAID.equals(a.verdict) && !NOT_THIS.equals(a.verdict)) {"
    },
    "outcome": "killed",
-   "evidence": []
+   "evidence": [
+    "    FAIL paid and already paid settle an obligation; paid and not this each answer a pair; missed is counted only on already paid",
+    "    FAIL one open obligation became two, and no candidate is left"
+   ]
   },
   {
    "index": 37,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "if (!JUDGED.equals(Journal.typeOf(line))) continue;\n            int payload",
-    "new": "int payload"
+    "old": "if (!JUDGED.equals(Journal.typeOf(line))) continue;\n            Answer a",
+    "new": "Answer a"
    },
    "outcome": "killed",
    "evidence": [
     "    FAIL a record of another kind that happens to carry the same fields is not an answer",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
    "index": 38,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "return obligation + \"|\" + payment;",
-    "new": "return obligation;"
+    "old": "        return payment;\n    }",
+    "new": "        return obligation + \"|\" + payment;\n    }"
    },
    "outcome": "killed",
    "evidence": [
-    "    FAIL refusing one payment of an obligation leaves its other payment to be asked about",
-    "    FAIL in a chain of reminders, marking one payment paid does not hide the question about the next, and the settled chain is not offered as open too"
+    "    FAIL a question is identified by its payment, so a reminder added to the chain does not change a question already answered",
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -525,16 +528,16 @@
    },
    "outcome": "killed",
    "evidence": [
-    "    FAIL two bills far apart are two obligations of one reminder each",
-    "  3403 checks, 1 failed"
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+    "    FAIL Mark paid hides that pair and settles the bill: neither is listed again, and the other bill is untouched"
    ]
   },
   {
    "index": 41,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;",
-    "new": "return journal != null;"
+    "old": "return journal.append(JUDGED, payload) != null;",
+    "new": "return true;"
    },
    "outcome": "killed",
    "evidence": [
@@ -546,8 +549,8 @@
    "index": 42,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;",
-    "new": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) == null;"
+    "old": "return journal.append(JUDGED, payload) != null;",
+    "new": "return journal.append(JUDGED, payload) == null;"
    },
    "outcome": "killed",
    "evidence": [
@@ -564,8 +567,8 @@
    },
    "outcome": "killed",
    "evidence": [
-    "    FAIL read back from the journal alone, the answered pair is gone and nothing else is",
-    "    FAIL the answered question does not return: candidate"
+    "    FAIL an obligation 60 days old is offered Already paid",
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled"
    ]
   },
   {
@@ -575,8 +578,11 @@
     "old": "candidate ? item.closer.ruleId : \"\", candidate ? item.closer.ruleVersion : 1L, Correlator.WINDOW_DAYS);",
     "new": "\"\", 1L, Correlator.WINDOW_DAYS);"
    },
-   "outcome": "alive",
-   "evidence": []
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the answer names the rule that proposed the pair and its version, and the window it used",
+    "  3472 checks, 1 failed"
+   ]
   },
   {
    "index": 45,
@@ -588,15 +594,15 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL three answers, one of each, one missed",
-    "    FAIL the same answers read twice count once"
+    "    FAIL an open answer carries the missed correlation it found, and no rule"
    ]
   },
   {
    "index": 46,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "out.settled.add(ob.group(1));\n                out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));",
-    "new": "out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));"
+    "old": "out.settled.add(a.obligation);\n                out.paidPairs.add",
+    "new": "out.paidPairs.add"
    },
    "outcome": "killed",
    "evidence": [
@@ -608,23 +614,23 @@
    "index": 47,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "out.settled.add(ob.group(1));\n                out.alreadyPaidSet.add(ob.group(1));",
-    "new": "out.alreadyPaidSet.add(ob.group(1));"
+    "old": "out.settled.add(a.obligation);\n                out.alreadyPaidSet.add",
+    "new": "out.alreadyPaidSet.add"
    },
    "outcome": "killed",
    "evidence": [
     "    FAIL paid and already paid settle an obligation; paid and not this each answer a pair; missed is counted only on already paid",
-    "  3403 checks, 1 failed"
+    "    FAIL adversary held: then Already paid, answered twice, leaves nothing to ask and counts once (5 not this, 1 already paid, 0 paid); held by set-based counts ('the same answers read twice count once')"
    ]
   },
   {
    "index": 48,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "if (PAID.equals(verdict) && pay.find(payload)) {",
-    "new": "if (PAID.equals(verdict)) {"
+    "old": "if (PAID.equals(a.verdict)) {\n                out.settled",
+    "new": "if (!NOT_THIS.equals(a.verdict) && !ALREADY_PAID.equals(a.verdict)) {\n                out.settled"
    },
-   "outcome": "killed",
+   "outcome": "alive",
    "evidence": []
   },
   {
@@ -663,20 +669,20 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL an already-paid answer that missed nothing counts as already paid and not as missed",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
    "index": 52,
    "mutant": {
     "file": "src/ReviewFacts.java.in",
-    "old": "if (ruleId == null || !ruleId.matches(\"[a-z.]{0,64}\"))",
-    "new": "if (ruleId == null)"
+    "old": "!ruleId.matches(\"[a-z0-9._-]{0,64}\")",
+    "new": "false"
    },
    "outcome": "killed",
    "evidence": [
     "    FAIL a rule is named by a short lower-case dotted name, never by free text",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -715,7 +721,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL a movement between the reminders of a chain, from a source nothing matched, is inside its window: a missed correlation",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -728,7 +734,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL the same amount in another currency is not a miss",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -741,7 +747,7 @@
    "outcome": "killed",
    "evidence": [
     "    FAIL the screen writes exactly one kind of event, in one place",
-    "  3403 checks, 1 failed"
+    "  3472 checks, 1 failed"
    ]
   },
   {
@@ -751,8 +757,11 @@
     "old": "noted = ok ? \"Noted.",
     "new": "noted = !ok ? \"Noted."
    },
-   "outcome": "alive",
-   "evidence": []
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL after a tap the screen says it only teaches Orb, only when the answer was recorded; candidates and open bills have their own caps",
+    "  3472 checks, 1 failed"
+   ]
   },
   {
    "index": 59,
@@ -761,8 +770,253 @@
     "old": "private static final int SHOWN_CANDIDATES = 40;",
     "new": "private static final int SHOWN_CANDIDATES = 0;"
    },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL after a tap the screen says it only teaches Orb, only when the answer was recorded; candidates and open bills have their own caps",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 60,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (m == null || !FIELDS.containsAll(m.keySet()) || !SCHEMA.equals(m.get(\"schema\"))) return null;",
+    "new": "if (m == null || !SCHEMA.equals(m.get(\"schema\"))) return null;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary held: an answer carrying a two-megabyte extra field is not an answer (it is not one the writer writes), and reading it is fast (69 ms)",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 61,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (m == null || !FIELDS.containsAll(m.keySet())",
+    "new": "if (m == null || false"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary held: an answer carrying a two-megabyte extra field is not an answer (it is not one the writer writes), and reading it is fast (142 ms)",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 62,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (out.containsKey(key)) return null;",
+    "new": "if (false) return null;"
+   },
    "outcome": "alive",
    "evidence": []
+  },
+  {
+   "index": 63,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "else if (c == '{' || c == '[') return null;",
+    "new": "else if (c == '[') return null;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 64,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "else if (c == '{' || c == '[') return null;",
+    "new": "else if (c == '{') return null;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 65,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "last.put(CANDIDATE.equals(a.shown) ? pairKey(a.obligation, a.payment) : \"open|\" + a.obligation, a);",
+    "new": "if (!last.containsKey(CANDIDATE.equals(a.shown) ? pairKey(a.obligation, a.payment) : \"open|\" + a.obligation)) last.put(CANDIDATE.equals(a.shown) ? pairKey(a.obligation, a.payment) : \"open|\" + a.obligation, a);"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 66,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (a == null) continue;\n            last.put",
+    "new": "last.put"
+   },
+   "outcome": "killed",
+   "evidence": []
+  },
+  {
+   "index": 67,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (missed && !ALREADY_PAID.equals(verdict)) throw",
+    "new": "if (false) throw"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 68,
+   "mutant": {
+    "file": "src/ReviewFacts.java.in",
+    "old": "if (!candidate && payment != null && !payment.isEmpty()) throw",
+    "new": "if (false) throw"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 69,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (!answerable(item)) continue;\n            String pair",
+    "new": "String pair"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary (was a break, fixed): a Keyer that returns something that is not 16 hex characters (the contract is an interface, not a check) puts questions in front of the person whose answer ReviewFacts.record then refuses by THROWING, on the UI thread: a doubt must not ask a question the journal cannot hold",
+    "    FAIL adversary (was a break, fixed): a payment whose rule name (read back from a sealed bundle) is not in the closed vocabulary [a-z.]{0,64} is shown as a question, and tapping Mark paid throws IllegalArgumentException from ReviewFacts.record instead of returning false"
+   ]
+  },
+  {
+   "index": 70,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (!answerable(item)) continue;\n            open.add",
+    "new": "open.add"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary (was a break, fixed): a Keyer that returns something that is not 16 hex characters (the contract is an interface, not a check) puts questions in front of the person whose answer ReviewFacts.record then refuses by THROWING, on the UI thread: a doubt must not ask a question the journal cannot hold",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 71,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (day(o) <= day(p.closer) && o.occurredMs >= through.occurredMs) through = o;",
+    "new": "if (o.occurredMs >= through.occurredMs) through = o;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary held: a chain of five with a payment for each is five questions, each with its own payment key and its own reminder key, and the namespaces cannot collide; held by 'one obligation, two payments' at length two",
+    "    FAIL adversary (was a break, fixed): marking the first month's payment paid hides the two later monthly bills, which have no payment in view, from Already paid (the chain is settled by its first reminder)"
+   ]
+  },
+  {
+   "index": 72,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (day(o) <= day(p.closer) && o.occurredMs >= through.occurredMs) through = o;",
+    "new": "if (day(o) <= day(p.closer)) through = o;"
+   },
+   "outcome": "alive",
+   "evidence": []
+  },
+  {
+   "index": 73,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "|| attributed.contains(f.id)) continue;",
+    "new": ") continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL adversary (was a break, fixed): one stray payment of 500.00 is reported as a missed correlation for BOTH of two open bills of 500.00 (2 misses from one movement), so the recall measure can count one payment twice",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 74,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "|| !f.currency.equals(ob.first().currency)) continue;",
+    "new": ") continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL the same amount in another currency is not a miss",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 75,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;",
+    "new": "if (shown.contains(ob)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL and nothing owed to the person is offered Already paid",
+    "    FAIL adversary held: money in does not close a bill the person owes, and out does not close a refund; held by the owner in the group key of Correlator.run"
+   ]
+  },
+  {
+   "index": 76,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (age > OPEN_WINDOW_DAYS || age < 0) continue;",
+    "new": "if (age > OPEN_WINDOW_DAYS) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL an obligation dated in the future is not offered either",
+    "  3472 checks, 1 failed"
+   ]
+  },
+  {
+   "index": 77,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;",
+    "new": "if (judged.paidPairs.contains(pair)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+    "    FAIL refusing one payment of an obligation leaves its other payment to be asked about"
+   ]
+  },
+  {
+   "index": 78,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;",
+    "new": "if (judged.refused.contains(pair)) continue;"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL Mark paid hides that pair and settles the bill: neither is listed again, and the other bill is untouched",
+    "    FAIL in a chain of reminders, marking one payment paid does not hide the question about the next, and the settled chain is not offered as open too"
+   ]
+  },
+  {
+   "index": 79,
+   "mutant": {
+    "file": "src/ReviewRules.java.in",
+    "old": "payKey = keyer.key(\"cand:pay:\" + p.closer.id);",
+    "new": "payKey = keyer.key(\"cand:pay:\" + p.opener.id);"
+   },
+   "outcome": "killed",
+   "evidence": [
+    "    FAIL one chain, two payments matched to its two reminders: two candidates, each keyed by its own payment, both about the chain's newest reminder",
+    "    FAIL adversary (was a break, fixed): an EARLIER reminder of the same bill kept after the answer (an older month sealed later, a re-keep) changes the chain's first reminder, so the key changes and the answered pair is asked again"
+   ]
   }
  ]
 }

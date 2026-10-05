@@ -246,7 +246,8 @@
   {
    "file": "src/ReviewFacts.java.in",
    "old": "if (PAID.equals(a.verdict)) {\n                out.settled",
-   "new": "if (!NOT_THIS.equals(a.verdict) && !ALREADY_PAID.equals(a.verdict)) {\n                out.settled"
+   "new": "if (!NOT_THIS.equals(a.verdict) && !ALREADY_PAID.equals(a.verdict)) {\n                out.settled",
+   "equivalent": "The reader only reaches this branch with a verdict that passed the writer's own checks (paid, notThis or alreadyPaid), so 'not notThis and not alreadyPaid' is exactly 'paid'."
   },
   {
    "file": "src/ReviewFacts.java.in",
@@ -321,12 +322,14 @@
   {
    "file": "src/ReviewFacts.java.in",
    "old": "else if (c == '{' || c == '[') return null;",
-   "new": "else if (c == '[') return null;"
+   "new": "else if (c == '[') return null;",
+   "equivalent": "A nested object inside a known field is refused anyway one step later: the flat reader's value grammar (string, boolean or digits only) does not accept the text that starts with a brace. This guard is defence in depth."
   },
   {
    "file": "src/ReviewFacts.java.in",
    "old": "else if (c == '{' || c == '[') return null;",
-   "new": "else if (c == '{') return null;"
+   "new": "else if (c == '{') return null;",
+   "equivalent": "A list inside a field is refused anyway one step later: the flat reader's value grammar (string, boolean or digits only) does not accept the text that starts with a bracket. This guard is defence in depth."
   },
   {
    "file": "src/ReviewFacts.java.in",
@@ -366,7 +369,8 @@
   {
    "file": "src/ReviewRules.java.in",
    "old": "if (day(o) <= day(p.closer) && o.occurredMs >= through.occurredMs) through = o;",
-   "new": "if (day(o) <= day(p.closer)) through = o;"
+   "new": "if (day(o) <= day(p.closer)) through = o;",
+   "equivalent": "The correlator hands over a bill's reminders in time order (it sorts all facts first), so 'not older than the one chosen so far' is always true; the clause only guards an order the correlator never gives."
   },
   {
    "file": "src/ReviewRules.java.in",
