@@ -8068,3 +8068,7 @@ If you switch **keeping facts** off, Orb now keeps nothing until you turn it on 
 4. Switch it **off**; **Sources → Messages → Look → Keep what Orb read…**. *(P361)*
 5. Turn it **on** again and Keep once more. *(P362)*
 6. **Export and share journal** and send it.
+
+#### Result — export `orb-20261005-081724` (operator, 2026-10-05): v61 on the device
+
+1,274 events (+11 since the v60 export); chain intact; **v61 (`29852800`) started once**; **no crash, no fault**. The journal's sequence for keeping, in order: **grant** (Turn on keeping facts, dialog, yes) → a Look → **revocation** (switched off) → a Look → **grant** again. **P360 confirmed** (a grant is recorded by the dialog's yes, not by a Keep). **P361 confirmed by absence:** between the revocation and the next grant there is a Look and **no `orb.observations.kept`**, and there is none after v60's 327 — a Keep that was refused writes nothing. **P362** cannot be told from a journal (an unchanged Keep writes nothing either way). **P358 and P359** (the button's text, the dialog, *Not now* changing nothing) are visible only on the phone; the operator sent the export without objection. The operator's v60 finding is closed: keeping can now be switched off and on, and off means off.
