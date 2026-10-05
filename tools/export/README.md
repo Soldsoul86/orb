@@ -10,6 +10,7 @@ node tools/export/analyse.mjs <export.txt>                        chain, builds,
 node tools/export/analyse.mjs <export.txt> --since <earlier.txt>  what changed since an earlier export
 node tools/export/analyse.mjs <export.txt> --check <preds.json>   bounds on event counts (prediction file)
 node tools/export/analyse.mjs <export.txt> --keys <type>          field names (never values) of one event type
+node tools/export/analyse.mjs <export.txt> --tally <type>         counts of a closed vocabulary's values; for any other field only how many distinct values
 ```
 
 Exit: `0` clean · `1` broken chain or failed check · `2` unusable file.

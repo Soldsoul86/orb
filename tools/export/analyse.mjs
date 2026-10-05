@@ -6,11 +6,12 @@
  *   node tools/export/analyse.mjs <export.txt> --since <earlier.txt> what changed since an earlier export of the same lane
  *   node tools/export/analyse.mjs <export.txt> --check <preds.json>  bounds on event counts from a prediction file
  *   node tools/export/analyse.mjs <export.txt> --keys <type>         the field names (never values) of one event type
+ *   node tools/export/analyse.mjs <export.txt> --tally <type>        per field: the counts of a closed vocabulary's values, else how many distinct values (never the values)
  *
  * Exit status: 0 clean, 1 a chain break or a failed check, 2 the file could not be used.
  */
 import { readFileSync } from "node:fs";
-import { parse, chain, typeCounts, builds, faults, latestReports, payloadKeys, diff, check } from "./lib.mjs";
+import { parse, chain, typeCounts, builds, faults, latestReports, payloadKeys, tally, diff, check } from "./lib.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name) => {
@@ -19,7 +20,7 @@ const flag = (name) => {
 };
 const file = args.find((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
 if (!file) {
-  console.error("usage: analyse.mjs <export.txt> [--since earlier.txt] [--check predictions.json] [--keys type]");
+  console.error("usage: analyse.mjs <export.txt> [--since earlier.txt] [--check predictions.json] [--keys type] [--tally type]");
   process.exit(2);
 }
 
@@ -45,8 +46,11 @@ if (!c.ok) failed = true;
 const since = flag("--since");
 const checks = flag("--check");
 const keysOf = flag("--keys");
+const tallyOf = flag("--tally");
 
-if (keysOf) {
+if (tallyOf) {
+  console.log(JSON.stringify(tally(now.events, tallyOf)));
+} else if (keysOf) {
   console.log(payloadKeys(now.events, keysOf).join(" ") || "(none)");
 } else if (since) {
   const d = diff(load(since).events, now.events);

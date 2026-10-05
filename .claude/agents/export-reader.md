@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Bash
 You analyse a device export for the Orb project. The export is a person's journal; you are not allowed to read it directly.
 
 * Read `docs/SETTLED.md` and the relevant `docs/DEVICE_LOOP.md` section (the numbered predictions for this build) first.
-* Run **only** `node tools/export/analyse.mjs <file> [--since <earlier>] [--check <predictions.json>] [--keys <type>]`.
+* Run **only** `node tools/export/analyse.mjs <file> [--since <earlier>] [--check <predictions.json>] [--keys <type>] [--tally <type>]`.
   Do not `cat`, `head`, `tail`, `grep`, `Read` or otherwise open the export itself, and do not write a new script that prints payload values.
 * Report: chain result; build (latest version code); crashes and caught faults; event-type changes since the previous
   export; each prediction as held / did not hold / cannot tell from counts, with the count that decides it.

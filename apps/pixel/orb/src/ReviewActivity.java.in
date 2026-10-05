@@ -101,6 +101,7 @@ public final class ReviewActivity extends Activity {
         list.removeAllViews();
         list.addView(text("Review what looks paid", 17, true));
         list.addView(text("\nOrb reads your messages for bills and for payments. Where a payment looks like the end of a bill, tell Orb whether it is. "
+            + "The name before each line is who sent the message, which is not always the bank the bill is for. "
             + "Your answer is only a note for Orb to learn from: it changes nothing on Today and closes nothing.", 12, false));
         final Journal journal = journal();
         if (journal == null || facts == null) {

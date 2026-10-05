@@ -99,6 +99,29 @@ export function payloadKeys(events, type) {
   return [...keys].sort();
 }
 
+/** Field names whose values are a closed vocabulary (enums, booleans, versions), so counting them cannot show a person's content. */
+export const TALLY_FIELDS = new Set(["verdict", "shown", "missed", "ruleId", "ruleVersion", "windowDays", "schema", "kind", "granted"]);
+
+/** How many events of a type carry each value of each closed-vocabulary field — and the number of distinct values of every other field, never the values. */
+export function tally(events, type) {
+  const out = {};
+  for (const e of events) {
+    if (e.type !== type) continue;
+    for (const [k, v] of Object.entries(e.payload ?? {})) {
+      if (TALLY_FIELDS.has(k) && (typeof v === "boolean" || typeof v === "number" || (typeof v === "string" && /^[A-Za-z0-9._-]{0,64}$/.test(v)))) {
+        out[k] ??= {};
+        out[k][String(v)] = (out[k][String(v)] ?? 0) + 1;
+      } else {
+        out[k] ??= new Set();
+        if (out[k] instanceof Set) out[k].add(JSON.stringify(v));
+      }
+    }
+  }
+  const result = {};
+  for (const [k, v] of Object.entries(out)) result[k] = v instanceof Set ? `${v.size} distinct` : v;
+  return result;
+}
+
 /** What changed between two exports of the same lane: per-type count differences and the new builds. */
 export function diff(before, after) {
   const a = typeCounts(before);

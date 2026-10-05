@@ -164,11 +164,11 @@ final class ReviewRules {
         return f.format(new java.util.Date(o.occurredMs));
     }
 
-    /** One item as a line: who, how much, when \u2014 and for a candidate, the payment that looks like its end. Words for what is *owed to* the person say *arrived*. */
+    /** One item as a line: who sent the message (not always the bank the bill is for), how much, when \u2014 and for a candidate, the payment that looks like its end. Words for what is *owed to* the person say *arrived*. */
     static String line(Item item, TimeZone zone) {
         String amount = Ledger.symbol(item.opener.currency) + Ledger.amount(item.opener.minor);
         boolean owedByMe = LoopRules.ME.equals(item.owner);
-        String head = item.opener.sourceId + ": " + (owedByMe ? "a bill of " : "something owed to you, ") + amount + " (" + dayText(item.opener, zone) + ")";
+        String head = "From " + item.opener.sourceId + ": " + (owedByMe ? "a bill of " : "something owed to you, ") + amount + " (" + dayText(item.opener, zone) + ")";
         if (item.closer == null) return head;
         return head + " \u00b7 " + (owedByMe ? "a payment of " : "money of ") + Ledger.symbol(item.closer.currency) + Ledger.amount(item.closer.minor) + " on " + dayText(item.closer, zone);
     }

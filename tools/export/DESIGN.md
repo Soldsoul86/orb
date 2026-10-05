@@ -6,7 +6,7 @@
 
 * **Counts and names, never values.** Exports hold people's data. The only payloads shown whole are those of types
   on a closed list (`NUMERIC_REPORTS`: the fit report), and even then only numeric fields. A type outside the list
-  is refused by name. `--keys` gives field names for noticing a new field, not what it holds.
+  is refused by name. `--keys` gives field names for noticing a new field, not what it holds. `--tally <type>` counts the values of a **fixed list of closed-vocabulary fields** (verdict, shown, missed, ruleId, ruleVersion, windowDays, schema, kind, granted — and only when the value is a short token); for every other field it says how many distinct values there are, never what they are.
 * **Chain check = continuity + payload hashes.** Each event must name the hash of the one before; each plaintext
   payload must hash (canonical JSON, sorted keys) to the envelope's `payloadHash`. The envelope hash itself is the
   journal's to verify — an export is checked for continuity, not re-signed. Sealed payloads are counted, not judged.

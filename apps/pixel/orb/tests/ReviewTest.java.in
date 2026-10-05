@@ -77,7 +77,7 @@ final class ReviewTest {
         Harness.suite("review: what the person is asked to judge");
         List<ReviewRules.Item> one = review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKA", "out", 100000L, 192L)));
         Harness.check("a bill and the payment that matches it: one candidate, shown with the bill and the payment", one.size() == 1 && ReviewFacts.CANDIDATE.equals(one.get(0).kind)
-            && ReviewRules.line(one.get(0), UTC).contains("BANKA: a bill of \u20b91,000.00") && ReviewRules.line(one.get(0), UTC).contains("a payment of \u20b91,000.00 on"));
+            && ReviewRules.line(one.get(0), UTC).startsWith("From BANKA: a bill of \u20b91,000.00") && ReviewRules.line(one.get(0), UTC).contains("a payment of \u20b91,000.00 on"));
         Harness.equal("it asks in the words that fit: this was paid", ReviewRules.question(one.get(0)) + "|" + ReviewRules.yes(one.get(0)), "Looks like this was paid|Mark paid");
         Harness.check("a payment before the bill, a different amount, or a different source is not a candidate",
             count(review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKA", "out", 100000L, 188L))), ReviewFacts.CANDIDATE) == 0

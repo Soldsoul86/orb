@@ -9,7 +9,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse, chain, typeCounts, builds, faults, latestReports, payloadKeys, diff, check } from "../lib.mjs";
+import { parse, chain, typeCounts, builds, faults, latestReports, payloadKeys, tally, diff, check } from "../lib.mjs";
 
 const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "analyse.mjs");
 const canon = (v) =>
@@ -168,4 +168,22 @@ test("the command line: --check exits 1 on a failed prediction, --since and --ke
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("tally counts closed-vocabulary values and only the number of distinct values of anything else", () => {
+  const events = [
+    { type: "x.judged", payload: { verdict: "paid", missed: false, obligation: "aaaa", sender: "SECRETBANK" } },
+    { type: "x.judged", payload: { verdict: "paid", missed: true, obligation: "bbbb", sender: "SECRETBANK" } },
+    { type: "x.judged", payload: { verdict: "notThis", missed: false, obligation: "bbbb", sender: "OTHER" } },
+    { type: "y.other", payload: { verdict: "ignored" } },
+  ];
+  const t = tally(events, "x.judged");
+  assert.deepEqual(t.verdict, { paid: 2, notThis: 1 });
+  assert.deepEqual(t.missed, { false: 2, true: 1 });
+  assert.equal(t.obligation, "2 distinct");
+  assert.equal(t.sender, "2 distinct");
+  assert.ok(!JSON.stringify(t).includes("SECRET"));
+  assert.ok(!JSON.stringify(t).includes("ignored"));
+  const sneaky = tally([{ type: "x", payload: { verdict: "a free text sentence with spaces" } }], "x");
+  assert.equal(sneaky.verdict, "1 distinct");
 });
