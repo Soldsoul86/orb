@@ -418,8 +418,17 @@
     {
      "suite": "phone",
      "check": "the precision is read by the screen and by nothing that decides"
+    },
+    {
+     "suite": "phone",
+     "check": "it added exactly one event, a judged one, at the end, and altered no earlier line"
+    },
+    {
+     "suite": "phone",
+     "check": "the person's commitments are exactly as they were: an answer changes nothing on Today"
     }
-   ]
+   ],
+   "limits": "Held behaviourally for the answer path (the event written, the commitments unchanged) and by source tripwires for the rest: a decider that read the counts directly, or wrapped a write in a helper, would pass the greps. The tripwires are named as such."
   },
   {
    "id": "I-018",
@@ -441,6 +450,10 @@
     {
      "suite": "phone",
      "check": "a key that is not a blinded key is refused: nothing is recorded by name"
+    },
+    {
+     "suite": "phone",
+     "check": "a rule is named by a short lower-case dotted name, never by free text"
     }
    ]
   }

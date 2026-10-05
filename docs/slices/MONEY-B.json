@@ -27,7 +27,8 @@
   "I-007",
   "I-008",
   "I-017",
-  "I-018"
+  "I-018",
+  "I-004"
  ],
  "scope": {
   "files": [
@@ -60,7 +61,12 @@
   "Obligations stay proposals: a Mark paid tap changes nothing on Today (DR-46).",
   "Only obligations the person owes (owner me) get Already paid; money owed to the person is judged as arrived, with no open-obligation list.",
   "The 60-day window and the 45-day matching window are policy constants, not measured.",
-  "Precision from the first 20 answers measures one inbox's rules, tuned on that inbox."
+  "Precision from the first 20 answers measures one inbox's rules, tuned on that inbox.",
+  "An answer is about a rule version: a normalizer version bump changes an observation's id and so the key of an obligation, and the review asks again (the answers were about the old rule).",
+  "Matching, the 60-day window and the 'missed' window use UTC days; the screen shows local days.",
+  "'missed' is computed from raw movements of the same amount and direction; once a second source exists it should use the ledger's movements (corroborated) instead.",
+  "The review's guards for 'nothing decides on the precision' are source tripwires; the answer path itself is held by behaviour.",
+  "On the first real inbox 71 of 184 obligations are chains of reminders and 13 of the 20 candidate pairs sit in one: the unit of a label is the pair, not the obligation."
  ],
  "expectFitChange": false
 }

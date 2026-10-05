@@ -32,16 +32,6 @@
   },
   {
    "file": "src/ReviewRules.java.in",
-   "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
-   "new": "if (judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;"
-  },
-  {
-   "file": "src/ReviewRules.java.in",
-   "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
-   "new": "if (judged.settled.contains(obKey)) continue;"
-  },
-  {
-   "file": "src/ReviewRules.java.in",
    "old": "            if (judged.settled.contains(obKey)) continue;\n            open.add",
    "new": "            open.add"
   },
@@ -195,28 +185,8 @@
   },
   {
    "file": "src/ReviewFacts.java.in",
-   "old": "if (PAID.equals(verdict)) {\n                out.settled.add(ob.group(1));\n                out.paid++;",
-   "new": "if (PAID.equals(verdict)) {\n                out.paid++;"
-  },
-  {
-   "file": "src/ReviewFacts.java.in",
-   "old": "out.settled.add(ob.group(1));\n                out.alreadyPaid++;",
-   "new": "out.alreadyPaid++;"
-  },
-  {
-   "file": "src/ReviewFacts.java.in",
    "old": "} else if (NOT_THIS.equals(verdict) && pay.find(payload)) {",
    "new": "} else if (NOT_THIS.equals(verdict)) {"
-  },
-  {
-   "file": "src/ReviewFacts.java.in",
-   "old": "if (m.find(payload) && \"true\".equals(m.group(1))) out.missed++;",
-   "new": "out.missed++;"
-  },
-  {
-   "file": "src/ReviewFacts.java.in",
-   "old": "out.refused.add(pairKey(ob.group(1), pay.group(1)));\n                out.notThis++;",
-   "new": "out.refused.add(pairKey(ob.group(1), pay.group(1)));"
   },
   {
    "file": "src/ReviewFacts.java.in",
@@ -237,6 +207,101 @@
    "file": "src/Correlator.java.in",
    "old": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, i)), could));",
    "new": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, open.size())), could));"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;",
+   "new": "return journal != null;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;",
+   "new": "return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) == null;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "return judged(item.obligationKey, item.paymentKey, verdict,",
+   "new": "return judged(item.paymentKey, item.obligationKey, verdict,"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "candidate ? item.closer.ruleId : \"\", candidate ? item.closer.ruleVersion : 1L, Correlator.WINDOW_DAYS);",
+   "new": "\"\", 1L, Correlator.WINDOW_DAYS);"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "!candidate && item.missed,",
+   "new": "false,"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "out.settled.add(ob.group(1));\n                out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));",
+   "new": "out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "out.settled.add(ob.group(1));\n                out.alreadyPaidSet.add(ob.group(1));",
+   "new": "out.alreadyPaidSet.add(ob.group(1));"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (PAID.equals(verdict) && pay.find(payload)) {",
+   "new": "if (PAID.equals(verdict)) {"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "long paid() { return paidPairs.size(); }",
+   "new": "long paid() { return paidPairs.size() + 1; }"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "long notThis() { return refused.size(); }",
+   "new": "long notThis() { return 0; }"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "long missed() { return missedSet.size(); }",
+   "new": "long missed() { return alreadyPaidSet.size(); }"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (ruleId == null || !ruleId.matches(\"[a-z.]{0,64}\"))",
+   "new": "if (ruleId == null)"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;",
+   "new": "if (judged.refused.contains(pair)) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;",
+   "new": "if (judged.paidPairs.contains(pair)) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "long from = day(ob.first());",
+   "new": "long from = day(ob.last());"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "|| !f.currency.equals(ob.first().currency)) continue;",
+   "new": ") continue;"
+  },
+  {
+   "file": "src/ReviewActivity.java.in",
+   "old": "boolean ok = ReviewFacts.record(journal(), item, verdict);",
+   "new": "boolean ok = true;"
+  },
+  {
+   "file": "src/ReviewActivity.java.in",
+   "old": "noted = ok ? \"Noted.",
+   "new": "noted = !ok ? \"Noted."
+  },
+  {
+   "file": "src/ReviewActivity.java.in",
+   "old": "private static final int SHOWN_CANDIDATES = 40;",
+   "new": "private static final int SHOWN_CANDIDATES = 0;"
   }
  ]
 }

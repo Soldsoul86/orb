@@ -50,6 +50,7 @@ final class ReviewFacts {
         if (!candidate && payment != null && !payment.isEmpty()) throw new IllegalArgumentException("an open obligation has no payment");
         if (candidate ? !(PAID.equals(verdict) || NOT_THIS.equals(verdict)) : !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("a verdict fits what was shown");
         if (missed && !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("only an answer of already paid can have missed a payment");
+        if (ruleId == null || !ruleId.matches("[a-z.]{0,64}")) throw new IllegalArgumentException("a rule is named by a short lower-case dotted name, never by free text");
         Map<String, Object> p = Json.obj();
         p.put("schema", SCHEMA);
         p.put("obligation", obligation);
@@ -57,22 +58,31 @@ final class ReviewFacts {
         p.put("verdict", verdict);
         p.put("shown", shown);
         p.put("missed", missed);
-        p.put("ruleId", ruleId == null ? "" : ruleId);
+        p.put("ruleId", ruleId);
         p.put("ruleVersion", Math.max(0L, ruleVersion));
         p.put("windowDays", Math.max(0L, windowDays));
         return p;
     }
 
-    /** Everything the journal says the person has answered: which obligations are settled, which pairs were refused, and the counts. */
+    /**
+     * Everything the journal says the person has answered, as **sets**: an answer repeated (a duplicated or restored journal) is one answer. The unit of a label is the
+     * **pair** — this bill, this payment — because an obligation can be a chain of reminders with a payment for each (on a real inbox 13 of the 20 candidates sit in
+     * such a chain), and one answer must not hide a question that was never asked.
+     */
     static final class Judged {
-        /** Obligations answered *paid* or *already paid*: the review does not offer them again. */
+        /** Obligations answered *already paid*, or with a payment marked paid: the review does not offer them as open again. */
         final Set<String> settled = new HashSet<>();
-        /** `obligation|payment` pairs the person said were not it. */
+        /** `obligation|payment` pairs marked paid, and pairs the person said were not it: neither is asked again. */
+        final Set<String> paidPairs = new HashSet<>();
         final Set<String> refused = new HashSet<>();
-        long paid;
-        long notThis;
-        long alreadyPaid;
-        long missed;
+        /** Obligations answered already paid, and of those the ones that had missed a payment. */
+        final Set<String> alreadyPaidSet = new HashSet<>();
+        final Set<String> missedSet = new HashSet<>();
+
+        long paid() { return paidPairs.size(); }
+        long notThis() { return refused.size(); }
+        long alreadyPaid() { return alreadyPaidSet.size(); }
+        long missed() { return missedSet.size(); }
     }
 
     private static final Pattern OBLIGATION = Pattern.compile("\"obligation\":\"([0-9a-f]{16})\"");
@@ -93,19 +103,30 @@ final class ReviewFacts {
             Matcher ob = OBLIGATION.matcher(line), pay = PAYMENT.matcher(line), v = VERDICT.matcher(line), m = MISSED.matcher(line);
             if (!ob.find(payload) || !v.find(payload)) continue;
             String verdict = v.group(1);
-            if (PAID.equals(verdict)) {
+            if (PAID.equals(verdict) && pay.find(payload)) {
                 out.settled.add(ob.group(1));
-                out.paid++;
+                out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));
             } else if (ALREADY_PAID.equals(verdict)) {
                 out.settled.add(ob.group(1));
-                out.alreadyPaid++;
-                if (m.find(payload) && "true".equals(m.group(1))) out.missed++;
+                out.alreadyPaidSet.add(ob.group(1));
+                if (m.find(payload) && "true".equals(m.group(1))) out.missedSet.add(ob.group(1));
             } else if (NOT_THIS.equals(verdict) && pay.find(payload)) {
                 out.refused.add(pairKey(ob.group(1), pay.group(1)));
-                out.notThis++;
             }
         }
         return out;
+    }
+
+    /** What one answer writes, from the item the person was shown. Pure: the same item and verdict give the same event. */
+    static Map<String, Object> payloadFor(ReviewRules.Item item, String verdict) {
+        boolean candidate = item.closer != null;
+        return judged(item.obligationKey, item.paymentKey, verdict, candidate ? CANDIDATE : OPEN, !candidate && item.missed,
+            candidate ? item.closer.ruleId : "", candidate ? item.closer.ruleVersion : 1L, Correlator.WINDOW_DAYS);
+    }
+
+    /** **The one place an answer is written:** one event, a label, and nothing else. Returns whether the journal took it. */
+    static boolean record(Journal journal, ReviewRules.Item item, String verdict) {
+        return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;
     }
 
     /** The first 20 answers are too few to report a precision from: below this it says so, and it never gates anything. */

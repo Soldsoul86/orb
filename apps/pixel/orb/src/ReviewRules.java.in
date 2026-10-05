@@ -92,7 +92,8 @@ final class ReviewRules {
             } catch (Exception cannotKey) {
                 continue;
             }
-            if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;
+            String pair = ReviewFacts.pairKey(obKey, payKey);
+            if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;
             shown.add(ob);
             candidates.add(new Item(ReviewFacts.CANDIDATE, ownerOf(ob.first()), ob.first(), ob.last(), p.closer, obKey, payKey, false));
         }

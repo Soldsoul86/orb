@@ -72,6 +72,18 @@ public final class FitProbe {
         for (Set<String> senders : byShape.values()) if (senders.size() > 1) crossSender++;
         System.out.println("ledger movements " + movements.size() + " (out " + out + ", in " + in + ") months " + Ledger.months(movements, java.util.TimeZone.getTimeZone("UTC")).size()
             + "  same-amount-same-day-different-senders groups " + crossSender);
+        // The review (docs/MONEY_PHONE.md section 17): how many questions it would ask, and how many obligations are chains of several reminders (one answer settles a chain).
+        Correlator.Result corr = Correlator.run(facts);
+        long chains = 0, chainPairs = 0, candidatePairs = corr.pairs.size(), latest = 0;
+        for (Observation o : facts) latest = Math.max(latest, o.occurredMs);
+        java.util.Map<String, Correlator.Obligation> byOpener = new java.util.HashMap<>();
+        for (Correlator.Obligation ob : corr.list) {
+            if (ob.openers.size() > 1) chains++;
+            for (Observation o : ob.openers) byOpener.put(o.id, ob);
+        }
+        for (Correlator.Pair p : corr.pairs) if (byOpener.get(p.opener.id).openers.size() > 1) chainPairs++;
+        long reviewable = ReviewRules.build(facts, new ReviewFacts.Judged(), new ReviewFacts.Keyer() { @Override public String key(String n) { return Integer.toHexString(n.hashCode()) + "0000000000000000".substring(0, 8); } }, latest).size();
+        System.out.println("review: obligations " + corr.list.size() + " of which chains of 2+ reminders " + chains + "; candidate pairs " + candidatePairs + " of which in a chain " + chainPairs + "; items the review would show now " + reviewable);
         // What keeping would make: sealed bundles, one per source x month (docs/MONEY_PHONE.md section 7). Counts of groups, by what they hold.
         java.util.TimeZone zone = java.util.TimeZone.getTimeZone("UTC");
         long newest = 0;

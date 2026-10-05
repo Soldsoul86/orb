@@ -22,7 +22,10 @@ import java.util.TimeZone;
  * screen only.
  */
 public final class ReviewActivity extends Activity {
-    private static final int SHOWN = 25;
+    private static final int SHOWN_CANDIDATES = 40;
+    private static final int SHOWN_OPEN = 25;
+    /** After a tap: what was done, in plain words, until the next one. */
+    private String noted = "";
 
     private LinearLayout list;
     private List<Observation> facts;
@@ -118,15 +121,22 @@ public final class ReviewActivity extends Activity {
             return;
         }
         boolean headedOpen = false;
-        for (int i = 0; i < items.size() && i < SHOWN; i++) {
+        int candidates = 0, opens = 0, hidden = 0;
+        for (int i = 0; i < items.size(); i++) {
             final ReviewRules.Item item = items.get(i);
-            if (item.closer == null && !headedOpen) {
-                list.addView(text("\nRecent bills with no payment in view", 13, true));
+            boolean candidate = item.closer != null;
+            if (candidate ? candidates >= SHOWN_CANDIDATES : opens >= SHOWN_OPEN) {
+                hidden++;
+                continue;
+            }
+            if (candidate) candidates++; else opens++;
+            if (!candidate && !headedOpen) {
+                list.addView(text("\nRecent bills with no payment in view (a bill you said was not matched to a payment comes back here)", 13, true));
                 headedOpen = true;
             }
-            if (item.closer != null) list.addView(text("\n" + ReviewRules.question(item), 12, true));
-            list.addView(text(item.closer != null ? ReviewRules.line(item, zone) : "\n" + ReviewRules.line(item, zone), 13, false));
-            if (item.closer != null) {
+            if (candidate) list.addView(text("\n" + ReviewRules.question(item), 12, true));
+            list.addView(text(candidate ? ReviewRules.line(item, zone) : "\n" + ReviewRules.line(item, zone), 13, false));
+            if (candidate) {
                 list.addView(button(ReviewRules.yes(item), new View.OnClickListener() {
                     @Override public void onClick(View v) { answer(item, ReviewFacts.PAID); }
                 }));
@@ -139,7 +149,7 @@ public final class ReviewActivity extends Activity {
                 }));
             }
         }
-        if (items.size() > SHOWN) list.addView(text("\n…and " + (items.size() - SHOWN) + " more, after these.", 11, false));
+        if (hidden > 0) list.addView(text("\n\u2026and " + hidden + " more, after these.", 11, false));
     }
 
     private List<String> readLines(Journal journal) {
@@ -159,16 +169,9 @@ public final class ReviewActivity extends Activity {
 
     /** One tap, one event: a label against blinded keys. Nothing else is written, and nothing else changes. */
     private void answer(ReviewRules.Item item, String verdict) {
-        Journal journal = journal();
-        boolean ok = false;
-        if (journal != null) {
-            boolean candidate = item.closer != null;
-            String rule = candidate ? item.closer.ruleId : "";
-            long version = candidate ? item.closer.ruleVersion : 1L;
-            ok = journal.append(ReviewFacts.JUDGED, ReviewFacts.judged(item.obligationKey, item.paymentKey, verdict, candidate ? ReviewFacts.CANDIDATE : ReviewFacts.OPEN,
-                !candidate && item.missed, rule, version, Correlator.WINDOW_DAYS)) != null;
-        }
+        boolean ok = ReviewFacts.record(journal(), item, verdict);
         if (!ok) new AlertDialog.Builder(this).setMessage("Orb could not record that, so nothing changed.").setPositiveButton("OK", null).show();
+        noted = ok ? "Noted. This only teaches Orb how often it is right: nothing was closed and nothing changed on Today." : "";
         render();
     }
 }

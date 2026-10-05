@@ -86,6 +86,18 @@
     {
      "suite": "phone",
      "check": "an answer is one event and nothing else is written"
+    },
+    {
+     "suite": "phone",
+     "check": "it added exactly one event, a judged one, at the end, and altered no earlier line"
+    },
+    {
+     "suite": "phone",
+     "check": "the person's commitments are exactly as they were: an answer changes nothing on Today"
+    },
+    {
+     "suite": "phone",
+     "check": "a journal that is not there takes no answer"
     }
    ]
   },
@@ -132,7 +144,7 @@
   },
   {
    "id": "REV-004",
-   "name": "Mark paid and Already paid settle an obligation for good",
+   "name": "Mark paid and Already paid are final for what they answered, and the next question in a chain is still asked",
    "category": "boundary",
    "risk": "medium",
    "invariants": [
@@ -150,17 +162,19 @@
     "the person answers Mark paid or Already paid, in any order of events, or after a restore"
    ],
    "then": [
-    "it is not listed again",
-    "its payment is not listed again"
+    "the answered pair is not listed again",
+    "a bill answered Already paid, or with a payment marked paid, is not offered as open",
+    "in a chain of reminders the next payment is still asked about"
    ],
    "mustNot": [
-    "an answered obligation returning",
-    "an answer about another obligation hiding this one"
+    "an answered question returning",
+    "an answer about another obligation hiding this one",
+    "one answer hiding a question that was never asked"
    ],
    "proof": [
     {
      "suite": "phone",
-     "check": "Mark paid settles the obligation: neither it nor its payment is listed again"
+     "check": "Mark paid hides that pair and settles the bill: neither is listed again, and the other bill is untouched"
     },
     {
      "suite": "phone",
@@ -172,7 +186,23 @@
     },
     {
      "suite": "phone",
-     "check": "paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid"
+     "check": "paid and already paid settle an obligation; paid and not this each answer a pair; missed is counted only on already paid"
+    },
+    {
+     "suite": "phone",
+     "check": "in a chain of reminders, marking one payment paid does not hide the question about the next, and the settled chain is not offered as open too"
+    },
+    {
+     "suite": "phone",
+     "check": "read back from the journal alone, the answered pair is gone and nothing else is"
+    },
+    {
+     "suite": "phone",
+     "check": "the same answers read twice count once"
+    },
+    {
+     "suite": "phone",
+     "check": "refusing one payment of an obligation leaves its other payment to be asked about"
     }
    ]
   },
@@ -265,6 +295,14 @@
     {
      "suite": "phone",
      "check": "a movement already matched to another obligation is not a miss for this one"
+    },
+    {
+     "suite": "phone",
+     "check": "a movement between the reminders of a chain, from a source nothing matched, is inside its window: a missed correlation"
+    },
+    {
+     "suite": "phone",
+     "check": "the same amount in another currency is not a miss"
     }
    ]
   },
@@ -316,6 +354,10 @@
     {
      "suite": "phone",
      "check": "only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named"
+    },
+    {
+     "suite": "phone",
+     "check": "a rule is named by a short lower-case dotted name, never by free text"
     }
    ]
   },
@@ -464,6 +506,10 @@
     {
      "suite": "phone",
      "check": "the screen is secure like Recall, reads only the kept facts through the person's marks, and says so when nothing is kept"
+    },
+    {
+     "suite": "phone",
+     "check": "the review is built from the kept facts, and a quiet service's facts are left out of it"
     }
    ]
   },
