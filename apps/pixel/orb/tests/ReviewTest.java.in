@@ -294,6 +294,13 @@ final class ReviewTest {
         ReviewFacts.Judged end = ReviewFacts.fold(journal.readLines());
         Harness.equal("three answers, one of each, one missed", end.paid() + "|" + end.notThis() + "|" + end.alreadyPaid() + "|" + end.missed(), "1|1|1|1");
         Harness.equal("and still only the three events were added to the journal", journal.readLines().size(), linesBefore.size() + 3);
+        Observation named = Observation.of(Observation.VALUE_MOVED).source("sms.sender", "BANKA", Observation.T0).times(152L * DAY, 152L * DAY).direction("out").object(Observation.MONEY, 7000L, "INR")
+            .subject("payment", "", LoopRules.INFERRED, "sms.payment.correlation", 3L).build();
+        List<ReviewRules.Item> withRule = review(Arrays.asList(bill("BANKA", "me", 7000L, 150L), named));
+        Map<String, Object> carried = ReviewFacts.payloadFor(withRule.get(0), ReviewFacts.PAID);
+        Harness.equal("the answer names the rule that proposed the pair and its version, and the window it used", carried.get("ruleId") + "|" + carried.get("ruleVersion") + "|" + carried.get("windowDays"), "sms.payment.correlation|3|" + Correlator.WINDOW_DAYS);
+        Map<String, Object> openPayload = ReviewFacts.payloadFor(review(Arrays.asList(bill("BANKA", "me", 50000L, 190L), moved("OTHER", "out", 50000L, 195L))).get(0), ReviewFacts.ALREADY_PAID);
+        Harness.equal("an open answer carries the missed correlation it found, and no rule", openPayload.get("missed") + "|" + openPayload.get("ruleId"), "true|");
         Harness.check("a journal that is not there takes no answer", !ReviewFacts.record(null, candidate, ReviewFacts.PAID));
         // A duplicated answer (a restored or doubled journal) is the same answer.
         List<String> doubled = new ArrayList<>(journal.readLines());
@@ -402,6 +409,8 @@ final class ReviewTest {
         Harness.check("the rules are pure: no storage, clock, Android or pattern", !rules.contains("Context") && !rules.contains("currentTimeMillis") && !rules.contains("import android") && !rules.contains("Pattern"));
         Harness.check("the screen is secure like Recall, reads only the kept facts through the person's marks, and says so when nothing is kept",
             screen.contains("FLAG_SECURE") && screen.contains("ObservationStore.load(") && screen.contains("Senders.quiet(") && !screen.contains("MessagesReader") && screen.contains("Nothing is kept yet"));
+        Harness.check("after a tap the screen says it only teaches Orb, only when the answer was recorded; candidates and open bills have their own caps",
+            screen.replaceAll("\\s+", " ").contains("noted = ok ? \"Noted. This only teaches Orb") && screen.contains("SHOWN_CANDIDATES = 40") && screen.contains("SHOWN_OPEN = 25") && screen.contains("a bill you said was not matched to a payment comes back here"));
         Harness.check("it is reached from Money moved, and declared not exported", code(read("LedgerActivity")).contains("ReviewActivity.class")
             && new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").matches("(?s).*<activity\\s+android:name=\"\\.ReviewActivity\"\\s+android:exported=\"false\"\\s*/>.*"));
     }
