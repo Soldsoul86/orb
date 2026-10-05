@@ -644,6 +644,14 @@
     {
      "suite": "phone",
      "check": "saying yes twice records one grant"
+    },
+    {
+     "suite": "phone",
+     "check": "turning it on again ends the switched-off state, and records a second yes"
+    },
+    {
+     "suite": "phone",
+     "check": "and from then on it is switched off, which is what refuses a Keep"
     }
    ]
   },
@@ -808,6 +816,70 @@
     "payee text in the journal, an export, a fit report or a probe line"
    ],
    "proof": []
+  },
+  {
+   "id": "M-022",
+   "name": "A switched-off capability refuses a Keep, and What Orb may do turns it on again",
+   "category": "recovery",
+   "risk": "high",
+   "invariants": [
+    "I-013",
+    "I-008"
+   ],
+   "files": [
+    "apps/pixel/orb/src/KeepAccess.java.in",
+    "apps/pixel/orb/src/PackageGrants.java.in",
+    "apps/pixel/orb/src/SourcesActivity.java.in",
+    "apps/pixel/orb/src/MayDoActivity.java.in"
+   ],
+   "given": [
+    "keeping facts was switched off by the person",
+    "a Look at a message backup"
+   ],
+   "when": [
+    "the person taps Keep on the Sources screen",
+    "later turns keeping on under What Orb may do and taps Keep again"
+   ],
+   "then": [
+    "nothing is shown or kept, and the screen says where to turn it on",
+    "after a dialog with the pinned words and a yes in What Orb may do, keeping works again"
+   ],
+   "mustNot": [
+    "a Keep that silently turns the capability back on",
+    "a switch that is only a flag and gates nothing",
+    "a turn-on that keeps by itself",
+    "a doubtful history treated as permission"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "never decided is not switched off: the first Keep is the person's first yes"
+    },
+    {
+     "suite": "phone",
+     "check": "and from then on it is switched off, which is what refuses a Keep"
+    },
+    {
+     "suite": "phone",
+     "check": "turning it on again ends the switched-off state, and records a second yes"
+    },
+    {
+     "suite": "phone",
+     "check": "another capability's revocation is not this one's"
+    },
+    {
+     "suite": "phone",
+     "check": "a doubt about the history fails toward not keeping"
+    },
+    {
+     "suite": "phone",
+     "check": "a switched-off capability refuses a Keep before anything is shown or kept, and says where to turn it on"
+    },
+    {
+     "suite": "phone",
+     "check": "What Orb may do turns keeping on by a dialog that carries the pinned words and a yes, and keeps nothing itself"
+    }
+   ]
   }
  ]
 }

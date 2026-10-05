@@ -19,6 +19,7 @@ were; the name is the round, not a subject. Run one against the phone app:
 | `note*.json` `marks*.json` `sev.json` | Person notes, marks, severity |
 | `c*.json` `l*.json` `h.json` `n3.json` `p*.json` | Earlier phone-app rounds (capture, links, handoff, nudge, people) |
 | `money-a.json` | Money slice A: the ledger and its corroboration, the six-way dispositions, the keep capability and bundle erasing (54 mutants; 49 killed, 5 documented equivalent, 0 alive after three rounds) |
+| `money-a2.json` | Switched off means off: the revocation check, the refusal on the Sources screen, the turn-on dialog (8 mutants, all killed) |
 | `tools-export.json` | The export analyser (use with `--config tools/mutate/tools-export.json`) |
 | `tools-engsys.json` | The engineering system's tools: scenarios, governance, slice (70 mutants, all killed; use with `--config tools/mutate/tools-engsys.json`) |
 

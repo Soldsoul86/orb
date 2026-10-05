@@ -8029,3 +8029,42 @@ Nothing is closed, opened or changed by either. A payment is still only a *candi
 9. Open **Today** and the morning brief. *(P357)*
 
 *(Keep the numbers you see in P348 and P351 for me: they are your own figures.)*
+
+#### Result — export `orb-20261005-080019` (operator, 2026-10-05): v60 on the device
+
+1,263 events; chain intact (no link break, no payload mismatch); v60 (`29851999`) started once; **no crash, no fault**. The operator reported *3,723 facts* in the Keep dialog and (typed "27") **327 bundles** — the export holds **327** `orb.observations.kept` events, so I read it as 327.
+
+**P346, P347, P349–P352, P353, P357 confirmed by the operator ("rest all working as intended").** **P348 / P355 confirmed by the export, to the digit:** 327 bundles, **3,723 facts** (the container's 3,717 plus the one quiet sender's), **93 senders, 25 months** (2024-10 … 2026-10), every event carrying only `attachment`, `attachmentBytes`, `confidencePercent`, `count`, `month`, `protocol`, `schema`, `sourceKey` (blinded), `sourceKind`, `version` — **no sender code, no amount**; one `orb.observations.keep` grant and one revocation, in that order.
+
+**P354 half-true, and a flaw found.** Switching keeping off worked and the Money screen still showed everything — but the operator **could not turn it back on**: the only control was *Turn on (opens Sources)*, which opened a screen on which Keep was still available. Worse, the export and the code agree that a Keep tap would have silently re-granted the capability, so **switching it off stopped nothing**. The capability's own guard (I-013, M-016) had proved *structure*, not *behaviour*. `LEARNINGS.md` L-004, `MONEY_PHONE.md` §16. Fixed in v61.
+
+### 7b98. Keeping facts: off means off, and a real way back on (v61) — 2026-10-05
+
+**Status: built, awaiting the device.** `orb-app-v61-keep-onoff.apk`. Nothing else changes.
+
+#### In plain words
+
+If you switch **keeping facts** off, Orb now keeps nothing until you turn it on again. Tapping *Keep what Orb read…* says *"Keeping facts is switched off. Turn it on under What Orb may do…"* and does nothing else. In **What Orb may do**, the entry now has a real **Turn on keeping facts** button that opens a short dialog (the same words as the capability) with **Turn on** / **Not now**. Turning it on keeps nothing by itself. Switching off still erases nothing.
+
+#### Checked before the device
+
+3,325 phone-side checks (8 new); new scenario **M-022** (the registry: 41 scenarios, 38 proven, 3 drafts); invariant I-013 restated and now held by behaviour; **8 of 8 new mutants killed** (`tools/mutate/lists/money-a2.json`). Lint clean.
+
+#### Predictions
+
+| | Prediction | If false |
+| --- | --- | --- |
+| **P358** | **What Orb may do → The facts Orb has read, kept sealed** (currently OFF): the button reads **Turn on keeping facts** (not "opens Sources") | the old text |
+| **P359** | Tapping it shows a dialog with the capability's words and **Turn on / Not now**; **Not now** changes nothing | no dialog, or it turns on by itself |
+| **P360** | **Turn on** makes the entry say **ON — you granted it**; the export gains one grant | still OFF |
+| **P361** | Switch it **off** again, then **Sources → Look → Keep what Orb read…**: a one-line message says it is switched off and where to turn it on; **no dialog, nothing kept** (the export gains no `orb.observations.kept`) | a dialog, or it keeps |
+| **P362** | Turn it on again, **Keep** again: *Kept 0 bundles. Unchanged: 327* (nothing changed since v60) and no new event | it writes again |
+
+#### Protocol
+
+1. Install `orb-app-v61-keep-onoff.apk` over v60.
+2. **What Orb may do** → the keep entry (it is OFF from your v60 test). *(P358)*
+3. Tap **Turn on keeping facts**; try **Not now**, then tap again and **Turn on**. *(P359, P360)*
+4. Switch it **off**; **Sources → Messages → Look → Keep what Orb read…**. *(P361)*
+5. Turn it **on** again and Keep once more. *(P362)*
+6. **Export and share journal** and send it.

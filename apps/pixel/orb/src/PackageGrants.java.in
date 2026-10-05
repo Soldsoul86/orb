@@ -35,4 +35,22 @@ final class PackageGrants {
         }
         return false;
     }
+
+    /**
+     * Whether the person **switched a capability off**: the last record about it is a revocation. Never decided (no record) is false, and so is granted. A line whose
+     * type cannot be read is refused, as in `lastIsGrant`.
+     */
+    static boolean lastIsRevocation(List<String> lines, String capability) throws IOException {
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            String line = lines.get(i);
+            String type = Journal.typeOf(line);
+            if (type == null) throw new IOException("cannot tell the type of event " + (i + 1) + "; refusing to skip it");
+            boolean granted = GRANTED.equals(type);
+            if (!granted && !REVOKED.equals(type)) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0 || line.indexOf("\"capability\":\"" + capability + "\"", payload) < 0) continue;
+            return !granted;
+        }
+        return false;
+    }
 }

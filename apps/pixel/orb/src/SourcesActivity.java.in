@@ -619,6 +619,17 @@ public final class SourcesActivity extends Activity {
     }
 
     private void confirmKeepFacts() {
+        final Journal now = journal();
+        if (now == null) return;
+        try {
+            if (KeepAccess.switchedOff(now.readLines())) {
+                message("Keeping facts is switched off. Turn it on under What Orb may do, and Orb will keep nothing until you do.");
+                return;
+            }
+        } catch (IOException unreadable) {
+            message("Orb could not read its history, so it kept nothing.");
+            return;
+        }
         final Keepable k = keepable();
         if (k.facts.isEmpty()) {
             message("There are no facts to keep from this file.");

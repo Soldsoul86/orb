@@ -300,13 +300,15 @@
   },
   {
    "id": "I-013",
-   "statement": "Keeping facts is the person's recorded decision, made at the one place that keeps them, and switching it off erases nothing.",
+   "statement": "Keeping facts is the person's recorded decision: asked first at the one place that keeps them; switched off means nothing is kept until it is turned on again with a yes; and switching off erases nothing.",
    "source": "MONEY_PHONE.md §7; CAPABILITY_MODEL.md",
    "threatenedBy": [
     "apps/pixel/orb/src/SourcesActivity.java.in",
     "apps/pixel/orb/src/KeepAccess.java.in",
     "apps/pixel/orb/src/ObservationStore.java.in",
-    "apps/pixel/orb/src/Capabilities.java.in"
+    "apps/pixel/orb/src/Capabilities.java.in",
+    "apps/pixel/orb/src/MayDoActivity.java.in",
+    "apps/pixel/orb/src/PackageGrants.java.in"
    ],
    "heldBy": [
     {
@@ -324,6 +326,18 @@
     {
      "suite": "phone",
      "check": "a revoked capability stops keeping: keepFacts is only reached from the dialog, which only the button opens"
+    },
+    {
+     "suite": "phone",
+     "check": "and from then on it is switched off, which is what refuses a Keep"
+    },
+    {
+     "suite": "phone",
+     "check": "a switched-off capability refuses a Keep before anything is shown or kept, and says where to turn it on"
+    },
+    {
+     "suite": "phone",
+     "check": "What Orb may do turns keeping on by a dialog that carries the pinned words and a yes, and keeps nothing itself"
     }
    ]
   },

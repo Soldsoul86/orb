@@ -35,3 +35,11 @@
 - **Fix:** M-018 now names the new text. Caught by the first change report of MONEY-A (`UNPROVEN M-018`), before the commit it would have shipped in.
 - **Regression:** `tools/scenarios` derived state (`unproven` for a named check that did not run); the slice report's BLOCKED status for an unproven scenario.
 - **Invariant:** none (a property of the registry itself: a scenario is never proof, only the named, passing check is).
+
+## L-004 — "Switch off keeping facts" was a flag that gated nothing
+
+- **Failure:** on the device (export 2026-10-05) the person switched keeping off and then could not turn it on again: the only control said *Turn on (opens Sources)* and led to a screen where Keep was still available. In fact a Keep tap silently re-granted the capability, so switching it off stopped nothing.
+- **Root cause:** the capability's guard (I-013, scenario M-016) proved *structure* — keeping is reachable from one place, a revocation is recorded — not *behaviour*: that a revoked capability refuses a Keep. A switch that gates nothing passed every check.
+- **Fix:** keeping is refused, before anything is shown, while the last record is a revocation (a doubt about the history counts as switched off); What Orb may do turns it on again by a dialog with the pinned words and a yes, and keeps nothing itself. v61.
+- **Regression:** scenario M-022; five new checks incl. the guard that the refusal precedes the dialog and returns; mutation list `money-a2` (8 killed).
+- **Invariant:** I-013 (restated: switched off means nothing is kept until it is turned on again with a yes).

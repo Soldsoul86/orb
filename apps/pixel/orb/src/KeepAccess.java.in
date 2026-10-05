@@ -21,6 +21,19 @@ final class KeepAccess {
         return new File(context.getFilesDir(), FILE).exists();
     }
 
+    /**
+     * Whether the person switched keeping off (the last record is a revocation). **Then nothing is kept until they turn it on again** — the Keep button on the
+     * Sources screen refuses, and says where to turn it on. Never decided is not switched off: the first Keep is the person's first yes. If the history cannot
+     * be read the answer is *switched off*: a doubt fails toward not keeping.
+     */
+    static boolean switchedOff(java.util.List<String> lines) {
+        try {
+            return PackageGrants.lastIsRevocation(lines, Capabilities.OBS_KEEP);
+        } catch (IOException unreadable) {
+            return true;
+        }
+    }
+
     /** Event first, then the flag: a crash in between leaves a grant on record that the device does not yet exercise \u2014 the harmless direction. */
     static void grant(Context context, Journal journal) throws IOException {
         if (granted(context)) return;

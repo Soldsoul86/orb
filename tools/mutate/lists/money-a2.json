@@ -1,0 +1,44 @@
+{
+ "mutants": [
+  {
+   "file": "src/PackageGrants.java.in",
+   "old": "            return !granted;\n        }\n        return false;\n    }\n}",
+   "new": "            return granted;\n        }\n        return false;\n    }\n}"
+  },
+  {
+   "file": "src/PackageGrants.java.in",
+   "old": "            return !granted;\n        }\n        return false;\n    }\n}",
+   "new": "            return !granted;\n        }\n        return true;\n    }\n}"
+  },
+  {
+   "file": "src/PackageGrants.java.in",
+   "old": "            if (payload < 0 || line.indexOf(\"\\\"capability\\\":\\\"\" + capability + \"\\\"\", payload) < 0) continue;\n            return !granted;",
+   "new": "            if (payload < 0) continue;\n            return !granted;"
+  },
+  {
+   "file": "src/KeepAccess.java.in",
+   "old": "return PackageGrants.lastIsRevocation(lines, Capabilities.OBS_KEEP);",
+   "new": "return false;"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "message(\"Keeping facts is switched off. Turn it on under What Orb may do, and Orb will keep nothing until you do.\");\n                return;",
+   "new": "message(\"Keeping facts is switched off. Turn it on under What Orb may do, and Orb will keep nothing until you do.\");"
+  },
+  {
+   "file": "src/SourcesActivity.java.in",
+   "old": "if (KeepAccess.switchedOff(now.readLines())) {",
+   "new": "if (false) {"
+  },
+  {
+   "file": "src/MayDoActivity.java.in",
+   "old": "                                        KeepAccess.grant(MayDoActivity.this, journal);\n",
+   "new": "                                        \n"
+  },
+  {
+   "file": "src/MayDoActivity.java.in",
+   "old": ".setMessage(Capabilities.OBS_KEEP_SAYS + ",
+   "new": ".setMessage("
+  }
+ ]
+}

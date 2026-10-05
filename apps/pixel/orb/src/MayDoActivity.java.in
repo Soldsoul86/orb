@@ -183,14 +183,29 @@ public final class MayDoActivity extends Activity {
                 return;   // The history cannot say whether it is on, so no control is offered on a guess.
             }
             final boolean keepOn = known;
-            b.setText(keepOn ? "Switch off keeping facts" : "Turn on (opens Sources)");
+            b.setText(keepOn ? "Switch off keeping facts" : "Turn on keeping facts");
             b.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View view) {
                     if (keepOn) {
                         KeepAccess.revoke(MayDoActivity.this, journal);
                         render();
                     } else {
-                        startActivity(new android.content.Intent(MayDoActivity.this, SourcesActivity.class));
+                        // A yes is the person's, asked first, in the words the capability is pinned to. Turning it on keeps nothing: keeping is the Keep button.
+                        new android.app.AlertDialog.Builder(MayDoActivity.this)
+                            .setTitle("Turn on keeping facts?")
+                            .setMessage(Capabilities.OBS_KEEP_SAYS + "\n\nTurning it on keeps nothing by itself: you still choose Keep on the Sources screen each time.")
+                            .setPositiveButton("Turn on", new android.content.DialogInterface.OnClickListener() {
+                                @Override public void onClick(android.content.DialogInterface d, int which) {
+                                    try {
+                                        KeepAccess.grant(MayDoActivity.this, journal);
+                                    } catch (IOException notRecorded) {
+                                        // Not recorded, so not on.
+                                    }
+                                    render();
+                                }
+                            })
+                            .setNegativeButton("Not now", null)
+                            .show();
                     }
                 }
             });

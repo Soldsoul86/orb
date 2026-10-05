@@ -337,6 +337,7 @@ final class LedgerTest {
         Journal journal = open(holder);
         Context context = holder[0];
         Harness.check("off until the person says yes", !KeepAccess.granted(context) && !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        Harness.check("never decided is not switched off: the first Keep is the person's first yes", !KeepAccess.switchedOff(journal.readLines()));
         KeepAccess.grant(context, journal);
         Harness.check("a yes is an event and then a flag", KeepAccess.granted(context) && PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
         KeepAccess.grant(context, journal);
@@ -346,11 +347,21 @@ final class LedgerTest {
         Harness.check("a grant the device does exercise is left alone by a reconcile", KeepAccess.granted(context) && PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP) && count(journal, PackageGrants.REVOKED) == 0);
         KeepAccess.revoke(context, journal);
         Harness.check("switching off stops it and says so", !KeepAccess.granted(context) && !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        Harness.check("and from then on it is switched off, which is what refuses a Keep", KeepAccess.switchedOff(journal.readLines()));
         Harness.equal("and erases nothing", ObservationStore.bundles(journal.readLines()), 1);
         KeepAccess.grant(context, journal);
+        Harness.check("turning it on again ends the switched-off state, and records a second yes", !KeepAccess.switchedOff(journal.readLines()) && KeepAccess.granted(context) && count(journal, PackageGrants.GRANTED) == 2);
         new java.io.File(context.getFilesDir(), "observations-keep.granted").delete();
         KeepAccess.reconcile(context, journal);
         Harness.check("a restore that brings the grant back without the flag is made to agree", !PackageGrants.lastIsGrant(journal.readLines(), Capabilities.OBS_KEEP));
+        Harness.check("a reconcile that revoked a grant the device lost leaves it switched off, not undecided", KeepAccess.switchedOff(journal.readLines()));
+        Context[] other = box();
+        Journal elsewhere = open(other);
+        java.util.Map<String, Object> briefRevoked = Json.obj();
+        briefRevoked.put("capability", Capabilities.BRIEF);
+        elsewhere.append(PackageGrants.REVOKED, briefRevoked);
+        Harness.check("another capability's revocation is not this one's", !PackageGrants.lastIsRevocation(elsewhere.readLines(), Capabilities.OBS_KEEP) && PackageGrants.lastIsRevocation(elsewhere.readLines(), Capabilities.BRIEF));
+        Harness.check("a doubt about the history fails toward not keeping", KeepAccess.switchedOff(Arrays.asList("not an event")));
         Capabilities.Status status = Capabilities.status(Capabilities.OBS_KEEP, journal.readLines());
         Harness.check("the screen says OFF, and what is kept", status.state.startsWith("OFF") && status.lastDetail.contains("1 bundle"));
         Harness.check("the capability is declared once, observe-tier and switchable, and records as the bundle event", Capabilities.ids().contains(Capabilities.OBS_KEEP) && Capabilities.OBS_KEEP_SAYS.contains("24 months") && Capabilities.OBS_KEEP_SAYS.contains("never keeps a message"));
@@ -397,6 +408,11 @@ final class LedgerTest {
         String sources = code(read("SourcesActivity"));
         Harness.check("and it asks first, then records the person's yes before it keeps", sources.indexOf("setPositiveButton(\"Keep\"") > 0 && sources.indexOf("KeepAccess.grant(") < sources.indexOf("ObservationStore.keepAll(")
             && sources.contains("will not keep any message or any of its words"));
+        Harness.check("a switched-off capability refuses a Keep before anything is shown or kept, and says where to turn it on", sources.indexOf("KeepAccess.switchedOff(") > 0
+            && sources.indexOf("KeepAccess.switchedOff(") < sources.indexOf("setPositiveButton(\"Keep\"") && sources.replaceAll("\\s+", " ").contains("Turn it on under What Orb may do, and Orb will keep nothing until you do.\"); return;"));
+        String mayDo = code(read("MayDoActivity"));
+        Harness.check("What Orb may do turns keeping on by a dialog that carries the pinned words and a yes, and keeps nothing itself",
+            mayDo.contains("Turn on keeping facts") && mayDo.contains("Capabilities.OBS_KEEP_SAYS") && mayDo.contains("KeepAccess.grant(") && !mayDo.contains("keepAll(") && !mayDo.contains("opens Sources)\" : \"Turn on keeping"));
         Harness.check("a revoked capability stops keeping: keepFacts is only reached from the dialog, which only the button opens", occurrences(read("SourcesActivity"), "keepFacts(k);") == 1 && occurrences(read("SourcesActivity"), "confirmKeepFacts();") == 1);
         Harness.check("the manifest declares the screen, not exported", code(read("MainActivity")).contains("LedgerActivity.class")
             && new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").matches("(?s).*<activity\\s+android:name=\"\\.LedgerActivity\"\\s+android:exported=\"false\"\\s*/>.*"));
