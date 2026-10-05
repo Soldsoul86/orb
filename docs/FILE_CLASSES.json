@@ -56,6 +56,10 @@
    "class": "CONSTITUTIONAL"
   },
   {
+   "glob": "AGENTS.md",
+   "class": "CONSTITUTIONAL"
+  },
+  {
    "glob": "apps/pixel/orb/AndroidManifest.xml",
    "class": "SECURITY",
    "watch": "manifest-permissions"
@@ -204,6 +208,7 @@
   "docs/scenarios/**",
   "tools/governance/**",
   "CLAUDE.md",
+  "AGENTS.md",
   "docs/slices/**"
  ]
 }

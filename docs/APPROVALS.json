@@ -1,91 +1,104 @@
 {
- "about": "Approval records (docs/ENGINEERING_SYSTEM.md section 3.5). Each says which paths a human approved, under which decision. The check reports coverage; it cannot tell who edited this file, so a change here is always flagged for review. Self-governing.",
- "approvals": [
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/LOOP_PROTOCOL.md",
-    "docs/fixtures/loops/**"
-   ],
-   "ref": "DR-41",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "Loop protocol v0.1 and its conformance corpus."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/SENDER_MARKS_PHONE.md"
-   ],
-   "ref": "DR-42",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "Sender marks."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/OBSERVATION_SEAM.md"
-   ],
-   "ref": "DR-43",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "The Observation seam, with the operator's amendments."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/MONEY_PHONE.md",
-    "docs/fixtures/money/**"
-   ],
-   "ref": "DR-44",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "Money v0.1: an adapter and a view; as-built amendments follow the approved decisions."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/ENGINEERING_SYSTEM.md",
-    "docs/invariants/**",
-    "docs/scenarios/**",
-    "docs/FILE_CLASSES.json",
-    "docs/APPROVALS.json"
-   ],
-   "ref": "DR-45",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "The engineering system, Phase 1, as proposed; the registries are seeded with it."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "CLAUDE.md"
-   ],
-   "ref": "DR-45",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "The Tooling section was added with the agent tooling (commit e8ddeda), accepted by the operator the same day; recorded retroactively."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/slices/MONEY-A.json"
-   ],
-   "ref": "DR-44",
-   "by": "operator",
-   "date": "2026-10-04",
-   "note": "Slice A's scope and budget, written after the code from the approved design (see its limitations)."
-  },
-  {
-   "gate": "PROTOCOL_APPROVAL",
-   "paths": [
-    "docs/slices/MONEY-B.json"
-   ],
-   "ref": "DR-46",
-   "by": "operator",
-   "date": "2026-10-05",
-   "note": "Slice B's scope and budget, written before the code from the approved decisions."
-  }
- ]
+  "about": "Approval records (docs/ENGINEERING_SYSTEM.md section 3.5). Each says which paths a human approved, under which decision. The check reports coverage; it cannot tell who edited this file, so a change here is always flagged for review. Self-governing.",
+  "approvals": [
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/LOOP_PROTOCOL.md",
+        "docs/fixtures/loops/**"
+      ],
+      "ref": "DR-41",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "Loop protocol v0.1 and its conformance corpus."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/SENDER_MARKS_PHONE.md"
+      ],
+      "ref": "DR-42",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "Sender marks."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/OBSERVATION_SEAM.md"
+      ],
+      "ref": "DR-43",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "The Observation seam, with the operator's amendments."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/MONEY_PHONE.md",
+        "docs/fixtures/money/**"
+      ],
+      "ref": "DR-44",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "Money v0.1: an adapter and a view; as-built amendments follow the approved decisions."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/ENGINEERING_SYSTEM.md",
+        "docs/invariants/**",
+        "docs/scenarios/**",
+        "docs/FILE_CLASSES.json",
+        "docs/APPROVALS.json"
+      ],
+      "ref": "DR-45",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "The engineering system, Phase 1, as proposed; the registries are seeded with it."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "CLAUDE.md"
+      ],
+      "ref": "DR-45",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "The Tooling section was added with the agent tooling (commit e8ddeda), accepted by the operator the same day; recorded retroactively."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/slices/MONEY-A.json"
+      ],
+      "ref": "DR-44",
+      "by": "operator",
+      "date": "2026-10-04",
+      "note": "Slice A's scope and budget, written after the code from the approved design (see its limitations)."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "docs/slices/MONEY-B.json"
+      ],
+      "ref": "DR-46",
+      "by": "operator",
+      "date": "2026-10-05",
+      "note": "Slice B's scope and budget, written before the code from the approved decisions."
+    },
+    {
+      "gate": "PROTOCOL_APPROVAL",
+      "paths": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/FILE_CLASSES.json",
+        "docs/DECISIONS.md"
+      ],
+      "ref": "DR-47",
+      "by": "operator",
+      "date": "2026-10-05",
+      "note": "The multi-agent operating instruction: AGENTS.md is the shared constitution for any agent; CLAUDE.md points to it."
+    }
+  ]
 }

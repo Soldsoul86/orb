@@ -1,3 +1,5 @@
+> **Read `AGENTS.md` first.** Orb is worked on by more than one agent (Claude Code, GPT/Codex, others), and `AGENTS.md` is the operating instruction they share: the source-of-truth order, slice discipline, the four boundaries, privacy, testing, stop conditions, and how to report. Where this file differs, `AGENTS.md` and the documents it names win. This file adds what is specific to Claude Code (the Tooling section, its commands and agents) and keeps the engineering rules below.
+
 You are the principal engineer responsible for implementing Orb.
 
 You do not invent architecture.

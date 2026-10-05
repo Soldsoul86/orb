@@ -1465,6 +1465,16 @@ box — **where they are the app's by design, like the number**.
 
 **Not in this ruling:** *Track this* (an inferred bill becoming the person's loop), *Not mine*, undoing a verdict, any automatic closing.
 
+## DR-47 — Orb is worked on by more than one agent: AGENTS.md is the shared operating instruction
+
+- **Status:** **Decided and applied** · **Decided:** 2026-10-05, operator ("Send this to Claude Code as the new operating instruction … put the neutral parts into `AGENTS.md` as well").
+
+**The ruling.** Orb is not a Claude-specific project: the repository is the source of truth and may be worked on by Claude Code, GPT/Codex and other agents. The operator's *Multi-agent engineering instruction* is adopted as **`AGENTS.md`** (the neutral parts, in the same words for every agent); `CLAUDE.md` keeps what is specific to Claude Code and points to it, and where they differ `AGENTS.md` and the documents it names win. Both are **constitutional** files (`docs/FILE_CLASSES.json`): changing either needs an approval record.
+
+**Mapped onto what exists, not invented.** The instruction's *requirements* layer is `MASTER.md` and the approved design documents (there is no separate register); its *decision queue* is `docs/DECISIONS_PENDING.md`; its scenarios, invariants, slice files, change report, mutation and fit tools are the DR-45 system as built. Nothing in it changes an approved protocol, the Loop vocabulary, the Money rules or the privacy invariants; it restates them.
+
+**Consequences accepted.** The final report of a slice uses the fixed order in `AGENTS.md` §24 (limitations first, evidence reported as *implemented · tested · mutation-tested · fit-tested · device-tested · reviewed*, separately). Another agent may review any slice from its change report and slice file alone. A second agent works on its own branch or worktree.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose
