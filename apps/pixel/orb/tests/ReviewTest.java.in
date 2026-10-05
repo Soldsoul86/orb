@@ -145,6 +145,9 @@ final class ReviewTest {
         Harness.check("one obligation, two payments matched to its two reminders: two candidates, each keyed by its own payment and the first reminder",
             pairs.size() == 2 && !pairs.get(0).paymentKey.equals(pairs.get(1).paymentKey) && pairs.get(0).obligationKey.equals(pairs.get(1).obligationKey)
             && pairs.get(0).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(0).closer.id)) && pairs.get(1).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(1).closer.id)));
+        List<ReviewRules.Item> single = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), moved("BANKA", "out", 4400L, 175L)));
+        Harness.check("a candidate is keyed by the first reminder of its obligation, so a later reminder does not change the question already answered",
+            single.size() == 1 && single.get(0).obligationKey.equals(pairs.get(0).obligationKey) && pairs.get(0).obligationKey.equals(KEYER.key("cand:ob:" + pairs.get(0).opener.id)));
         ReviewFacts.Judged oneRefused = new ReviewFacts.Judged();
         oneRefused.refused.add(ReviewFacts.pairKey(pairs.get(0).obligationKey, pairs.get(0).paymentKey));
         List<ReviewRules.Item> remaining = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), bill("BANKA", "me", 4400L, 170L), moved("BANKA", "out", 4400L, 175L), moved("BANKA", "out", 4400L, 176L)), oneRefused);

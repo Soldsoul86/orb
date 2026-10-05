@@ -73,12 +73,14 @@
   {
    "file": "src/ReviewRules.java.in",
    "old": "return a.closer.id.compareTo(b.closer.id);",
-   "new": "return 0;"
+   "new": "return 0;",
+   "equivalent": "The order of equal elements is already deterministic: the candidates and obligations come from the correlation's hash-map by key, which gives the same order for the same facts whatever order they were handed in (the shuffle checks hold that). The id tie-break makes that a contract instead of a property of the map; no input can tell the two apart."
   },
   {
    "file": "src/ReviewRules.java.in",
    "old": "return a.obligationKey.compareTo(b.obligationKey);",
-   "new": "return 0;"
+   "new": "return 0;",
+   "equivalent": "The order of equal elements is already deterministic: the candidates and obligations come from the correlation's hash-map by key, which gives the same order for the same facts whatever order they were handed in (the shuffle checks hold that). The id tie-break makes that a contract instead of a property of the map; no input can tell the two apart."
   },
   {
    "file": "src/ReviewRules.java.in",
