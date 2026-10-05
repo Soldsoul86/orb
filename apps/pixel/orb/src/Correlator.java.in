@@ -97,8 +97,20 @@ final class Correlator {
         return o.bearer;
     }
 
+    /** The key a closer is matched under: the same source, the same next mover, the same amount **and the same currency**. */
+    private static String closerKey(Observation o) {
+        return o.sourceKind + "|" + o.sourceId + "|" + closerOwner(o) + "|" + o.minor + "|" + o.currency;
+    }
+
+    /** The same payment seen as a fulfilment and as money moved: the same source, instant, amount and **direction of who moved it**. */
+    private static String paymentKey(Observation o) {
+        return o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor + "|" + closerOwner(o);
+    }
+
     static Result run(List<Observation> all) {
-        List<Observation> sorted = new ArrayList<>(all);
+        List<Observation> sorted = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+        for (Observation o : all) if (seenIds.add(o.id)) sorted.add(o);   // a fact read twice is one fact
         Collections.sort(sorted, new Comparator<Observation>() {
             @Override public int compare(Observation a, Observation b) {
                 if (a.occurredMs != b.occurredMs) return a.occurredMs < b.occurredMs ? -1 : 1;
@@ -107,7 +119,7 @@ final class Correlator {
         });
         // A payment that states its own fulfilment is one payment: the fulfilment is the closer, and the money moved beside it is the same event.
         Set<String> paired = new HashSet<>();
-        for (Observation o : sorted) if (Observation.OBLIGATION_FULFILLED.equals(o.type) && o.minor > 0) paired.add(o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor);
+        for (Observation o : sorted) if (Observation.OBLIGATION_FULFILLED.equals(o.type) && o.minor > 0) paired.add(paymentKey(o));
         Map<String, List<Observation>> pairedMoves = new HashMap<>();
         Map<String, List<Observation>> openers = new HashMap<>();
         Map<String, List<Observation>> closers = new HashMap<>();
@@ -115,14 +127,14 @@ final class Correlator {
         for (Observation o : sorted) {
             if (opener(o)) {
                 r.openers++;
-                add(openers, o.sourceKind + "|" + o.sourceId + "|" + openerOwner(o) + "|" + o.minor, o);
+                add(openers, o.sourceKind + "|" + o.sourceId + "|" + openerOwner(o) + "|" + o.minor + "|" + o.currency, o);
             } else if (closer(o)) {
-                if (Observation.VALUE_MOVED.equals(o.type) && paired.contains(o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor)) {
-                    add(pairedMoves, o.sourceKind + "|" + o.sourceId + "|" + o.occurredMs + "|" + o.minor, o);
+                if (Observation.VALUE_MOVED.equals(o.type) && paired.contains(paymentKey(o))) {
+                    add(pairedMoves, paymentKey(o), o);
                     continue;
                 }
                 r.closers++;
-                add(closers, o.sourceKind + "|" + o.sourceId + "|" + closerOwner(o) + "|" + o.minor, o);
+                add(closers, closerKey(o), o);
             }
         }
         for (Map.Entry<String, List<Observation>> e : openers.entrySet()) {
@@ -137,7 +149,7 @@ final class Correlator {
                         r.pairs.add(new Pair(open.get(i), c));
                         r.matched.add(c.id);
                         r.closing.add(c.id);
-                        List<Observation> sameMoney = pairedMoves.get(c.sourceKind + "|" + c.sourceId + "|" + c.occurredMs + "|" + c.minor);
+                        List<Observation> sameMoney = pairedMoves.get(paymentKey(c));
                         if (sameMoney != null) for (Observation m : sameMoney) r.closing.add(m.id);
                         r.candidates++;
                         break;

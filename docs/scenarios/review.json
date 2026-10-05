@@ -549,6 +549,442 @@
      "check": "it is reached from Money moved, and declared not exported"
     }
    ]
+  },
+  {
+   "id": "REV-012",
+   "name": "A chain of reminders: each payment is its own question, and answers survive reminders added or lost elsewhere",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-017",
+    "I-004"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/ReviewFacts.java.in"
+   ],
+   "given": [
+    "a bill restated several times, or a bill that comes every month, with payments"
+   ],
+   "when": [
+    "the person answers, then reminders are added, sealed later or lost from the kept facts"
+   ],
+   "then": [
+    "an answered question stays answered; a newer bill after the payment is a new question; the next payment in the chain is still asked"
+   ],
+   "mustNot": [
+    "an answered question returning",
+    "a later month's bill never asked about",
+    "one answer hiding questions never asked"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary held: the answered pair is gone"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a later reminder (day 170) joined to the chain after the answer does not bring the answered pair back; held by 'a later reminder does not change the key'"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): an EARLIER reminder of the same bill kept after the answer (an older month sealed later, a re-keep) changes the chain's first reminder, so the key changes and the answered pair is asked again"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): when the first reminder of a chain leaves the kept facts (retention, a quiet service taken back), the pair already answered Not this is asked again"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: six monthly bills of one amount are one open obligation, offered once"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): after the person says September's rent is already paid, October's bill (30 days later, a new reminder of the same chain) is never offered: the answer settled the chain's first-reminder key for ever, so a question that was never asked is hidden"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): marking the first month's payment paid hides the two later monthly bills, which have no payment in view, from Already paid (the chain is settled by its first reminder)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: Not this on each of five pairs of one chain leaves 5,4,3,2,1 questions, then the bill as ONE open obligation ([5, 4, 3, 2, 1]); held by 'one open obligation became two' in ReviewTest at length one"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: then Already paid, answered twice, leaves nothing to ask and counts once (5 not this, 1 already paid, 0 paid); held by set-based counts ('the same answers read twice count once')"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: five reminders at 44-day gaps and one payment: exactly one question, keyed by the reminder it matched (the newest within reach), and the obligation is not also offered as open; held by 'one obligation of two reminders ...' in ReviewTest only at length two"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a chain of five with a payment for each is five questions, each with its own payment key and its own reminder key, and the namespaces cannot collide; held by 'one obligation, two payments' at length two"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: the obligation and the payment namespaces give different keys for the same id (no key collision between them); held by the 'cand:ob:' and 'cand:pay:' prefixes (no check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: answering the same candidate twice is one paid pair and four questions are left; held by set-based counts"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a chain of five reminders with a payment for each, plus a refused pair, gives the same review in any of 40 orders; held by the sort in Correlator.run and the tie-breaks in ReviewRules.build (ReviewTest shuffles only chains of two)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: reminders 44 and 45 days apart are one obligation, 46 days apart are two; no review check pins the 45/46 edge of the grouping (held by accident)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a payment 45 days after a bill closes it, 46 days after does not; held by accident (ReviewTest pins 45/46 only for the missed correlation)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: six reminders at 45-day gaps are one obligation; held by accident"
+    }
+   ]
+  },
+  {
+   "id": "REV-013",
+   "name": "Only a real closure candidate is offered: right currency, right direction, one payment once",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-011"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "bills and payments in two currencies, money in and out at one instant, duplicated facts"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "no candidate across currencies; money in is never swallowed as a payment the person made; a payment and a fulfilment of it are one; a payment pairs with one bill"
+   ],
+   "mustNot": [
+    "a false closure candidate",
+    "a lost candidate",
+    "the same payment offered twice"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): the same bill and the same payment handed twice are one fact, so one question (build lists 1; the Correlator pairs the one payment with each copy of the bill)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: the same fact sealed in two bundles (kept under two time zones) loads once and is asked about once; held by the byId map in ObservationStore.load (no review check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a payment cannot match two obligations: it pairs with exactly one bill; held by 'used' in Correlator.run (no check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: two bills of one amount from two senders and one payment from the second: one candidate, for the second; the first stays open; held by 'a movement already matched to another obligation is not a miss' only partly"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a refund restated three times and then arriving: one question, in the words for money that came, and never offered as Already paid; held by 'money owed to the person' in ReviewTest"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: money in does not close a bill the person owes, and out does not close a refund; held by the owner in the group key of Correlator.run"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a zero amount is no bill and no payment; held by 'o.minor > 0' in Correlator (no check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): 500.00 USD from the same sender is offered as the end of a bill of 500.00 INR (the correlator never looks at the currency, though missed does): a false closure candidate, and one currency equated with another (I-011)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): money coming IN at the same moment, amount and sender as a payment the person made is treated as 'the same payment' and swallowed (the paired-move key has no direction), so a refund owed to the person has no candidate"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a bundle holding both the fulfilment and the movement of one payment is one question, closed by the fulfilment; held by 'paired' in Correlator.run and by LedgerTest's corroboration checks, not by a review check"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: after Not this on that payment the bill is open and its own movement is not called a missed correlation; held by r.closing carrying the paired movement"
+    }
+   ]
+  },
+  {
+   "id": "REV-014",
+   "name": "The journal's answers are read as strictly as they are written",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-018",
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewFacts.java.in"
+   ],
+   "given": [
+    "hand-made, restored or merged journal lines"
+   ],
+   "when": [
+    "answers are folded"
+   ],
+   "then": [
+    "only a flat object of the known fields of the known schema, passing the writer's own checks, is an answer; one label per pair; repeats count once"
+   ],
+   "mustNot": [
+    "an unknown schema believed",
+    "a line the writer would refuse believed",
+    "a nested object misread as the answer",
+    "an answer counted twice"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): an answer of a schema this build does not know (candidate.judged.v2, from a newer build or a restore) is read as version 1 and settles the obligation"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): a line the writer would refuse (already paid, but shown as a candidate with a payment) is believed on read and settles the obligation: write validates, read does not"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): an answer that also carries another capability's object with obligation and verdict fields is read from the FIRST match anywhere in the line, so the obligation answered is the other object's ([])"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): one pair answered both Mark paid and Not this (two devices merged, a restore) counts as two answers in the precision (0 paid + 1 not this for one pair)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: answers with a number for a key, a list for the verdict, a string for missed, over-long keys, or a paid verdict with no payment are not answers; held by the anchored 16-hex patterns (no check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: an answer carrying a two-megabyte extra field is not an answer (it is not one the writer writes), and reading it is fast (37 ms)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: one answer restored 50,000 times is one answer, and folds in 294 ms; held by 'the same answers read twice count once'"
+    }
+   ]
+  },
+  {
+   "id": "REV-015",
+   "name": "A question that cannot be answered is never asked",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-018"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/ReviewFacts.java.in"
+   ],
+   "given": [
+    "a key that cannot be made, a rule name outside the vocabulary, a key that is not a blinded key"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "the item is left out; the others are asked in order"
+   ],
+   "mustNot": [
+    "a question whose answer the journal would refuse",
+    "a tap that throws"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary held: a key that cannot be made for one bill leaves only that bill out; the others are still asked, in order; held by accident (ReviewTest breaks every key at once)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a payment whose key cannot be made leaves its bill to be asked about as open, not as a question about a payment the journal cannot name; held by accident"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): a Keyer that returns something that is not 16 hex characters (the contract is an interface, not a check) puts questions in front of the person whose answer ReviewFacts.record then refuses by THROWING, on the UI thread: a doubt must not ask a question the journal cannot hold"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): a payment whose rule name (read back from a sealed bundle) is not in the closed vocabulary [a-z.]{0,64} is shown as a question, and tapping Mark paid throws IllegalArgumentException from ReviewFacts.record instead of returning false"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): the natural next rule name, sms.payment.correlation.v2, has a digit, so every candidate it proposes is unanswerable (the vocabulary refuses it on write, nothing refuses it on show)"
+    }
+   ]
+  },
+  {
+   "id": "REV-016",
+   "name": "One unmatched movement is a missed correlation for one bill, never two",
+   "category": "adversarial",
+   "risk": "medium",
+   "invariants": [
+    "I-017",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in"
+   ],
+   "given": [
+    "two open bills of one amount and one stray movement"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "one bill carries the miss"
+   ],
+   "mustNot": [
+    "one payment counted as a miss twice"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): one stray payment of 500.00 is reported as a missed correlation for BOTH of two open bills of 500.00 (1 misses from one movement), so the recall measure can count one payment twice"
+    }
+   ]
+  },
+  {
+   "id": "REV-017",
+   "name": "Dates, limits and size: the edges of the window, a long's limits, and ten thousand facts",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-004"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "bills at the 60/61-day edge in UTC, amounts at the limits of a long, 10,000 facts"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "exact edges, no exception, under a few seconds on the UI path"
+   ],
+   "mustNot": [
+    "an exception",
+    "a window that moves with the time zone",
+    "a stalled screen"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary held: the 60-day window is by UTC calendar day: a bill of day 140 is open until the last millisecond of day 200 and gone at the first of day 201; held by '60 days old / 61 days old' at noon only"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a bill at 23:59:59.999 UTC of day 140 is 60 days old on day 200 and 61 on day 201"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: matching is by UTC day: a payment 44 days and 1 ms after a bill is 'within 45 days', one 45 days and 1 ms after is not (stated in 17a); held by 'a movement exactly 45 days' in ReviewTest, for missed only"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: an amount of Long.MAX_VALUE minor units is asked about and printed exactly; held by accident (long arithmetic is only comparison and division)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: facts dated at Long.MAX_VALUE, Long.MIN_VALUE, the epoch and a day before it do not throw in the review or in its line; held by Math.floorDiv (no check)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: a bill with no currency is still listed and printable, and answerable; held by Observation.Builder (null becomes empty)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: 10,000 facts (5,000 bills in the last 60 days, a third paid) build in under 3 s with a cheap Keyer (408 ms, 5000 items); held by accident"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: the same with the install's real Keyer (a file read and a keyed hash for each key, on the UI thread) is still under 5 s, the ANR limit (295 ms); held by accident, and it grows linearly with the items"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: one sender restating one bill daily for 4,000 days, each paid, builds in under 3 s (464 ms); the pairing is quadratic in the chain; held by accident"
+    }
+   ]
+  },
+  {
+   "id": "REV-018",
+   "name": "What decides never reads the answers; the screen compiles against the facts it reads",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewActivity.java.in",
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "the source of the review, the correlator and the screen"
+   ],
+   "when": [
+    "the source is scanned"
+   ],
+   "then": [
+    "no file outside ReviewFacts and ReviewActivity reads the counts; the rules read only the hiding sets; the correlator never sees an answer; the screen reads Judged by its methods"
+   ],
+   "mustNot": [
+    "a decider that reads the precision",
+    "a screen that does not compile against the facts it uses"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "adversary (was a break, fixed): ReviewActivity does not compile: it reads judged.[] as fields, but ReviewFacts.Judged has them as methods paid(), notThis(), alreadyPaid(), missed() (the suite never compiles the Activity, so every check is green)"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: no file outside ReviewFacts and ReviewActivity reads the answer counts (paid(), notThis(), alreadyPaid(), missed()); ReviewTest guards fold( and precisionLine( only, so the counters are held by accident"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: the rules read the answers only as sets that hide a question (settled, paidPairs, refused), never the counts and never the precision"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: the correlator never sees an answer: it names no ReviewFacts, Judged or journal; held by accident"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: with 5 answers the precision is not reported (insufficient sample) and the answers change no question beyond their own pair; held by 'below 20 answers it says so'"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: 19 answers say insufficient sample and 20 report, whatever the split; held by 'below 20 answers it says so'"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: at the limits of a long the precision line does not throw"
+    },
+    {
+     "suite": "phone",
+     "check": "adversary held: no answers is not a division by zero for the missed line either"
+    }
+   ]
   }
  ]
 }

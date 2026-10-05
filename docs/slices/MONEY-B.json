@@ -19,7 +19,14 @@
   "REV-008",
   "REV-009",
   "REV-010",
-  "REV-011"
+  "REV-011",
+  "REV-012",
+  "REV-013",
+  "REV-014",
+  "REV-015",
+  "REV-016",
+  "REV-017",
+  "REV-018"
  ],
  "invariants": [
   "I-005",
@@ -55,7 +62,8 @@
  "proof": [
   "bash apps/pixel/orb/tests/run.sh",
   "npm run test:tools",
-  "node tools/mutate/mutate.mjs --list tools/mutate/lists/money-b.json --json artifacts/mutation/money-b.json"
+  "node tools/mutate/mutate.mjs --list tools/mutate/lists/money-b.json --json artifacts/mutation/money-b.json",
+  "cd apps/pixel/orb && ORB_CALL_LOG=1 ORB_PACKAGE_SCAN=0 ANDROID_HOME=/root/android-sdk bash build.sh   # the Activities are not in the suite: the APK build is their compile check"
  ],
  "limitations": [
   "Obligations stay proposals: a Mark paid tap changes nothing on Today (DR-46).",
@@ -66,7 +74,10 @@
   "Matching, the 60-day window and the 'missed' window use UTC days; the screen shows local days.",
   "'missed' is computed from raw movements of the same amount and direction; once a second source exists it should use the ledger's movements (corroborated) instead.",
   "The review's guards for 'nothing decides on the precision' are source tripwires; the answer path itself is held by behaviour.",
-  "On the first real inbox 71 of 184 obligations are chains of reminders and 13 of the 20 candidate pairs sit in one: the unit of a label is the pair, not the obligation."
+  "On the first real inbox 71 of 184 obligations are chains of reminders and 13 of the 20 candidate pairs sit in one: the unit of a label is the pair, not the obligation.",
+  "The screens (Activities) are not compiled into the phone suite; a source scan guards the one mistake found, and the APK build is their compile check (the adversary found ReviewActivity would not have built).",
+  "'missed' attributes one stray movement to the earliest open obligation it fits, so it is counted once.",
+  "The labels (orb.candidate.judged) are not erased by Erase source / Erase all: they hold only blinded keys and outlive the kept facts by design, like sender marks."
  ],
  "expectFitChange": false
 }

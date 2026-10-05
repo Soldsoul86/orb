@@ -6,15 +6,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * What the person's answer in the review writes to the journal (`docs/MONEY_PHONE.md` §17, DR-46): one event, `orb.candidate.judged` — a **label**. It holds blinded
+ * What the person's answer in the review writes to the journal (`docs/MONEY_PHONE.md` \u00a717, DR-46): one event, `orb.candidate.judged` \u2014 a **label**. It holds blinded
  * keys for the obligation and the payment, the verdict, what was shown, whether a movement was missed, and the name and version of the rule that proposed the
  * pair. **Never an amount, a sender, a day or a word.** It opens, closes and changes nothing: not a loop, not a commitment, not the ledger.
  *
- * The answers are read back as sets, so any order — and a restore — gives the same review.
+ * The answers are read back as sets, so any order \u2014 and a restore \u2014 gives the same review.
  */
 final class ReviewFacts {
     private ReviewFacts() {}
@@ -50,7 +48,7 @@ final class ReviewFacts {
         if (!candidate && payment != null && !payment.isEmpty()) throw new IllegalArgumentException("an open obligation has no payment");
         if (candidate ? !(PAID.equals(verdict) || NOT_THIS.equals(verdict)) : !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("a verdict fits what was shown");
         if (missed && !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("only an answer of already paid can have missed a payment");
-        if (ruleId == null || !ruleId.matches("[a-z.]{0,64}")) throw new IllegalArgumentException("a rule is named by a short lower-case dotted name, never by free text");
+        if (ruleId == null || !ruleId.matches("[a-z0-9._-]{0,64}")) throw new IllegalArgumentException("a rule is named by a short lower-case dotted name, never by free text");
         Map<String, Object> p = Json.obj();
         p.put("schema", SCHEMA);
         p.put("obligation", obligation);
@@ -66,7 +64,7 @@ final class ReviewFacts {
 
     /**
      * Everything the journal says the person has answered, as **sets**: an answer repeated (a duplicated or restored journal) is one answer. The unit of a label is the
-     * **pair** — this bill, this payment — because an obligation can be a chain of reminders with a payment for each (on a real inbox 13 of the 20 candidates sit in
+     * **pair** \u2014 this bill, this payment \u2014 because an obligation can be a chain of reminders with a payment for each (on a real inbox 13 of the 20 candidates sit in
      * such a chain), and one answer must not hide a question that was never asked.
      */
     static final class Judged {
@@ -85,33 +83,142 @@ final class ReviewFacts {
         long missed() { return missedSet.size(); }
     }
 
-    private static final Pattern OBLIGATION = Pattern.compile("\"obligation\":\"([0-9a-f]{16})\"");
-    private static final Pattern PAYMENT = Pattern.compile("\"payment\":\"([0-9a-f]{16})\"");
-    private static final Pattern VERDICT = Pattern.compile("\"verdict\":\"([A-Za-z]+)\"");
-    private static final Pattern MISSED = Pattern.compile("\"missed\":(true|false)");
-
-    static String pairKey(String obligation, String payment) {
-        return obligation + "|" + payment;
+    /** One answer, as read back from the journal. */
+    private static final class Answer {
+        String obligation, payment, verdict, shown;
+        boolean missed;
     }
 
+    private static final java.util.Set<String> FIELDS = new java.util.HashSet<>(java.util.Arrays.asList("schema", "obligation", "payment", "verdict", "shown", "missed", "ruleId", "ruleVersion", "windowDays"));
+
+    /**
+     * What identifies a question about a payment: **the payment**. Which reminder of a chain it was matched to can change when an older reminder is sealed later or one
+     * leaves the kept facts; the payment does not, so an answer given about it holds.
+     */
+    static String pairKey(String obligation, String payment) {
+        return payment;
+    }
+
+    /** The payload object of an event line, or null if there is none or it holds anything nested: an answer is one flat object. */
+    private static String flatPayload(String line) {
+        int at = line.indexOf("\"payload\":");
+        if (at < 0) return null;
+        int i = at + "\"payload\":".length();
+        if (i >= line.length() || line.charAt(i) != '{') return null;
+        int start = i;
+        boolean inString = false;
+        for (i = start + 1; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inString) {
+                if (c == '\\') i++;
+                else if (c == '"') inString = false;
+            } else if (c == '"') inString = true;
+            else if (c == '{' || c == '[') return null;
+            else if (c == '}') return line.substring(start, i + 1);
+        }
+        return null;
+    }
+
+    /** A flat object of strings, numbers and booleans, read strictly; null if it is anything else. */
+    private static Map<String, Object> parseFlat(String object) {
+        Map<String, Object> out = new HashMap<>();
+        int i = 1;
+        int n = object.length() - 1;   // the closing brace
+        while (i < n) {
+            if (object.charAt(i) != '"') return null;
+            int[] end = new int[1];
+            String key = readString(object, i, end);
+            if (key == null || end[0] >= n || object.charAt(end[0]) != ':') return null;
+            i = end[0] + 1;
+            Object value;
+            if (i < n && object.charAt(i) == '"') {
+                value = readString(object, i, end);
+                if (value == null) return null;
+                i = end[0];
+            } else {
+                int j = i;
+                while (j < n && object.charAt(j) != ',') j++;
+                String raw = object.substring(i, j);
+                if ("true".equals(raw)) value = Boolean.TRUE;
+                else if ("false".equals(raw)) value = Boolean.FALSE;
+                else if (raw.matches("[0-9]{1,18}")) value = Long.valueOf(raw);
+                else return null;
+                i = j;
+            }
+            if (out.containsKey(key)) return null;
+            out.put(key, value);
+            if (i < n) {
+                if (object.charAt(i) != ',') return null;
+                i++;
+            }
+        }
+        return out;
+    }
+
+    /** The string that starts at `from` (a quote), with the index just past its closing quote in `end[0]`; null if it is not terminated. */
+    private static String readString(String s, int from, int[] end) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = from + 1; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                end[0] = i + 1;
+                return sb.toString();
+            }
+            if (c == '\\') {
+                if (++i >= s.length()) return null;
+                sb.append(s.charAt(i));
+            } else sb.append(c);
+        }
+        return null;
+    }
+
+    /** An answer as the writer would have written it, or null: an unknown schema, an unknown or missing field, a value the writer would refuse. */
+    private static Answer parse(String line) {
+        String object = flatPayload(line);
+        if (object == null) return null;
+        Map<String, Object> m = parseFlat(object);
+        if (m == null || !FIELDS.containsAll(m.keySet()) || !SCHEMA.equals(m.get("schema"))) return null;
+        for (String required : new String[] {"obligation", "verdict", "shown", "missed", "ruleId", "ruleVersion", "windowDays"}) if (!m.containsKey(required)) return null;
+        if (!(m.get("obligation") instanceof String) || !(m.get("verdict") instanceof String) || !(m.get("shown") instanceof String) || !(m.get("missed") instanceof Boolean)
+            || !(m.get("ruleId") instanceof String) || !(m.get("ruleVersion") instanceof Long) || !(m.get("windowDays") instanceof Long)
+            || (m.containsKey("payment") && !(m.get("payment") instanceof String))) return null;
+        Answer a = new Answer();
+        a.obligation = (String) m.get("obligation");
+        a.payment = m.containsKey("payment") ? (String) m.get("payment") : "";
+        a.verdict = (String) m.get("verdict");
+        a.shown = (String) m.get("shown");
+        a.missed = (Boolean) m.get("missed");
+        try {
+            judged(a.obligation, a.payment, a.verdict, a.shown, a.missed, (String) m.get("ruleId"), (Long) m.get("ruleVersion"), (Long) m.get("windowDays"));
+        } catch (IllegalArgumentException writerWouldRefuse) {
+            return null;
+        }
+        return a;
+    }
+
+    /**
+     * The journal's answers, read as strictly as they are written: one flat object of the known fields of the known schema, passing the same checks. **One label per
+     * pair (per obligation for an open one), the last in the journal's order** \u2014 an answer given twice, or changed, counts once.
+     */
     static Judged fold(List<String> lines) {
-        Judged out = new Judged();
+        Map<String, Answer> last = new java.util.LinkedHashMap<>();
         for (String line : lines) {
             if (!JUDGED.equals(Journal.typeOf(line))) continue;
-            int payload = line.indexOf("\"payload\":");
-            if (payload < 0) continue;
-            Matcher ob = OBLIGATION.matcher(line), pay = PAYMENT.matcher(line), v = VERDICT.matcher(line), m = MISSED.matcher(line);
-            if (!ob.find(payload) || !v.find(payload)) continue;
-            String verdict = v.group(1);
-            if (PAID.equals(verdict) && pay.find(payload)) {
-                out.settled.add(ob.group(1));
-                out.paidPairs.add(pairKey(ob.group(1), pay.group(1)));
-            } else if (ALREADY_PAID.equals(verdict)) {
-                out.settled.add(ob.group(1));
-                out.alreadyPaidSet.add(ob.group(1));
-                if (m.find(payload) && "true".equals(m.group(1))) out.missedSet.add(ob.group(1));
-            } else if (NOT_THIS.equals(verdict) && pay.find(payload)) {
-                out.refused.add(pairKey(ob.group(1), pay.group(1)));
+            Answer a = parse(line);
+            if (a == null) continue;
+            last.put(CANDIDATE.equals(a.shown) ? pairKey(a.obligation, a.payment) : "open|" + a.obligation, a);
+        }
+        Judged out = new Judged();
+        for (Answer a : last.values()) {
+            if (PAID.equals(a.verdict)) {
+                out.settled.add(a.obligation);
+                out.paidPairs.add(pairKey(a.obligation, a.payment));
+            } else if (ALREADY_PAID.equals(a.verdict)) {
+                out.settled.add(a.obligation);
+                out.alreadyPaidSet.add(a.obligation);
+                if (a.missed) out.missedSet.add(a.obligation);
+            } else if (NOT_THIS.equals(a.verdict)) {
+                out.refused.add(pairKey(a.obligation, a.payment));
             }
         }
         return out;
@@ -126,7 +233,14 @@ final class ReviewFacts {
 
     /** **The one place an answer is written:** one event, a label, and nothing else. Returns whether the journal took it. */
     static boolean record(Journal journal, ReviewRules.Item item, String verdict) {
-        return journal != null && journal.append(JUDGED, payloadFor(item, verdict)) != null;
+        if (journal == null) return false;
+        Map<String, Object> payload;
+        try {
+            payload = payloadFor(item, verdict);
+        } catch (IllegalArgumentException cannotBeWritten) {
+            return false;
+        }
+        return journal.append(JUDGED, payload) != null;
     }
 
     /** The first 20 answers are too few to report a precision from: below this it says so, and it never gates anything. */
@@ -135,10 +249,10 @@ final class ReviewFacts {
     static String precisionLine(long paid, long notThis) {
         long n = paid + notThis;
         if (n < MIN_ANSWERS) return "Precision: insufficient sample (" + n + " of " + MIN_ANSWERS + " answers).";
-        return "Precision: " + Math.round(100.0 * paid / n) + "% of " + n + " answers (paid ÷ paid + not this).";
+        return "Precision: " + Math.round(100.0 * paid / n) + "% of " + n + " answers (paid \u00f7 paid + not this).";
     }
 
     static String missedLine(long alreadyPaid, long missed) {
-        return "Missed correlations: " + missed + " of " + alreadyPaid + " “already paid” answers.";
+        return "Missed correlations: " + missed + " of " + alreadyPaid + " \u201calready paid\u201d answers.";
     }
 }

@@ -11,12 +11,12 @@ import java.util.Set;
 import java.util.TimeZone;
 
 /**
- * The review (`docs/MONEY_PHONE.md` §6 and §17, DR-46): what the person is asked to judge, from the kept facts alone. A pure function of *(the facts, what the person
- * has already answered, now)* — it reads no words and writes nothing, and **it opens, closes and changes nothing**: the answers are labels that measure how well
+ * The review (`docs/MONEY_PHONE.md` \u00a76 and \u00a717, DR-46): what the person is asked to judge, from the kept facts alone. A pure function of *(the facts, what the person
+ * has already answered, now)* \u2014 it reads no words and writes nothing, and **it opens, closes and changes nothing**: the answers are labels that measure how well
  * the correlation does (`Correlator`), not operations on a loop.
  *
  * Two kinds of item. A **candidate** is a payment that looks like the end of a bill (or, for money owed to the person, that it arrived): *Mark paid* or *Not this*.
- * An **open** obligation of the last `OPEN_WINDOW_DAYS` that has no candidate in view: *Already paid* — and if the ledger then holds a movement of that amount in
+ * An **open** obligation of the last `OPEN_WINDOW_DAYS` that has no candidate in view: *Already paid* \u2014 and if the ledger then holds a movement of that amount in
  * its window that the correlation did not match to it, that is a **missed correlation**.
  */
 final class ReviewRules {
@@ -60,16 +60,27 @@ final class ReviewRules {
     }
 
     /** Whether a movement of this obligation's amount and direction sits inside its window and was not matched to any obligation. */
-    private static boolean missed(Correlator.Obligation ob, List<Observation> facts, Set<String> matchedMovements) {
+    private static boolean missed(Correlator.Obligation ob, List<Observation> facts, Set<String> matchedMovements, Set<String> attributed) {
         long from = day(ob.first());
         long to = day(ob.last()) + Correlator.WINDOW_DAYS;
         String direction = LoopRules.ME.equals(ownerOf(ob.first())) ? Observation.OUT : Observation.IN;
         for (Observation f : facts) {
             if (!Observation.VALUE_MOVED.equals(f.type) || !direction.equals(f.direction) || f.minor != ob.first().minor || !f.currency.equals(ob.first().currency)) continue;
-            if (day(f) < from || day(f) > to || matchedMovements.contains(f.id)) continue;
+            if (day(f) < from || day(f) > to || matchedMovements.contains(f.id) || attributed.contains(f.id)) continue;
+            attributed.add(f.id);   // one stray movement is a miss for one bill, the earliest it fits, never for two
             return true;
         }
         return false;
+    }
+
+    /** Whether the person's answer to this item could be written down: a question the journal cannot hold the answer to is never asked. */
+    private static boolean answerable(Item item) {
+        try {
+            ReviewFacts.payloadFor(item, item.closer != null ? ReviewFacts.PAID : ReviewFacts.ALREADY_PAID);
+            return true;
+        } catch (IllegalArgumentException refused) {
+            return false;
+        }
     }
 
     /**
@@ -87,15 +98,22 @@ final class ReviewRules {
             if (ob == null) continue;
             String obKey, payKey;
             try {
-                obKey = keyer.key("cand:ob:" + ob.first().id);
+                // The bill is keyed by the **newest reminder of its chain that is not after the payment**: reminders restated before the payment are the same bill,
+                // one that comes after it (next month's rent) is a new bill and a new question. An older reminder sealed later, or lost, does not change the key.
+                // The question itself is identified by the payment, which never changes (`ReviewFacts.pairKey`).
+                Observation through = p.opener;
+                for (Observation o : ob.openers) if (day(o) <= day(p.closer) && o.occurredMs >= through.occurredMs) through = o;
+                obKey = keyer.key("cand:ob:" + through.id);
                 payKey = keyer.key("cand:pay:" + p.closer.id);
             } catch (Exception cannotKey) {
                 continue;
             }
+            Item item = new Item(ReviewFacts.CANDIDATE, ownerOf(ob.first()), p.opener, ob.last(), p.closer, obKey, payKey, false);
+            if (!answerable(item)) continue;
             String pair = ReviewFacts.pairKey(obKey, payKey);
             if (judged.paidPairs.contains(pair) || judged.refused.contains(pair)) continue;
             shown.add(ob);
-            candidates.add(new Item(ReviewFacts.CANDIDATE, ownerOf(ob.first()), ob.first(), ob.last(), p.closer, obKey, payKey, false));
+            candidates.add(item);
         }
         Collections.sort(candidates, new Comparator<Item>() {
             @Override public int compare(Item a, Item b) {
@@ -105,18 +123,29 @@ final class ReviewRules {
         });
         List<Item> open = new ArrayList<>();
         long today = Math.floorDiv(nowMs, DAY);
-        for (Correlator.Obligation ob : r.list) {
+        Set<String> attributed = new HashSet<>();
+        List<Correlator.Obligation> inOrder = new ArrayList<>(r.list);
+        Collections.sort(inOrder, new Comparator<Correlator.Obligation>() {
+            @Override public int compare(Correlator.Obligation a, Correlator.Obligation b) {
+                if (a.first().occurredMs != b.first().occurredMs) return a.first().occurredMs < b.first().occurredMs ? -1 : 1;
+                return a.first().id.compareTo(b.first().id);
+            }
+        });
+        for (Correlator.Obligation ob : inOrder) {
             if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;
             long age = today - day(ob.last());
             if (age > OPEN_WINDOW_DAYS || age < 0) continue;
             String obKey;
             try {
-                obKey = keyer.key("cand:ob:" + ob.first().id);
+                // An open question is about the newest reminder: answered, it stays answered; a newer reminder of the same chain is a new question.
+                obKey = keyer.key("cand:ob:" + ob.last().id);
             } catch (Exception cannotKey) {
                 continue;
             }
             if (judged.settled.contains(obKey)) continue;
-            open.add(new Item(ReviewFacts.OPEN, LoopRules.ME, ob.first(), ob.last(), null, obKey, "", missed(ob, facts, r.closing)));
+            Item item = new Item(ReviewFacts.OPEN, LoopRules.ME, ob.last(), ob.last(), null, obKey, "", missed(ob, facts, r.closing, attributed));
+            if (!answerable(item)) continue;
+            open.add(item);
         }
         Collections.sort(open, new Comparator<Item>() {
             @Override public int compare(Item a, Item b) {
@@ -135,13 +164,13 @@ final class ReviewRules {
         return f.format(new java.util.Date(o.occurredMs));
     }
 
-    /** One item as a line: who, how much, when — and for a candidate, the payment that looks like its end. Words for what is *owed to* the person say *arrived*. */
+    /** One item as a line: who, how much, when \u2014 and for a candidate, the payment that looks like its end. Words for what is *owed to* the person say *arrived*. */
     static String line(Item item, TimeZone zone) {
         String amount = Ledger.symbol(item.opener.currency) + Ledger.amount(item.opener.minor);
         boolean owedByMe = LoopRules.ME.equals(item.owner);
         String head = item.opener.sourceId + ": " + (owedByMe ? "a bill of " : "something owed to you, ") + amount + " (" + dayText(item.opener, zone) + ")";
         if (item.closer == null) return head;
-        return head + " · " + (owedByMe ? "a payment of " : "money of ") + Ledger.symbol(item.closer.currency) + Ledger.amount(item.closer.minor) + " on " + dayText(item.closer, zone);
+        return head + " \u00b7 " + (owedByMe ? "a payment of " : "money of ") + Ledger.symbol(item.closer.currency) + Ledger.amount(item.closer.minor) + " on " + dayText(item.closer, zone);
     }
 
     /** The question over a candidate, in the words that fit who owed whom. */

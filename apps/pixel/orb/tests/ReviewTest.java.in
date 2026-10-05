@@ -14,7 +14,7 @@ import java.util.Random;
 import java.util.TimeZone;
 
 /**
- * Money slice B (`docs/MONEY_PHONE.md` §6, §17; DR-46): the review. What the person is asked to judge, from the kept facts alone; that an answer is a **label** that
+ * Money slice B (`docs/MONEY_PHONE.md` \u00a76, \u00a717; DR-46): the review. What the person is asked to judge, from the kept facts alone; that an answer is a **label** that
  * opens, closes and changes nothing; what the answer records and what it must never hold; and the precision, reported and never read by anything that decides.
  */
 final class ReviewTest {
@@ -139,17 +139,22 @@ final class ReviewTest {
         // What the first mutation round of this slice found: behaviours with no test.
         List<ReviewRules.Item> grown = review(Arrays.asList(bill("BANKA", "me", 4400L, 120L), bill("BANKA", "me", 4400L, 160L)));
         Harness.check("an obligation of two reminders is as old as its last reminder: 80 days since the first, 40 since the last, is still asked about", grown.size() == 1 && ReviewFacts.OPEN.equals(grown.get(0).kind));
-        Harness.equal("and it counts as one obligation, keyed by its first reminder", ReviewFacts.OPEN + "|" + grown.get(0).obligationKey, ReviewFacts.OPEN + "|" + KEYER.key("cand:ob:" + grown.get(0).opener.id));
+        Harness.equal("and its open question is about its newest reminder, keyed by that reminder", ReviewFacts.OPEN + "|" + grown.get(0).obligationKey, ReviewFacts.OPEN + "|" + KEYER.key("cand:ob:" + grown.get(0).last.id));
         List<ReviewRules.Item> alone = review(Arrays.asList(bill("BANKA", "me", 4400L, 160L)));
         List<ReviewRules.Item> later = review(Arrays.asList(bill("BANKA", "me", 4400L, 160L), bill("BANKA", "me", 4400L, 175L)));
-        Harness.equal("a later reminder does not change the key of the obligation, so an answer given before it still holds", alone.get(0).obligationKey, later.get(0).obligationKey);
+        Harness.check("a newer reminder of a chain is a new question: an answer given before it does not silence it", !alone.get(0).obligationKey.equals(later.get(0).obligationKey));
+        List<ReviewRules.Item> earlierSealed = review(Arrays.asList(bill("BANKA", "me", 4400L, 140L), bill("BANKA", "me", 4400L, 160L)));
+        Harness.equal("an earlier reminder sealed later does not change the question about the newest", alone.get(0).obligationKey, earlierSealed.get(0).obligationKey);
         List<ReviewRules.Item> pairs = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), bill("BANKA", "me", 4400L, 170L), moved("BANKA", "out", 4400L, 175L), moved("BANKA", "out", 4400L, 176L)));
-        Harness.check("one obligation, two payments matched to its two reminders: two candidates, each keyed by its own payment and the first reminder",
+        Harness.check("one chain, two payments matched to its two reminders: two candidates, each keyed by its own payment, both about the chain's newest reminder",
             pairs.size() == 2 && !pairs.get(0).paymentKey.equals(pairs.get(1).paymentKey) && pairs.get(0).obligationKey.equals(pairs.get(1).obligationKey)
-            && pairs.get(0).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(0).closer.id)) && pairs.get(1).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(1).closer.id)));
+            && pairs.get(0).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(0).closer.id)) && pairs.get(1).paymentKey.equals(KEYER.key("cand:pay:" + pairs.get(1).closer.id))
+            && pairs.get(0).obligationKey.equals(KEYER.key("cand:ob:" + pairs.get(0).last.id)));   // payments 175 and 176 both come after the newest reminder (170)
         List<ReviewRules.Item> single = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), moved("BANKA", "out", 4400L, 175L)));
-        Harness.check("a candidate is keyed by the first reminder of its obligation, so a later reminder does not change the question already answered",
-            single.size() == 1 && single.get(0).obligationKey.equals(pairs.get(0).obligationKey) && pairs.get(0).obligationKey.equals(KEYER.key("cand:ob:" + pairs.get(0).opener.id)));
+        ReviewRules.Item sameQuestion = null;
+        for (ReviewRules.Item i : pairs) if (i.paymentKey.equals(single.get(0).paymentKey)) sameQuestion = i;
+        Harness.check("a question is identified by its payment, so a reminder added to the chain does not change a question already answered",
+            single.size() == 1 && sameQuestion != null && ReviewFacts.pairKey(single.get(0).obligationKey, single.get(0).paymentKey).equals(ReviewFacts.pairKey(sameQuestion.obligationKey, sameQuestion.paymentKey)));
         ReviewFacts.Judged oneRefused = new ReviewFacts.Judged();
         oneRefused.refused.add(ReviewFacts.pairKey(pairs.get(0).obligationKey, pairs.get(0).paymentKey));
         List<ReviewRules.Item> remaining = review(Arrays.asList(bill("BANKA", "me", 4400L, 150L), bill("BANKA", "me", 4400L, 170L), moved("BANKA", "out", 4400L, 175L), moved("BANKA", "out", 4400L, 176L)), oneRefused);
@@ -232,7 +237,7 @@ final class ReviewTest {
         Harness.suite("review: answers are labels, folded from the journal in any order");
         String ob = "0011223344556677", pay = "8899aabbccddeeff", ob2 = "1111222233334444";
         Map<String, Object> a = ReviewFacts.judged(ob, pay, ReviewFacts.NOT_THIS, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
-        Map<String, Object> b = ReviewFacts.judged(ob, pay, ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
+        Map<String, Object> b = ReviewFacts.judged(ob, "ffeeddccbbaa9988", ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
         Map<String, Object> c = ReviewFacts.judged(ob2, "", ReviewFacts.ALREADY_PAID, ReviewFacts.OPEN, true, "", 1L, 45L);
         Context[] h1 = new Context[1], h2 = new Context[1];
         Journal j1 = open(h1);
@@ -392,7 +397,7 @@ final class ReviewTest {
         Harness.suite("review: what the review may read, write and do \u2014 held by the source");
         String rules = code(read("ReviewRules")), facts = code(read("ReviewFacts")), screen = code(read("ReviewActivity"));
         Harness.check("the review opens, closes and changes nothing: it names no loop, commitment, ledger writer or journal append outside the one answer",
-            !rules.contains("append(") && occurrences(facts, ".append(JUDGED") == 1 && occurrences(facts, "append(") == 1 && !screen.contains("append(") && !screen.contains("LoopFacts") && !screen.contains("Commitments") && !screen.contains("CommitmentFacts") && !screen.contains("LoopRules.CLOSED") && !rules.contains("Journal"));
+            !rules.contains("append(") && occurrences(facts, "journal.append(JUDGED") == 1 && occurrences(facts, "journal.append(") == 1 && !screen.contains("append(") && !screen.contains("LoopFacts") && !screen.contains("Commitments") && !screen.contains("CommitmentFacts") && !screen.contains("LoopRules.CLOSED") && !rules.contains("Journal"));
         Harness.equal("the screen writes exactly one kind of event, in one place", occurrences(screen, "append(") + "|" + occurrences(screen, "ReviewFacts.record(") + "|" + occurrences(facts, "static boolean record("), "0|1|1");
         Harness.check("the precision is read by the screen and by nothing that decides", occurrences(screen, "ReviewFacts.precisionLine(") == 1);
         int elsewhere = 0;

@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.TimeZone;
 
 /**
- * Review what looks paid (`docs/MONEY_PHONE.md` §6 and §17, DR-46). Reads **only the kept facts** (through the person's sender marks) and asks the person two things:
- * *does this payment look like the end of this bill?* — **Mark paid** or **Not this** — and, of a recent bill with no payment in view, *is it already paid?*
- * **An answer is a label.** It is one event against blinded keys; it opens, closes and changes nothing — no loop, no commitment, no ledger — so a tap here changes
+ * Review what looks paid (`docs/MONEY_PHONE.md` \u00a76 and \u00a717, DR-46). Reads **only the kept facts** (through the person's sender marks) and asks the person two things:
+ * *does this payment look like the end of this bill?* \u2014 **Mark paid** or **Not this** \u2014 and, of a recent bill with no payment in view, *is it already paid?*
+ * **An answer is a label.** It is one event against blinded keys; it opens, closes and changes nothing \u2014 no loop, no commitment, no ledger \u2014 so a tap here changes
  * nothing on Today. What it produces is the first ground truth about how well Orb's correlation does. **Secure like Recall**: amounts and sender codes are on this
  * screen only.
  */
@@ -75,7 +75,7 @@ public final class ReviewActivity extends Activity {
             list.addView(text("\nOrb's history could not be opened.", 13, false));
             return;
         }
-        list.addView(text("\nReading what Orb has kept…", 13, false));
+        list.addView(text("\nReading what Orb has kept\u2026", 13, false));
         loading = true;
         new Thread(new Runnable() {
             @Override public void run() {
@@ -108,13 +108,13 @@ public final class ReviewActivity extends Activity {
             return;
         }
         if (facts.isEmpty()) {
-            list.addView(text("\nNothing is kept yet. Look at a message backup in Sources, then choose “Keep what Orb read”.", 13, false));
+            list.addView(text("\nNothing is kept yet. Look at a message backup in Sources, then choose \u201cKeep what Orb read\u201d.", 13, false));
             return;
         }
         ReviewFacts.Judged judged = ReviewFacts.fold(readLines(journal));
-        list.addView(text("\n" + judged.paid + " marked paid · " + judged.notThis + " said not this · " + judged.alreadyPaid + " already paid", 12, true));
-        list.addView(text(ReviewFacts.precisionLine(judged.paid, judged.notThis), 12, false));
-        list.addView(text(ReviewFacts.missedLine(judged.alreadyPaid, judged.missed), 12, false));
+        list.addView(text("\n" + judged.paid() + " marked paid \u00b7 " + judged.notThis() + " said not this \u00b7 " + judged.alreadyPaid() + " already paid", 12, true));
+        list.addView(text(ReviewFacts.precisionLine(judged.paid(), judged.notThis()), 12, false));
+        list.addView(text(ReviewFacts.missedLine(judged.alreadyPaid(), judged.missed()), 12, false));
         List<ReviewRules.Item> items = ReviewRules.build(facts, judged, ReviewFacts.keyer(this), System.currentTimeMillis());
         if (items.isEmpty()) {
             list.addView(text("\nNothing to ask about right now.", 13, false));
