@@ -1,0 +1,239 @@
+{
+ "mutants": [
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "static final int OPEN_WINDOW_DAYS = 60;",
+   "new": "static final int OPEN_WINDOW_DAYS = 61;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (age > OPEN_WINDOW_DAYS || age < 0) continue;",
+   "new": "if (age >= OPEN_WINDOW_DAYS || age < 0) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (age > OPEN_WINDOW_DAYS || age < 0) continue;",
+   "new": "if (age > OPEN_WINDOW_DAYS) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "long age = today - day(ob.last());",
+   "new": "long age = today - day(ob.first());"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;",
+   "new": "if (shown.contains(ob)) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (shown.contains(ob) || !LoopRules.ME.equals(ownerOf(ob.first()))) continue;",
+   "new": "if (!LoopRules.ME.equals(ownerOf(ob.first()))) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
+   "new": "if (judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (judged.settled.contains(obKey) || judged.refused.contains(ReviewFacts.pairKey(obKey, payKey))) continue;",
+   "new": "if (judged.settled.contains(obKey)) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "            if (judged.settled.contains(obKey)) continue;\n            open.add",
+   "new": "            open.add"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "            shown.add(ob);\n",
+   "new": "            \n"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "keyer.key(\"cand:ob:\" + ob.first().id);\n                payKey",
+   "new": "keyer.key(\"cand:ob:\" + ob.last().id);\n                payKey"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "payKey = keyer.key(\"cand:pay:\" + p.closer.id);",
+   "new": "payKey = keyer.key(\"cand:pay:\" + p.opener.id);"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (a.closer.occurredMs != b.closer.occurredMs) return a.closer.occurredMs > b.closer.occurredMs ? -1 : 1;",
+   "new": "if (a.closer.occurredMs != b.closer.occurredMs) return a.closer.occurredMs > b.closer.occurredMs ? 1 : -1;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (a.last.occurredMs != b.last.occurredMs) return a.last.occurredMs > b.last.occurredMs ? -1 : 1;",
+   "new": "if (a.last.occurredMs != b.last.occurredMs) return a.last.occurredMs > b.last.occurredMs ? 1 : -1;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "return a.closer.id.compareTo(b.closer.id);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "return a.obligationKey.compareTo(b.obligationKey);",
+   "new": "return 0;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "List<Item> out = new ArrayList<>(candidates);\n        out.addAll(open);",
+   "new": "List<Item> out = new ArrayList<>(open);\n        out.addAll(candidates);"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "long to = day(ob.last()) + Correlator.WINDOW_DAYS;",
+   "new": "long to = day(ob.last()) + Correlator.WINDOW_DAYS + 1;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "long from = day(ob.first());",
+   "new": "long from = day(ob.first()) - 1;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "String direction = LoopRules.ME.equals(ownerOf(ob.first())) ? Observation.OUT : Observation.IN;",
+   "new": "String direction = Observation.OUT;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "|| f.minor != ob.first().minor || !f.currency.equals(ob.first().currency)) continue;",
+   "new": "|| !f.currency.equals(ob.first().currency)) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (day(f) < from || day(f) > to || matchedMovements.contains(f.id)) continue;",
+   "new": "if (day(f) < from || day(f) > to) continue;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "return Observation.REQUEST_RECEIVED.equals(opener.type) ? LoopRules.ME : opener.bearer;",
+   "new": "return opener.bearer;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "return LoopRules.ME.equals(item.owner) ? \"Looks like this was paid\" : \"Looks like this arrived\";",
+   "new": "return \"Looks like this was paid\";"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "return LoopRules.ME.equals(item.owner) ? \"Mark paid\" : \"Mark arrived\";",
+   "new": "return \"Mark paid\";"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "if (item.closer == null) return head;",
+   "new": "if (false) return head;"
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "(owedByMe ? \"a bill of \" : \"something owed to you, \")",
+   "new": "\"a bill of \""
+  },
+  {
+   "file": "src/ReviewRules.java.in",
+   "old": "} catch (Exception cannotKey) {\n                continue;\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add",
+   "new": "} catch (Exception cannotKey) {\n                obKey = \"0000000000000000\";\n            }\n            if (judged.settled.contains(obKey)) continue;\n            open.add"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (obligation == null || !obligation.matches(\"[0-9a-f]{16}\"))",
+   "new": "if (obligation == null)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (candidate && (payment == null || !payment.matches(\"[0-9a-f]{16}\")))",
+   "new": "if (candidate && payment == null)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (!candidate && payment != null && !payment.isEmpty())",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (candidate ? !(PAID.equals(verdict) || NOT_THIS.equals(verdict)) : !ALREADY_PAID.equals(verdict))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (missed && !ALREADY_PAID.equals(verdict))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (!candidate && !OPEN.equals(shown))",
+   "new": "if (false)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (candidate) p.put(\"payment\", payment);",
+   "new": "p.put(\"payment\", payment == null ? \"\" : payment);"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (n < MIN_ANSWERS) return",
+   "new": "if (n <= MIN_ANSWERS) return"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "static final int MIN_ANSWERS = 20;",
+   "new": "static final int MIN_ANSWERS = 21;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "Math.round(100.0 * paid / n)",
+   "new": "(100 * paid / n)"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (PAID.equals(verdict)) {\n                out.settled.add(ob.group(1));\n                out.paid++;",
+   "new": "if (PAID.equals(verdict)) {\n                out.paid++;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "out.settled.add(ob.group(1));\n                out.alreadyPaid++;",
+   "new": "out.alreadyPaid++;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "} else if (NOT_THIS.equals(verdict) && pay.find(payload)) {",
+   "new": "} else if (NOT_THIS.equals(verdict)) {"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (m.find(payload) && \"true\".equals(m.group(1))) out.missed++;",
+   "new": "out.missed++;"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "out.refused.add(pairKey(ob.group(1), pay.group(1)));\n                out.notThis++;",
+   "new": "out.refused.add(pairKey(ob.group(1), pay.group(1)));"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "if (!JUDGED.equals(Journal.typeOf(line))) continue;\n            int payload",
+   "new": "int payload"
+  },
+  {
+   "file": "src/ReviewFacts.java.in",
+   "old": "return obligation + \"|\" + payment;",
+   "new": "return obligation;"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "r.pairs.add(new Pair(open.get(i), c));",
+   "new": "r.pairs.add(new Pair(open.get(0), c));"
+  },
+  {
+   "file": "src/Correlator.java.in",
+   "old": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, i)), could));",
+   "new": "r.list.add(new Obligation(new ArrayList<>(open.subList(start, open.size())), could));"
+  }
+ ]
+}
