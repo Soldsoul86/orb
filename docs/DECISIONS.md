@@ -1457,6 +1457,14 @@ box — **where they are the app's by design, like the number**.
 
 **The proposal.** Phase 1 only: an **invariant registry**, a **scenario registry** whose state is *derived* from the proof it names (never hand-set), a **slice file** and `/slice` command with a budget and stop conditions, a generated **change report**, **file classes** with a diff check against recorded approvals, and a **decision queue** and learnings log. JSON, not YAML; checks before blocking hooks; three agent prompts, not five. It changes no product architecture, contract or protocol. Phases 2–4 (impact graph, conformance/golden/differential runners, worktrees, device runner and prediction registry, privacy and permission scanners, release gate, artifact registry, dashboard) are mapped, not scheduled.
 
+## DR-46 — Money B: the person's answer is a label, and the review lists what can be measured
+
+- **Status:** **Decided; slice B in build** (`MONEY_PHONE.md` §17) · **Decided:** 2026-10-05, operator ("A and A" to `PD-001` and `PD-002`).
+
+**The ruling.** (1) *Mark paid*, *Not this* and *Already paid* are **labels**, not loop operations: each is one new event, `orb.candidate.judged`, against blinded keys of the obligation and the payment. **No loop is opened or closed, and no commitment or ledger changes** — §6's `orb.loop.closed` applied to a thing that is not yet a loop, and obligations stay proposals until a later *Track this* slice. A *Mark paid* tap changes nothing on Today; what it produces is the labelled set that lets correlation precision and recall be measured once the statement exists. (2) The review lists the **candidates** (a payment that looks like the end of a bill) and the **open obligations of the last 60 days** that have none, each with *Already paid*, newest first; 60 days is a policy constant. Precision is **reported from 20 answers and never gates anything**; automatic closing stays off whatever the number.
+
+**Not in this ruling:** *Track this* (an inferred bill becoming the person's loop), *Not mine*, undoing a verdict, any automatic closing.
+
 ## Provenance
 
 DR-1 to DR-5 were decided by the operator in a session on 2026-09-26 whose

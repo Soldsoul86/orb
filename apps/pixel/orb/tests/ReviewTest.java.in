@@ -1,0 +1,292 @@
+package @PKG@;
+
+import android.content.Context;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.TimeZone;
+
+/**
+ * Money slice B (`docs/MONEY_PHONE.md` §6, §17; DR-46): the review. What the person is asked to judge, from the kept facts alone; that an answer is a **label** that
+ * opens, closes and changes nothing; what the answer records and what it must never hold; and the precision, reported and never read by anything that decides.
+ */
+final class ReviewTest {
+    private ReviewTest() {}
+
+    private static final long DAY = 86_400_000L;
+    private static final long NOW = 200L * DAY + 12 * 3_600_000L;
+    private static final TimeZone UTC = TimeZone.getTimeZone("UTC");
+
+    private static Observation bill(String source, String owner, long minor, long day) {
+        return Observation.of(Observation.OBLIGATION_STATED).source("sms.sender", source, Observation.T0).times(day * DAY + 3_600_000L, day * DAY + 3_600_000L)
+            .bearer(owner).object(Observation.MONEY, minor, "INR").confidence(80).build();
+    }
+
+    private static Observation moved(String source, String direction, long minor, long day) {
+        return Observation.of(Observation.VALUE_MOVED).source("sms.sender", source, Observation.T0).times(day * DAY + 7_200_000L, day * DAY + 7_200_000L)
+            .direction(direction).object(Observation.MONEY, minor, "INR").confidence(90).build();
+    }
+
+    /** A deterministic stand-in for Orb's blinded key: a hash of what it is given, sixteen hex characters. */
+    private static final ReviewFacts.Keyer KEYER = new ReviewFacts.Keyer() {
+        @Override public String key(String namespaced) throws Exception {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(namespaced.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < 8; i++) out.append(String.format(java.util.Locale.ROOT, "%02x", d[i]));
+            return out.toString();
+        }
+    };
+
+    private static final ReviewFacts.Keyer BROKEN = new ReviewFacts.Keyer() {
+        @Override public String key(String namespaced) throws Exception {
+            throw new Exception("no key");
+        }
+    };
+
+    private static List<ReviewRules.Item> review(List<Observation> facts, ReviewFacts.Judged judged) {
+        return ReviewRules.build(facts, judged, KEYER, NOW);
+    }
+
+    private static List<ReviewRules.Item> review(List<Observation> facts) {
+        return review(facts, new ReviewFacts.Judged());
+    }
+
+    private static int count(List<ReviewRules.Item> items, String kind) {
+        int n = 0;
+        for (ReviewRules.Item i : items) if (kind.equals(i.kind)) n++;
+        return n;
+    }
+
+    static void run() throws Exception {
+        items();
+        answers();
+        event();
+        precision();
+        guards();
+    }
+
+    private static void items() throws Exception {
+        Harness.suite("review: what the person is asked to judge");
+        List<ReviewRules.Item> one = review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKA", "out", 100000L, 192L)));
+        Harness.check("a bill and the payment that matches it: one candidate, shown with the bill and the payment", one.size() == 1 && ReviewFacts.CANDIDATE.equals(one.get(0).kind)
+            && ReviewRules.line(one.get(0), UTC).contains("BANKA: a bill of \u20b91,000.00") && ReviewRules.line(one.get(0), UTC).contains("a payment of \u20b91,000.00 on"));
+        Harness.equal("it asks in the words that fit: this was paid", ReviewRules.question(one.get(0)) + "|" + ReviewRules.yes(one.get(0)), "Looks like this was paid|Mark paid");
+        Harness.check("a payment before the bill, a different amount, or a different source is not a candidate",
+            count(review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKA", "out", 100000L, 188L))), ReviewFacts.CANDIDATE) == 0
+            && count(review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKA", "out", 100001L, 192L))), ReviewFacts.CANDIDATE) == 0
+            && count(review(Arrays.asList(bill("BANKA", "me", 100000L, 190L), moved("BANKB", "out", 100000L, 192L))), ReviewFacts.CANDIDATE) == 0);
+
+        Harness.check("an obligation 60 days old is offered Already paid", count(review(Arrays.asList(bill("BANKA", "me", 5000L, 140L))), ReviewFacts.OPEN) == 1);
+        Harness.check("an obligation 61 days old is not", review(Arrays.asList(bill("BANKA", "me", 5000L, 139L))).isEmpty());
+        Harness.check("an obligation dated in the future is not offered either", review(Arrays.asList(bill("BANKA", "me", 5000L, 205L))).isEmpty());
+        Harness.equal("the window is a policy constant, not data", ReviewRules.OPEN_WINDOW_DAYS, 60);
+
+        // Two bills 50 days apart are two obligations; each has its payment.
+        Observation b1 = bill("BANKA", "me", 7000L, 150L), b2 = bill("BANKA", "me", 7000L, 200L);
+        Observation p1 = moved("BANKA", "out", 7000L, 152L), p2 = moved("BANKA", "out", 7000L, 202L);
+        List<Observation> both = Arrays.asList(b1, b2, p1, p2);
+        List<ReviewRules.Item> two = review(both);
+        Harness.equal("two bills far apart and a payment for each: two candidates", count(two, ReviewFacts.CANDIDATE), 2);
+        ReviewRules.Item first = null;
+        for (ReviewRules.Item i : two) if (i.opener.id.equals(b1.id)) first = i;
+        ReviewFacts.Judged refused = new ReviewFacts.Judged();
+        refused.refused.add(ReviewFacts.pairKey(first.obligationKey, first.paymentKey));
+        List<ReviewRules.Item> after = review(both, refused);
+        Harness.check("Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled",
+            count(after, ReviewFacts.CANDIDATE) == 1 && count(after, ReviewFacts.OPEN) == 1 && after.get(0).opener.id.equals(b2.id) && after.get(1).opener.id.equals(b1.id));
+        ReviewFacts.Judged paid = new ReviewFacts.Judged();
+        paid.settled.add(first.obligationKey);
+        List<ReviewRules.Item> settled = review(both, paid);
+        Harness.check("Mark paid settles the obligation: neither it nor its payment is listed again", settled.size() == 1 && settled.get(0).opener.id.equals(b2.id));
+        Harness.check("a verdict about another obligation does not hide this one", review(both, otherSettled()).size() == 2);
+
+        List<ReviewRules.Item> open = review(Arrays.asList(bill("BANKA", "me", 5000L, 190L)));
+        ReviewFacts.Judged already = new ReviewFacts.Judged();
+        already.settled.add(open.get(0).obligationKey);
+        Harness.check("Already paid settles the obligation: it is not offered again", review(Arrays.asList(bill("BANKA", "me", 5000L, 190L)), already).isEmpty());
+
+        Harness.check("a fact whose key cannot be made is not listed: a doubt never asks a question the journal cannot hold the answer to",
+            ReviewRules.build(both, new ReviewFacts.Judged(), BROKEN, NOW).isEmpty());
+        Harness.check("with nothing kept there is nothing to ask", review(new ArrayList<Observation>()).isEmpty());
+
+        List<ReviewRules.Item> ordered = review(Arrays.asList(bill("BANKA", "me", 7000L, 150L), moved("BANKA", "out", 7000L, 152L), bill("BANKB", "me", 8000L, 195L), moved("BANKB", "out", 8000L, 197L),
+            bill("BANKC", "me", 9000L, 170L), bill("BANKD", "me", 9100L, 180L)));
+        List<String> kinds = new ArrayList<>(), days = new ArrayList<>();
+        for (ReviewRules.Item i : ordered) { kinds.add(i.kind); days.add(i.closer == null ? "-" : Long.toString(Math.floorDiv(i.closer.occurredMs, DAY))); }
+        Harness.equal("candidates come newest payment first, then open obligations newest first", kinds + "|" + days, "[candidate, candidate, open, open]|[197, 152, -, -]");
+        Harness.equal("and the open ones, newest bill first: D then C", ordered.get(2).opener.sourceId + ordered.get(3).opener.sourceId, "BANKDBANKC");
+
+        List<Observation> mixed = new ArrayList<>(Arrays.asList(bill("BANKA", "me", 7000L, 150L), moved("BANKA", "out", 7000L, 152L), bill("BANKB", "me", 8000L, 195L), moved("BANKB", "out", 8000L, 197L),
+            bill("BANKC", "me", 9000L, 170L), bill("BANKD", "me", 9100L, 180L), bill("BANKA", "me", 7000L, 200L)));
+        String want = keysOf(review(mixed));
+        boolean same = true;
+        for (int seed = 0; seed < 25; seed++) {
+            List<Observation> shuffled = new ArrayList<>(mixed);
+            Collections.shuffle(shuffled, new Random(seed));
+            same &= keysOf(review(shuffled)).equals(want);
+        }
+        Harness.check("the same facts in any order give the same review", same);
+
+        // Money owed to the person is judged as having arrived, and has no open list.
+        List<ReviewRules.Item> owed = review(Arrays.asList(bill("SHOP", "them", 120000L, 190L), moved("SHOP", "in", 120000L, 192L)));
+        Harness.equal("money owed to the person is asked about as having arrived", owed.size() + "|" + ReviewRules.question(owed.get(0)) + "|" + ReviewRules.yes(owed.get(0)), "1|Looks like this arrived|Mark arrived");
+        Harness.check("and nothing owed to the person is offered Already paid", review(Arrays.asList(bill("SHOP", "them", 120000L, 190L))).isEmpty());
+
+        // Missed correlations.
+        List<ReviewRules.Item> m1 = review(Arrays.asList(bill("BANKA", "me", 50000L, 190L), moved("OTHER", "out", 50000L, 195L)));
+        Harness.check("a movement of that amount in the window from a source nothing matched is a missed correlation", count(m1, ReviewFacts.OPEN) == 1 && m1.get(0).missed);
+        Harness.check("nothing of that amount moved: not missed", !review(Arrays.asList(bill("BANKA", "me", 50000L, 190L))).get(0).missed);
+        Harness.check("a movement of another amount, the other way, or outside the window is not a miss",
+            !review(Arrays.asList(bill("BANKA", "me", 50000L, 190L), moved("OTHER", "out", 50001L, 195L))).get(0).missed
+            && !review(Arrays.asList(bill("BANKA", "me", 50000L, 190L), moved("OTHER", "in", 50000L, 195L))).get(0).missed
+            && !review(Arrays.asList(bill("BANKA", "me", 50000L, 190L), moved("OTHER", "out", 50000L, 189L))).get(0).missed
+            && !review(Arrays.asList(bill("BANKA", "me", 50000L, 150L), moved("OTHER", "out", 50000L, 196L))).get(0).missed);
+        Harness.check("a movement exactly 45 days after the last reminder is inside the window; the 46th day is not",
+            review(Arrays.asList(bill("BANKA", "me", 50000L, 150L), moved("OTHER", "out", 50000L, 195L))).size() == 1 && review(Arrays.asList(bill("BANKA", "me", 50000L, 150L), moved("OTHER", "out", 50000L, 195L))).get(0).missed
+            && !review(Arrays.asList(bill("BANKA", "me", 50000L, 150L), moved("OTHER", "out", 50000L, 196L))).get(0).missed);
+        List<ReviewRules.Item> matched = review(Arrays.asList(bill("SRC1", "me", 100000L, 190L), bill("SRC2", "me", 100000L, 191L), moved("SRC2", "out", 100000L, 193L)));
+        ReviewRules.Item src1 = null;
+        for (ReviewRules.Item i : matched) if (ReviewFacts.OPEN.equals(i.kind)) src1 = i;
+        Harness.check("a movement already matched to another obligation is not a miss for this one", src1 != null && !src1.missed && count(matched, ReviewFacts.CANDIDATE) == 1);
+    }
+
+    private static ReviewFacts.Judged otherSettled() {
+        ReviewFacts.Judged j = new ReviewFacts.Judged();
+        j.settled.add("0123456789abcdef");
+        j.refused.add(ReviewFacts.pairKey("0123456789abcdef", "fedcba9876543210"));
+        return j;
+    }
+
+    private static String keysOf(List<ReviewRules.Item> items) {
+        StringBuilder sb = new StringBuilder();
+        for (ReviewRules.Item i : items) sb.append(i.kind).append(':').append(i.obligationKey).append(':').append(i.paymentKey).append(':').append(i.missed).append(';');
+        return sb.toString();
+    }
+
+    private static Journal open(Context[] holder) throws Exception {
+        Install.forget();
+        Context context = new Context(Files.createTempDirectory("orb-review").toFile());
+        holder[0] = context;
+        return Journal.open(context, Install.lane(context), Install.id(context));
+    }
+
+    private static void answers() throws Exception {
+        Harness.suite("review: answers are labels, folded from the journal in any order");
+        String ob = "0011223344556677", pay = "8899aabbccddeeff", ob2 = "1111222233334444";
+        Map<String, Object> a = ReviewFacts.judged(ob, pay, ReviewFacts.NOT_THIS, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
+        Map<String, Object> b = ReviewFacts.judged(ob, pay, ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
+        Map<String, Object> c = ReviewFacts.judged(ob2, "", ReviewFacts.ALREADY_PAID, ReviewFacts.OPEN, true, "", 1L, 45L);
+        Context[] h1 = new Context[1], h2 = new Context[1];
+        Journal j1 = open(h1);
+        j1.append(ReviewFacts.JUDGED, a);
+        j1.append(ReviewFacts.JUDGED, b);
+        j1.append(ReviewFacts.JUDGED, c);
+        Journal j2 = open(h2);
+        j2.append(ReviewFacts.JUDGED, c);
+        j2.append(ReviewFacts.JUDGED, b);
+        j2.append(ReviewFacts.JUDGED, a);
+        ReviewFacts.Judged f1 = ReviewFacts.fold(j1.readLines()), f2 = ReviewFacts.fold(j2.readLines());
+        Harness.equal("the answers, folded, are the same whatever order they were given in", f1.settled + "|" + f1.refused + "|" + f1.paid + f1.notThis + f1.alreadyPaid + f1.missed,
+            f2.settled + "|" + f2.refused + "|" + f2.paid + f2.notThis + f2.alreadyPaid + f2.missed);
+        Harness.equal("paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid", f1.settled.size() + "|" + f1.refused.size() + "|" + f1.paid + "|" + f1.notThis + "|" + f1.alreadyPaid + "|" + f1.missed, "2|1|1|1|1|1");
+        Harness.equal("an answer is one event and nothing else is written", count(j1, ReviewFacts.JUDGED) + "|" + j1.readLines().size(), "3|" + (3 + countOthers(j1)));
+        Harness.check("an event of another type, or a payload with no obligation, is not an answer", ReviewFacts.fold(Arrays.asList()).settled.isEmpty());
+    }
+
+    private static int countOthers(Journal j) throws Exception {
+        int n = 0;
+        for (String l : j.readLines()) if (!ReviewFacts.JUDGED.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static int count(Journal j, String type) throws Exception {
+        int n = 0;
+        for (String l : j.readLines()) if (type.equals(Journal.typeOf(l))) n++;
+        return n;
+    }
+
+    private static boolean throwsOn(Runnable r) {
+        try {
+            r.run();
+            return false;
+        } catch (IllegalArgumentException refused) {
+            return true;
+        }
+    }
+
+    private static void event() {
+        Harness.suite("review: what an answer may hold");
+        Map<String, Object> e = ReviewFacts.judged("0011223344556677", "8899aabbccddeeff", ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "sms.payment.correlation", 1L, 45L);
+        Harness.equal("the judged event holds only blinded keys, enums and counts", new java.util.TreeSet<>(e.keySet()).toString(), "[missed, obligation, payment, ruleId, ruleVersion, schema, shown, verdict, windowDays]");
+        String canon = Json.canonical(e);
+        Harness.check("no amount, sender, day or word is in it", !canon.contains("BANK") && !canon.contains("100000") && !canon.contains("INR") && canon.contains("\"verdict\":\"paid\"") && canon.contains(ReviewFacts.SCHEMA));
+        Harness.check("an open answer carries no payment key at all", !ReviewFacts.judged("0011223344556677", "", ReviewFacts.ALREADY_PAID, ReviewFacts.OPEN, false, "", 1L, 45L).containsKey("payment"));
+        Harness.check("a key that is not a blinded key is refused: nothing is recorded by name",
+            throwsOn(new Runnable() { public void run() { ReviewFacts.judged("BANKA", "8899aabbccddeeff", ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "", 1L, 45L); } })
+            && throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "100000", ReviewFacts.PAID, ReviewFacts.CANDIDATE, false, "", 1L, 45L); } }));
+        Harness.check("a verdict must fit what was shown: paid and not this answer a candidate, already paid answers an open obligation",
+            throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "8899aabbccddeeff", ReviewFacts.ALREADY_PAID, ReviewFacts.CANDIDATE, false, "", 1L, 45L); } })
+            && throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "", ReviewFacts.PAID, ReviewFacts.OPEN, false, "", 1L, 45L); } })
+            && throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "", "closed", ReviewFacts.OPEN, false, "", 1L, 45L); } }));
+        Harness.check("only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named",
+            throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "8899aabbccddeeff", ReviewFacts.PAID, ReviewFacts.CANDIDATE, true, "", 1L, 45L); } })
+            && throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "8899aabbccddeeff", ReviewFacts.ALREADY_PAID, ReviewFacts.OPEN, false, "", 1L, 45L); } })
+            && throwsOn(new Runnable() { public void run() { ReviewFacts.judged("0011223344556677", "", ReviewFacts.ALREADY_PAID, "elsewhere", false, "", 1L, 45L); } }));
+    }
+
+    private static void precision() {
+        Harness.suite("review: the precision is reported, never decided on");
+        Harness.equal("below 20 answers it says so", ReviewFacts.precisionLine(10, 9), "Precision: insufficient sample (19 of 20 answers).");
+        Harness.equal("from 20 it is reported, as a percentage of the answers", ReviewFacts.precisionLine(15, 5), "Precision: 75% of 20 answers (paid \u00f7 paid + not this).");
+        Harness.equal("and it rounds to a whole percent", ReviewFacts.precisionLine(12, 9) + "|" + ReviewFacts.precisionLine(13, 8) + "|" + ReviewFacts.precisionLine(1, 19), "Precision: 57% of 21 answers (paid \u00f7 paid + not this).|Precision: 62% of 21 answers (paid \u00f7 paid + not this).|Precision: 5% of 20 answers (paid \u00f7 paid + not this).");
+        Harness.equal("no answers at all is an insufficient sample, not a division by zero", ReviewFacts.precisionLine(0, 0), "Precision: insufficient sample (0 of 20 answers).");
+        Harness.equal("a missed correlation is counted among the already-paid answers", ReviewFacts.missedLine(4, 1), "Missed correlations: 1 of 4 \u201calready paid\u201d answers.");
+    }
+
+    private static String read(String name) throws Exception {
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        return new String(Files.readAllBytes(root.resolve("src/" + name + ".java.in")), StandardCharsets.UTF_8);
+    }
+
+    private static String code(String source) {
+        return source.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", "");
+    }
+
+    private static int occurrences(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) n++;
+        return n;
+    }
+
+    private static void guards() throws Exception {
+        Harness.suite("review: what the review may read, write and do \u2014 held by the source");
+        String rules = code(read("ReviewRules")), facts = code(read("ReviewFacts")), screen = code(read("ReviewActivity"));
+        Harness.check("the review opens, closes and changes nothing: it names no loop, commitment, ledger writer or journal append outside the one answer",
+            !rules.contains("append(") && !facts.contains("append(") && !screen.contains("LoopFacts") && !screen.contains("Commitments") && !screen.contains("CommitmentFacts") && !screen.contains("LoopRules.CLOSED") && !rules.contains("Journal"));
+        Harness.equal("the screen writes exactly one kind of event, in one place", occurrences(screen, ".append(") + "|" + occurrences(screen, "ReviewFacts.JUDGED"), "1|1");
+        Harness.check("the precision is read by the screen and by nothing that decides", occurrences(screen, "ReviewFacts.precisionLine(") == 1);
+        int elsewhere = 0;
+        Path root = Paths.get(System.getProperty("orb.root", "."));
+        try (java.util.stream.Stream<Path> files = Files.list(root.resolve("src"))) {
+            for (Path file : (Iterable<Path>) files::iterator) {
+                String name = file.getFileName().toString();
+                if (!name.endsWith(".java.in") || name.startsWith("ReviewActivity") || name.startsWith("ReviewFacts")) continue;
+                String text = code(new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
+                elsewhere += occurrences(text, "precisionLine(") + occurrences(text, "ReviewFacts.fold(");
+            }
+        }
+        Harness.equal("nothing else reads the answers or the precision: the review's rules take what was answered as an argument and never look", elsewhere, 0);
+        Harness.check("the rules are pure: no storage, clock, Android or pattern", !rules.contains("Context") && !rules.contains("currentTimeMillis") && !rules.contains("import android") && !rules.contains("Pattern"));
+        Harness.check("the screen is secure like Recall, reads only the kept facts through the person's marks, and says so when nothing is kept",
+            screen.contains("FLAG_SECURE") && screen.contains("ObservationStore.load(") && screen.contains("Senders.quiet(") && !screen.contains("MessagesReader") && screen.contains("Nothing is kept yet"));
+        Harness.check("it is reached from Money moved, and declared not exported", code(read("LedgerActivity")).contains("ReviewActivity.class")
+            && new String(Files.readAllBytes(root.resolve("AndroidManifest.xml")), StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "").matches("(?s).*<activity\\s+android:name=\"\\.ReviewActivity\"\\s+android:exported=\"false\"\\s*/>.*"));
+    }
+}

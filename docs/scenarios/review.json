@@ -1,0 +1,508 @@
+{
+ "domain": "REVIEW",
+ "about": "Scenarios for Money slice B (docs/ENGINEERING_SYSTEM.md section 3.2). State is derived from the proof each names. PROTOCOL-class.",
+ "scenarios": [
+  {
+   "id": "REV-001",
+   "name": "A payment that looks like a bill's end is offered to be judged",
+   "category": "happy",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a bill and a payment of the same amount from the same service, the payment after the bill"
+   ],
+   "when": [
+    "the review is built from the kept facts"
+   ],
+   "then": [
+    "one candidate, shown with the bill and the payment, asking whether it was paid"
+   ],
+   "mustNot": [
+    "a candidate for a payment before the bill, of another amount, or from another service",
+    "a candidate that closes anything"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a bill and the payment that matches it: one candidate, shown with the bill and the payment"
+    },
+    {
+     "suite": "phone",
+     "check": "it asks in the words that fit: this was paid"
+    },
+    {
+     "suite": "phone",
+     "check": "a payment before the bill, a different amount, or a different source is not a candidate"
+    }
+   ]
+  },
+  {
+   "id": "REV-002",
+   "name": "An answer is a label: it opens, closes and changes nothing",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-017",
+    "I-006",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewFacts.java.in",
+    "apps/pixel/orb/src/ReviewActivity.java.in",
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "any answer: Mark paid, Not this or Already paid"
+   ],
+   "when": [
+    "it is recorded"
+   ],
+   "then": [
+    "exactly one event is written, against blinded keys",
+    "no loop, commitment or ledger is touched"
+   ],
+   "mustNot": [
+    "a loop opened or closed by an answer",
+    "a second event written",
+    "a change on Today"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the review opens, closes and changes nothing: it names no loop, commitment, ledger writer or journal append outside the one answer"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen writes exactly one kind of event, in one place"
+    },
+    {
+     "suite": "phone",
+     "check": "an answer is one event and nothing else is written"
+    }
+   ]
+  },
+  {
+   "id": "REV-003",
+   "name": "Not this hides that pair only",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "two bills far apart, each with a payment"
+   ],
+   "when": [
+    "the person says Not this to one pair"
+   ],
+   "then": [
+    "the other pair is still asked about",
+    "the refused bill is an open obligation again, not settled"
+   ],
+   "mustNot": [
+    "both pairs hidden",
+    "the obligation settled by a refusal"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "two bills far apart and a payment for each: two candidates"
+    },
+    {
+     "suite": "phone",
+     "check": "Not this hides that pair only: the other bill is still asked about, and the refused bill is an open obligation again, not settled"
+    },
+    {
+     "suite": "phone",
+     "check": "a verdict about another obligation does not hide this one"
+    }
+   ]
+  },
+  {
+   "id": "REV-004",
+   "name": "Mark paid and Already paid settle an obligation for good",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/ReviewFacts.java.in"
+   ],
+   "given": [
+    "a candidate or an open obligation"
+   ],
+   "when": [
+    "the person answers Mark paid or Already paid, in any order of events, or after a restore"
+   ],
+   "then": [
+    "it is not listed again",
+    "its payment is not listed again"
+   ],
+   "mustNot": [
+    "an answered obligation returning",
+    "an answer about another obligation hiding this one"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "Mark paid settles the obligation: neither it nor its payment is listed again"
+    },
+    {
+     "suite": "phone",
+     "check": "Already paid settles the obligation: it is not offered again"
+    },
+    {
+     "suite": "phone",
+     "check": "the answers, folded, are the same whatever order they were given in"
+    },
+    {
+     "suite": "phone",
+     "check": "paid and already paid settle an obligation; not this refuses a pair; missed is counted only on already paid"
+    }
+   ]
+  },
+  {
+   "id": "REV-005",
+   "name": "An open obligation is asked about for 60 days, not longer",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "a bill with no payment in view"
+   ],
+   "when": [
+    "it is 60 days old, then 61, then dated in the future"
+   ],
+   "then": [
+    "60 is offered; 61 and the future are not"
+   ],
+   "mustNot": [
+    "a long list of settled old bills answered by habit"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "an obligation 60 days old is offered Already paid"
+    },
+    {
+     "suite": "phone",
+     "check": "an obligation 61 days old is not"
+    },
+    {
+     "suite": "phone",
+     "check": "an obligation dated in the future is not offered either"
+    },
+    {
+     "suite": "phone",
+     "check": "the window is a policy constant, not data"
+    }
+   ]
+  },
+  {
+   "id": "REV-006",
+   "name": "Already paid measures a missed correlation honestly",
+   "category": "adversarial",
+   "risk": "high",
+   "invariants": [
+    "I-017",
+    "I-007"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "an open bill and the ledger"
+   ],
+   "when": [
+    "the person says Already paid"
+   ],
+   "then": [
+    "missed is true only if a movement of that amount and direction sits in the obligation's window and nothing matched it"
+   ],
+   "mustNot": [
+    "a miss claimed for a movement already matched to another obligation",
+    "a miss for another amount, the other way, or outside the 45-day window"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "a movement of that amount in the window from a source nothing matched is a missed correlation"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing of that amount moved: not missed"
+    },
+    {
+     "suite": "phone",
+     "check": "a movement of another amount, the other way, or outside the window is not a miss"
+    },
+    {
+     "suite": "phone",
+     "check": "a movement exactly 45 days after the last reminder is inside the window; the 46th day is not"
+    },
+    {
+     "suite": "phone",
+     "check": "a movement already matched to another obligation is not a miss for this one"
+    }
+   ]
+  },
+  {
+   "id": "REV-007",
+   "name": "An answer holds only blinded keys, enums and counts",
+   "category": "privacy",
+   "risk": "high",
+   "invariants": [
+    "I-005",
+    "I-018"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewFacts.java.in"
+   ],
+   "given": [
+    "any answer"
+   ],
+   "when": [
+    "its event is built"
+   ],
+   "then": [
+    "keys, verdict, what was shown, missed, rule name and version, window"
+   ],
+   "mustNot": [
+    "an amount, a sender, a day, a word, a key that is a name"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the judged event holds only blinded keys, enums and counts"
+    },
+    {
+     "suite": "phone",
+     "check": "no amount, sender, day or word is in it"
+    },
+    {
+     "suite": "phone",
+     "check": "an open answer carries no payment key at all"
+    },
+    {
+     "suite": "phone",
+     "check": "a key that is not a blinded key is refused: nothing is recorded by name"
+    },
+    {
+     "suite": "phone",
+     "check": "a verdict must fit what was shown: paid and not this answer a candidate, already paid answers an open obligation"
+    },
+    {
+     "suite": "phone",
+     "check": "only an answer of already paid can have missed a payment; an open obligation has no payment; what was shown is named"
+    }
+   ]
+  },
+  {
+   "id": "REV-008",
+   "name": "Precision is reported from 20 answers and never decided on",
+   "category": "boundary",
+   "risk": "high",
+   "invariants": [
+    "I-006",
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewFacts.java.in",
+    "apps/pixel/orb/src/ReviewActivity.java.in"
+   ],
+   "given": [
+    "answers given"
+   ],
+   "when": [
+    "the screen reports them"
+   ],
+   "then": [
+    "below 20: insufficient sample; from 20: a percentage",
+    "nothing else reads the number"
+   ],
+   "mustNot": [
+    "a threshold that switches behaviour on",
+    "a division by zero"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "below 20 answers it says so"
+    },
+    {
+     "suite": "phone",
+     "check": "from 20 it is reported, as a percentage of the answers"
+    },
+    {
+     "suite": "phone",
+     "check": "and it rounds to a whole percent"
+    },
+    {
+     "suite": "phone",
+     "check": "no answers at all is an insufficient sample, not a division by zero"
+    },
+    {
+     "suite": "phone",
+     "check": "the precision is read by the screen and by nothing that decides"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing else reads the answers or the precision: the review's rules take what was answered as an argument and never look"
+    }
+   ]
+  },
+  {
+   "id": "REV-009",
+   "name": "Money owed to the person is judged as arrived, with no open list",
+   "category": "boundary",
+   "risk": "medium",
+   "invariants": [
+    "I-017"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "something owed to the person and money in from the same service"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "a candidate in the words 'Looks like this arrived' / 'Mark arrived'",
+    "no Already paid for what is owed to the person"
+   ],
+   "mustNot": [
+    "Already paid on money owed to the person"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "money owed to the person is asked about as having arrived"
+    },
+    {
+     "suite": "phone",
+     "check": "and nothing owed to the person is offered Already paid"
+    }
+   ]
+  },
+  {
+   "id": "REV-010",
+   "name": "The review is built the same from the same facts, and only from what was kept",
+   "category": "recovery",
+   "risk": "high",
+   "invariants": [
+    "I-004",
+    "I-008"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in",
+    "apps/pixel/orb/src/ReviewActivity.java.in"
+   ],
+   "given": [
+    "kept facts in any order",
+    "a quiet service",
+    "nothing kept"
+   ],
+   "when": [
+    "the review is built"
+   ],
+   "then": [
+    "the same items, in the same order",
+    "a quiet service's facts left out",
+    "'Nothing is kept yet' when there is nothing"
+   ],
+   "mustNot": [
+    "an order-dependent review",
+    "a question about a fact whose key cannot be made"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the same facts in any order give the same review"
+    },
+    {
+     "suite": "phone",
+     "check": "candidates come newest payment first, then open obligations newest first"
+    },
+    {
+     "suite": "phone",
+     "check": "and the open ones, newest bill first: D then C"
+    },
+    {
+     "suite": "phone",
+     "check": "with nothing kept there is nothing to ask"
+    },
+    {
+     "suite": "phone",
+     "check": "a fact whose key cannot be made is not listed: a doubt never asks a question the journal cannot hold the answer to"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen is secure like Recall, reads only the kept facts through the person's marks, and says so when nothing is kept"
+    }
+   ]
+  },
+  {
+   "id": "REV-011",
+   "name": "The review screen is secure, pure in its rules, and reached only from Money moved",
+   "category": "privacy",
+   "risk": "medium",
+   "invariants": [
+    "I-005"
+   ],
+   "files": [
+    "apps/pixel/orb/src/ReviewActivity.java.in",
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "given": [
+    "the review's code and manifest"
+   ],
+   "when": [
+    "the source is read"
+   ],
+   "then": [
+    "secure window, rules with no storage or clock, a screen that is not exported"
+   ],
+   "mustNot": [
+    "a screen that can be screenshotted",
+    "rules that read the clock or storage"
+   ],
+   "proof": [
+    {
+     "suite": "phone",
+     "check": "the rules are pure: no storage, clock, Android or pattern"
+    },
+    {
+     "suite": "phone",
+     "check": "it is reached from Money moved, and declared not exported"
+    }
+   ]
+  }
+ ]
+}

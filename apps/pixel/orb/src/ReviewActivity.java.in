@@ -1,0 +1,174 @@
+package @PKG@;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.io.IOException;
+import java.util.List;
+import java.util.TimeZone;
+
+/**
+ * Review what looks paid (`docs/MONEY_PHONE.md` §6 and §17, DR-46). Reads **only the kept facts** (through the person's sender marks) and asks the person two things:
+ * *does this payment look like the end of this bill?* — **Mark paid** or **Not this** — and, of a recent bill with no payment in view, *is it already paid?*
+ * **An answer is a label.** It is one event against blinded keys; it opens, closes and changes nothing — no loop, no commitment, no ledger — so a tap here changes
+ * nothing on Today. What it produces is the first ground truth about how well Orb's correlation does. **Secure like Recall**: amounts and sender codes are on this
+ * screen only.
+ */
+public final class ReviewActivity extends Activity {
+    private static final int SHOWN = 25;
+
+    private LinearLayout list;
+    private List<Observation> facts;
+    private boolean loading;
+    private final TimeZone zone = TimeZone.getDefault();
+
+    @Override
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 120, 40, 40);
+        list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        root.addView(list);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(root);
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        load();
+    }
+
+    private TextView text(String s, int size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private Journal journal() {
+        Orb orb = Orb.get();
+        return orb == null ? null : orb.journal();
+    }
+
+    private void load() {
+        if (loading) return;
+        final Journal journal = journal();
+        list.removeAllViews();
+        list.addView(text("Review what looks paid", 17, true));
+        if (journal == null) {
+            list.addView(text("\nOrb's history could not be opened.", 13, false));
+            return;
+        }
+        list.addView(text("\nReading what Orb has kept…", 13, false));
+        loading = true;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                List<Observation> loaded = null;
+                try {
+                    loaded = ObservationStore.load(ReviewActivity.this, journal, Senders.quiet(ReviewActivity.this, journal));
+                } catch (IOException unreadable) {
+                    loaded = null;
+                }
+                final List<Observation> got = loaded;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        loading = false;
+                        facts = got;
+                        render();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void render() {
+        list.removeAllViews();
+        list.addView(text("Review what looks paid", 17, true));
+        list.addView(text("\nOrb reads your messages for bills and for payments. Where a payment looks like the end of a bill, tell Orb whether it is. "
+            + "Your answer is only a note for Orb to learn from: it changes nothing on Today and closes nothing.", 12, false));
+        final Journal journal = journal();
+        if (journal == null || facts == null) {
+            list.addView(text("\nOrb could not read what it has kept.", 13, false));
+            return;
+        }
+        if (facts.isEmpty()) {
+            list.addView(text("\nNothing is kept yet. Look at a message backup in Sources, then choose “Keep what Orb read”.", 13, false));
+            return;
+        }
+        ReviewFacts.Judged judged = ReviewFacts.fold(readLines(journal));
+        list.addView(text("\n" + judged.paid + " marked paid · " + judged.notThis + " said not this · " + judged.alreadyPaid + " already paid", 12, true));
+        list.addView(text(ReviewFacts.precisionLine(judged.paid, judged.notThis), 12, false));
+        list.addView(text(ReviewFacts.missedLine(judged.alreadyPaid, judged.missed), 12, false));
+        List<ReviewRules.Item> items = ReviewRules.build(facts, judged, ReviewFacts.keyer(this), System.currentTimeMillis());
+        if (items.isEmpty()) {
+            list.addView(text("\nNothing to ask about right now.", 13, false));
+            return;
+        }
+        boolean headedOpen = false;
+        for (int i = 0; i < items.size() && i < SHOWN; i++) {
+            final ReviewRules.Item item = items.get(i);
+            if (item.closer == null && !headedOpen) {
+                list.addView(text("\nRecent bills with no payment in view", 13, true));
+                headedOpen = true;
+            }
+            if (item.closer != null) list.addView(text("\n" + ReviewRules.question(item), 12, true));
+            list.addView(text(item.closer != null ? ReviewRules.line(item, zone) : "\n" + ReviewRules.line(item, zone), 13, false));
+            if (item.closer != null) {
+                list.addView(button(ReviewRules.yes(item), new View.OnClickListener() {
+                    @Override public void onClick(View v) { answer(item, ReviewFacts.PAID); }
+                }));
+                list.addView(button("Not this", new View.OnClickListener() {
+                    @Override public void onClick(View v) { answer(item, ReviewFacts.NOT_THIS); }
+                }));
+            } else {
+                list.addView(button("Already paid", new View.OnClickListener() {
+                    @Override public void onClick(View v) { answer(item, ReviewFacts.ALREADY_PAID); }
+                }));
+            }
+        }
+        if (items.size() > SHOWN) list.addView(text("\n…and " + (items.size() - SHOWN) + " more, after these.", 11, false));
+    }
+
+    private List<String> readLines(Journal journal) {
+        try {
+            return journal.readLines();
+        } catch (IOException unreadable) {
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    private Button button(String label, View.OnClickListener l) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setOnClickListener(l);
+        return b;
+    }
+
+    /** One tap, one event: a label against blinded keys. Nothing else is written, and nothing else changes. */
+    private void answer(ReviewRules.Item item, String verdict) {
+        Journal journal = journal();
+        boolean ok = false;
+        if (journal != null) {
+            boolean candidate = item.closer != null;
+            String rule = candidate ? item.closer.ruleId : "";
+            long version = candidate ? item.closer.ruleVersion : 1L;
+            ok = journal.append(ReviewFacts.JUDGED, ReviewFacts.judged(item.obligationKey, item.paymentKey, verdict, candidate ? ReviewFacts.CANDIDATE : ReviewFacts.OPEN,
+                !candidate && item.missed, rule, version, Correlator.WINDOW_DAYS)) != null;
+        }
+        if (!ok) new AlertDialog.Builder(this).setMessage("Orb could not record that, so nothing changed.").setPositiveButton("OK", null).show();
+        render();
+    }
+}

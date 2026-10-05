@@ -37,6 +37,40 @@ final class Correlator {
         long obligationsClosed;
         /** Closers that matched: each is a closure candidate. */
         long candidates;
+        /** Each distinct obligation: the openings that make it, and the closings (of the same amount, from the same source) that could close it. */
+        final List<Obligation> list = new ArrayList<>();
+        /** Which closing was matched to which opening: the candidates, one by one. */
+        final List<Pair> pairs = new ArrayList<>();
+    }
+
+    /** One obligation: reminders within the window are one. Its facts are kept so that the person can be shown it and judge it (`docs/MONEY_PHONE.md` §6). */
+    static final class Obligation {
+        final List<Observation> openers;
+        final List<Observation> closers;
+
+        Obligation(List<Observation> openers, List<Observation> closers) {
+            this.openers = openers;
+            this.closers = closers;
+        }
+
+        Observation first() {
+            return openers.get(0);
+        }
+
+        Observation last() {
+            return openers.get(openers.size() - 1);
+        }
+    }
+
+    /** A closing matched to an opening. */
+    static final class Pair {
+        final Observation opener;
+        final Observation closer;
+
+        Pair(Observation opener, Observation closer) {
+            this.opener = opener;
+            this.closer = closer;
+        }
     }
 
     private static long day(Observation o) {
@@ -100,6 +134,7 @@ final class Correlator {
                     if (used[i] || day(open.get(i)) > day(c)) continue;
                     if (day(c) - day(open.get(i)) <= WINDOW_DAYS) {
                         used[i] = true;
+                        r.pairs.add(new Pair(open.get(i), c));
                         r.matched.add(c.id);
                         r.closing.add(c.id);
                         List<Observation> sameMoney = pairedMoves.get(c.sourceKind + "|" + c.sourceId + "|" + c.occurredMs + "|" + c.minor);
@@ -114,7 +149,10 @@ final class Correlator {
                 if (i < open.size() && day(open.get(i)) - day(open.get(i - 1)) <= WINDOW_DAYS) continue;
                 r.obligations++;
                 long first = day(open.get(start)), last = day(open.get(i - 1));
-                for (Observation c : close) if (day(c) >= first && day(c) - last <= WINDOW_DAYS) { r.obligationsClosed++; break; }
+                List<Observation> could = new ArrayList<>();
+                for (Observation c : close) if (day(c) >= first && day(c) - last <= WINDOW_DAYS) could.add(c);
+                if (!could.isEmpty()) r.obligationsClosed++;
+                r.list.add(new Obligation(new ArrayList<>(open.subList(start, i)), could));
                 start = i;
             }
         }

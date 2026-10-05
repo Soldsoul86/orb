@@ -76,6 +76,16 @@
    "by": "operator",
    "date": "2026-10-04",
    "note": "Slice A's scope and budget, written after the code from the approved design (see its limitations)."
+  },
+  {
+   "gate": "PROTOCOL_APPROVAL",
+   "paths": [
+    "docs/slices/MONEY-B.json"
+   ],
+   "ref": "DR-46",
+   "by": "operator",
+   "date": "2026-10-05",
+   "note": "Slice B's scope and budget, written before the code from the approved decisions."
   }
  ]
 }

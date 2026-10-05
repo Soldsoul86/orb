@@ -1,0 +1,66 @@
+{
+ "id": "MONEY-B",
+ "title": "Money slice B \u2014 review what looks paid: Mark paid, Not this, Already paid (labels)",
+ "design": "docs/MONEY_PHONE.md",
+ "decisions": [
+  "DR-43",
+  "DR-44",
+  "DR-46"
+ ],
+ "base": "7a78370",
+ "scenarios": [
+  "REV-001",
+  "REV-002",
+  "REV-003",
+  "REV-004",
+  "REV-005",
+  "REV-006",
+  "REV-007",
+  "REV-008",
+  "REV-009",
+  "REV-010",
+  "REV-011"
+ ],
+ "invariants": [
+  "I-005",
+  "I-006",
+  "I-007",
+  "I-008",
+  "I-017",
+  "I-018"
+ ],
+ "scope": {
+  "files": [
+   "apps/pixel/orb/**",
+   "docs/MONEY_PHONE.md",
+   "docs/fixtures/money/**",
+   "docs/invariants/**",
+   "tools/fit/**",
+   "tools/mutate/**",
+   "tools/export/**",
+   "tools/scenarios/**"
+  ]
+ },
+ "budget": {
+  "maxFiles": 40,
+  "maxLines": 3500,
+  "maxFailedRuns": 3
+ },
+ "required": [
+  "phone",
+  "tools",
+  "mutation"
+ ],
+ "proof": [
+  "bash apps/pixel/orb/tests/run.sh",
+  "npm run test:tools",
+  "node tools/mutate/mutate.mjs --list tools/mutate/lists/money-b.json --json artifacts/mutation/money-b.json"
+ ],
+ "limitations": [
+  "Obligations stay proposals: a Mark paid tap changes nothing on Today (DR-46).",
+  "Only obligations the person owes (owner me) get Already paid; money owed to the person is judged as arrived, with no open-obligation list.",
+  "The 60-day window and the 45-day matching window are policy constants, not measured.",
+  "Precision from the first 20 answers measures one inbox's rules, tuned on that inbox."
+ ],
+ "expectFitChange": false
+}

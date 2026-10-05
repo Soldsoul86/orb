@@ -109,6 +109,9 @@ public final class LedgerActivity extends Activity {
     private void render() {
         list.removeAllViews();
         list.addView(text("Money moved", 17, true));
+        list.addView(button("Review what looks paid", new View.OnClickListener() {
+            @Override public void onClick(View v) { startActivity(new android.content.Intent(LedgerActivity.this, ReviewActivity.class)); }
+        }));
         list.addView(text("\nThis is money that moved, read from the facts Orb has kept \u2014 not what you spent or earned. The same money can appear twice: "
             + "card payments and card spends both show. Amounts in different currencies are never added together.", 12, false));
         if (movements == null || movements.isEmpty()) {

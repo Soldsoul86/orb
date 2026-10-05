@@ -1,0 +1,123 @@
+package @PKG@;
+
+import android.content.Context;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * What the person's answer in the review writes to the journal (`docs/MONEY_PHONE.md` §17, DR-46): one event, `orb.candidate.judged` — a **label**. It holds blinded
+ * keys for the obligation and the payment, the verdict, what was shown, whether a movement was missed, and the name and version of the rule that proposed the
+ * pair. **Never an amount, a sender, a day or a word.** It opens, closes and changes nothing: not a loop, not a commitment, not the ledger.
+ *
+ * The answers are read back as sets, so any order — and a restore — gives the same review.
+ */
+final class ReviewFacts {
+    private ReviewFacts() {}
+
+    static final String JUDGED = "orb.candidate.judged";
+    static final String SCHEMA = "candidate.judged.v1";
+
+    static final String PAID = "paid";
+    static final String NOT_THIS = "notThis";
+    static final String ALREADY_PAID = "alreadyPaid";
+    /** What the person was shown: a payment that looks like the end of the bill, or an open obligation with none. */
+    static final String CANDIDATE = "candidate";
+    static final String OPEN = "open";
+
+    /** The blinded key of an obligation or a payment, made from its namespaced id. */
+    interface Keyer {
+        String key(String namespaced) throws Exception;
+    }
+
+    static Keyer keyer(final Context context) {
+        return new Keyer() {
+            @Override public String key(String namespaced) throws Exception {
+                return Attachments.address(context, namespaced).substring(0, 16);
+            }
+        };
+    }
+
+    static Map<String, Object> judged(String obligation, String payment, String verdict, String shown, boolean missed, String ruleId, long ruleVersion, long windowDays) {
+        if (obligation == null || !obligation.matches("[0-9a-f]{16}")) throw new IllegalArgumentException("an obligation is recorded by its blinded key");
+        boolean candidate = CANDIDATE.equals(shown);
+        if (!candidate && !OPEN.equals(shown)) throw new IllegalArgumentException("what was shown is a candidate or an open obligation");
+        if (candidate && (payment == null || !payment.matches("[0-9a-f]{16}"))) throw new IllegalArgumentException("a candidate names its payment by a blinded key");
+        if (!candidate && payment != null && !payment.isEmpty()) throw new IllegalArgumentException("an open obligation has no payment");
+        if (candidate ? !(PAID.equals(verdict) || NOT_THIS.equals(verdict)) : !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("a verdict fits what was shown");
+        if (missed && !ALREADY_PAID.equals(verdict)) throw new IllegalArgumentException("only an answer of already paid can have missed a payment");
+        Map<String, Object> p = Json.obj();
+        p.put("schema", SCHEMA);
+        p.put("obligation", obligation);
+        if (candidate) p.put("payment", payment);
+        p.put("verdict", verdict);
+        p.put("shown", shown);
+        p.put("missed", missed);
+        p.put("ruleId", ruleId == null ? "" : ruleId);
+        p.put("ruleVersion", Math.max(0L, ruleVersion));
+        p.put("windowDays", Math.max(0L, windowDays));
+        return p;
+    }
+
+    /** Everything the journal says the person has answered: which obligations are settled, which pairs were refused, and the counts. */
+    static final class Judged {
+        /** Obligations answered *paid* or *already paid*: the review does not offer them again. */
+        final Set<String> settled = new HashSet<>();
+        /** `obligation|payment` pairs the person said were not it. */
+        final Set<String> refused = new HashSet<>();
+        long paid;
+        long notThis;
+        long alreadyPaid;
+        long missed;
+    }
+
+    private static final Pattern OBLIGATION = Pattern.compile("\"obligation\":\"([0-9a-f]{16})\"");
+    private static final Pattern PAYMENT = Pattern.compile("\"payment\":\"([0-9a-f]{16})\"");
+    private static final Pattern VERDICT = Pattern.compile("\"verdict\":\"([A-Za-z]+)\"");
+    private static final Pattern MISSED = Pattern.compile("\"missed\":(true|false)");
+
+    static String pairKey(String obligation, String payment) {
+        return obligation + "|" + payment;
+    }
+
+    static Judged fold(List<String> lines) {
+        Judged out = new Judged();
+        for (String line : lines) {
+            if (!JUDGED.equals(Journal.typeOf(line))) continue;
+            int payload = line.indexOf("\"payload\":");
+            if (payload < 0) continue;
+            Matcher ob = OBLIGATION.matcher(line), pay = PAYMENT.matcher(line), v = VERDICT.matcher(line), m = MISSED.matcher(line);
+            if (!ob.find(payload) || !v.find(payload)) continue;
+            String verdict = v.group(1);
+            if (PAID.equals(verdict)) {
+                out.settled.add(ob.group(1));
+                out.paid++;
+            } else if (ALREADY_PAID.equals(verdict)) {
+                out.settled.add(ob.group(1));
+                out.alreadyPaid++;
+                if (m.find(payload) && "true".equals(m.group(1))) out.missed++;
+            } else if (NOT_THIS.equals(verdict) && pay.find(payload)) {
+                out.refused.add(pairKey(ob.group(1), pay.group(1)));
+                out.notThis++;
+            }
+        }
+        return out;
+    }
+
+    /** The first 20 answers are too few to report a precision from: below this it says so, and it never gates anything. */
+    static final int MIN_ANSWERS = 20;
+
+    static String precisionLine(long paid, long notThis) {
+        long n = paid + notThis;
+        if (n < MIN_ANSWERS) return "Precision: insufficient sample (" + n + " of " + MIN_ANSWERS + " answers).";
+        return "Precision: " + Math.round(100.0 * paid / n) + "% of " + n + " answers (paid ÷ paid + not this).";
+    }
+
+    static String missedLine(long alreadyPaid, long missed) {
+        return "Missed correlations: " + missed + " of " + alreadyPaid + " “already paid” answers.";
+    }
+}

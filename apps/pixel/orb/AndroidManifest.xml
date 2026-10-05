@@ -151,6 +151,11 @@
             android:name=".LedgerActivity"
             android:exported="false" />
 
+        <!-- Review what looks paid: the person's answers are labels (docs/MONEY_PHONE.md section 17). Not exported; secure like Recall. -->
+        <activity
+            android:name=".ReviewActivity"
+            android:exported="false" />
+
         <!-- Today: what matters now. Not exported; secure like Recall. -->
         <activity
             android:name=".TodayActivity"

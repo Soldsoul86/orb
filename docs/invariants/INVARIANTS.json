@@ -391,6 +391,58 @@
      "check": "the manifest asks for no INTERNET"
     }
    ]
+  },
+  {
+   "id": "I-017",
+   "statement": "A person's answer about a candidate is a label: it is one event against blinded keys and opens, closes and changes nothing — no loop, no commitment, no ledger — and the measured precision is reported and never read by anything that decides.",
+   "source": "MONEY_PHONE.md §17; DR-46; OBSERVATION_SEAM.md §7",
+   "threatenedBy": [
+    "apps/pixel/orb/src/ReviewRules.java.in",
+    "apps/pixel/orb/src/ReviewFacts.java.in",
+    "apps/pixel/orb/src/ReviewActivity.java.in",
+    "apps/pixel/orb/src/Correlator.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the review opens, closes and changes nothing: it names no loop, commitment, ledger writer or journal append outside the one answer"
+    },
+    {
+     "suite": "phone",
+     "check": "the screen writes exactly one kind of event, in one place"
+    },
+    {
+     "suite": "phone",
+     "check": "nothing else reads the answers or the precision: the review's rules take what was answered as an argument and never look"
+    },
+    {
+     "suite": "phone",
+     "check": "the precision is read by the screen and by nothing that decides"
+    }
+   ]
+  },
+  {
+   "id": "I-018",
+   "statement": "An answer in the journal holds only blinded keys, enums and counts: never an amount, a sender code, a day or a word, and a key that is not a blinded key is refused.",
+   "source": "CONSTITUTION Art. VII; MONEY_PHONE.md §17",
+   "threatenedBy": [
+    "apps/pixel/orb/src/ReviewFacts.java.in",
+    "apps/pixel/orb/src/ReviewActivity.java.in"
+   ],
+   "heldBy": [
+    {
+     "suite": "phone",
+     "check": "the judged event holds only blinded keys, enums and counts"
+    },
+    {
+     "suite": "phone",
+     "check": "no amount, sender, day or word is in it"
+    },
+    {
+     "suite": "phone",
+     "check": "a key that is not a blinded key is refused: nothing is recorded by name"
+    }
+   ]
   }
  ]
 }
