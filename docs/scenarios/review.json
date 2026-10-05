@@ -773,11 +773,11 @@
     },
     {
      "suite": "phone",
-     "check": "adversary held: an answer carrying a two-megabyte extra field is not an answer (it is not one the writer writes), and reading it is fast (37 ms)"
+     "check": "adversary held: an answer carrying a two-megabyte extra field is not an answer (it is not one the writer writes), and reading it is fast"
     },
     {
      "suite": "phone",
-     "check": "adversary held: one answer restored 50,000 times is one answer, and folds in 294 ms; held by 'the same answers read twice count once'"
+     "check": "adversary held: one answer restored 50,000 times is one answer, and folds fast; held by 'the same answers read twice count once'"
     }
    ]
   },
@@ -913,15 +913,15 @@
     },
     {
      "suite": "phone",
-     "check": "adversary held: 10,000 facts (5,000 bills in the last 60 days, a third paid) build in under 3 s with a cheap Keyer (408 ms, 5000 items); held by accident"
+     "check": "adversary held: 10,000 facts (5,000 bills in the last 60 days, a third paid) build in under 3 s with a cheap Keyer; held by accident"
     },
     {
      "suite": "phone",
-     "check": "adversary held: the same with the install's real Keyer (a file read and a keyed hash for each key, on the UI thread) is still under 5 s, the ANR limit (295 ms); held by accident, and it grows linearly with the items"
+     "check": "adversary held: the same with the install's real Keyer (a file read and a keyed hash for each key, on the UI thread) is still under 5 s, the ANR limit; held by accident, and it grows linearly with the items"
     },
     {
      "suite": "phone",
-     "check": "adversary held: one sender restating one bill daily for 4,000 days, each paid, builds in under 3 s (464 ms); the pairing is quadratic in the chain; held by accident"
+     "check": "adversary held: one sender restating one bill daily for 4,000 days, each paid, builds in under 3 s; the pairing is quadratic in the chain; held by accident"
     }
    ]
   },
