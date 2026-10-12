@@ -71,8 +71,13 @@ class MediaExportTest {
             }
             assertNotNull("Sharesheet must list compatible receiver", target)
             target!!.click()
-            assertTrue("Receiver must read and decode the granted MP4", device.wait(
-                Until.hasObject(By.text("Received playable video: CAD Test.mp4")), 10000))
+            val received = device.wait(Until.hasObject(By.text("Received playable video: CAD Test.mp4")), 10000)
+            if (!received) {
+                val hierarchy = java.io.ByteArrayOutputStream()
+                device.dumpWindowHierarchy(hierarchy)
+                println(hierarchy.toString("UTF-8"))
+            }
+            assertTrue("Receiver must read and decode the granted MP4", received)
             device.pressBack()
         }
         assertEquals(before, hash(file))
