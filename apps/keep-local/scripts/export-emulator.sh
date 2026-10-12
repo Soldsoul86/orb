@@ -21,6 +21,8 @@ check_original() {
 }
 adb install "$artifact/original.apk"
 seed
+python3 apps/keep-local/scripts/recover-existing-media.py --serial "$(adb get-serialno)" --title "CAD Test" --output "$evidence/recovered-CAD-Test.mp4" --recordings-stopped | tee "$evidence/recovery-tool.txt"
+cmp "$evidence/cad-test.mp4" "$evidence/recovered-CAD-Test.mp4"
 # Demonstrate the real release blocker rather than claiming fixture signing is compatible.
 if adb install -r "$artifact/update-fixture.apk" > "$evidence/real-upgrade-rejected.txt" 2>&1; then
   echo 'Unexpected acceptance of mismatched certificate'; exit 1
