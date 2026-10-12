@@ -20,6 +20,10 @@ for entry in "$original:baseline-fixture.apk" "$unsigned:update-fixture.apk" "$t
 done
 "$signer" verify --print-certs test-artifacts/update-fixture.apk > evidence/fixture-certificate-NOT-FOR-UPGRADE.txt
 if grep -q '323de20c67ad49e07d67d623b527306a96c80ba4ad7bccf573093b85b95ee7c9' evidence/fixture-certificate-NOT-FOR-UPGRADE.txt; then exit 1; fi
+if KEEP_LOCAL_KEYSTORE="$work/fixture.jks" KEEP_LOCAL_STORE_PASSWORD=android KEEP_LOCAL_KEY_ALIAS=fixture KEEP_LOCAL_KEY_PASSWORD=android bash gradlew --no-daemon help > evidence/wrong-signing-key-gate.txt 2>&1; then
+  echo 'Wrong signing key was accepted'; exit 1
+fi
+grep -q 'RELEASE BLOCKED: signing certificate does not match' evidence/wrong-signing-key-gate.txt
 rm "$work/fixture.jks"
 printf '%s\n' 'RELEASE BLOCKED: original signing key is unavailable. Product APK is UNSIGNED.' 'Test APKs are disposable emulator fixtures, cannot update the delivered APK, and must not be installed on a phone containing recordings.' > evidence/RELEASE-BLOCKER.txt
 cp evidence/RELEASE-BLOCKER.txt test-artifacts/DO-NOT-INSTALL-ON-YOUR-PHONE.txt
