@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: keep-local-${{ github.event.pull_request.number || github.ref }}
+  group: keep-local-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   build:
