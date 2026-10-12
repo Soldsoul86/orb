@@ -1,0 +1,23 @@
+KEEP LOCAL — ENGINEERING VERIFICATION
+2026-10-12
+
+VERIFIED locally: desktop SQLite FTS4 schema/triggers, prefix syntax regression,
+insert/update/delete, source manifest permission policy, shell syntax and Python
+script syntax. Original FTS4 prefix expression failed a partial-word query;
+placing the wildcard inside the quoted token fixes the reproduced failure.
+
+IN PROGRESS: GitHub Actions Android compile, unit tests, lint, APK signature and
+merged permission checks; API 29/36 emulator install and note flow.
+
+UNVERIFIED on a physical phone: installation, Play Protect response, core note
+flow, imported photos/files/audio/video, voice recording, consent revocation,
+recording interruption/rotation, notifications, media playback, OCR, dictation,
+RAM/CPU/battery/thermal performance and compatibility with 4 GB budget devices.
+
+INCOMPLETE: saved-audio transcription, internal app audio capture, direct camera
+capture, PDF content indexing, encrypted export, persistent release/update key.
+Existing photo/video capture path is import/share or consent-based screen video.
+
+Local blocker: no full JDK/SDK/Gradle; outbound proxy connection unavailable in
+the command sandbox, and network permission requests stalled before execution.
+Use linked CI evidence for actual Android results; do not infer them from source.

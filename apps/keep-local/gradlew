@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# A tiny SHA-256-verified Gradle bootstrap (not the canonical Gradle Wrapper JAR).
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE="${GRADLE_USER_HOME:-${HOME}/.gradle}/keep-local-bootstrap"
+BIN="${BASE}/gradle-8.13/bin/gradle"
+ZIP="${BASE}/gradle-8.13-bin.zip"
+SHA256="20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78"
+if [[ ! -x "$BIN" ]]; then
+    command -v curl >/dev/null || { echo 'curl required to bootstrap Gradle' >&2; exit 1; }
+    command -v unzip >/dev/null || { echo 'unzip required to bootstrap Gradle' >&2; exit 1; }
+    mkdir -p "$BASE"
+    curl --fail --location --connect-timeout 15 --max-time 300 --retry 2 --output "${ZIP}.download" \
+        'https://services.gradle.org/distributions/gradle-8.13-bin.zip'
+    python3 - "${ZIP}.download" "$SHA256" <<'PY'
+import hashlib, sys
+path, expected = sys.argv[1:]
+sha = hashlib.sha256()
+with open(path, 'rb') as f:
+    for chunk in iter(lambda: f.read(1024*1024), b''):
+        sha.update(chunk)
+assert sha.hexdigest() == expected, 'Gradle distribution failed SHA-256 verification'
+PY
+    mv "${ZIP}.download" "$ZIP"
+    unzip -q -o "$ZIP" -d "$BASE"
+fi
+cd "$ROOT"
+exec "$BIN" "$@"
