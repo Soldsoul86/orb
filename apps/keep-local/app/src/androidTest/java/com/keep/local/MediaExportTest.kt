@@ -140,6 +140,56 @@ class MediaExportTest {
         assertEquals(before, hash(MediaExport.source(context, item)))
     }
 
+    @Test fun providerCannotBeReadByAnotherAppWithoutExplicitGrant() {
+        val original = cad()
+        val id = db.add("video", "Private grant check", path = original.path, mime = original.mime, bytes = original.bytes)
+        try {
+            context.startActivity(Intent(Intent.ACTION_SEND).apply {
+                component = android.content.ComponentName("com.keep.local.test", "com.keep.local.ShareReceiverActivity")
+                putExtra(Intent.EXTRA_STREAM, AppFiles.itemUri(id))
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            assertTrue(device.wait(Until.hasObject(By.text("Receive failed: SecurityException")), 5000))
+            device.pressBack()
+        } finally { db.remove(id) }
+    }
+
+    @Test fun saveToFilesCreatesPlayableVideoInDownloads() {
+        val item = cad()
+        val title = "Keep Local SAF ${System.nanoTime()}"
+        val id = db.add("video", title, path = item.path, mime = item.mime, bytes = item.bytes)
+        val exported = "/sdcard/Download/$title.mp4"
+        try {
+            ActivityScenario.launch<EditorActivity>(Intent(context, EditorActivity::class.java).putExtra("id", id)).use {
+                onView(withId(R.id.media_files)).perform(scrollTo(), click())
+                val roots = device.wait(Until.findObject(By.desc("Show roots")), 5000)
+                if (roots != null) {
+                    roots.click()
+                    val downloads = device.wait(Until.findObject(By.text("Downloads")), 5000)
+                    assertNotNull("Local Downloads destination", downloads)
+                    downloads!!.click()
+                }
+                val save = device.wait(Until.findObject(By.res("com.google.android.documentsui", "action_menu_save")), 3000)
+                    ?: device.wait(Until.findObject(By.res("com.android.documentsui", "action_menu_save")), 3000)
+                    ?: device.wait(Until.findObject(By.text("SAVE")), 3000)
+                assertNotNull("Create document confirmation", save)
+                save!!.click()
+                val expected = hash(MediaExport.source(context, item))
+                val deadline = System.currentTimeMillis() + 15000
+                var matched = false
+                while (!matched && System.currentTimeMillis() < deadline) {
+                    matched = device.executeShellCommand("sha256sum '$exported'").startsWith(expected)
+                    if (!matched) Thread.sleep(100)
+                }
+                assertTrue("SAF export in Downloads equals original MP4", matched)
+                playable(AppFiles.itemUri(item.id))
+            }
+        } finally {
+            db.remove(id)
+            device.executeShellCommand("rm -f '$exported'")
+        }
+    }
+
     @Test fun largeFileIsStreamedAndOtherMediaHaveCorrectNamesAndMime() {
         val file = File(AppFiles.mediaDir(context), "large-export-test.bin")
         val destination = File(context.cacheDir, "large-copy.bin")

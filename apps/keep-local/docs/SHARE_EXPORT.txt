@@ -48,3 +48,24 @@ Verification plan (results to be recorded after CI):
 - Same-key fixture upgrade validates storage continuity, NOT original signing.
 - Phone installation, ChatGPT/WhatsApp/Drive receiving behavior, actual user's
   CAD Test, physical low-storage behavior and Play Protect remain unverified.
+
+Original key status confirmed by user: no signing-key backup available.
+Therefore an in-place phone update is blocked, not merely untested.
+
+Read-only recovery route for the installed debug build (physical phone UNVERIFIED):
+1. Stop all Keep Local recordings. Keep the app installed and its data intact.
+2. On a trusted computer install Android platform-tools and Python 3.
+3. Connect the phone by USB, enable USB debugging, and authorize that computer.
+4. Run adb devices to identify the device serial.
+5. Run:
+   python3 scripts/recover-existing-media.py --serial YOUR_SERIAL --title "CAD Test" --output "CAD Test.mp4" --recordings-stopped
+6. If duplicate titles exist, rerun with the displayed --id. Existing output
+   files are never overwritten. The script reads the database and original
+   via run-as; it never writes to app storage or changes the installation.
+7. Copy the verified MP4 back to the phone's Download folder through USB, then
+   choose it from ChatGPT's attachment picker if that app supports MP4 uploads.
+   Actual ChatGPT upload acceptance is not verified.
+8. Reopen Keep Local. Disable USB debugging when finished if desired.
+
+This route requires a computer and an authorized USB connection. It is not an
+on-phone replacement for the requested update and does not meet that criterion.

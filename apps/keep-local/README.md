@@ -67,3 +67,11 @@ bash gradlew :app:connectedDebugAndroidTest  # needs an emulator/device
 3. **Find it**: search a saved title, note, shared link, or text detected in image/video. Tap result, tap **Play from matching moment** if there is a matching timestamp; otherwise tap **Play recording**.
 
 See `docs/acceptance.md` and `docs/architecture.md` for test gates, data contract and failure cases.
+
+### Share/export release status
+
+The 0.2.0 source adds Share, Save to Gallery and Save to Files to saved media.
+**The phone update is blocked:** the original 0.1.0 CI signing key was not
+preserved and no backup is available. Do not uninstall the existing app.
+An unsigned build or disposable emulator test APK cannot update it.
+See `docs/SHARE_EXPORT.txt` for verification and the read-only USB recovery tool.
