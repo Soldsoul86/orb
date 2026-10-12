@@ -3,11 +3,11 @@ set -euo pipefail
 artifact="${1:?artifact directory}"
 evidence="apps/keep-local/evidence"
 mkdir -p "$evidence"
-trap 'timeout 10s adb logcat -d > "$evidence/export-logcat.txt" || true; timeout 10s adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 && timeout 10s adb pull /sdcard/window.xml "$evidence/window.xml" >/dev/null 2>&1 || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true' EXIT
+trap 'timeout 10s adb logcat -d > "$evidence/export-logcat.txt" || true; timeout 10s adb shell uiautomator dump /data/local/tmp/window.xml >/dev/null 2>&1 && timeout 10s adb pull /data/local/tmp/window.xml "$evidence/window.xml" >/dev/null 2>&1 || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true' EXIT
 # Never run against a physical phone; package removal below is for disposable fixtures.
 test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
-adb shell screenrecord --size 320x480 --bit-rate 500000 --time-limit 2 /sdcard/cad-test.mp4
-adb pull /sdcard/cad-test.mp4 "$evidence/cad-test.mp4"
+adb shell screenrecord --size 320x480 --bit-rate 500000 --time-limit 2 /data/local/tmp/cad-test.mp4
+adb pull /data/local/tmp/cad-test.mp4 "$evidence/cad-test.mp4"
 python3 apps/keep-local/scripts/seed-export-fixture.py
 seed() {
   adb shell am force-stop com.keep.local
