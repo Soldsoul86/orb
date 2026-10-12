@@ -1,4 +1,4 @@
-package com.keep.local;
+package com.keep.local.next;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -37,7 +37,7 @@ public class ShareReceiverActivity extends Activity {
             // A grant for one item must never expose any other item URI.
             boolean denied = false;
             try (Cursor ignored = getContentResolver().query(
-                    Uri.parse("content://com.keep.local.media/item/0"), null, null, null, null)) {
+                    Uri.parse("content://com.keep.local.next.media/item/0"), null, null, null, null)) {
                 // Even a nonexistent item must be rejected at the permission boundary.
             } catch (SecurityException expected) { denied = true; }
             if (!denied) throw new IllegalStateException("Unscoped provider access");

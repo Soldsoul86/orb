@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.app.Activity
 import android.app.Service
@@ -22,8 +22,8 @@ import java.io.File
 /** MediaProjection screen capture. No hidden/automatic recording and no internal-audio bypass. */
 class ScreenService : Service() {
     companion object {
-        const val START = "com.keep.local.SCREEN_START"
-        const val STOP = "com.keep.local.SCREEN_STOP"
+        const val START = "com.keep.local.next.SCREEN_START"
+        const val STOP = "com.keep.local.next.SCREEN_STOP"
         const val RESULT = "result"
         const val DATA = "consent"
         const val MIC = "microphone"

@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.app.Service
 import android.content.Intent
@@ -13,8 +13,8 @@ import java.io.File
 /** Microphone capture with an explicit notification and a visible Stop action. */
 class VoiceService : Service() {
     companion object {
-        const val START = "com.keep.local.VOICE_START"
-        const val STOP = "com.keep.local.VOICE_STOP"
+        const val START = "com.keep.local.next.VOICE_START"
+        const val STOP = "com.keep.local.next.VOICE_STOP"
         @Volatile var active = false
             private set
     }

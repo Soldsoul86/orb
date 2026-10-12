@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 fun main() {
     fun check(label: String, actual: Any?, expected: Any?) {

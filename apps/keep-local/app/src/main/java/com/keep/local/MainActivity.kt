@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.Manifest
 import android.app.Activity
@@ -27,7 +27,7 @@ import java.util.concurrent.Executors
 /** A deliberately small native UI: record, share, index, search, view. No WebView. */
 class MainActivity : Activity() {
     companion object {
-        const val TILE_CAPTURE = "com.keep.local.TILE_CAPTURE"
+        const val TILE_CAPTURE = "com.keep.local.next.TILE_CAPTURE"
         private const val REQ_PICK = 10
         private const val REQ_PROJECTION = 11
         private const val REQ_MIC = 12

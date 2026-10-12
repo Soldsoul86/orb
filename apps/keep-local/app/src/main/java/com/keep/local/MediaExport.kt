@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.content.ClipData
 import android.content.ContentValues
@@ -107,7 +107,7 @@ object MediaExport {
     }
 
     fun saveToDocument(context: Context, item: MemoryItem, uri: Uri, cancel: CancellationSignal) {
-        require(uri.scheme == "content" && uri.authority != "com.keep.local.media") { "Invalid destination" }
+        require(uri.scheme == "content" && uri.authority != "com.keep.local.next.media") { "Invalid destination" }
         try {
             copyTo(context, source(context, item), uri, cancel)
         } catch (e: Exception) {

@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.app.job.JobInfo
 import android.app.job.JobScheduler
@@ -45,7 +45,7 @@ object AppFiles {
         return candidate.takeIf { it.toPath().startsWith(base) && it.isFile }
     }
 
-    fun itemUri(id: Long): Uri = Uri.parse("content://com.keep.local.media/item/$id")
+    fun itemUri(id: Long): Uri = Uri.parse("content://com.keep.local.next.media/item/$id")
 
     fun cleanStalePartialFiles(context: Context) {
         // Only remove old unfinished captures, never completed media or recent captures.
