@@ -10,4 +10,4 @@ adb shell am instrument -w com.keep.local.test/androidx.test.runner.AndroidJUnit
 # am instrument may exit 0 even when tests fail; require the runner's success line.
 grep -Eq '^OK \([1-9][0-9]* tests?\)' "$evidence/instrumentation.txt"
 adb shell am start -W -n com.keep.local/.MainActivity | tee "$evidence/launch.txt"
-adb shell dumpsys meminfo com.keep.local > "$evidence/emulator-meminfo.txt"
+adb shell dumpsys meminfo com.keep.local | tee "$evidence/emulator-meminfo.txt"

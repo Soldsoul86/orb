@@ -42,9 +42,14 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk | tee evidence/signature.txt
           apkanalyzer manifest print app/build/outputs/apk/debug/app-debug.apk > evidence/packaged-manifest.xml
           python3 scripts/check_packaged_manifest.py evidence/packaged-manifest.xml
-          sha256sum app/build/outputs/apk/debug/app-debug.apk > evidence/APK-SHA256.txt
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee evidence/APK-SHA256.txt
           git rev-parse HEAD > evidence/commit.txt
           java -version 2> evidence/java.txt
+      - name: Test and lint summaries
+        if: always()
+        run: |
+          if [ -f app/build/reports/lint-results-debug.txt ]; then cat app/build/reports/lint-results-debug.txt; fi
+          if [ -d app/build/test-results/testDebugUnitTest ]; then cat app/build/test-results/testDebugUnitTest/TEST-*.xml; fi
       - name: Publish APK and evidence
         uses: actions/upload-artifact@v4
         if: always()
