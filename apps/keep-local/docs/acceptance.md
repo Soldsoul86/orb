@@ -19,6 +19,10 @@ Do not say "working on a ₹15,000 device" merely because Gradle compiles. Test 
 
 `./core-tests/run.sh` exercises pure deterministic indexing utilities. `python3 core-tests/db_contract.py` executes the real SQLite schema definitions from `MemoryDb.kt` in a local SQLite engine and validates index updates and permission boundaries. Neither tests Android screen recording or a 4 GB phone.
 
-## Build caveat
+## Current build evidence
 
-No APK was built in the authoring environment, because it lacks the Android SDK and build dependencies. An Android Studio/Gradle sync and device tests are required. Do not mark release as verified without them.
+A debug APK now builds, has a verified signature, and installs on API 29/36
+emulators. The note capture/save/reopen/retrieve instrumentation passes on both.
+See VERIFICATION.txt for the exact tested commit, APK hash and CI run. The
+physical-device gates above remain outstanding; emulator results are not phone
+compatibility or Play Protect approval.

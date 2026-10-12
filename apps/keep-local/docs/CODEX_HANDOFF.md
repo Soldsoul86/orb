@@ -1,3 +1,11 @@
+# Current handoff: physical-phone proof
+
+The APK now builds and passes note-flow instrumentation on API 29/36 emulators.
+See VERIFICATION.txt for exact evidence and PHONE_TEST.txt for the first install.
+The original task list below is retained as further device-validation scope;
+its statement that no APK exists is superseded by the verification report.
+Android Studio is optional; the command-line GitHub build is configured.
+
 # Codex task: device proof, not feature proliferation
 
 Repository: this directory. Treat the code and tests as unverified Android source, not a functioning APK.

@@ -13,6 +13,10 @@ https://github.com/Soldsoul86/orb/pull/1
 - Recorder instances are owned before configuration, so failure during setup
   releases them. Failed database saves remove partial/final media, while an OCR
   scheduling failure no longer deletes a successfully saved import.
+- Guarded the microphone foreground-service type on Android 10, handle recorder
+  error callbacks, and limit screen file size to available space minus a reserve.
+- Explicitly exclude every supported backup domain from both Android 12+ cloud
+  backup and device transfer; keep legacy backups disabled as well.
 - Removed delayed UI callbacks on activity teardown, guarded async callbacks,
   preserved editor text across recreation with stable view IDs, handled service
   launch failures, and paused playback when leaving its activity.
@@ -28,15 +32,17 @@ https://github.com/Soldsoul86/orb/pull/1
 
 ## Verification scope
 
-See VERIFICATION.txt for final statuses, CI run, checksums and emulator results.
+The debug APK builds, passes signature checks and installs on API 29/36 emulators.
+All 3 JVM tests and 3 Android tests per emulator pass. Lint has 0 errors and 29
+non-blocking warnings. See VERIFICATION.txt for the CI run, hashes and measurements.
 Desktop checks do not prove Android behavior; emulator results do not prove a
 retail 4 GB phone. The first phone procedure is in PHONE_TEST.txt.
 
 | Feature | Current verification boundary |
 |---|---|
-| Note capture/save/reopen/prefix retrieval | Automated Android test in CI |
-| Search edit/delete and bounded previews | Desktop SQLite and Android tests |
-| Permission allowlist, no Internet permission, backup flag | Packaged APK check |
+| Note capture/save/reopen/prefix retrieval | VERIFIED on API 29/36 emulators |
+| Search edit/delete and bounded previews | VERIFIED in desktop SQLite and API 29/36 Android tests |
+| Permission allowlist, no Internet permission, backup flag | VERIFIED packaged APK and backup-rule configuration checks |
 | Import/share of photos/files/audio/video | Compiled; device flow unverified |
 | Voice and consent-based screen recording | Compiled and statically audited; runtime unverified |
 | Recording stop/revoke/rotation/low-storage behavior | Physical-device tests outstanding |

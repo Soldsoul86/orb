@@ -4,9 +4,9 @@
 
 A native Kotlin Android project intended for 4 GB RAM devices, running on Android 10+ (API 29). All user memories remain in app-private storage; the application does **not** request internet access, broad file permissions, or accessibility permission. Android's file-based device encryption protects app-private data when configured; this version has no separate in-app password or encryption key.
 
-**Status: engineering build in progress.** Desktop SQLite/source checks pass locally. See `docs/VERIFICATION.txt` and the linked CI run for the current build and Android test evidence. Physical-phone installation, Play Protect, 4 GB RAM performance and recording lifecycle remain unverified until tested.
+**Status: signed debug APK built and installed on Android 10 and Android 16 emulators.** Three JVM tests and three instrumentation tests on each emulator pass, including capture → save → reopen → prefix retrieval. [Download APK and reports](https://github.com/Soldsoul86/orb/actions/runs/38257971597/artifacts/11751510965). See `docs/VERIFICATION.txt` for hashes, measurements and feature status. Physical-phone installation, Play Protect behavior, recording lifecycle and 4 GB performance remain unverified.
 
-## Implemented in source
+## Implemented in source (runtime status in docs/VERIFICATION.txt)
 
 | Flow | Capability |
 |---|---|

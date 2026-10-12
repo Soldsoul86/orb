@@ -1,23 +1,63 @@
-KEEP LOCAL — ENGINEERING VERIFICATION
-2026-10-12
+KEEP LOCAL — VERIFIED DEBUG BUILD
+Date: 2026-10-12
+Source commit: 4e1dda87da92e324a84372e228919c3b5fa8ac39
+CI test merge: a5f34df0abb12e65758f81addbbb5ec3411fe9fe
+Run: https://github.com/Soldsoul86/orb/actions/runs/38257971597
+PR: https://github.com/Soldsoul86/orb/pull/1
+APK + evidence: https://github.com/Soldsoul86/orb/actions/runs/38257971597/artifacts/11751510965
+Artifact expires: 2026-11-11. Download and retain it.
+APK within ZIP: app/build/outputs/apk/debug/app-debug.apk
+APK SHA-256: e2b823fe7ee9d4f242b20d781c76b283060c0ff441fc2862a3f2adf7d36dfa2a
+Signing certificate SHA-256: 323de20c67ad49e07d67d623b527306a96c80ba4ad7bccf573093b85b95ee7c9
 
-VERIFIED locally: desktop SQLite FTS4 schema/triggers, prefix syntax regression,
-insert/update/delete, source manifest permission policy, shell syntax and Python
-script syntax. Original FTS4 prefix expression failed a partial-word query;
-placing the wildcard inside the quoted token fixes the reproduced failure.
+VERIFIED
+- assembleDebug and assembleDebugAndroidTest: successful.
+- JVM: 3 tests, 0 failures/errors, including the 11 original core checks.
+- Lint: 0 errors, 29 warnings (dependency/target updates, localization/style,
+  missing launcher icon and storage API suggestions). The single suppression
+  is the API-gated legacy Quick Settings call required on Android 10–13.
+- APK Signature Scheme v2 verified by apksigner; one Android debug signer.
+- Actual packaged permission allowlist, no INTERNET/broad storage permission,
+  allowBackup=false, minSdk=29 and targetSdk=36 checks passed.
+- Desktop SQLite: FTS insert/update/delete, prefix regression, manifest checks
+  and Android 12+ cloud backup/device-transfer exclusion configuration passed.
+- Android 10 / API 29 x86_64 emulator: exact artifact APK install SUCCESS;
+  3 instrumentation tests passed.
+- Android 16 / API 36 x86_64 emulator: exact artifact APK install SUCCESS;
+  3 instrumentation tests passed.
+- Those Android tests cover note capture/save/Activity reopen/prefix retrieval,
+  Android FTS edits/deletes, complete originals with bounded list previews,
+  installed permission constraints and a path-traversal rejection.
 
-IN PROGRESS: GitHub Actions Android compile, unit tests, lint, APK signature and
-merged permission checks; API 29/36 emulator install and note flow.
+OBSERVED EMULATOR PERFORMANCE (single samples, not phone benchmarks)
+- API 29: post-test foreground PSS 43,801 KiB (~42.8 MiB);
+  subsequent am start -W TotalTime 1,778 ms.
+- API 36: post-test foreground PSS 46,278 KiB (~45.2 MiB);
+  subsequent am start -W TotalTime 5,213 ms.
+- These are x86_64 CI emulators using software graphics, not retail devices.
+  No peak recording/OCR memory, p95 search, thermal or battery budget is verified.
 
-UNVERIFIED on a physical phone: installation, Play Protect response, core note
-flow, imported photos/files/audio/video, voice recording, consent revocation,
-recording interruption/rotation, notifications, media playback, OCR, dictation,
-RAM/CPU/battery/thermal performance and compatibility with 4 GB budget devices.
+UNVERIFIED
+- Any physical phone, retail price/4 GB compatibility and Play Protect outcome.
+- Physical-device note flow, airplane-mode end-to-end media/OCR operation,
+  share/import of photos/files/audio/video, recording start/stop/revoke/rotation,
+  microphone/notification denial, playback, Latin OCR and optional OS dictation.
+- Force-stop/reboot/process-death recovery, large-library performance and
+  low-space behavior under concurrent disk use. Recording paths were statically
+  audited and corrected but are not runtime verified by the note tests.
+- OEM enforcement of backup exclusions (configuration checks passed).
 
-INCOMPLETE: saved-audio transcription, internal app audio capture, direct camera
-capture, PDF content indexing, encrypted export, persistent release/update key.
-Existing photo/video capture path is import/share or consent-based screen video.
+INCOMPLETE / NOT IMPLEMENTED
+- Saved-audio transcription, internal app audio capture, direct camera capture,
+  PDF body indexing, encrypted export and a persistent release/update key.
+- Photo/video/file support currently uses import/share or screen recording.
 
-Local blocker: no full JDK/SDK/Gradle; outbound proxy connection unavailable in
-the command sandbox, and network permission requests stalled before execution.
-Use linked CI evidence for actual Android results; do not infer them from source.
+LIMITS
+- Keep Play Protect enabled; signature verification is not Play Protect approval.
+- CI debug keys are ephemeral. Cross-run upgrades may have a signature mismatch;
+  do not uninstall important memories to resolve it (uninstall deletes data).
+- Reproducible build procedure provided, not byte-identical APK reproducibility.
+- Orb's unrelated existing trading demonstration fails on the unchanged base
+  with event.risk.measured.toFixed TypeError (run 38255662912). It was not changed.
+- Local cloud SDK downloads were blocked; engineering verification ran in
+  authorized GitHub Actions. No physical phone is connected to this session.
