@@ -3,7 +3,7 @@ on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
   push:
-    branches: ['main', 'codex/keep-local-*']
+    branches: ['main']
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
   workflow_dispatch:
 permissions:
@@ -25,6 +25,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          cmdline-tools-version: '13114758'
+          log-accepted-android-sdk-licenses: false
       - name: Install pinned SDK packages
         run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
       - name: SQLite and source privacy contract
@@ -67,6 +71,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          cmdline-tools-version: '13114758'
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - name: Enable emulator acceleration
         run: |
