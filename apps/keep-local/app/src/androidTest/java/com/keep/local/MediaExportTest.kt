@@ -84,16 +84,21 @@ class MediaExportTest {
                 }
             }
             assertTrue(device.hasObject(By.res("com.keep.local", "memory_title")))
+            device.waitForIdle()
             onView(withId(R.id.media_share)).perform(scrollTo(), click())
             // Native resolver is actually displayed; select a real separate-UID receiver.
-            var target = device.wait(Until.findObject(By.textContains("Keep Local Test Receiver")), 5000)
+            var target = device.wait(Until.findObject(By.text("KL Receiver")), 10000)
             if (target == null) {
                 device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4,
                     device.displayWidth / 2, device.displayHeight / 4, 20)
-                target = device.wait(Until.findObject(By.textContains("Keep Local Test Receiver")), 5000)
+                target = device.wait(Until.findObject(By.text("KL Receiver")), 10000)
             }
-            assertNotNull("Sharesheet must list compatible receiver", target)
-            clickStable(By.textContains("Keep Local Test Receiver"))
+            if (target == null) {
+                val hierarchy = java.io.ByteArrayOutputStream()
+                device.dumpWindowHierarchy(hierarchy)
+                fail("Sharesheet receiver missing: " + hierarchy.toString("UTF-8"))
+            }
+            clickStable(By.text("KL Receiver"))
             val received = device.wait(Until.hasObject(By.text("Received playable video: CAD Test.mp4; other URI denied")), 10000)
             if (!received) {
                 val hierarchy = java.io.ByteArrayOutputStream()
@@ -119,6 +124,7 @@ class MediaExportTest {
             val deadline = System.currentTimeMillis() + 15000
             while (rows() == existing && System.currentTimeMillis() < deadline) Thread.sleep(100)
             assertEquals(existing + 1, rows())
+            assertTrue(device.wait(Until.gone(By.text("Saving a copy…")), 5000))
         }
         val duplicate = MediaExport.saveToGallery(context, item, CancellationSignal())
         try {
@@ -176,13 +182,13 @@ class MediaExportTest {
         try {
             ActivityScenario.launch<EditorActivity>(Intent(context, EditorActivity::class.java).putExtra("id", id)).use {
                 onView(withId(R.id.media_files)).perform(scrollTo(), click())
-                val roots = device.wait(Until.findObject(By.desc("Show roots")), 5000)
-                if (roots != null) {
-                    clickStable(By.desc("Show roots"))
-                    val downloads = device.wait(Until.findObject(By.text("Downloads")), 5000)
-                    assertNotNull("Local Downloads destination", downloads)
-                    clickStable(By.text("Downloads"))
-                }
+                // Match the drawer row's resource ID, not the toolbar's identical
+                // "Downloads" label. Android 10 can start with the drawer already open.
+                val downloads = By.res("android", "title").text("Downloads")
+                device.waitForIdle()
+                if (!device.hasObject(downloads)) clickStable(By.desc("Show roots"))
+                clickStable(downloads)
+                assertTrue(device.wait(Until.gone(By.text("Save to")), 5000))
                 val save = device.wait(Until.findObject(By.res("com.google.android.documentsui", "action_menu_save")), 3000)
                     ?: device.wait(Until.findObject(By.res("com.android.documentsui", "action_menu_save")), 3000)
                     ?: device.wait(Until.findObject(By.text("SAVE")), 3000)
