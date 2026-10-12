@@ -1,15 +1,13 @@
-name: Keep Local Android
+name: Keep Local Share Export Verification
 on:
   pull_request:
-    paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
-  push:
-    branches: ['main']
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: keep-local-${{ github.sha }}
+  group: keep-local-export-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   build:
@@ -29,43 +27,48 @@ jobs:
           packages: platform-tools
           cmdline-tools-version: '13114758'
           log-accepted-android-sdk-licenses: false
-      - name: Install pinned SDK packages
+      - name: Install SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
-      - name: SQLite and source privacy contract
+      - name: Schema and privacy checks
         run: python3 core-tests/db_contract.py
-      - name: Build debug APK and test APK, unit tests, lint
+      - name: Compile unsigned product, tests, JVM tests and lint
         run: bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
-      - name: Verify APK signature and packaged permissions
-        if: ${{ !cancelled() && hashFiles('apps/keep-local/app/build/outputs/apk/debug/app-debug.apk') != '' }}
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38257971597
+          github-token: ${{ github.token }}
+          name: keep-local-debug-a5f34df0abb12e65758f81addbbb5ec3411fe9fe
+          path: apps/keep-local/previous
+      - name: Prepare disposable emulator APKs; original-key release remains blocked
+        run: bash scripts/prepare-export-verification.sh
+      - name: Inspect compiled product
         run: |
-          mkdir -p evidence
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk | tee evidence/signature.txt
-          apkanalyzer manifest print app/build/outputs/apk/debug/app-debug.apk > evidence/packaged-manifest.xml
+          apkanalyzer manifest print app/build/outputs/apk/debug/app-debug-unsigned.apk > evidence/packaged-manifest.xml
           python3 scripts/check_packaged_manifest.py evidence/packaged-manifest.xml
-          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee evidence/APK-SHA256.txt
           git rev-parse HEAD > evidence/commit.txt
-          java -version 2> evidence/java.txt
-      - name: Test and lint summaries
+      - name: Test summaries
         if: always()
         run: |
           if [ -f app/build/reports/lint-results-debug.txt ]; then cat app/build/reports/lint-results-debug.txt; fi
           if [ -d app/build/test-results/testDebugUnitTest ]; then cat app/build/test-results/testDebugUnitTest/TEST-*.xml; fi
-      - name: Publish APK and evidence
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: keep-local-debug-${{ github.sha }}
+          name: keep-local-UNSIGNED-release-blocked-${{ github.sha }}
           path: |
-            apps/keep-local/app/build/outputs/apk/debug/*.apk
-            apps/keep-local/app/build/outputs/apk/androidTest/debug/*.apk
+            apps/keep-local/app/build/outputs/apk/debug/*unsigned.apk
             apps/keep-local/app/build/reports/
             apps/keep-local/evidence/
-          if-no-files-found: error
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disposable-emulator-fixtures-NOT-A-PHONE-UPDATE
+          path: apps/keep-local/test-artifacts/
+          retention-days: 7
   emulator:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -83,26 +86,24 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: actions/download-artifact@v4
         with:
-          name: keep-local-debug-${{ github.sha }}
-          path: keep-local-artifact
-      - name: Enable emulator acceleration
+          name: disposable-emulator-fixtures-NOT-A-PHONE-UPDATE
+          path: export-fixtures
+      - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install and exercise capture-save-retrieve
+      - name: Verify sharing, export and fixture upgrade
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: bash apps/keep-local/scripts/emulator-smoke.sh keep-local-artifact
+          script: bash apps/keep-local/scripts/export-emulator.sh export-fixtures
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: keep-local-emulator-api-${{ matrix.api }}
-          path: |
-            apps/keep-local/app/build/reports/androidTests/
-            apps/keep-local/app/build/outputs/androidTest-results/
-            apps/keep-local/evidence/
+          name: share-export-evidence-api-${{ matrix.api }}
+          path: apps/keep-local/evidence/
+          retention-days: 30

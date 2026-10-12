@@ -19,7 +19,7 @@ import java.text.DateFormat
 import java.util.Date
 
 /** Explicit source/note/extraction separation. Edit metadata without modifying media. */
-class EditorActivity : Activity() {
+class EditorActivity : MediaActionsActivity() {
     private var item: MemoryItem? = null
     private lateinit var titleInput: EditText
     private lateinit var note: EditText
@@ -59,6 +59,21 @@ class EditorActivity : Activity() {
             setText(item?.title ?: "")
         }
         root.addView(titleInput)
+        val i = item
+        if (i?.path != null) {
+            val search = intent.getStringExtra("query")?.trim().orEmpty()
+            val matched = i.extracted.lines().firstOrNull { line ->
+                search.isNotBlank() && CoreLogic.ftsQuery(search).isNotBlank() &&
+                    search.split(' ').any { it.length > 2 && line.contains(it, ignoreCase = true) }
+            }
+            val seek = Regex("^@(\\d+)s —").find(matched ?: "")?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
+            val play: (() -> Unit)? = if (i.kind in listOf("video", "audio")) ({
+                startActivity(Intent(this, PlaybackActivity::class.java)
+                    .putExtra("id", i.id).putExtra("start_ms", seek * 1000))
+            }) else null
+            addMediaActions(root, i, play)
+        }
+
         root.addView(text("Your note / context", 15, secondary).apply { setPadding(0, dp(18), 0, 0) })
         note = EditText(this).apply {
             id = R.id.memory_note
@@ -77,19 +92,6 @@ class EditorActivity : Activity() {
         }
         root.addView(pinned)
         root.addView(button("Save", root) { save() })
-        val i = item
-        if (i != null && i.kind in listOf("video", "audio")) {
-            val search = intent.getStringExtra("query")?.trim().orEmpty()
-            val matched = i.extracted.lines().firstOrNull { line ->
-                search.isNotBlank() && CoreLogic.ftsQuery(search).isNotBlank() &&
-                    search.split(' ').any { it.length > 2 && line.contains(it, ignoreCase = true) }
-            }
-            val seek = Regex("^@(\\d+)s —").find(matched ?: "")?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
-            root.addView(button(if (seek > 0) "Play from matching moment (${seek}s)" else "Play recording", root) {
-                startActivity(Intent(this, PlaybackActivity::class.java)
-                    .putExtra("id", i.id).putExtra("start_ms", seek * 1000))
-            })
-        }
         if (i != null && ((i.path != null && i.kind !in listOf("audio", "video")) || i.kind == "link")) {
             root.addView(button("Open original", root) { openOriginal() })
         }

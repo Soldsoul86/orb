@@ -1,0 +1,50 @@
+Keep Local 0.2.0 — Share and export
+
+Release status: BLOCKED pending recovery of the ORIGINAL signing private key.
+Original package/namespace: com.keep.local (unchanged).
+Version: 2 / 0.2.0. SQLite memories.db user_version remains 1; schema unchanged.
+Existing files/media paths and content://com.keep.local.media/item/<id> remain valid.
+Original certificate SHA-256:
+323de20c67ad49e07d67d623b527306a96c80ba4ad7bccf573093b85b95ee7c9
+Original APK SHA-256:
+e2b823fe7ee9d4f242b20d781c76b283060c0ff441fc2862a3f2adf7d36dfa2a
+
+The old GitHub-hosted build generated ~/.android/debug.keystore but neither
+saved nor cached it. The old APK/artifacts contain only the public certificate,
+not the private signing key. Other Orb package keys are not this identity.
+Do not uninstall the existing app, clear its storage or disable Play Protect.
+
+Build behavior:
+- Missing key: unsigned product APK. It cannot be installed or used as an update.
+- Provided key: checks pinned original certificate before packaging.
+- Configure KEEP_LOCAL_KEYSTORE, KEEP_LOCAL_STORE_PASSWORD, KEEP_LOCAL_KEY_ALIAS,
+  KEEP_LOCAL_KEY_PASSWORD securely outside Git. No secrets are embedded/uploaded.
+- CI signs disposable test copies ONLY for emulator verification, including a
+  re-signed baseline. They cannot upgrade the original signed installation.
+- CI explicitly checks that the real original rejects a mismatched certificate,
+  and that its seeded recording remains intact after rejection.
+
+Implementation:
+- Explicit Share uses ACTION_SEND, MIME, EXTRA_STREAM and ClipData with a
+  temporary read grant. Non-exported item provider serves a seekable read-only
+  file descriptor, no raw paths or directory grants.
+- Photos/video: MediaStore pending insertion then stream, close, publish in
+  Pictures/Keep Local or Movies/Keep Local. Duplicate files are not overwritten.
+- All media: Save to Files via ACTION_CREATE_DOCUMENT, local-only preference.
+- Export filenames use the saved title, safe extension and bounded UTF-8 length.
+- Copying runs off the UI thread with 64 KiB buffer, cancellation and partial
+  output cleanup; original file and metadata are never mutated by export.
+- Rotation retains an active copy without retaining the old Activity. Leaving
+  the Activity cancels; process death can leave an invisible pending MediaStore
+  row that Android expires. SAF providers may retain a partial file on process
+  death or if deletion fails. No recovery of original content is needed.
+- No permissions added; app has no INTERNET or broad storage permission.
+
+Verification plan (results to be recorded after CI):
+- JVM filename, streaming, cancellation, truncated source and full-output tests.
+- API29/API36 seeded CAD Test playback, real native chooser -> separate test-UID
+  receiver reading/decoding MP4, gallery copy equality and decode, duplicates,
+  cancelled picker/missing files, 256 MiB stream, read-only provider, restart.
+- Same-key fixture upgrade validates storage continuity, NOT original signing.
+- Phone installation, ChatGPT/WhatsApp/Drive receiving behavior, actual user's
+  CAD Test, physical low-storage behavior and Play Protect remain unverified.
