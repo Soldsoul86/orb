@@ -3,6 +3,7 @@ set -euo pipefail
 artifact="${1:?Pass the downloaded APK artifact directory}"
 evidence="apps/keep-local/evidence"
 mkdir -p "$evidence"
+trap 'timeout 10s adb logcat -d > "$evidence/emulator-logcat.txt" || true' EXIT
 # Install the exact APKs published by the build job, without rebuilding/signing.
 adb install -r "$artifact/app/build/outputs/apk/debug/app-debug.apk"
 adb install -r "$artifact/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"

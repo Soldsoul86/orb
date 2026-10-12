@@ -6,3 +6,5 @@ local.properties
 *.apk
 *.aab
 .DS_Store
+evidence/
+__pycache__/

@@ -1,0 +1,30 @@
+KEEP LOCAL — FIRST PHONE TEST (not yet executed)
+
+1. Download the build artifact from the verified GitHub Actions run. Extract
+   app/build/outputs/apk/debug/app-debug.apk. The androidTest APK is only for CI.
+2. Keep Google Play Protect enabled. Open the APK and use Android's normal
+   per-source 'Install unknown apps' permission if prompted. Record any warning
+   or failure exactly; stop if Play Protect blocks it rather than disabling it.
+   With a USB-authorized phone: adb install -r app-debug.apk
+3. Enable airplane mode. Open Keep Local → + Note. Enter title 'Budget meeting'
+   and note 'Remember the deadline tomorrow'; tap Save.
+4. Close/reopen Keep Local. Search 'deadl'. Open the result and confirm the
+   original note appears unchanged. Edit and save, then verify old terms stop
+   matching. Delete only this test memory and confirm the result disappears.
+5. Record model, Android version, RAM, APK SHA-256, installation result,
+   Play Protect outcome and capture/save/search result. None is assumed passed.
+6. Later gates: deny/allow mic; start/stop voice; deny/allow each new screen
+   consent; stop by notification and system indicator; reopen/play; rotate;
+   repeat while low on storage. See acceptance.md.
+
+Performance commands (USB debugging is optional):
+  adb shell am start -W -n com.keep.local/.MainActivity
+  adb shell dumpsys meminfo com.keep.local
+  adb logcat -d -s AndroidRuntime
+Capture idle/recording/OCR/playback separately. An emulator memory figure does
+not verify a retail 4 GB phone. No device is attached to this Work session.
+
+CI uses a new debug signing key for each run. If installing a later build gives
+INSTALL_FAILED_UPDATE_INCOMPATIBLE, do not uninstall important data. Preserve
+that installation until a signing/export strategy is available. These builds
+are for test memories, not the sole copy of important information.

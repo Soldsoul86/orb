@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.widget.Toast
@@ -36,7 +37,8 @@ class VoiceService : Service() {
         try {
             startForeground(201, RecordingNotifications.make(this,
                 "Voice recording", "Microphone on • stored on this phone", STOP, VoiceService::class.java),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                if (Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                else 0)
             if (AppFiles.mediaDir(this).usableSpace < 500L * 1024 * 1024) error("Low storage")
             val file = AppFiles.tempFile(this, "m4a")
             pending = file
@@ -55,6 +57,7 @@ class VoiceService : Service() {
                     if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
                         what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) stopAndSave()
                 }
+                setOnErrorListener { _, _, _ -> stopAndSave() }
                 setOutputFile(file.absolutePath)
                 prepare()
                 start()

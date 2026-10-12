@@ -47,3 +47,11 @@ for filename in required:
 assert 'compileSdk = 36' in (root / 'app/build.gradle.kts').read_text()
 assert 'targetSdk = 36' in (root / 'app/build.gradle.kts').read_text()
 print('PASS: source components present, current Android target defined')
+
+rules = ET.parse(root / 'app/src/main/res/xml/data_extraction_rules.xml').getroot()
+for transport in ('cloud-backup', 'device-transfer'):
+    domains = {e.get('domain') for e in rules.find(transport).findall('exclude') if e.get('path') == '.'}
+    assert {'root', 'file', 'database', 'sharedpref', 'external', 'device_root',
+            'device_file', 'device_database', 'device_sharedpref'} <= domains
+assert app.attrib.get(ns+'dataExtractionRules') == '@xml/data_extraction_rules'
+print('PASS: cloud backup and device-transfer exclusions')

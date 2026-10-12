@@ -56,11 +56,12 @@ class ScreenService : Service() {
         try {
             val mic = intent.getBooleanExtra(MIC, false)
             val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
-                (if (mic) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
+                (if (mic && Build.VERSION.SDK_INT >= 30) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
             startForeground(202, RecordingNotifications.make(this,
                 "Screen recording", if (mic) "Screen and microphone • on-device" else "Screen video only • on-device",
                 STOP, ScreenService::class.java), types)
-            if (AppFiles.mediaDir(this).usableSpace < 500L * 1024 * 1024) error("Low storage")
+            val freeBytes = AppFiles.mediaDir(this).usableSpace
+            if (freeBytes < 500L * 1024 * 1024) error("Low storage")
             val consent = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(DATA, Intent::class.java)
                 else intent.getParcelableExtra(DATA) as? Intent
             requireNotNull(consent) { "Screen recording consent missing" }
@@ -80,7 +81,9 @@ class ScreenService : Service() {
                 setVideoFrameRate(24)
                 setVideoEncodingBitRate(1_600_000)
                 setMaxDuration(30 * 60 * 1000) // bound long recordings on low-storage phones
-                setMaxFileSize(1_073_741_824L) // 1 GiB, stop before storage can be exhausted
+                // Keep a reserve when the phone has less than 1 GiB free.
+                setMaxFileSize(minOf(1_073_741_824L, freeBytes - 250L * 1024 * 1024))
+                setOnErrorListener { _, _, _ -> handler.post { saveAndStop() } }
                 setOnInfoListener { _, what, _ ->
                     if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
                         what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED) {
