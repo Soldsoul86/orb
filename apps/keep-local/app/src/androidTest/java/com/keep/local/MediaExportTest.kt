@@ -16,10 +16,13 @@ import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.After
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.FileNotFoundException
@@ -31,6 +34,15 @@ class MediaExportTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val db get() = MemoryDb.get(context)
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+    @After fun leaveExternalScreens() { device.pressBack(); device.pressHome() }
+    private fun clickStable(selector: BySelector) {
+        repeat(4) {
+            device.waitForIdle()
+            val node = device.wait(Until.findObject(selector), 3000)
+            if (node != null) try { node.click(); return } catch (_: StaleObjectException) { }
+        }
+        fail("Control did not stabilize: $selector")
+    }
     private fun cad() = requireNotNull(db.get(987654L)) { "CI must seed an existing CAD Test video before upgrade" }
     private fun hash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -70,7 +82,7 @@ class MediaExportTest {
                 target = device.wait(Until.findObject(By.textContains("Keep Local Test Receiver")), 5000)
             }
             assertNotNull("Sharesheet must list compatible receiver", target)
-            target!!.click()
+            clickStable(By.textContains("Keep Local Test Receiver"))
             val received = device.wait(Until.hasObject(By.text("Received playable video: CAD Test.mp4")), 10000)
             if (!received) {
                 val hierarchy = java.io.ByteArrayOutputStream()
@@ -149,13 +161,18 @@ class MediaExportTest {
         val original = cad()
         val id = db.add("video", "Private grant check", path = original.path, mime = original.mime, bytes = original.bytes)
         try {
-            context.startActivity(Intent(Intent.ACTION_SEND).apply {
-                component = android.content.ComponentName("com.keep.local.test", "com.keep.local.ShareReceiverActivity")
-                putExtra(Intent.EXTRA_STREAM, AppFiles.itemUri(id))
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
-            assertTrue(device.wait(Until.hasObject(By.text("Receive failed: SecurityException")), 5000))
-            device.pressBack()
+            // A visible Activity avoids Android's background-launch restriction;
+            // otherwise the receiver never runs and cannot exercise provider access.
+            ActivityScenario.launch<EditorActivity>(Intent(context, EditorActivity::class.java).putExtra("id", id)).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.startActivity(Intent(Intent.ACTION_SEND).apply {
+                        component = android.content.ComponentName("com.keep.local.test", "com.keep.local.ShareReceiverActivity")
+                        putExtra(Intent.EXTRA_STREAM, AppFiles.itemUri(id))
+                    })
+                }
+                assertTrue(device.wait(Until.hasObject(By.text("Receive failed: SecurityException")), 5000))
+                device.pressBack()
+            }
         } finally { db.remove(id) }
     }
 
@@ -169,16 +186,16 @@ class MediaExportTest {
                 onView(withId(R.id.media_files)).perform(scrollTo(), click())
                 val roots = device.wait(Until.findObject(By.desc("Show roots")), 5000)
                 if (roots != null) {
-                    roots.click()
+                    clickStable(By.desc("Show roots"))
                     val downloads = device.wait(Until.findObject(By.text("Downloads")), 5000)
                     assertNotNull("Local Downloads destination", downloads)
-                    downloads!!.click()
+                    clickStable(By.text("Downloads"))
                 }
                 val save = device.wait(Until.findObject(By.res("com.google.android.documentsui", "action_menu_save")), 3000)
                     ?: device.wait(Until.findObject(By.res("com.android.documentsui", "action_menu_save")), 3000)
                     ?: device.wait(Until.findObject(By.text("SAVE")), 3000)
                 assertNotNull("Create document confirmation", save)
-                save!!.click()
+                clickStable(By.res(save!!.resourceName))
                 val expected = hash(MediaExport.source(context, item))
                 val deadline = System.currentTimeMillis() + 15000
                 var matched = false

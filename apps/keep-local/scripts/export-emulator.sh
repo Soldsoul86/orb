@@ -37,7 +37,10 @@ adb shell am force-stop com.keep.local
 adb install -r "$artifact/update-fixture.apk" | tee "$evidence/fixture-upgrade.txt"
 check_original
 adb install "$artifact/tests-fixture.apk"
-adb shell am instrument -w com.keep.local.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/export-tests.txt"
+if ! timeout 240s adb shell am instrument -w com.keep.local.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/export-tests.txt"; then
+  adb logcat -d -s AndroidRuntime:E KeepLocalReceiver:V | tail -150
+  exit 1
+fi
 if ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "$evidence/export-tests.txt"; then
   adb logcat -d -s AndroidRuntime:E KeepLocalReceiver:V | tail -150
   exit 1
