@@ -1,0 +1,108 @@
+name: Keep Local Android
+on:
+  pull_request:
+    paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
+  push:
+    branches: ['main']
+    paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: keep-local-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/keep-local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          cmdline-tools-version: '13114758'
+          log-accepted-android-sdk-licenses: false
+      - name: Install pinned SDK packages
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
+      - name: SQLite and source privacy contract
+        run: python3 core-tests/db_contract.py
+      - name: Build debug APK and test APK, unit tests, lint
+        run: bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+      - name: Verify APK signature and packaged permissions
+        if: ${{ !cancelled() && hashFiles('apps/keep-local/app/build/outputs/apk/debug/app-debug.apk') != '' }}
+        run: |
+          mkdir -p evidence
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk | tee evidence/signature.txt
+          apkanalyzer manifest print app/build/outputs/apk/debug/app-debug.apk > evidence/packaged-manifest.xml
+          python3 scripts/check_packaged_manifest.py evidence/packaged-manifest.xml
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee evidence/APK-SHA256.txt
+          git rev-parse HEAD > evidence/commit.txt
+          java -version 2> evidence/java.txt
+      - name: Test and lint summaries
+        if: always()
+        run: |
+          if [ -f app/build/reports/lint-results-debug.txt ]; then cat app/build/reports/lint-results-debug.txt; fi
+          if [ -d app/build/test-results/testDebugUnitTest ]; then cat app/build/test-results/testDebugUnitTest/TEST-*.xml; fi
+      - name: Publish APK and evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: keep-local-debug-${{ github.sha }}
+          path: |
+            apps/keep-local/app/build/outputs/apk/debug/*.apk
+            apps/keep-local/app/build/outputs/apk/androidTest/debug/*.apk
+            apps/keep-local/app/build/reports/
+            apps/keep-local/evidence/
+          if-no-files-found: error
+          retention-days: 30
+  emulator:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 36]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          cmdline-tools-version: '13114758'
+          log-accepted-android-sdk-licenses: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: keep-local-debug-${{ github.sha }}
+          path: keep-local-artifact
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and exercise capture-save-retrieve
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash apps/keep-local/scripts/emulator-smoke.sh keep-local-artifact
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: keep-local-emulator-api-${{ matrix.api }}
+          path: |
+            apps/keep-local/app/build/reports/androidTests/
+            apps/keep-local/app/build/outputs/androidTest-results/
+            apps/keep-local/evidence/

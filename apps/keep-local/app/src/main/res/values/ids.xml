@@ -1,0 +1,6 @@
+<resources>
+    <item name="search_query" type="id" />
+    <item name="memory_title" type="id" />
+    <item name="memory_note" type="id" />
+    <item name="memory_pinned" type="id" />
+</resources>

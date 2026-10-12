@@ -1,0 +1,53 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Enforce offline even when a bundled library declares network permissions. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- Deliberately NO INTERNET, storage-all-files, overlay or accessibility permission. -->
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:mimeType="video/mp4" /></intent>
+    </queries>
+
+    <application
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="true">
+        <activity android:name=".PlaybackActivity" android:exported="false" />
+        <activity android:name=".EditorActivity" android:exported="false" />
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <service android:name=".ScreenService" android:exported="false" android:foregroundServiceType="mediaProjection|microphone"/>
+        <service android:name=".VoiceService" android:exported="false" android:foregroundServiceType="microphone"/>
+        <service android:name=".OcrJob" android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name=".ScreenTile" android:label="@string/qs_tile" android:icon="@drawable/ic_notification"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+        </service>
+        <provider android:name=".MediaProvider" android:authorities="com.keep.local.media"
+            android:grantUriPermissions="true" android:exported="false"/>
+    </application>
+</manifest>
