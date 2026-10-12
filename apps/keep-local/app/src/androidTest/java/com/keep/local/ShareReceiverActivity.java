@@ -34,7 +34,14 @@ public class ShareReceiverActivity extends Activity {
                 if (frame == null) throw new IllegalStateException("Frame");
                 frame.recycle();
             }
-            result = "Received playable video: " + title;
+            // A grant for one item must never expose any other item URI.
+            boolean denied = false;
+            try (Cursor ignored = getContentResolver().query(
+                    Uri.parse("content://com.keep.local.media/item/0"), null, null, null, null)) {
+                // Even a nonexistent item must be rejected at the permission boundary.
+            } catch (SecurityException expected) { denied = true; }
+            if (!denied) throw new IllegalStateException("Unscoped provider access");
+            result = "Received playable video: " + title + "; other URI denied";
         } catch (Exception error) {
             android.util.Log.e("KeepLocalReceiver", "Receive failed", error);
             result = "Receive failed: " + error.getClass().getSimpleName();

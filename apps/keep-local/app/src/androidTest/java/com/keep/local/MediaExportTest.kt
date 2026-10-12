@@ -72,7 +72,13 @@ class MediaExportTest {
         ActivityScenario.launch<EditorActivity>(Intent(context, EditorActivity::class.java).putExtra("id", item.id)).use {
             onView(withId(R.id.media_play)).perform(scrollTo(), click())
             assertTrue(device.wait(Until.hasObject(By.clazz("android.widget.VideoView")), 5000))
-            device.pressBack()
+            repeat(3) {
+                if (!device.hasObject(By.res("com.keep.local", "memory_title"))) {
+                    device.pressBack()
+                    device.wait(Until.hasObject(By.res("com.keep.local", "memory_title")), 1000)
+                }
+            }
+            assertTrue(device.hasObject(By.res("com.keep.local", "memory_title")))
             onView(withId(R.id.media_share)).perform(scrollTo(), click())
             // Native resolver is actually displayed; select a real separate-UID receiver.
             var target = device.wait(Until.findObject(By.textContains("Keep Local Test Receiver")), 5000)
@@ -83,7 +89,7 @@ class MediaExportTest {
             }
             assertNotNull("Sharesheet must list compatible receiver", target)
             clickStable(By.textContains("Keep Local Test Receiver"))
-            val received = device.wait(Until.hasObject(By.text("Received playable video: CAD Test.mp4")), 10000)
+            val received = device.wait(Until.hasObject(By.text("Received playable video: CAD Test.mp4; other URI denied")), 10000)
             if (!received) {
                 val hierarchy = java.io.ByteArrayOutputStream()
                 device.dumpWindowHierarchy(hierarchy)
@@ -157,28 +163,9 @@ class MediaExportTest {
         assertEquals(before, hash(MediaExport.source(context, item)))
     }
 
-    @Test fun providerCannotBeReadByAnotherAppWithoutExplicitGrant() {
-        val original = cad()
-        val id = db.add("video", "Private grant check", path = original.path, mime = original.mime, bytes = original.bytes)
-        try {
-            // A visible Activity avoids Android's background-launch restriction;
-            // otherwise the receiver never runs and cannot exercise provider access.
-            ActivityScenario.launch<EditorActivity>(Intent(context, EditorActivity::class.java).putExtra("id", id)).use { scenario ->
-                scenario.onActivity { activity ->
-                    activity.startActivity(Intent(Intent.ACTION_SEND).apply {
-                        component = android.content.ComponentName("com.keep.local.test", "com.keep.local.ShareReceiverActivity")
-                        putExtra(Intent.EXTRA_STREAM, AppFiles.itemUri(id))
-                    })
-                }
-                assertTrue(device.wait(Until.hasObject(By.text("Receive failed: SecurityException")), 5000))
-                device.pressBack()
-            }
-        } finally { db.remove(id) }
-    }
-
     @Test fun saveToFilesCreatesPlayableVideoInDownloads() {
         val item = cad()
-        val title = "Keep Local SAF ${System.nanoTime()}"
+        val title = "KeepLocalSAF${System.nanoTime()}"
         val id = db.add("video", title, path = item.path, mime = item.mime, bytes = item.bytes)
         val exported = "/sdcard/Download/$title.mp4"
         try {
@@ -200,15 +187,22 @@ class MediaExportTest {
                 val deadline = System.currentTimeMillis() + 15000
                 var matched = false
                 while (!matched && System.currentTimeMillis() < deadline) {
-                    matched = device.executeShellCommand("sha256sum '$exported'").startsWith(expected)
+                    matched = device.executeShellCommand("sha256sum $exported").startsWith(expected)
                     if (!matched) Thread.sleep(100)
+                }
+                if (!matched) {
+                    println(device.executeShellCommand("ls -l /sdcard/Download"))
+                    println(device.executeShellCommand("sha256sum $exported"))
+                    val hierarchy = java.io.ByteArrayOutputStream()
+                    device.dumpWindowHierarchy(hierarchy)
+                    println(hierarchy.toString("UTF-8"))
                 }
                 assertTrue("SAF export in Downloads equals original MP4", matched)
                 playable(AppFiles.itemUri(item.id))
             }
         } finally {
             db.remove(id)
-            device.executeShellCommand("rm -f '$exported'")
+            device.executeShellCommand("rm -f $exported")
         }
     }
 
