@@ -3,4 +3,8 @@
     <item name="memory_title" type="id" />
     <item name="memory_note" type="id" />
     <item name="memory_pinned" type="id" />
+    <item name="media_play" type="id" />
+    <item name="media_share" type="id" />
+    <item name="media_gallery" type="id" />
+    <item name="media_files" type="id" />
 </resources>

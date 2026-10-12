@@ -1,0 +1,132 @@
+Keep Local 0.2.0 — Share and export
+
+Release status: BLOCKED. User confirmed no original signing-key backup exists.
+Original package/namespace: com.keep.local (unchanged).
+Version: 2 / 0.2.0. SQLite memories.db user_version remains 1; schema unchanged.
+Existing files/media paths and content://com.keep.local.media/item/<id> remain valid.
+Original certificate SHA-256:
+323de20c67ad49e07d67d623b527306a96c80ba4ad7bccf573093b85b95ee7c9
+Original APK SHA-256:
+e2b823fe7ee9d4f242b20d781c76b283060c0ff441fc2862a3f2adf7d36dfa2a
+
+The old GitHub-hosted build generated ~/.android/debug.keystore but neither
+saved nor cached it. The old APK/artifacts contain only the public certificate,
+not the private signing key. Other Orb package keys are not this identity.
+Do not uninstall the existing app, clear its storage or disable Play Protect.
+
+Build behavior:
+- Missing key: unsigned product APK. It cannot be installed or used as an update.
+- Provided key: checks pinned original certificate before packaging.
+- Configure KEEP_LOCAL_KEYSTORE, KEEP_LOCAL_STORE_PASSWORD, KEEP_LOCAL_KEY_ALIAS,
+  KEEP_LOCAL_KEY_PASSWORD securely outside Git. No secrets are embedded/uploaded.
+- CI signs disposable test copies ONLY for emulator verification, including a
+  re-signed baseline. They cannot upgrade the original signed installation.
+- CI explicitly checks that the real original rejects a mismatched certificate,
+  and that its seeded recording remains intact after rejection.
+
+Implementation:
+- Explicit Share uses ACTION_SEND, MIME, EXTRA_STREAM and ClipData with a
+  temporary read grant. Non-exported item provider serves a seekable read-only
+  file descriptor, no raw paths or directory grants.
+- Photos/video: MediaStore pending insertion then stream, close, publish in
+  Pictures/Keep Local or Movies/Keep Local. Existing names are queried and a
+  numeric suffix is chosen under a lock. Duplicate files are not overwritten.
+- All media: Save to Files via ACTION_CREATE_DOCUMENT, local-only preference.
+- Export filenames use the saved title, safe extension and bounded UTF-8 length.
+- Copying runs off the UI thread with 64 KiB buffer, cancellation and partial
+  output cleanup; original file and metadata are never mutated by export.
+- Rotation retains an active copy without retaining the old Activity. Leaving
+  the Activity cancels; process death can leave an invisible pending MediaStore
+  row that Android expires. SAF providers may retain a partial file on process
+  death or if deletion fails. No recovery of original content is needed.
+- No permissions added; app has no INTERNET or broad storage permission.
+
+Executed verification — 2026-10-12:
+Source commit: d61bbe24e675928eecf4e9a510780cc68382063a
+CI tested PR merge: 14fb36c7935b54a0512b138edf1cbb217173c607
+https://github.com/Soldsoul86/orb/actions/runs/38273229590
+Build, Android 10/API29 and Android 16/API36 jobs: SUCCESS.
+Final documentation changes after this run do not alter executable source.
+
+VERIFIED in CI:
+- Kotlin compilation, unsigned debug product APK and instrumentation APK.
+- 6 JVM tests passed; Android lint: 0 errors, 30 warnings.
+- SQLite/FTS, permission allowlist, backup exclusions and packaged identity.
+- 8 instrumentation tests passed on EACH emulator (3 existing + 5 export).
+- A synthetic video titled CAD Test seeded into the v1 database before upgrade
+  remains playable through the details screen and existing provider.
+- Native Android Sharesheet opens. A separate-UID test receiver can read and
+  decode the granted MP4, with CAD Test.mp4 display name. An ungranted item URI
+  is denied. This is not verification of ChatGPT, WhatsApp or Google Drive.
+- Save to Gallery button creates a published, decodable MP4 in Movies/Keep Local;
+  original/export SHA-256 hashes match. Duplicate names remain distinct.
+- Native Save to Files picker writes a byte-identical MP4 into Downloads.
+- Cancelled picker, pre-cancelled Gallery export and missing-file errors preserve
+  originals. Traversal and write-open attempts fail.
+- Filename sanitization including Unicode, invalid characters and extensions.
+- 300 MiB synthetic JVM stream uses at most a 64 KiB read buffer; 256 MiB Android
+  disk copy hashes match. This is not a measurement on a 4 GB physical phone.
+- Injected output-full/truncation errors and stream cancellation (JVM).
+- Audio/image/document MIME and filename mapping (Android tests).
+- Original file hash and metadata retained; file remains after process restart.
+- Same-disposable-key baseline-to-update installation preserves seeded v1 media.
+  This verifies data continuity only: baseline was re-signed for that test.
+- The actual originally signed APK rejects the different-key update with
+  INSTALL_FAILED_UPDATE_INCOMPATIBLE; its seeded recording remains intact.
+- USB/run-as recovery script copies synthetic CAD Test bytes from the ACTUAL
+  originally signed APK on both emulators, without changing its installation.
+
+IMPLEMENTED but device behavior UNVERIFIED:
+- Audio, image and document attachment export to real receiving apps.
+- Photo Gallery insertion (video Gallery insertion is verified).
+- Rotation during a copy, mid-copy UI cancellation and process death recovery.
+- Physical low-storage conditions (I/O failure handling is tested synthetically).
+- Existing voice/screen capture lifecycles on a physical phone remain unverified
+  in this focused release; existing capture implementations were preserved.
+
+INCOMPLETE/BLOCKED:
+- Installable upgrade of the user's current app: original private key is lost.
+- Actual user's CAD Test recovery, phone installation/performance and attachment
+  to ChatGPT require physical-device testing. No Play Protect approval is claimed.
+- Empty (zero-byte) files are currently rejected as unavailable media.
+- Some SAF providers can leave a partial destination after process death or a
+  failed cleanup; original private recordings remain untouched.
+- Lint warnings remain (dependency freshness, existing UI/resources/style).
+- Unrelated root Orb verify workflow fails in existing trading-demo code;
+  the standalone Keep Local workflow above is green.
+
+Artifacts:
+Unsigned product APK and build/lint reports (NOT installable):
+https://github.com/Soldsoul86/orb/actions/runs/38273229590/artifacts/11758480479
+Inside ZIP: app/build/outputs/apk/debug/app-debug-unsigned.apk
+APK digest is included in evidence/UNSIGNED-APK-SHA256.txt.
+API29 evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38273229590/artifacts/11758905097
+API36 evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38273229590/artifacts/11758785191
+Disposable signed fixtures are labelled NOT-A-PHONE-UPDATE and must not be used
+as a phone release. They are retained for 7 days; other artifacts for 30 days.
+CI currently retrieves the previous signed APK from run 38257971597. Preserve
+that trusted original APK before its artifact expires on 2026-11-11 to keep the
+original-certificate regression test runnable. It cannot recover the private key.
+
+Original key status confirmed by user: no signing-key backup available.
+Therefore an in-place phone update is blocked, not merely untested.
+
+Read-only recovery route for the installed debug build (physical phone UNVERIFIED):
+1. Stop all Keep Local recordings. Keep the app installed and its data intact.
+2. On a trusted computer install Android platform-tools and Python 3.
+3. Connect the phone by USB, enable USB debugging, and authorize that computer.
+4. Run adb devices to identify the device serial.
+5. Run:
+   python3 scripts/recover-existing-media.py --serial YOUR_SERIAL --title "CAD Test" --output "CAD Test.mp4" --recordings-stopped
+6. If duplicate titles exist, rerun with the displayed --id. Existing output
+   files are never overwritten. The script reads the database and original
+   via run-as; it never writes to app storage or changes the installation.
+7. Copy the verified MP4 back to the phone's Download folder through USB, then
+   choose it from ChatGPT's attachment picker if that app supports MP4 uploads.
+   Actual ChatGPT upload acceptance is not verified.
+8. Reopen Keep Local. Disable USB debugging when finished if desired.
+
+This route requires a computer and an authorized USB connection. It is not an
+on-phone replacement for the requested update and does not meet that criterion.

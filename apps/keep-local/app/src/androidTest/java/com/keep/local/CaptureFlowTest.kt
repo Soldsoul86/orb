@@ -42,7 +42,7 @@ class CaptureFlowTest {
                     catch (_: androidx.test.espresso.NoMatchingViewException) { Thread.sleep(100) }
                 }
                 assertTrue("Saved note should appear for a prefix query", shown)
-                onView(withSubstring(title)).perform(click())
+                onView(withSubstring(title)).perform(scrollTo(), click())
                 onView(withId(R.id.memory_note)).check(matches(withText(body)))
             }
         } finally { db.search(title, "note").filter { it.title == title }.forEach { db.remove(it.id) } }

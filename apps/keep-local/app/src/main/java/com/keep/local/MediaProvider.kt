@@ -28,15 +28,15 @@ class MediaProvider : ContentProvider() {
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
-    override fun getType(uri: Uri): String = item(uri).mime ?: "application/octet-stream"
+    override fun getType(uri: Uri): String = MediaExport.mime(item(uri))
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, selectionArgs: Array<out String>?, sortOrder: String?): Cursor {
         val memory = item(uri)
         val cols = projection ?: arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)
         val c = MatrixCursor(cols)
         c.addRow(cols.map {
             when (it) {
-                OpenableColumns.DISPLAY_NAME -> memory.title
-                OpenableColumns.SIZE -> memory.bytes
+                OpenableColumns.DISPLAY_NAME -> MediaExport.filename(memory)
+                OpenableColumns.SIZE -> AppFiles.safeFile(requireNotNull(context), memory.path)?.length()
                 else -> null
             }
         })

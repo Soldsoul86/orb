@@ -8,3 +8,9 @@ local.properties
 .DS_Store
 evidence/
 __pycache__/
+*.keystore
+*.jks
+*.p12
+signing.properties
+previous/
+test-artifacts/

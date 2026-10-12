@@ -11,7 +11,7 @@ import android.view.View
 import android.widget.*
 
 /** Native media playback. Video OCR results become clickable time markers. */
-class PlaybackActivity : Activity() {
+class PlaybackActivity : MediaActionsActivity() {
     private var video: VideoView? = null
     private var player: MediaPlayer? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -36,6 +36,7 @@ class PlaybackActivity : Activity() {
         WindowInsetsHelper.applyTo(root)
         root.addView(label(item.title, 20, white))
         root.addView(label("Saved on device • ${CoreLogic.prettyBytes(item.bytes)}", 12, muted))
+        addMediaActions(root, item)
         val seekStart = intent.getLongExtra("start_ms", 0).toInt().coerceAtLeast(0)
         if (item.kind == "video") {
             video = VideoView(this).apply {
