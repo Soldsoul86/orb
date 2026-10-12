@@ -60,6 +60,7 @@ object MediaExport {
 
     fun isGalleryItem(item: MemoryItem) = mime(item).let { it.startsWith("video/") || it.startsWith("image/") }
 
+    @Synchronized
     fun saveToGallery(context: Context, item: MemoryItem, cancel: CancellationSignal): Uri {
         val original = source(context, item)
         require(isGalleryItem(item)) { "Use Save to Files for this format" }
@@ -70,15 +71,26 @@ object MediaExport {
         val collection = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val resolver = context.contentResolver
+        val folder = "${if (video) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES}/Keep Local/"
+        val preferred = filename(item)
+        var displayName = preferred
+        var suffix = 1
+        // Some MediaStore versions reuse an existing row for an identical path.
+        // Allocate an unused name under a process lock before inserting a new copy.
+        while (resolver.query(collection, arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND ${MediaStore.MediaColumns.DISPLAY_NAME}=?",
+                arrayOf(folder, displayName), null)?.use { it.moveToFirst() } == true) {
+            cancel.throwIfCanceled()
+            displayName = "${preferred.substringBeforeLast('.')} (${suffix++}).${preferred.substringAfterLast('.')}"
+        }
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, filename(item))
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
             put(MediaStore.MediaColumns.MIME_TYPE, mime(item))
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${if (video) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES}/Keep Local")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
             // If the OS kills the process mid-copy, Android can expire the unpublished row.
             put(MediaStore.MediaColumns.DATE_EXPIRES, System.currentTimeMillis() / 1000 + 86400)
         }
-        // MediaStore generates a unique physical filename when DISPLAY_NAME collides.
         val uri = resolver.insert(collection, values) ?: throw IOException("Gallery is unavailable")
         try {
             copyTo(context, original, uri, cancel)

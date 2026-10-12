@@ -45,12 +45,17 @@ class MediaExportTest {
     }
     private fun cad() = requireNotNull(db.get(987654L)) { "CI must seed an existing CAD Test video before upgrade" }
     private fun hash(file: File): String {
+        return file.inputStream().use { streamHash(it) }
+    }
+    private fun streamHash(input: java.io.InputStream): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(65536)
-            while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
-        }
+        val buffer = ByteArray(65536)
+        while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+    private fun shellHash(path: String): String {
+        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("cat $path")
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { streamHash(it) }
     }
     private fun playable(uri: Uri) {
         MediaMetadataRetriever().use {
@@ -187,15 +192,14 @@ class MediaExportTest {
                 val deadline = System.currentTimeMillis() + 15000
                 var matched = false
                 while (!matched && System.currentTimeMillis() < deadline) {
-                    matched = device.executeShellCommand("sha256sum $exported").startsWith(expected)
+                    matched = shellHash(exported) == expected
                     if (!matched) Thread.sleep(100)
                 }
                 if (!matched) {
-                    println(device.executeShellCommand("ls -l /sdcard/Download"))
-                    println(device.executeShellCommand("sha256sum $exported"))
                     val hierarchy = java.io.ByteArrayOutputStream()
                     device.dumpWindowHierarchy(hierarchy)
-                    println(hierarchy.toString("UTF-8"))
+                    fail("SAF export mismatch: expected=$expected actual=${shellHash(exported)}; " +
+                        device.executeShellCommand("ls -l /sdcard/Download") + hierarchy.toString("UTF-8"))
                 }
                 assertTrue("SAF export in Downloads equals original MP4", matched)
                 playable(AppFiles.itemUri(item.id))
