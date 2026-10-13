@@ -43,4 +43,38 @@ class AuthorizedLibraryTest {
         }finally{db.close()}
         val stop=AtomicBoolean(true);assertFalse(AuthorizedLibrary.step(c,stop))
     }
+    @Test fun realFolderPickerPersistsReadGrantAndRevocationErasesExtractedText(){
+        val device=androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        androidx.test.core.app.ActivityScenario.launch(LibrarySettingsActivity::class.java).use {
+            androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Choose document folder")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),androidx.test.espresso.action.ViewActions.click())
+            val roots=androidx.test.uiautomator.By.text("Keep Local fixtures")
+            device.waitForIdle()
+            if(!device.hasObject(roots)) device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.desc("Show roots")),5000)?.click()
+            val fixture=device.wait(androidx.test.uiautomator.Until.findObject(roots),5000)
+            assertNotNull("Fixture folder must appear in Android document picker",fixture);fixture!!.click()
+            val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.textMatches("(?i)(use this folder|select)")),5000)
+            assertNotNull("Folder consent action",select);select!!.click()
+            device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.textMatches("(?i)allow")),2000)?.click()
+            assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Choose what Keep Local can remember.")),5000))
+        }
+        val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority==LibraryFixtureProvider.AUTH}
+        assertNotNull("Persisted read grant",grant)
+        val source=AuthorizedLibrary.enableTree(c,grant!!.uri)
+        // One scan batch, then a fresh caller resumes durable processing.
+        AuthorizedLibrary.step(c,AtomicBoolean(false))
+        assertFalse(AuthorizedLibrary.step(c,AtomicBoolean(true)))
+        repeat(20){AuthorizedLibrary.step(c,AtomicBoolean(false))}
+        val matches=MemoryDb.get(c).search("Manufacturer warranty",null)
+        val item=matches.first{it.path?.contains(LibraryFixtureProvider.AUTH)==true}
+        assertTrue(MemoryDb.get(c).get(item.id)!!.extracted.contains("2028-06-30"))
+        val original=MediaSource.open(c,item).use{it.readBytes()}
+        // Revoke at the OS boundary, not merely through our source table.
+        c.contentResolver.releasePersistableUriPermission(grant.uri,android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        AuthorizedLibrary.reconcile(c)
+        assertFalse(AuthorizedLibrary.accessible(c,item.id))
+        assertTrue(MemoryDb.get(c).search("Manufacturer warranty",null).none{it.id==item.id})
+        assertEquals("",MemoryDb.get(c).get(item.id)!!.extracted)
+        assertTrue(original.isNotEmpty())
+    }
+
 }

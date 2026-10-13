@@ -144,12 +144,12 @@ object AuthorizedLibrary {
     private fun scanMedia(c:Context,s:Array<String>,stop:AtomicBoolean){
         val id=s[0].toLong();val epoch=s[3].toLong();val cursor=s[4].toLong()
         val collection=when(s[2]){"image"->MS.Images.Media.EXTERNAL_CONTENT_URI;"video"->MS.Video.Media.EXTERNAL_CONTENT_URI;else->MS.Audio.Media.EXTERNAL_CONTENT_URI}
-        val cols=arrayOf("_id","_display_name","mime_type","_size","date_modified","date_added","relative_path")
+        val cols=arrayOf("_id","_display_name","mime_type","_size","date_modified","date_added","relative_path") + if(s[2]!="audio")arrayOf("datetaken")else emptyArray()
         var n=0;var last=cursor
         c.contentResolver.query(collection,cols,"_id>? AND is_pending=0",arrayOf(cursor.toString()),"_id ASC")?.use{r->
             while(n<100&&!stop.get()&&r.moveToNext()){
-                last=r.getLong(0);val added=r.getLong(5)*1000
-                upsert(c,id,ContentUris.withAppendedId(collection,last),r.getString(1)?:"Untitled",r.getString(2)?:"application/octet-stream",r.getLong(3),r.getLong(4),added,"media_added",r.getString(6)?:"",epoch);n++
+                last=r.getLong(0);val taken=if(s[2]!="audio")r.getLong(7) else 0L;val added=if(taken>0)taken else r.getLong(5)*1000
+                upsert(c,id,ContentUris.withAppendedId(collection,last),r.getString(1)?:"Untitled",r.getString(2)?:"application/octet-stream",r.getLong(3),r.getLong(4),added,if(taken>0)"capture_time" else "media_added",r.getString(6)?:"",epoch);n++
                 db(c).execSQL("UPDATE library_sources SET status='processing',cursor=? WHERE id=?",arrayOf(last,id))
             }
         }?:error("Media query unavailable")
