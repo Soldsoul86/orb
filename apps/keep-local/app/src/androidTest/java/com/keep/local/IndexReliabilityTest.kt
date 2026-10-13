@@ -60,6 +60,8 @@ class IndexReliabilityTest {
             assertTrue("Visual completion must happen before inventory drains",value("SELECT count(*) FROM assets a JOIN memories m ON m.id=a.memory_id WHERE m.title LIKE 'scale-synthetic-%' AND a.state='ready'")>0)
             assertTrue(MemoryDb.get(c).search("Scale regression receipt",null).any{it.title=="scale-document"})
             assertTrue(MemoryDb.get(c).search("scale-synthetic-9999",null).isNotEmpty())
+            d.execSQL("UPDATE memories SET created_at=1941235200000 WHERE title='scale-synthetic-9999'")
+            assertTrue(MemoryDb.get(c).search(java.time.Instant.ofEpochMilli(1941235200000).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString(),"image").any{it.title=="scale-synthetic-9999"})
             val queryStart=SystemClock.elapsedRealtime()
             repeat(30){IndexProgress.counts(c);IndexProgress.next(c,"'image','video'")}
             val queryMs=SystemClock.elapsedRealtime()-queryStart

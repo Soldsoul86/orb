@@ -22,7 +22,7 @@ class OcrJob : JobService() {
     private val worker = Executors.newSingleThreadExecutor()
     private val cancelled = ConcurrentHashMap<Int, AtomicBoolean>()
 
-    private fun paused()=getSharedPreferences("visual",0).getBoolean("paused_explicitly",false)
+    private fun paused()=getSharedPreferences("visual",0).let{it.getBoolean("paused_explicitly",it.contains("enabled")&&!it.getBoolean("enabled",false))}
 
     override fun onStartJob(params: JobParameters): Boolean {
         val stopped = AtomicBoolean(false)

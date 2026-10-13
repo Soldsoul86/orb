@@ -30,6 +30,7 @@ class LibrarySettingsActivity:Activity(){
         button("Choose document folder"){
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION).putExtra(Intent.EXTRA_LOCAL_ONLY,true),71)
         }
+        label("Search filenames and notes immediately; media-type filters work before deep processing. Enter YYYY-MM-DD to also find recorded source dates (UTC, or the recorded clock date when timezone is unavailable).")
         label("Text/Markdown/CSV and DOCX text: up to 2 MiB. PDF: OCR of the first 20 pages, Latin text. Other files retain metadata; saved-audio transcription is unavailable. Visual search uses your existing optional model pack.")
         button("Models and visual index"){startActivity(Intent(this,ModelsActivity::class.java))}
         button("Start / resume indexing"){VisualIndex.setEnabled(this,true);renderStatus()}

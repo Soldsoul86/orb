@@ -121,9 +121,14 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
 
     fun search(query: String, kind: String?, max: Int = 150): List<MemoryItem> {
         val match = CoreLogic.ftsQuery(query)
+        val date=runCatching{java.time.LocalDate.parse(query.trim())}.getOrNull()
         val args = arrayListOf<String>()
         val where = arrayListOf(LibrarySchema.VISIBLE)
-        if (match.isNotEmpty()) { where.add("memory_fts MATCH ?"); args.add(match) }
+        if(date!=null){
+            val start=date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            where.add("(memories.id IN (SELECT docid FROM memory_fts WHERE memory_fts MATCH ?) OR coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) >= ? AND coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) < ?)")
+            args.add(match);args.add(start.toString());args.add((start+86_400_000).toString())
+        } else if (match.isNotEmpty()) { where.add("memory_fts MATCH ?"); args.add(match) }
         else if (query.isNotBlank()) { return emptyList() }
         if (kind != null) { where.add("memories.kind=?"); args.add(kind) }
         val sql = buildString {
@@ -133,7 +138,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
                 "substr(memories.body,1,240) AS body, substr(memories.extracted,1,240) AS extracted, " +
                 "memories.source, memories.path, memories.mime, memories.created_at, " +
                 "memories.bytes, memories.duration_ms, memories.pinned, memories.suggestion FROM memories ")
-            if (match.isNotEmpty()) append("JOIN memory_fts ON memory_fts.docid=memories.id ")
+            if (match.isNotEmpty() && date==null) append("JOIN memory_fts ON memory_fts.docid=memories.id ")
             if (where.isNotEmpty()) append("WHERE ${where.joinToString(" AND ")} ")
             append("ORDER BY memories.pinned DESC, memories.created_at DESC LIMIT ${max.coerceIn(1, 250)}")
         }

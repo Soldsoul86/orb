@@ -67,3 +67,10 @@ Gates and limitations:
 - Folder providers can hide change metadata or reorder entries. A subsequent rescan
   is required to reconcile changes during enumeration. Same-size/same-mtime changes
   on Android 10 or such providers remain a limitation; no silent full-index reset.
+
+Validation finding: the initial Android 10 restart test launched the app with adb,
+then launched instrumentation, which force-stopped that just-started process while
+JobScheduler was binding. OS log recorded a bind timeout. The test now performs
+one explicit force-stop then reopens via ActivityScenario inside the new test
+process; it still asserts real worker commits and retained checkpoints. No timeout
+assertion was relaxed and no production scheduling bypass was used.

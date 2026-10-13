@@ -67,7 +67,7 @@ class VisualIndexJob : JobService() {
                 // Well below JobScheduler's execution limit. Reuse one model across fair rounds.
                 val deadline=SystemClock.elapsedRealtime()+120000
                 while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
-                    if(IndexPipeline.restricted(this)){defer=true;break}
+                    if(IndexPipeline.restricted(this)){IndexProgress.phase(this,"Waiting for capture / severe thermal pressure to end");defer=true;break}
                     more=IndexPipeline.round(this,stop) {
                         engine ?: ClipEncoder(this).also{engine=it}
                     }
