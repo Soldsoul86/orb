@@ -65,8 +65,10 @@ class CaptureFlowTest {
         val permissions = context.packageManager.getPackageInfo(context.packageName,
             PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
         for (permission in listOf(Manifest.permission.INTERNET,
-            Manifest.permission.MANAGE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.MANAGE_EXTERNAL_STORAGE,
             Manifest.permission.SYSTEM_ALERT_WINDOW)) assertFalse(permission, permission in permissions)
+        assertTrue(Manifest.permission.READ_MEDIA_IMAGES in permissions)
+        assertTrue(Manifest.permission.READ_MEDIA_VIDEO in permissions)
         assertNull(AppFiles.safeFile(context, "../databases/memories.db"))
     }
 }

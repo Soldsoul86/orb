@@ -125,17 +125,19 @@ object AuthorizedLibrary {
             catch(e:Exception){d.execSQL("UPDATE library_sources SET status='failed',error=? WHERE id=?",arrayOf("Scan failed; retry or reauthorize folder",id))}
             return true
         }
-        val id=d.rawQuery("SELECT si.memory_id FROM source_items si JOIN memories m ON m.id=si.memory_id JOIN library_sources ls ON ls.id=si.source_id WHERE si.excluded=0 AND ls.enabled=1 AND si.state IN ('queued','processing') AND m.kind IN ('file','audio') LIMIT 1",null).use{if(it.moveToFirst())it.getLong(0)else null} ?: return false
+        val id=d.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE a.state IN ('not_indexed','indexing') AND m.kind IN ('file','audio') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) LIMIT 1",null).use{if(it.moveToFirst())it.getLong(0)else null} ?: return false
         try {
             val item=MemoryDb.get(c).get(id)?:return true
+            d.execSQL("UPDATE assets SET state='indexing' WHERE memory_id=?",arrayOf(id))
             d.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             val text=if(item.kind=="audio")null else DocumentText.extract(c,item,stop)
             if(stop.get())return true
-            synchronized(VisualIndex){if(accessible(c,id)){
+            synchronized(VisualIndex){if(!MediaSource.external(item)||accessible(c,id)){
                 if(text!=null)MemoryDb.get(c).setExtracted(id,text)
+                d.execSQL("UPDATE assets SET state=? WHERE memory_id=?",arrayOf(if(text!=null)"ready" else "unsupported",id))
                 d.execSQL("UPDATE source_items SET state=?,error=? WHERE memory_id=?",arrayOf(if(text!=null)"completed" else "unsupported",if(text==null)"Text extraction/transcription unavailable for this format" else null,id))
             }}
-        }catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){invalidate(c,id)}catch(e:Exception){d.execSQL("UPDATE source_items SET state='failed',error='Extraction failed; retry available' WHERE memory_id=?",arrayOf(id))}
+        }catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id));d.execSQL("UPDATE source_items SET state='failed',error='Extraction failed; retry available' WHERE memory_id=?",arrayOf(id))}
         return true
     }
     private fun completedScan(c:Context,id:Long,epoch:Long) {

@@ -19,7 +19,7 @@ object VisualIndex {
     fun setEnabled(c: Context, yes: Boolean) { c.getSharedPreferences("visual",0).edit().putBoolean("enabled",yes).apply()
         if (yes) schedule(c) else c.getSystemService(JobScheduler::class.java).cancel(JOB) }
     fun schedule(c: Context) {
-        if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c))) return
+        if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c) && !MemoryDb.get(c).readableDatabase.rawQuery("SELECT 1 FROM memories WHERE kind='file' LIMIT 1",null).use{it.moveToFirst()})) return
         val scheduler=c.getSystemService(JobScheduler::class.java)
         if (scheduler.getPendingJob(JOB)!=null) return
         scheduler.schedule(JobInfo.Builder(JOB, ComponentName(c, VisualIndexJob::class.java))

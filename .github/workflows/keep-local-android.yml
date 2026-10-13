@@ -33,6 +33,7 @@ jobs:
       - name: Compile and test
         run: |
           python3 core-tests/db_contract.py
+          python3 core-tests/library_contract.py
           bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
       - uses: actions/download-artifact@v4
         with:

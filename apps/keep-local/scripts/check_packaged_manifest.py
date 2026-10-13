@@ -12,6 +12,8 @@ allowed = {
 }
 allowed |= {'android.permission.READ_EXTERNAL_STORAGE','android.permission.READ_MEDIA_IMAGES','android.permission.READ_MEDIA_VIDEO','android.permission.READ_MEDIA_AUDIO','android.permission.READ_MEDIA_VISUAL_USER_SELECTED'}
 perms = {p.get(a + 'name') for p in root.findall('uses-permission')}
+legacy=next(p for p in root.findall('uses-permission') if p.get(a+'name')=='android.permission.READ_EXTERNAL_STORAGE')
+assert legacy.get(a+'maxSdkVersion')=='32'
 assert perms <= allowed, f'Unexpected packaged permissions: {perms - allowed}'
 assert root.get('package') == 'com.keep.local.next'
 assert root.get(a + 'versionCode') == '4'
