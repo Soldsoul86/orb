@@ -1,11 +1,11 @@
 Keep Local 0.4 build evidence
 
-Compiled Kotlin source: bd2f078db66505e2e09b2ed7711e30669a5b821a
-Build: https://github.com/Soldsoul86/orb/actions/runs/38390387247
+Compiled Kotlin source: 5b73fc3a0ab3834c906789f2c06ad926e9438797
+Build: https://github.com/Soldsoul86/orb/actions/runs/38391653229
 Kotlin/application/instrumentation assembly, lint and 9 JVM tests passed.
 SQLite migration/FTS/provenance contracts passed.
 Unsigned APK SHA-256:
-7cd1f5075e049f1817e0da86f74d4493323ce6247743b14b60616f00a3e7e62f
+5032860db4780c1e680af1bc6bd3e9eb1f2528a351ca49074dd91589d0bc0b8f
 
 The final signed-emulator outcomes and measurements are maintained at:
 https://github.com/Soldsoul86/orb/blob/codex/keep-local-discovery/apps/keep-local/docs/DISCOVERY_RESULTS.txt
