@@ -75,7 +75,15 @@ class DiscoveryFlowTest {
             val video=i==4;val collection=if(video)MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
             val time=1700000000000L + if(i==3)3*86400000L else i*60000L
             val uri=c.contentResolver.insert(collection,ContentValues().apply{put("_display_name","opaque-discovery-$i.${if(video)"mp4" else "jpg"}");put("mime_type",if(video)"video/mp4" else "image/jpeg");put("relative_path",if(video)"Movies/DiscoveryFixtures/" else "Pictures/DiscoveryFixtures/");put("is_pending",1)})!!
-            c.contentResolver.openOutputStream(uri)!!.use{out->inst.context.assets.open(name).use{it.copyTo(out)}}
+            if(video)c.contentResolver.openOutputStream(uri)!!.use{out->inst.context.assets.open(name).use{it.copyTo(out)}}
+            else {
+                // Real capture metadata survives MediaStore's asynchronous metadata scan.
+                val photo=File(c.cacheDir,"dated-$i.jpg")
+                inst.context.assets.open(name).use{input->photo.outputStream().use{input.copyTo(it)}}
+                val stamp=java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss",java.util.Locale.ROOT).apply{timeZone=java.util.TimeZone.getTimeZone("UTC")}.format(java.util.Date(time))
+                android.media.ExifInterface(photo.path).apply{setAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL,stamp);setAttribute(android.media.ExifInterface.TAG_DATETIME,stamp);saveAttributes()}
+                c.contentResolver.openOutputStream(uri)!!.use{out->photo.inputStream().use{it.copyTo(out)}};photo.delete()
+            }
             c.contentResolver.update(uri,ContentValues().apply{put("is_pending",0);put("datetaken",time)},null,null)
             files.put(JSONObject().put("uri",uri.toString()).put("sha256",hash(uri)).put("label",listOf("cat","coffee","astronaut","rocket","montage")[i]))
         }
@@ -94,7 +102,9 @@ class DiscoveryFlowTest {
         val experience=records.filter{it.type=="experience"&&it.evidence.any{e->e.id in labels}}
         val reuse=records.filter{it.type=="reusable"&&it.evidence.any{e->e.id in labels}}
         assertEquals("Warranty and receipt; plain negative text yields no suggestion",2,doc.size)
-        assertTrue("Captured-photo group",experience.isNotEmpty());assertTrue("Real CLIP reuse evidence",reuse.isNotEmpty())
+        val capturedRows=AuthorizedLibrary.db(c).rawQuery("SELECT memory_id,content_time,time_basis,group_path FROM source_items WHERE memory_id IN ("+labels.keys.joinToString(",")+")",null).use{r->buildList{while(r.moveToNext())add("${r.getLong(0)}:${r.getLong(1)}:${r.getString(2)}:${r.getString(3)}")}}
+        println("DISCOVERY_CAPTURE_METADATA $capturedRows")
+        assertTrue("Captured-photo group: $capturedRows",experience.isNotEmpty());assertTrue("Real CLIP reuse evidence",reuse.isNotEmpty())
         assertTrue(experience.all{d->d.evidence.none{labels[it.id]=="rocket"}})
         var unsupported=0;var evaluated=0;var unlabeled=0
         for(d in reuse){
