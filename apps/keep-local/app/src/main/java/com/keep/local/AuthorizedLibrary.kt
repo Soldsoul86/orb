@@ -106,12 +106,13 @@ object AuthorizedLibrary {
                 d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,time,basis,group,id))
                 d.execSQL("UPDATE memories SET bytes=?,mime=? WHERE id=?",arrayOf(size,mime,id))
             }
-            d.execSQL("UPDATE source_items SET seen=? WHERE memory_id=?",arrayOf(epoch,id))
+            d.execSQL("UPDATE source_items SET seen=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(epoch,time,basis,group,id))
             val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{q->var yes=false;while(q.moveToNext())if(group.startsWith(q.getString(0)))yes=true;yes}
             if(blocked)exclude(c,id)
             return@synchronized id
         }
         val excluded=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{r->var yes=false;while(r.moveToNext())if(group.startsWith(r.getString(0)))yes=true;yes}
+        if(excluded)return@synchronized -1L
         val kind=when{mime.startsWith("image/")->"image";mime.startsWith("video/")->"video";mime.startsWith("audio/")->"audio";else->"file"}
         d.beginTransaction();try{
             val id=MemoryDb.get(c).add(kind,title,source="Authorized device content",path=uri.toString(),mime=mime,bytes=size)
@@ -170,6 +171,8 @@ object AuthorizedLibrary {
         d.execSQL("INSERT OR IGNORE INTO scan_folders(source_id,document_id) VALUES(?,?)",arrayOf(id,DC.getTreeDocumentId(tree)))
         val folder=d.rawQuery("SELECT document_id,offset FROM scan_folders WHERE source_id=? AND done=0 LIMIT 1",arrayOf(id.toString())).use{if(it.moveToFirst())it.getString(0) to it.getInt(1)else null}
         if(folder==null){completedScan(c,id,epoch);return}
+        val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(id.toString())).use{q->var yes=false;while(q.moveToNext())if(folder.first.startsWith(q.getString(0)))yes=true;yes}
+        if(blocked){d.execSQL("UPDATE scan_folders SET done=1 WHERE source_id=? AND document_id=?",arrayOf(id,folder.first));return}
         val uri=DC.buildChildDocumentsUriUsingTree(tree,folder.first);var n=0;var position=0
         c.contentResolver.query(uri,arrayOf(DC.Document.COLUMN_DOCUMENT_ID,DC.Document.COLUMN_DISPLAY_NAME,DC.Document.COLUMN_MIME_TYPE,DC.Document.COLUMN_SIZE,DC.Document.COLUMN_LAST_MODIFIED),null,null,null)?.use{r->
             while(n<100&&!stop.get()&&r.moveToNext()){

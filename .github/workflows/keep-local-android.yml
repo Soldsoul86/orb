@@ -15,11 +15,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38380019549
+          run-id: 38382709825
           github-token: ${{ github.token }}
           name: creative-evidence-api-29
           path: prior-evidence
-      - run: rg -n 'RootsCache|LibraryFixture|DocumentsProvider|Failed to load|root.*cursor|CursorIndexOutOfBounds|Permission Denial|Unknown URI' prior-evidence/logcat.txt | tail -80 || true
+      - run: rg -n 'AndroidRuntime|Exception|Permission Denial|Displayed.*documents|cmp=.*documents|ActivityTaskManager' prior-evidence/logcat.txt | tail -80 || true
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
