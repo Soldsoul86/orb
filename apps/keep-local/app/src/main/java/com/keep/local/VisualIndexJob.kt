@@ -35,8 +35,10 @@ object VisualIndex {
     fun blob(v: FloatArray): ByteArray = ByteBuffer.allocate(v.size*4).order(ByteOrder.LITTLE_ENDIAN).apply { v.forEach { putFloat(it) } }.array()
     fun vector(v: ByteArray): FloatArray { require(v.size==2048); val b=ByteBuffer.wrap(v).order(ByteOrder.LITTLE_ENDIAN);return FloatArray(512){b.float} }
     fun thumbnail(c: Context,id: Long,ms: Long) = File(c.cacheDir,"visual/${id}_${ms}.jpg")
-    fun clear(c: Context) {
+    @Synchronized fun clear(c: Context) {
         setEnabled(c,false)
+        val prefs=c.getSharedPreferences("visual",0)
+        prefs.edit().putLong("generation",prefs.getLong("generation",0)+1).commit()
         val db=MemoryDb.get(c).writableDatabase
         db.delete("representations","modality='visual'",null)
         db.execSQL("UPDATE assets SET state='not_indexed',next_ms=0,model_id=NULL,error=NULL")
@@ -72,6 +74,7 @@ class VisualIndexJob : JobService() {
     companion object {
         /** One bounded, durable step. Cancellation never advances its checkpoint. */
         fun indexOne(c: Context,id: Long,engine: VisualEncoder,stop: AtomicBoolean) {
+            val generation=c.getSharedPreferences("visual",0).getLong("generation",0)
             val db=MemoryDb.get(c).writableDatabase
             val item=MemoryDb.get(c).get(id) ?: return
             val file=AppFiles.safeFile(c,item.path) ?: error("Original file unavailable")
@@ -102,6 +105,8 @@ class VisualIndexJob : JobService() {
                 val thumb=VisualIndex.thumbnail(c,id,ms);thumb.parentFile!!.mkdirs()
                 val small=Bitmap.createScaledBitmap(bitmap,160,(bitmap.height*160/bitmap.width).coerceAtLeast(1),true)
                 try { thumb.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG,75,it) } } finally { if(small!==bitmap)small.recycle() }
+                synchronized(VisualIndex) {
+                if(stop.get() || generation!=c.getSharedPreferences("visual",0).getLong("generation",0)) { thumb.delete(); return }
                 db.beginTransaction()
                 try {
                     if(MemoryDb.get(c).get(id)==null) return
@@ -112,6 +117,7 @@ class VisualIndexJob : JobService() {
                     db.execSQL("UPDATE assets SET sha256=?,state=?,next_ms=?,total_ms=?,model_id=?,error=NULL,updated_at=? WHERE memory_id=?",arrayOf(hash,if(item.kind=="image"||next>=duration)"ready" else "indexing",next,duration,engine.modelId,System.currentTimeMillis(),id))
                     db.setTransactionSuccessful()
                 } finally {db.endTransaction()}
+                }
             } finally {bitmap.recycle()}
         }
     }

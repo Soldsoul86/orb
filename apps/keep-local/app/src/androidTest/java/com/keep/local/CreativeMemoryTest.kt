@@ -56,7 +56,9 @@ class CreativeMemoryTest {
                     // An interrupted step must not create any representation.
                     VisualIndexJob.indexOne(c,id,model,AtomicBoolean(true))
                     MemoryDb.get(c).readableDatabase.rawQuery("SELECT COUNT(*) FROM representations WHERE memory_id=?",arrayOf(id.toString())).use{it.moveToFirst();assertEquals(0,it.getInt(0))}
+                    val perAssetStart=SystemClock.elapsedRealtime()
                     repeat(if(i==4)6 else 1){VisualIndexJob.indexOne(c,id,model,AtomicBoolean(false))}
+                    if(i==4)report.put("montage_index_ms_per_minute",(SystemClock.elapsedRealtime()-perAssetStart)*5)
                 }
                 report.put("index_ms",SystemClock.elapsedRealtime()-indexStart)
                 val queries=listOf("a photograph of a cat","a cup of coffee","an astronaut in a spacesuit","a rocket launch")

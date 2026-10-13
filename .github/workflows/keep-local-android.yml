@@ -28,7 +28,7 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - name: Prepare pinned local model and real-photo test corpus
         run: |
-          python3 -m pip install onnxruntime==1.22.0 transformers==4.51.3 scikit-image==0.25.2 pillow
+          python3 -m pip install onnxruntime==1.22.0 transformers==4.51.3 scikit-image==0.25.2 imageio-ffmpeg==0.6.0 pillow
           python3 scripts/prepare-visual-model.py
       - name: Compile and test
         run: |

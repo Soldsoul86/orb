@@ -10,6 +10,7 @@ class ModelsActivity:Activity() {
     private val io=Executors.newSingleThreadExecutor()
     private val cancel=CancellationSignal()
     private lateinit var status:TextView
+    private var installing=false
     private val handler=Handler(Looper.getMainLooper())
     private val refresh=object:Runnable {override fun run(){showStatus();handler.postDelayed(this,1500)}}
     override fun onCreate(state:Bundle?) {
@@ -27,12 +28,12 @@ class ModelsActivity:Activity() {
         button("Remove visual model and index") {AlertDialog.Builder(this).setMessage("Originals, notes and OCR remain. Remove only the visual model and its derived index?").setNegativeButton("Cancel",null).setPositiveButton("Remove"){_,_->VisualIndex.clear(this);ModelPack.directory(this).deleteRecursively();showStatus()}.show()}
         root.addView(TextView(this).apply{text="Indexing waits when battery or storage is low, and pauses during severe thermal pressure. Frame checkpoints resume when the app is reopened after a restart. Search works with the portion already indexed.\n\nKeep Local does not recognize who you are. Use your own notes for confirmed identity context. Offline saved-audio transcription and action recognition are not included in this milestone."})
     }
-    private fun showStatus(){if(!isDestroyed)status.text="\nModel: ${if(ModelPack.ready(this))"installed" else "not installed"}\nIndexing: ${if(VisualIndex.enabled(this))"enabled" else "paused"}\n${VisualIndex.status(this)}\n"}
+    private fun showStatus(){if(!isDestroyed && !installing)status.text="\nModel: ${if(ModelPack.ready(this))"installed" else "not installed"}\nIndexing: ${if(VisualIndex.enabled(this))"enabled" else "paused"}\n${VisualIndex.status(this)}\n"}
     override fun onResume(){super.onResume();handler.post(refresh)}
     override fun onPause(){handler.removeCallbacks(refresh);super.onPause()}
     override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);val uri=data?.data?:return
-        if(request==40 && result==RESULT_OK){status.text="Installing model…";val app=applicationContext
-            io.execute {try{ModelPack.install(app,uri,cancel);runOnUiThread{if(!isDestroyed){toast("Model installed. Tap Index / resume to process your library.");showStatus()}}}catch(e:Exception){runOnUiThread{if(!isDestroyed)toast("Model not installed: ${e.message}")}}}
+        if(request==40 && result==RESULT_OK){installing=true;status.text="Installing model…";val app=applicationContext
+            io.execute {try{ModelPack.install(app,uri,cancel);runOnUiThread{if(!isDestroyed){installing=false;toast("Model installed. Tap Index / resume to process your library.");showStatus()}}}catch(e:Exception){runOnUiThread{if(!isDestroyed){installing=false;toast("Model not installed: ${e.message}");showStatus()}}}}
         }
     }
     private fun toast(s:String)=Toast.makeText(this,s,Toast.LENGTH_LONG).show()

@@ -35,6 +35,6 @@ from PIL import Image
 for name,loader in [('a',data.chelsea),('b',data.coffee),('c',data.astronaut),('d',data.rocket)]:
     Image.fromarray(loader()).save(testassets/f'{name}.jpg')
 # A labeled scene montage, NOT evidence of action recognition. No audio or text.
-import subprocess
-subprocess.run(['ffmpeg','-y','-loop','1','-t','4','-i',str(testassets/'a.jpg'),'-loop','1','-t','4','-i',str(testassets/'b.jpg'),'-loop','1','-t','4','-i',str(testassets/'c.jpg'),'-filter_complex','[0:v]scale=384:384,setsar=1[v0];[1:v]scale=384:384,setsar=1[v1];[2:v]scale=384:384,setsar=1[v2];[v0][v1][v2]concat=n=3:v=1:a=0[v]','-map','[v]','-r','12','-c:v','libx264','-pix_fmt','yuv420p',str(testassets/'m0.mp4')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+import subprocess,imageio_ffmpeg
+subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-y','-loop','1','-t','4','-i',str(testassets/'a.jpg'),'-loop','1','-t','4','-i',str(testassets/'b.jpg'),'-loop','1','-t','4','-i',str(testassets/'c.jpg'),'-filter_complex','[0:v]scale=384:384,setsar=1[v0];[1:v]scale=384:384,setsar=1[v1];[2:v]scale=384:384,setsar=1[v2];[v0][v1][v2]concat=n=3:v=1:a=0[v]','-map','[v]','-r','12','-c:v','libx264','-pix_fmt','yuv420p',str(testassets/'m0.mp4')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 (testassets/'corpus.json').write_text(json.dumps({'source':'scikit-image sample photographs; see https://scikit-image.org/docs/stable/api/skimage.data.html','images':{'a.jpg':'cat','b.jpg':'coffee','c.jpg':'astronaut','d.jpg':'rocket'},'video':'m0.mp4 is a synthetic montage, not a real action video','intervals_ms':[[0,4000,'cat'],[4000,8000,'coffee'],[8000,12000,'astronaut']]}))
