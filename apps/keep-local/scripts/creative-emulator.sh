@@ -30,7 +30,13 @@ adb shell cmd connectivity airplane-mode enable || true
 adb shell svc wifi disable
 adb shell svc data disable
 adb shell settings get global airplane_mode_on | tee "$evidence/airplane-mode.txt"
-timeout 900s adb shell am instrument -w com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
+timeout 180s adb shell am instrument -w -e class com.keep.local.next.IndexRestartTest -e restart_phase before com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/restart-before.txt"
+grep -F 'OK (1 test)' "$evidence/restart-before.txt"
+adb shell am force-stop com.keep.local.next
+adb shell am start -W -n com.keep.local.next/.MainActivity
+timeout 180s adb shell am instrument -w -e class com.keep.local.next.IndexRestartTest -e restart_phase after com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/restart-after.txt"
+grep -F 'OK (1 test)' "$evidence/restart-after.txt"
+timeout 900s adb shell am instrument -w -e notClass com.keep.local.next.IndexRestartTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
 grep -Eq '^OK \([1-9][0-9]* tests?\)' "$evidence/tests.txt"
 adb shell am force-stop com.keep.local.next
 adb shell am start -W -n com.keep.local.next/.MainActivity
