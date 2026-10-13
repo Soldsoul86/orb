@@ -52,9 +52,9 @@ class AuthorizedLibraryTest {
             if(!device.hasObject(roots)) device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.desc("Show roots")),5000)?.click()
             val fixture=device.wait(androidx.test.uiautomator.Until.findObject(roots),5000)
             assertNotNull("Fixture folder must appear in Android document picker",fixture);fixture!!.click()
-            val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.textMatches("(?i)(use this folder|select)")),5000)
+            val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)(use this folder|select)"))),5000)
             assertNotNull("Folder consent action",select);select!!.click()
-            device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.textMatches("(?i)allow")),2000)?.click()
+            device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)allow"))),2000)?.click()
             assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Choose what Keep Local can remember.")),5000))
         }
         val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority==LibraryFixtureProvider.AUTH}
