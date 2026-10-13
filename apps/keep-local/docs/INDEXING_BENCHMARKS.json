@@ -1,0 +1,332 @@
+{
+  "release": "0.4.1",
+  "runtime_commit": "7fd20f0ddcc0e39cc726f80766286e9dc8a425c1",
+  "signing_commit": "adb0555b92ac2d39c061dae4e8e7911e698840f8",
+  "run": 38410006098,
+  "apk_sha256": "491853728f4aab2deb1c535327e61009d1f0e16eb5a5bcdc17a3211dd72329f6",
+  "scope": "Emulator fixture regression measurements only; not physical-device performance or personal-library quality.",
+  "android_10_api29": {
+    "job": 115339986242,
+    "discovery": {
+      "environment": "Android emulator; fixture documents and real photos / constructed video; no physical device",
+      "airplane_mode": true,
+      "authorized_visual_assets": 5,
+      "authorized_documents": 3,
+      "literal_document_suggestions": 2,
+      "experience_groups": 1,
+      "reusable_pairs": 4,
+      "unsupported_visual_pairs": 0,
+      "evaluated_labeled_pairs": 4,
+      "unlabeled_pairs_not_scored": 0,
+      "strict_scene_label_mismatches": 1,
+      "timestamp_boundary_tolerance_ms": 100,
+      "visual_pair_evidence": [
+        {
+          "similarity": 0.9164321,
+          "sources": [
+            {
+              "id": 997991,
+              "start_ms": 4000,
+              "strict_label": "coffee"
+            },
+            {
+              "id": 997992,
+              "start_ms": 0,
+              "strict_label": "cat"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.9318315,
+          "sources": [
+            {
+              "id": 987654,
+              "start_ms": 0,
+              "strict_label": "rocket"
+            },
+            {
+              "id": 997995,
+              "start_ms": 0,
+              "strict_label": "rocket"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.9600827,
+          "sources": [
+            {
+              "id": 997991,
+              "start_ms": 6000,
+              "strict_label": "coffee"
+            },
+            {
+              "id": 997993,
+              "start_ms": 0,
+              "strict_label": "coffee"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.9884834,
+          "sources": [
+            {
+              "id": 997991,
+              "start_ms": 10000,
+              "strict_label": "astronaut"
+            },
+            {
+              "id": 997994,
+              "start_ms": 0,
+              "strict_label": "astronaut"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        }
+      ],
+      "duplicate_suggestions_on_repeat": 0,
+      "index_visual_ms": 2441,
+      "discovery_generation_ms": 307,
+      "time_to_first_discovery_ms": 9816,
+      "sampled_pss_kb": 73937,
+      "database_and_wal_growth_bytes": 0,
+      "peak_process_rss": "VmHWM:\t  365744 kB",
+      "review_actions": "Automated fixture decisions, NOT evidence of real user usefulness",
+      "index_removal_preserved_originals_models_and_review_decisions": true,
+      "review_survived_process_death": true,
+      "folder_revocation_hid_evidence": true,
+      "original_media_hashes_unchanged": true
+    },
+    "visual": {
+      "environment": "Android emulator; not physical flagship performance",
+      "model_id": "clip-vit-b32-int8-v1",
+      "model_bytes": 155008455,
+      "airplane_mode": true,
+      "action_recognition_tested": false,
+      "video_corpus": "synthetic montage of real photos, not an action video",
+      "montage_index_ms_per_minute": 9805,
+      "index_ms": 5600,
+      "queries": [
+        {
+          "query": "a photograph of a cat",
+          "expected_id": 987770,
+          "actual_id": 987770,
+          "score": 0.27007255,
+          "correct": true
+        },
+        {
+          "query": "a cup of coffee",
+          "expected_id": 987771,
+          "actual_id": 987771,
+          "score": 0.28773016,
+          "correct": true
+        },
+        {
+          "query": "an astronaut in a spacesuit",
+          "expected_id": 987772,
+          "actual_id": 987772,
+          "score": 0.26338583,
+          "correct": true
+        },
+        {
+          "query": "a rocket launch",
+          "expected_id": 987773,
+          "actual_id": 987773,
+          "score": 0.26550484,
+          "correct": true
+        }
+      ],
+      "precision_at_1": 1,
+      "recall_at_1": 1,
+      "search_4_queries_ms": 660,
+      "correct_video_queries": 1,
+      "video_query_count": 1,
+      "coffee_moment_ms": 6000,
+      "coffee_ground_truth_ms": [
+        4000,
+        8000
+      ],
+      "cpu_microbenchmark": {
+        "cpu_1_threads_load_and_infer_ms": 669,
+        "cpu_2_threads_load_and_infer_ms": 586
+      },
+      "process_pss_kb_sample": 185493,
+      "elapsed_ms": 11163,
+      "rss": "VmHWM:\t  539824 kB; VmRSS:\t  299356 kB"
+    },
+    "indexing": {
+      "synthetic_media_records": 10000,
+      "real_inventory_files": 205,
+      "seed_ms": 4838,
+      "first_fair_round_ms": 888,
+      "count_and_queue_30_iterations_ms": 1054,
+      "process_peak_rss_kib": 539824,
+      "db_wal_growth_bytes": 4043936,
+      "visual_complete_before_inventory_drained": true
+    }
+  },
+  "android_16_api36": {
+    "job": 115339986130,
+    "discovery": {
+      "environment": "Android emulator; fixture documents and real photos / constructed video; no physical device",
+      "airplane_mode": true,
+      "authorized_visual_assets": 5,
+      "authorized_documents": 3,
+      "literal_document_suggestions": 2,
+      "experience_groups": 1,
+      "reusable_pairs": 4,
+      "unsupported_visual_pairs": 0,
+      "evaluated_labeled_pairs": 4,
+      "unlabeled_pairs_not_scored": 0,
+      "strict_scene_label_mismatches": 0,
+      "timestamp_boundary_tolerance_ms": 100,
+      "visual_pair_evidence": [
+        {
+          "similarity": 0.9619208,
+          "sources": [
+            {
+              "id": 997990,
+              "start_ms": 6000,
+              "strict_label": "coffee"
+            },
+            {
+              "id": 997992,
+              "start_ms": 0,
+              "strict_label": "coffee"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.97187394,
+          "sources": [
+            {
+              "id": 997990,
+              "start_ms": 0,
+              "strict_label": "cat"
+            },
+            {
+              "id": 997991,
+              "start_ms": 0,
+              "strict_label": "cat"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.9845599,
+          "sources": [
+            {
+              "id": 997990,
+              "start_ms": 10000,
+              "strict_label": "astronaut"
+            },
+            {
+              "id": 997993,
+              "start_ms": 0,
+              "strict_label": "astronaut"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        },
+        {
+          "similarity": 0.9912875,
+          "sources": [
+            {
+              "id": 987654,
+              "start_ms": 0,
+              "strict_label": "rocket"
+            },
+            {
+              "id": 997994,
+              "start_ms": 0,
+              "strict_label": "rocket"
+            }
+          ],
+          "supported_with_100ms_boundary_tolerance": true
+        }
+      ],
+      "duplicate_suggestions_on_repeat": 0,
+      "index_visual_ms": 1716,
+      "discovery_generation_ms": 72,
+      "time_to_first_discovery_ms": 8008,
+      "sampled_pss_kb": 87209,
+      "database_and_wal_growth_bytes": 0,
+      "peak_process_rss": "VmHWM:\t  356004 kB",
+      "review_actions": "Automated fixture decisions, NOT evidence of real user usefulness",
+      "index_removal_preserved_originals_models_and_review_decisions": true,
+      "review_survived_process_death": true,
+      "folder_revocation_hid_evidence": true,
+      "original_media_hashes_unchanged": true
+    },
+    "visual": {
+      "environment": "Android emulator; not physical flagship performance",
+      "model_id": "clip-vit-b32-int8-v1",
+      "model_bytes": 155008455,
+      "airplane_mode": true,
+      "action_recognition_tested": false,
+      "video_corpus": "synthetic montage of real photos, not an action video",
+      "montage_index_ms_per_minute": 4930,
+      "index_ms": 2690,
+      "queries": [
+        {
+          "query": "a photograph of a cat",
+          "expected_id": 987770,
+          "actual_id": 987770,
+          "score": 0.275108,
+          "correct": true
+        },
+        {
+          "query": "a cup of coffee",
+          "expected_id": 987771,
+          "actual_id": 987771,
+          "score": 0.28896913,
+          "correct": true
+        },
+        {
+          "query": "an astronaut in a spacesuit",
+          "expected_id": 987772,
+          "actual_id": 987772,
+          "score": 0.2648316,
+          "correct": true
+        },
+        {
+          "query": "a rocket launch",
+          "expected_id": 987773,
+          "actual_id": 987773,
+          "score": 0.26745388,
+          "correct": true
+        }
+      ],
+      "precision_at_1": 1,
+      "recall_at_1": 1,
+      "search_4_queries_ms": 575,
+      "correct_video_queries": 1,
+      "video_query_count": 1,
+      "coffee_moment_ms": 6000,
+      "coffee_ground_truth_ms": [
+        4000,
+        8000
+      ],
+      "cpu_microbenchmark": {
+        "cpu_1_threads_load_and_infer_ms": 419,
+        "cpu_2_threads_load_and_infer_ms": 375
+      },
+      "process_pss_kb_sample": 107448,
+      "elapsed_ms": 6312,
+      "rss": "VmHWM:\t  468440 kB; VmRSS:\t  262156 kB"
+    },
+    "indexing": {
+      "synthetic_media_records": 10000,
+      "real_inventory_files": 205,
+      "seed_ms": 561,
+      "first_fair_round_ms": 307,
+      "count_and_queue_30_iterations_ms": 390,
+      "process_peak_rss_kib": 468440,
+      "db_wal_growth_bytes": 4005888,
+      "visual_complete_before_inventory_drained": true
+    }
+  }
+}

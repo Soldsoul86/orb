@@ -1,0 +1,108 @@
+Keep Local 0.4.1 indexing stability — release evidence
+
+Application: com.keep.local.next, versionCode 5 / versionName 0.4.1, minSDK29,
+targetSDK36. No new permissions or models. Database v3 -> v4 is additive.
+
+Runtime/test source: 7fd20f0ddcc0e39cc726f80766286e9dc8a425c1
+Compile: https://github.com/Soldsoul86/orb/actions/runs/38409291889
+Unsigned APK SHA256:
+d804b09e0c599e9ce67d6193fc508f5e4797d499a98a4a3c914a3eac1e795679
+
+Verified compile: assembleDebug, assembleDebugAndroidTest, lintDebug, 9 JVM tests
+(0 failures/errors/skips) and 3 Python SQLite/manifest contracts. The SQL scale
+contract commits 10,000 FTS records, preserves UUIDs/review state through additive
+migration and verifies rollback does not expose an uncommitted completed state.
+
+Signing identity retained from the delivered 0.4.0 APK:
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d
+Actual baseline: Actions 38394887256, Keep-Local-0.4.0.apk SHA256
+86b01e6cf1655b535c6d74ec890ab78c7738b03edfcacf21874c71ba10bacce9
+Private key stays outside the repository and CI; exact-payload public signatures
+are committed. CI verifies both APK certificates and performs adb install -r.
+
+Release gate PASSED: signed build and both emulator jobs succeeded on 2026-10-13.
+Sign and Verify: https://github.com/Soldsoul86/orb/actions/runs/38410006098
+Signing/source archive commit: adb0555b92ac2d39c061dae4e8e7911e698840f8
+Download (ZIP contains Keep-Local-0.4.1.apk, source ZIP and install instructions):
+https://github.com/Soldsoul86/orb/actions/runs/38410006098/artifacts/11820562488
+Signed APK SHA256:
+491853728f4aab2deb1c535327e61009d1f0e16eb5a5bcdc17a3211dd72329f6
+ZIP SHA256 (different from the APK checksum):
+c3d2f1837d1a58b35ba1ed4b8ccb50ae3e4e1a3bee636dd8637a8b8b1d9fdd03
+Artifact retention: 2027-01-11; retain the download for long-term use.
+API29 evidence (logs, JSON, screenshots, upgrade and original-byte comparisons):
+https://github.com/Soldsoul86/orb/actions/runs/38410006098/artifacts/11821601357
+API36 evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38410006098/artifacts/11820688185
+Evidence artifacts retained through 2026-11-12; measured values are also committed
+in INDEXING_BENCHMARKS.json. Both compile-run emulator jobs passed independently.
+The artifact's bundled source is the signing commit; later report-only commits
+do not change the signed application bytes.
+
+Emulator suite: 29 test executions per API (26 distinct methods; upgrade, restart
+and review have before/after process phases), plus model-file hashes and original
+file comparisons. Android 10/API29 and Android 16/API36, x86_64, 4096 MiB emulator
+configuration. That emulator RAM setting is not a product/device requirement.
+- Actual delivered 0.4.0 app: grant a folder through Android Files, index text,
+  persist UUID/reference and paused preference. Upgrade and verify grant/text/model.
+- 10,000 synthetic media records plus 205 MediaStore JPEG files from one real-photo
+  fixture. This is a queue/DB scalability fixture, NOT 10,205 distinct real scenes.
+- Inventory still pending while an actual CLIP image and text document complete.
+- Resume and rescan preserve unfinished inventory cursor/epoch; repeat scan produces
+  no duplicate URI records. Basic filename/type/date search works before deep finish.
+- Actual force-stop/reopen resumes checkpoints; existing video survives byte-for-byte.
+- Pause during inference cancels uncommitted output; corrupt original defers retries
+  and a following real image completes. Third failure exhausts automatic retries.
+- A changed source generation during inference cannot commit stale visual evidence.
+- Real SAF grant/revocation, source exclusions, parser limits, offline CLIP search,
+  timestamped results, review persistence/corrections/dismissal and export regressions.
+- Gallery/Files and separate-UID sharing receiver tests; 256 MiB streaming fixture.
+- Airplane mode enabled for core regression flows; application has no INTERNET.
+
+Measured final signed-app emulator results (API29 / API36):
+- 29 test executions per emulator: zero failed; 58 total, 26 distinct methods.
+  Logs repeat some OK lines because shell grep echoes them; these are not extra tests.
+- Insert 10,000 synthetic records: 4838 / 561 ms.
+- First fair inventory/text/real-CLIP round: 888 / 307 ms. Both committed a real
+  image and document while inventory was unfinished, reproducing the corrected order.
+- 30 aggregate count + queue lookups: 1054 / 390 ms.
+- Scale-test database plus WAL growth: 4043936 / 4005888 bytes.
+- Instrumentation process RSS high-water mark: 539824 / 468440 KiB.
+- Four visual fixture queries: 660 / 575 ms total; four correct top results per
+  emulator, plus one correct video/timestamp query. This tiny corpus does not
+  establish real-library recall or action recognition accuracy.
+- Constructed photo montage indexing: 9805 / 4930 ms per video minute. This is
+  not a representative motion-video or physical-phone throughput measurement.
+- Discovery regression: 0 repeated suggestions after regeneration. API29 has one
+  strict scene-label mismatch at the 4000 ms transition, accepted only by the
+  existing 100 ms boundary tolerance; API36 has none. Do not present this as
+  perfect factual discovery quality. Four labeled visual pairs per emulator only.
+- Expected corrupt-file retry failure was isolated; following image completed.
+  No unexpected test failures. Physical-library error rate remains unknown.
+
+Interpretation and remaining gates:
+No direct access to the user's phone, original indexing trace or complete personal
+library. Audit establishes source defects compatible with the reported counters;
+it does not prove every cause in the observed physical-phone session. Follow
+INDEXING_PHONE_CHECKS.txt without clearing the index. Physical battery/thermal,
+peak RAM, OEM scheduling, Play Protect and third-party app acceptance are unverified.
+
+RSS figures are whole instrumentation-process high-water marks (include earlier
+tests/model sessions), not isolated inference allocation. DB growth includes WAL
+allocation/reuse. Round time includes a model session with potentially warm OS
+file caches and is not a cold-start or sustained throughput claim. No ETA supplied.
+
+Other limitations: saved-audio ASR unsupported; PDF extraction capped at 20 pages,
+UTF-8/DOCX bounded; visual results are sampled-frame similarity, not action proof.
+Android 10/SAF change detection depends on size/mtime; unknown/coarse provider
+metadata can conceal equal-size changes. Model pack unchanged at 155008455 bytes.
+
+Repository-wide trading-runtime verify remains independently failing at
+scripts/simulate-hard-exit.mjs:201: event.risk.measured.toFixed is not a function.
+The dedicated Android workflow is the applicable APK build/test gate. No trading
+runtime code was changed for this release.
+
+Next smallest step: run the five-minute resume/pause/restart protocol on the
+existing phone library and inspect copied counters/last-commit diagnostics. Do not
+advance to Prepared Action implementations until physical indexing is trustworthy.
+Future shared interfaces are documentation only in UNIFIED_CONTEXT_CONTRACTS.txt.

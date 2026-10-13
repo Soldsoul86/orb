@@ -1,0 +1,44 @@
+Future shared interfaces — documentation only, after the Phase A acceptance gate
+
+One Keep Local package, one authoritative local database. Health, Wealth,
+Entertainment, Knowledge and Work are optional category filters, never separate
+agents or databases. Promise: Remember what matters. Recognize when it matters.
+Prepare what helps.
+
+ObservationRef: stable asset UUID + source revision + optional moment range/excerpt;
+source URI is authorization-scoped, never proof of continued permission. Resolve
+through the existing source gate immediately before viewing, reasoning or sharing.
+Record observed/import time, explicit permission scope, and fact origin (observed,
+user-stated, inferred). Existing original evidence remains immutable.
+
+ContextLink: stable link ID, observation references, relationship, origin,
+confidence if meaningful, created/versioned time, user correction reference.
+An inference is never promoted into a fact by merely being kept.
+
+AttentionLoop: stable ID, evidence refs, unresolved need, uncertainty, status,
+optional domain filters, user-confirmed fields, trigger IDs. No mandatory obligation
+may be inferred from speculative visual similarity.
+
+Trigger: loop ID, explicit condition (time, related observation, user request or
+material context change), evidence, approval/scheduling scope, last evaluated time.
+A trigger is local state, not authority to notify, read another app or transact.
+
+PreparedAction: stable ID, goal, trigger and evidence refs, rationale, proposed
+next step, destination, editable draft/selected assets, exact data proposed to leave
+the phone, required authorization, revision, expiry and outcome ID. Preparing is
+noncommitting. Permission/revision changes invalidate approval; preview and approve
+before external handoff. Never silently send a message or financial transaction.
+
+OutcomeEvent: action ID, event ID/time, accepted/edited/dismissed/snoozed/
+handoff-opened/user-confirmed-completed/failed/unknown, evidence and event origin.
+Opening the destination is not confirmed delivery or completion.
+
+FeedbackEvent: immutable event with separate correctness, usefulness, timing and
+outcome judgments; optional corrected interpretation. Never rewrite source evidence
+or historical outcomes. Learn prioritization only after measured useful outcomes.
+
+Migration boundary: additive tables/FKs to assets.asset_uuid, with derived records
+invalidated or hidden when authorization disappears. Preserve review history and
+source IDs. No second Orb app, private app scraping, cloud core or App Gateway
+implementation is included in 0.4.1. The next gate is the existing library making
+measurable indexing progress on the user's phone.

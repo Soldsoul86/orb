@@ -3,7 +3,7 @@ set -euo pipefail
 artifact="${1:?artifact}"
 evidence=apps/keep-local/evidence
 mkdir -p "$evidence"
-trap 'timeout 10s adb logcat -d > "$evidence/logcat.txt" || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true; grep -E "DISCOVERY_(CAPTURE|PAIR)" "$evidence/logcat.txt" || true' EXIT
+trap 'timeout 10s adb logcat -d > "$evidence/logcat.txt" || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true; grep -E "DISCOVERY_(CAPTURE|PAIR)|SQLiteLog|FATAL EXCEPTION|KeepLocalIndex" "$evidence/logcat.txt" || true' EXIT
 test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 adb install "$artifact/baseline.apk"
 unzip -p "$artifact/tests.apk" assets/m1.mp4 > "$evidence/cad-test.mp4"
@@ -21,10 +21,6 @@ for f in vision.onnx text.onnx vocab.json merges.txt installed; do
   adb shell "cat /data/local/tmp/kl-model/$f | run-as com.keep.local.next sh -c 'cat > files/models/clip-vit-b32-int8-v1/$f'"
 done
 adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-before.txt"
-adb install -r "$artifact/app.apk" | tee "$evidence/upgrade.txt"
-adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-after.txt"
-cmp "$evidence/models-before.txt" "$evidence/models-after.txt"
-adb install "$artifact/tests.apk"
 mkdir -p "$evidence/document-originals"
 printf 'Manufacturer warranty\nWarranty expires 2028-06-30\nKeep this document for your records.\n' > "$evidence/document-originals/warranty.txt"
 printf 'Purchase receipt\nInvoice date 2026-09-17\nTotal INR 1250.00\n' > "$evidence/document-originals/receipt.txt"
@@ -32,6 +28,17 @@ printf 'A quiet afternoon with blue skies. No special plans.\n' > "$evidence/doc
 adb shell mkdir -p /sdcard/Documents/KeepLocalFixtures
 adb push "$evidence/document-originals/." /sdcard/Documents/KeepLocalFixtures/
 
+adb install "$artifact/tests.apk"
+timeout 180s adb shell am instrument -w -e class com.keep.local.next.UpgradeAuthorizationTest -e upgrade_phase before com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/upgrade-source-before.txt"
+grep -F 'OK (1 test)' "$evidence/upgrade-source-before.txt"
+adb shell am force-stop com.keep.local.next
+adb install -r "$artifact/app.apk" | tee "$evidence/upgrade.txt"
+adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-after.txt"
+cmp "$evidence/models-before.txt" "$evidence/models-after.txt"
+adb install "$artifact/tests.apk"
+
+timeout 180s adb shell am instrument -w -e class com.keep.local.next.UpgradeAuthorizationTest -e upgrade_phase after com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/upgrade-source-after.txt"
+grep -F 'OK (1 test)' "$evidence/upgrade-source-after.txt"
 adb shell cmd connectivity airplane-mode enable || true
 adb shell svc wifi disable
 adb shell svc data disable
@@ -39,12 +46,13 @@ adb shell settings get global airplane_mode_on | tee "$evidence/airplane-mode.tx
 timeout 180s adb shell am instrument -w -e class com.keep.local.next.IndexRestartTest -e restart_phase before com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/restart-before.txt"
 grep -F 'OK (1 test)' "$evidence/restart-before.txt"
 adb shell am force-stop com.keep.local.next
-adb shell am start -W -n com.keep.local.next/.MainActivity
+# Instrumentation starts a fresh process; ActivityScenario reopens the app within it.
+# Launching through adb first causes instrumentation to immediately kill a binding job.
 timeout 180s adb shell am instrument -w -e class com.keep.local.next.IndexRestartTest -e restart_phase after com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/restart-after.txt"
 grep -F 'OK (1 test)' "$evidence/restart-after.txt"
 timeout 300s adb shell am instrument -w -e class com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/library-tests.txt"
 grep -F 'OK (5 tests)' "$evidence/library-tests.txt"
-timeout 900s adb shell am instrument -w -e notClass com.keep.local.next.IndexRestartTest,com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest,com.keep.local.next.DiscoveryFlowTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
+timeout 900s adb shell am instrument -w -e notClass com.keep.local.next.UpgradeAuthorizationTest,com.keep.local.next.IndexRestartTest,com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest,com.keep.local.next.DiscoveryFlowTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
 grep -Eq '^OK \([1-9][0-9]* tests?\)' "$evidence/tests.txt"
 adb shell am force-stop com.keep.local.next
 adb shell am start -W -n com.keep.local.next/.MainActivity
@@ -62,7 +70,9 @@ cat "$evidence/discovery-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/visual-benchmark.json > "$evidence/visual-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/creative-demo.png > "$evidence/creative-demo.png"
 cat "$evidence/visual-benchmark.json"
+adb exec-out run-as com.keep.local.next cat files/indexing-benchmark.json > "$evidence/indexing-benchmark.json"
+cat "$evidence/indexing-benchmark.json"
 adb shell dumpsys meminfo com.keep.local.next > "$evidence/meminfo.txt"
 adb pull /sdcard/Documents/KeepLocalFixtures "$evidence/documents-after"
 diff -r "$evidence/document-originals" "$evidence/documents-after"
-echo 'PASS: same-package upgrade, v2-to-v3 migration, original retention, offline visual retrieval and export suite.'
+echo 'PASS: same-package upgrade, v3-to-v4 migration, original retention, offline visual retrieval and export suite.'

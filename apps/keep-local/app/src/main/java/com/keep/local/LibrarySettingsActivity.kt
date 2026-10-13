@@ -30,12 +30,18 @@ class LibrarySettingsActivity:Activity(){
         button("Choose document folder"){
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION).putExtra(Intent.EXTRA_LOCAL_ONLY,true),71)
         }
+        label("Search filenames and notes immediately; media-type filters work before deep processing. Enter YYYY-MM-DD to also find recorded source dates (UTC, or the recorded clock date when timezone is unavailable).")
         label("Text/Markdown/CSV and DOCX text: up to 2 MiB. PDF: OCR of the first 20 pages, Latin text. Other files retain metadata; saved-audio transcription is unavailable. Visual search uses your existing optional model pack.")
         button("Models and visual index"){startActivity(Intent(this,ModelsActivity::class.java))}
-        button("Start / resume indexing"){VisualIndex.setEnabled(this,true);AuthorizedLibrary.rescan(this);renderStatus()}
+        button("Start / resume indexing"){VisualIndex.setEnabled(this,true);renderStatus()}
         button("Pause indexing"){VisualIndex.setEnabled(this,false);renderStatus()}
-        button("Rescan / retry"){AuthorizedLibrary.rescan(this);MemoryDb.get(this).writableDatabase.execSQL("UPDATE assets SET state='not_indexed' WHERE state='error'");renderStatus()}
+        button("Rescan / retry"){AuthorizedLibrary.rescan(this);IndexProgress.retryFailed(this);renderStatus()}
         progress=label("Checking sources…")
+        button("Copy indexing diagnostics"){
+            val report=IndexProgress.report(this)
+            getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Keep Local indexing diagnostics",report))
+            Toast.makeText(this,"Counts and worker diagnostics copied; no filenames or excerpts",Toast.LENGTH_LONG).show()
+        }
         button("Manage authorized sources"){manageSources()}
         button("Remove derived index (keep originals)"){
             AlertDialog.Builder(this).setMessage("Remove derived text, visual vectors and suggestions? Originals, your notes, review decisions and installed models remain. Indexing will pause.").setNegativeButton("Cancel",null).setPositiveButton("Remove"){_,_->io.execute{AuthorizedLibrary.clearDerived(this);runOnUiThread{renderStatus()}}}.show()
@@ -57,11 +63,8 @@ class LibrarySettingsActivity:Activity(){
     }
     private fun renderStatus(){
         if(!::progress.isInitialized)return
-        val d=AuthorizedLibrary.db(this)
-        val summary=d.rawQuery("SELECT state,COUNT(*) FROM source_items GROUP BY state",null).use{r->buildList{while(r.moveToNext())add("${r.getInt(1)} ${r.getString(0).replace('_',' ')}")}.joinToString(" · ")}
-        val roots=d.rawQuery("SELECT label,status FROM library_sources",null).use{r->buildList{while(r.moveToNext())add("${r.getString(0)}: ${r.getString(1)}")}.joinToString("\n")}
-        val dbBytes=listOf("","-wal","-shm").sumOf{java.io.File(getDatabasePath("memories.db").path+it).length()}
-        progress.text="${if(VisualIndex.enabled(this))"Indexing enabled" else "Paused"}\n$roots\n$summary\nDatabase: ${CoreLogic.prettyBytes(dbBytes)}\n${VisualIndex.status(this)}"
+        progress.text=IndexProgress.report(this)
+
     }
     override fun onRequestPermissionsResult(code:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(code,permissions,results)
         if(code==70){val kind=pendingKind?:return;pendingKind=null

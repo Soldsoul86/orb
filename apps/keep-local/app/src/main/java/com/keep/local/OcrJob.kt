@@ -22,6 +22,8 @@ class OcrJob : JobService() {
     private val worker = Executors.newSingleThreadExecutor()
     private val cancelled = ConcurrentHashMap<Int, AtomicBoolean>()
 
+    private fun paused()=getSharedPreferences("visual",0).let{it.getBoolean("paused_explicitly",it.contains("enabled")&&!it.getBoolean("enabled",false))}
+
     override fun onStartJob(params: JobParameters): Boolean {
         val stopped = AtomicBoolean(false)
         cancelled[params.jobId] = stopped
@@ -29,13 +31,13 @@ class OcrJob : JobService() {
             var retry=false
             val generation=getSharedPreferences("visual",0).getLong("generation",0)
             try {
-                if (VoiceService.active || ScreenService.active || getSystemService(android.os.PowerManager::class.java).currentThermalStatus >= android.os.PowerManager.THERMAL_STATUS_SEVERE) { retry=true;return@execute }
+                if (paused() || IndexPipeline.restricted(this)) { retry=true;return@execute }
                 val id = params.extras.getLong("memory_id", -1)
                 val item = MemoryDb.get(this).get(id)
                 val file = item?.path?.let { AppFiles.safeFile(this, it) }
                 if (item != null && file != null && item.kind in listOf("image", "video")) {
                     val extracted = extractText(item, file, stopped)
-                    if (VoiceService.active || ScreenService.active) retry=true
+                    if (paused() || IndexPipeline.restricted(this)) retry=true
                     else synchronized(VisualIndex) { if (!stopped.get() && generation==getSharedPreferences("visual",0).getLong("generation",0)) MemoryDb.get(this).setExtracted(id, extracted) }
                 }
             } catch (_: Exception) { /* keep media even if OCR fails */ }
@@ -69,13 +71,13 @@ class OcrJob : JobService() {
             val smallW = (rawW * scale).toInt().coerceAtLeast(16)
             val smallH = (rawH * scale).toInt().coerceAtLeast(16)
             for (ms in samplesMs) {
-                if (stopped.get() || VoiceService.active || ScreenService.active) break
+                if (paused() || stopped.get() || IndexPipeline.restricted(this)) break
                 var frame: Bitmap? = null
                 try {
                     frame = if (retriever == null) decodeSmall(file) else
                         retriever.getScaledFrameAtTime(ms * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, smallW, smallH)
                     if (frame == null) continue
-                    val result = Tasks.await(recognizer.process(InputImage.fromBitmap(frame, 0)))
+                    val result = Tasks.await(recognizer.process(InputImage.fromBitmap(frame, 0)),30,java.util.concurrent.TimeUnit.SECONDS)
                     val text = result.text.trim()
                     if (text.isNotEmpty() && text != previous) {
                         found.add(if (retriever == null) "Image text — $text" else "@${ms / 1000}s — $text")

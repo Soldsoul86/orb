@@ -1,0 +1,82 @@
+Keep Local 0.4.1 — Phase A indexing reliability
+
+Scope: existing com.keep.local.next only; DB v3 -> v4 additive. No original,
+model, permission, UUID or review-history reset. Future intelligence is not shipped.
+
+Evidence from the delivered 0.4.0 source (5b73fc3 runtime / 2a4dcd2 compile):
+1. VisualIndexJob drains AuthorizedLibrary.step for the entire 25-second budget.
+   step always enumerates queued/processing sources first; then all file/audio
+   extraction. CLIP only runs with leftover budget. A growing inventory can thus
+   commit thousands of basic searchable records while ready remains unchanged.
+2. LibrarySettingsActivity's Resume calls rescan unconditionally. rescan resets
+   every source cursor to zero and deletes SAF traversal checkpoints, even when
+   a scan was incomplete. Repeated resumes can repeat inventory work.
+3. JobService sets again=true after any successful unit and calls jobFinished(...,
+   true), putting ordinary continuation through growing linear failure backoff.
+4. Image EXIF is opened during every inventory upsert lacking MediaStore date_taken,
+   including unchanged images. Per-row cursor writes and metadata I/O amplify cost.
+5. Source.status='processing' means enumeration. Visual status counts partial video
+   checkpoints and includes unavailable sources; source and asset counters differ.
+6. Existing FTS already indexes titles/notes on insertion. Ready is not required for
+   basic search; the old UI failed to explain this.
+
+The phone observations are compatible with these defects, but no phone trace,
+worker timestamps or throughput from that observation period are available.
+This is a source-confirmed causal mechanism, not a claim that the exact phone
+session was reproduced. Android background quotas/thermal/storage conditions
+can additionally delay execution. The diagnostic report makes this distinguishable.
+
+Changes:
+- One finite, constrained JobScheduler worker, bounded to a 120-second round budget,
+  with one model instance per run. No unrestricted service or new model.
+- Each round inventories <=100 rows, processes one document/audio item, then one
+  image/video sample. Stages cannot drain ahead of all others. Sources rotate;
+  assets rotate by committed checkpoint time. Capturing/severe thermal state defers.
+- Success schedules continuation normally. OS interruptions may still use Android
+  retry behaviour. Low battery/storage constraints remain. Idle rescan every 30 min
+  is best effort; Android controls actual execution time. Force-stop requires reopen.
+- Resume does not rescan. Explicit rescan preserves unfinished inventory and scans
+  completed inventories for additions/changes/removals. Metadata rescans do not
+  reset failed-enrichment retry history. URI upserts preserve IDs and user titles.
+- MediaStore asks for sorted bounded pages, commits inventory/checkpoint together,
+  performs no image-content reads in inventory. EXIF moves into image enrichment.
+  SAF cursor seeks avoid replaying earlier rows in our process; provider internals
+  and stable ordering support vary. Final rescans reconcile moved/deleted sources.
+- Android 11+ MediaStore generation_modified catches equal-size/equal-mtime changes
+  after an initial generation baseline. Android 10/SAF depend on provider size/mtime.
+- Content revision rechecked at commit; concurrent change/revocation cannot resurrect
+  stale representations. Corrupt enrichments retry at 30 s, 120 s, then stop after
+  three attempts. Explicit Retry resets this budget. Missing permissions are separate.
+- Original content is never written or deleted by index work. SHA-256 uses 64 KiB
+  streaming; a very large first video hash can still be a long cancellable unit.
+- Completion counters derive from committed asset state. Basic metadata is searchable
+  when inventory commits; partial video checkpoints remain pending. Unsupported audio
+  is explicit. Recent bounded journal records committed processing units, durations,
+  and completed assets. Journal contains no filenames, URIs, excerpts or embeddings.
+- Copy diagnostics is an explicit clipboard action with counts, error classes and
+  worker status only. No upload, notification or automatic sharing.
+
+Gates and limitations:
+- This release is Phase A only. Shared context/action interfaces are documentation.
+- Index events retain 256 recent units; throughput is a recent sample, not a lifetime
+  counter or ETA. OS waiting/capture/thermal delays are not inference measurements.
+- Deep completion means currently supported processing (CLIP sampled frames or
+  bounded document text), not understanding every action, all PDF pages or audio.
+- No saved-audio transcription, new accelerator runtime or action recognition.
+- No battery/thermal/flagship performance claim without physical measurements.
+- Folder providers can hide change metadata or reorder entries. A subsequent rescan
+  is required to reconcile changes during enumeration. Same-size/same-mtime changes
+  on Android 10 or such providers remain a limitation; no silent full-index reset.
+
+Validation finding: the initial Android 10 restart test launched the app with adb,
+then launched instrumentation, which force-stopped that just-started process while
+JobScheduler was binding. OS log recorded a bind timeout. The test now performs
+one explicit force-stop then reopens via ActivityScenario inside the new test
+process; it still asserts real worker commits and retained checkpoints. No timeout
+assertion was relaxed and no production scheduling bypass was used.
+
+User-supplied phone context (not a measured device run): Pixel 10a, visual model
+installed, observation interval approximately 3–4 minutes; repeated Resume/Rescan
+use not remembered. Android version was not supplied. Do not attribute the exact
+phone session to repeated Resume taps without logs. This context supports the
+scan-first hypothesis but does not replace physical upgrade/throughput testing.

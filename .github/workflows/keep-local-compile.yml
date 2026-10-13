@@ -1,4 +1,4 @@
-name: Compile and Test Keep Local Discovery
+name: Rebuild Keep Local Indexing Stability from Source
 on:
   workflow_dispatch:
 permissions:
@@ -32,6 +32,7 @@ jobs:
         run: |
           python3 core-tests/db_contract.py
           python3 core-tests/library_contract.py
+          python3 core-tests/indexing_contract.py
           bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
       - name: Summarize JVM test results
         run: |
@@ -42,28 +43,28 @@ jobs:
           PYRESULTS
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38364349728
+          run-id: 38394887256
           github-token: ${{ github.token }}
-          name: Keep-Local-0.3.0-signed-APK
+          name: Keep-Local-0.4.0-signed-APK
           path: apps/keep-local/previous
       - name: Prepare emulator fixtures and offline signing request
         run: |
           mkdir -p evidence delivery test-artifacts signing/responses
-          cp app/build/outputs/apk/debug/app-debug-unsigned.apk delivery/Keep-Local-0.4.0-unsigned.apk
+          cp app/build/outputs/apk/debug/app-debug-unsigned.apk delivery/Keep-Local-0.4.1-unsigned.apk
           keytool -genkeypair -keystore "$RUNNER_TEMP/test.jks" -storepass android -alias test -dname CN=Disposable-Emulator-Only -keyalg RSA -validity 2
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/app.apk delivery/Keep-Local-0.4.0-unsigned.apk
-          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/baseline.apk previous/Keep-Local-0.3.0.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/app.apk delivery/Keep-Local-0.4.1-unsigned.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/baseline.apk previous/Keep-Local-0.4.0.apk
           "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/tests.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           rm "$RUNNER_TEMP/test.jks"
-          apkanalyzer manifest print delivery/Keep-Local-0.4.0-unsigned.apk > evidence/manifest.xml
+          apkanalyzer manifest print delivery/Keep-Local-0.4.1-unsigned.apk > evidence/manifest.xml
           python3 scripts/check_packaged_manifest.py evidence/manifest.xml
           javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/classes" scripts/signing/DetachedSigner.java
-          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.4.0-unsigned.apk delivery/Keep-Local-0.4.0.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.4.1-unsigned.apk delivery/Keep-Local-0.4.1.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
           cat evidence/offline-signing-request.txt
           java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner test-artifacts/tests.apk delivery/tests-signed.apk signing/app-certificate.pem signing/responses > evidence/test-offline-signing-request.txt 2>&1 || true
           cat evidence/test-offline-signing-request.txt
-          sha256sum delivery/Keep-Local-0.4.0-unsigned.apk | tee evidence/unsigned-sha256.txt
+          sha256sum delivery/Keep-Local-0.4.1-unsigned.apk | tee evidence/unsigned-sha256.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

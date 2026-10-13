@@ -50,10 +50,11 @@ class DiscoveryFlowTest {
             assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
             tapVisible(action)
             if(action=="Correct"){
-                onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
+                assertTrue(device.wait(Until.hasObject(By.clazz("android.widget.EditText")),5000))
+                onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
                 onView(withText("Save correction")).perform(click())
             }
-            if(reason!=null)onView(withText(reason)).perform(click())
+            if(reason!=null){assertTrue(device.wait(Until.hasObject(By.text(reason)),5000));onView(withText(reason)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(click())}
             val expected=when(action){"Keep"->"kept";"Correct"->"corrected";else->"dismissed"}
             val end=SystemClock.elapsedRealtime()+5000
             while(Discoveries.get(c,id)?.status!=expected&&SystemClock.elapsedRealtime()<end)Thread.sleep(50)
