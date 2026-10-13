@@ -24,7 +24,7 @@ class LibrarySettingsActivity:Activity(){
         val scroll=ScrollView(this);scroll.addView(root);setContentView(scroll);WindowInsetsHelper.applyTo(scroll)
         label("Choose what Keep Local can remember.",24f)
         label("Only sources you authorize are read. Originals stay where they are. Everything is processed on this device; no location or identity is inferred.")
-        listOf("image" to "Photos","video" to "Videos","audio" to "Audio recordings").forEach{(kind,name)->button("Allow $name"){
+        listOf("image" to "Photos","video" to "Videos","audio" to "Audio (recordings and music)").forEach{(kind,name)->button("Allow $name"){
             pendingKind=kind;requestPermissions(AuthorizedLibrary.permissions(kind),70)
         }}
         button("Choose document folder"){

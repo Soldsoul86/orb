@@ -7,7 +7,7 @@ src=(root/'app/src/main/java/com/keep/local/MemoryDb.kt').read_text()
 for m in re.finditer(r'db\.execSQL\((?:"""(?P<triple>.*?)"""\.trimIndent\(\)|"(?P<single>[^"]*)")\)',src,re.S):
  db.executescript((m.group('triple') or m.group('single')).strip())
 db.execute("INSERT INTO memories(id,kind,title,created_at,path) VALUES(1,'video','CAD Test',1700000000000,'media/cad-test.mp4')")
-for schema in ['CreativeSchema.kt','LibrarySchema.kt']:
+for schema in ['CreativeSchema.kt','LibrarySchema.kt','DiscoverySchema.kt']:
  text=(root/'app/src/main/java/com/keep/local'/schema).read_text()
  for _ in range(2):
   for m in re.finditer(r'db\.execSQL\((?:"""(?P<triple>.*?)"""|"(?P<single>[^"]*)")\)',text,re.S):db.executescript((m.group('triple') or m.group('single')).strip())
@@ -25,3 +25,13 @@ db.execute('DELETE FROM memories WHERE id=2')
 assert db.execute('SELECT count(*) FROM source_items').fetchone()[0]==0
 assert db.execute('SELECT asset_uuid FROM assets WHERE memory_id=1').fetchone()[0]==uuid
 print('PASS: additive v2/v3 schema, stable UUID, revoked-source filtering and FK cascade; original path unchanged')
+
+db.execute("INSERT INTO discoveries VALUES('d','document','Possible','Literal','Uncertain',NULL,1,'rules')")
+db.execute("INSERT INTO discovery_evidence VALUES('d',1,?,'content://source','revision',0,0,'exact text')",(uuid,))
+db.execute("INSERT INTO review_state VALUES('d','corrected','corrected_information','Human correction',2)")
+assert db.execute('SELECT excerpt FROM discovery_evidence').fetchone()[0]=='exact text'
+db.execute('DELETE FROM memories WHERE id=1')
+assert db.execute('SELECT count(*) FROM discoveries').fetchone()[0]==0
+assert db.execute('SELECT count(*) FROM discovery_evidence').fetchone()[0]==0
+assert db.execute('SELECT correction FROM review_state').fetchone()[0]=='Human correction'
+print('PASS: separate evidence/corrections, source deletion removes derived record, decisions survive')

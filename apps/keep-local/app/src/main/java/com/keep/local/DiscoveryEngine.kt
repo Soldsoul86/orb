@@ -25,15 +25,15 @@ object DiscoveryEngine {
         }}
         prefs.edit().putLong("document_cursor",last).apply()
     }
-    private data class Timed(val id:Long,val time:Long,val folder:String)
+    private data class Timed(val id:Long,val time:Long,val folder:String,val hash:String)
     private fun experiences(c:Context){
         val prefs=c.getSharedPreferences("discovery",0);val after=prefs.getLong("experience_cursor",0)
-        val rows=db(c).rawQuery("SELECT si.memory_id,si.content_time,si.group_path FROM source_items si JOIN memories ON memories.id=si.memory_id WHERE si.memory_id>? AND si.time_basis='capture_time' AND si.content_time>0 AND memories.kind IN ('image','video') AND ${LibrarySchema.VISIBLE} ORDER BY si.memory_id LIMIT 200",arrayOf(after.toString())).use{r->buildList{while(r.moveToNext())add(Timed(r.getLong(0),r.getLong(1),r.getString(2)))}}
+        val rows=db(c).rawQuery("SELECT si.memory_id,si.content_time,si.group_path,a.sha256 FROM source_items si JOIN assets a ON a.memory_id=si.memory_id JOIN memories ON memories.id=si.memory_id WHERE si.memory_id>? AND si.time_basis='capture_time' AND si.content_time>0 AND memories.kind IN ('image','video') AND ${LibrarySchema.VISIBLE} ORDER BY si.memory_id LIMIT 200",arrayOf(after.toString())).use{r->buildList{while(r.moveToNext())add(Timed(r.getLong(0),r.getLong(1),r.getString(2),r.getString(3).orEmpty()))}}
         prefs.edit().putLong("experience_cursor",rows.lastOrNull()?.id?:0).apply()
         var proposed=0
         for((folder,assets) in rows.groupBy{it.folder}){
             if(folder.isBlank())continue
-            val sorted=assets.sortedBy{it.time};var start=0
+            val sorted=assets.distinctBy{it.hash.ifBlank{it.id.toString()}}.sortedBy{it.time};var start=0
             while(start<sorted.size && proposed<5){
                 val group=sorted.drop(start).takeWhile{it.time-sorted[start].time<=10*60*1000L}.take(12)
                 start+=group.size

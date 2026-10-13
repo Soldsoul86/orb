@@ -22,6 +22,7 @@ object Discoveries {
     fun evidence(c:Context,id:Long,type:String,start:Long=0,end:Long=0,excerpt:String=""):DiscoveryEvidence? {
         val item=MemoryDb.get(c).get(id)?:return null
         if(!CreativeSearch.available(c,item))return null
+        if(item.path!=null && runCatching{MediaSource.check(c,item)}.isFailure)return null
         val uuid=db(c).rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=?",arrayOf(id.toString())).use{if(it.moveToFirst())it.getString(0)else null}?:return null
         return DiscoveryEvidence(id,uuid,if(MediaSource.external(item))item.path!! else AppFiles.itemUri(id).toString(),revision(c,item,type),start,end,excerpt)
     }
@@ -29,7 +30,7 @@ object Discoveries {
     fun propose(c:Context,type:String,suggestion:String,reason:String,uncertainty:String,evidence:List<DiscoveryEvidence>,score:Float?=null):String? = synchronized(VisualIndex) {
         if(evidence.isEmpty() || evidence.any{MemoryDb.get(c).get(it.id)==null})return@synchronized null
         val d=db(c)
-        val key=hash(type+":"+if(type=="document")evidence.first().revision else evidence.sortedBy{it.uuid}.joinToString("|"){it.uuid+":"+it.revision})
+        val key=hash(type+":"+if(type=="document")evidence.first().revision else if(type=="reusable")evidence.map{it.revision}.sorted().joinToString("|") else evidence.sortedBy{it.uuid}.joinToString("|"){it.uuid+":"+it.revision})
         if(d.rawQuery("SELECT 1 FROM discoveries WHERE id=?",arrayOf(key)).use{it.moveToFirst()})return@synchronized key
         val suppressed=evidence.all{e->d.rawQuery("SELECT 1 FROM dismissed_evidence WHERE type=? AND asset_uuid=? AND revision=?",arrayOf(type,e.uuid,e.revision)).use{it.moveToFirst()}}
         val dismissed=d.rawQuery("SELECT 1 FROM review_state WHERE discovery_id=? AND status='dismissed'",arrayOf(key)).use{it.moveToFirst()}
@@ -38,7 +39,7 @@ object Discoveries {
         if(queue>=20)return@synchronized null
         d.beginTransaction();try {
             // Check again inside the same lock used by revocation/deletion handling.
-            if(evidence.any{e->val item=MemoryDb.get(c).get(e.id);item==null||!CreativeSearch.available(c,item)||revision(c,item,type)!=e.revision})return@synchronized null
+            if(evidence.any{e->val current=Discoveries.evidence(c,e.id,type,e.start,e.end,e.excerpt);current==null||current.uuid!=e.uuid||current.source!=e.source||current.revision!=e.revision||(type=="document"&&e.excerpt.lineSequence().filter{it.isNotBlank()}.any{line->val item=MemoryDb.get(c).get(e.id)!!;line !in (if(item.kind=="note")item.body else item.extracted)})})return@synchronized null
             d.insertOrThrow("discoveries",null,ContentValues().apply{put("id",key);put("type",type);put("suggestion",suggestion);put("reason",reason);put("uncertainty",uncertainty);if(score!=null)put("score",score);put("created_at",System.currentTimeMillis());put("version",when(type){"document"->"literal-document-rules-0.4.0";"experience"->"capture-metadata-rules-0.4.0";else->VERSION})})
             evidence.forEach{e->d.insertOrThrow("discovery_evidence",null,ContentValues().apply{put("discovery_id",key);put("memory_id",e.id);put("asset_uuid",e.uuid);put("source_ref",e.source);put("revision",e.revision);put("start_ms",e.start);put("end_ms",e.end);put("excerpt",e.excerpt)})}
             d.setTransactionSuccessful();key
@@ -51,7 +52,7 @@ object Discoveries {
     }
     fun valid(c:Context,d:Discovery):Boolean {
         val minimum=if(d.type=="document")1 else 2
-        return d.evidence.size>=minimum && d.evidence.all{e->val item=MemoryDb.get(c).get(e.id);item!=null&&CreativeSearch.available(c,item)&&revision(c,item,d.type)==e.revision}
+        return d.evidence.size>=minimum && d.evidence.all{e->val item=MemoryDb.get(c).get(e.id);item!=null&&CreativeSearch.available(c,item)&&(item.path==null||runCatching{MediaSource.check(c,item)}.isSuccess)&&revision(c,item,d.type)==e.revision&&e.source==(if(MediaSource.external(item))item.path else AppFiles.itemUri(item.id).toString())&&db(c).rawQuery("SELECT 1 FROM assets WHERE memory_id=? AND asset_uuid=?",arrayOf(e.id.toString(),e.uuid)).use{it.moveToFirst()}&&(d.type!="reusable"||db(c).rawQuery("SELECT 1 FROM representations WHERE memory_id=? AND modality='visual' AND start_ms=? AND end_ms=? AND model_id=?",arrayOf(e.id.toString(),e.start.toString(),e.end.toString(),ModelPack.ID)).use{it.moveToFirst()})}
     }
     fun list(c:Context,history:Boolean=false):List<Discovery> {
         AuthorizedLibrary.reconcile(c)

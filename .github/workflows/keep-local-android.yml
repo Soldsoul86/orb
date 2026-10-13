@@ -56,6 +56,8 @@ jobs:
           javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/classes" scripts/signing/DetachedSigner.java
           java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.4.0-unsigned.apk delivery/Keep-Local-0.4.0.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
           cat evidence/offline-signing-request.txt
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner test-artifacts/tests.apk delivery/tests-signed.apk signing/app-certificate.pem signing/responses > evidence/test-offline-signing-request.txt 2>&1 || true
+          cat evidence/test-offline-signing-request.txt
           sha256sum delivery/Keep-Local-0.4.0-unsigned.apk | tee evidence/unsigned-sha256.txt
       - uses: actions/upload-artifact@v4
         if: always()

@@ -44,16 +44,25 @@ timeout 180s adb shell am instrument -w -e class com.keep.local.next.IndexRestar
 grep -F 'OK (1 test)' "$evidence/restart-after.txt"
 timeout 300s adb shell am instrument -w -e class com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/library-tests.txt"
 grep -F 'OK (5 tests)' "$evidence/library-tests.txt"
-timeout 900s adb shell am instrument -w -e notClass com.keep.local.next.IndexRestartTest,com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
+timeout 900s adb shell am instrument -w -e notClass com.keep.local.next.IndexRestartTest,com.keep.local.next.AuthorizedLibraryTest,com.keep.local.next.DocumentParserTest,com.keep.local.next.DiscoveryFlowTest com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/tests.txt"
 grep -Eq '^OK \([1-9][0-9]* tests?\)' "$evidence/tests.txt"
 adb shell am force-stop com.keep.local.next
 adb shell am start -W -n com.keep.local.next/.MainActivity
 adb exec-out run-as com.keep.local.next cat files/media/cad-test.mp4 > "$evidence/readback.mp4"
 cmp "$evidence/readback.mp4" "$evidence/cad-test.mp4"
+timeout 600s adb shell am instrument -w -e class com.keep.local.next.DiscoveryFlowTest -e review_phase before com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/review-before.txt"
+grep -F 'OK (1 test)' "$evidence/review-before.txt"
+adb shell am force-stop com.keep.local.next
+adb shell am start -W -n com.keep.local.next/.MainActivity
+timeout 180s adb shell am instrument -w -e class com.keep.local.next.DiscoveryFlowTest -e review_phase after com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/review-after.txt"
+grep -F 'OK (1 test)' "$evidence/review-after.txt"
+adb exec-out run-as com.keep.local.next cat files/discovery-benchmark.json > "$evidence/discovery-benchmark.json"
+adb exec-out run-as com.keep.local.next cat files/discovery-review.png > "$evidence/discovery-review.png"
+cat "$evidence/discovery-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/visual-benchmark.json > "$evidence/visual-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/creative-demo.png > "$evidence/creative-demo.png"
 cat "$evidence/visual-benchmark.json"
 adb shell dumpsys meminfo com.keep.local.next > "$evidence/meminfo.txt"
 adb pull /sdcard/Documents/KeepLocalFixtures "$evidence/documents-after"
 diff -r "$evidence/document-originals" "$evidence/documents-after"
-echo 'PASS: same-package upgrade, v1 migration, original retention, offline visual retrieval and export suite.'
+echo 'PASS: same-package upgrade, v2-to-v3 migration, original retention, offline visual retrieval and export suite.'

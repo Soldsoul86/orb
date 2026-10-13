@@ -45,28 +45,8 @@ class AuthorizedLibraryTest {
         val stop=AtomicBoolean(true);assertFalse(AuthorizedLibrary.step(c,stop))
     }
     @Test fun realFolderPickerPersistsReadGrantAndRevocationErasesExtractedText(){
-        val device=androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val inst=InstrumentationRegistry.getInstrumentation()
-        val monitor=object:android.app.Instrumentation.ActivityMonitor(){
-            override fun onStartActivity(intent:android.content.Intent):android.app.Instrumentation.ActivityResult? {
-                if(intent.action==android.content.Intent.ACTION_OPEN_DOCUMENT_TREE) intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents","primary:Documents/KeepLocalFixtures"))
-                return null
-            }
-        }
-        inst.addMonitor(monitor)
-        try { androidx.test.core.app.ActivityScenario.launch(LibrarySettingsActivity::class.java).use {
-            androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Choose document folder")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),androidx.test.espresso.action.ViewActions.click())
-            val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.res(java.util.regex.Pattern.compile(".*:id/action_menu_select"))),3000)
-                ?:device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)(use this folder|select|allow access.*)"))),5000)
-            val hierarchy=java.io.ByteArrayOutputStream();if(select==null)device.dumpWindowHierarchy(hierarchy)
-            assertNotNull("Folder consent action: "+hierarchy.toString("UTF-8"),select);select!!.click()
-            device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)allow"))),2000)?.click()
-            assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.pkg(c.packageName)),5000))
-        }
-        } finally { inst.removeMonitor(monitor) }
-        val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority=="com.android.externalstorage.documents"&&it.uri.toString().contains("KeepLocalFixtures")}
-        assertNotNull("Persisted read grant",grant)
-        val source=AuthorizedLibrary.enableTree(c,grant!!.uri)
+        val folder=TestFolder.authorize(c)
+        val source=AuthorizedLibrary.enableTree(c,folder)
         // One scan batch, then a fresh caller resumes durable processing.
         AuthorizedLibrary.step(c,AtomicBoolean(false))
         assertFalse(AuthorizedLibrary.step(c,AtomicBoolean(true)))
@@ -76,7 +56,7 @@ class AuthorizedLibraryTest {
         assertTrue(MemoryDb.get(c).get(item.id)!!.extracted.contains("2028-06-30"))
         val original=MediaSource.open(c,item).use{it.readBytes()}
         // Revoke at the OS boundary, not merely through our source table.
-        c.contentResolver.releasePersistableUriPermission(grant.uri,android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        c.contentResolver.releasePersistableUriPermission(folder,android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         AuthorizedLibrary.reconcile(c)
         assertFalse(AuthorizedLibrary.accessible(c,item.id))
         assertTrue(MemoryDb.get(c).search("Manufacturer warranty",null).none{it.id==item.id})
