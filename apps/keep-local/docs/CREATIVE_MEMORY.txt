@@ -44,8 +44,8 @@ limits imports. No chipset assumptions or entry-level phone target remain.
 
 Validation corpus: real scikit-image sample photos of cat, coffee, astronaut,
 and rocket, with opaque filenames and blank notes/OCR. A synthetic montage
-places cat at 0-4s, coffee at 4-8s and astronaut at 8-12s; a separate rocket-only video is a distractor. It is NOT a real action
-video. Tests compare CLIP tokenizer against a reference tokenizer, measure visual
+places cat at 0-4s, coffee at 4-8s and astronaut at 8-12s; a separate rocket-only
+video is a distractor. It is NOT a real action video. Tests compare CLIP tokenizer against a reference tokenizer, measure visual
 hit rate and montage timestamp, indexing/search time and memory samples. Emulator
 metrics are not flagship-device, battery or thermal benchmarks. The noodles
 versus noodles-on-table action demo remains UNVERIFIED; no claims based on this
@@ -56,3 +56,8 @@ model pack and requests a detached APK signature. The recovered private key stay
 in the private workspace. Only its public certificate and signatures can enter
 Git. The final workflow reuses exact unsigned bytes and verifies the certificate
 and actual in-place upgrade against the previously delivered signed APK.
+
+Hardware qualification: ORT CPU compatibility is verified on emulators; this is
+not a claim of an optimal flagship model/runtime. The prototype does not enable
+unbenchmarked GPU/NPU providers. Representative ARM64 flagship benchmarking and
+a larger real-video corpus are gates before choosing an accelerated default.

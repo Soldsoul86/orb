@@ -1,22 +1,23 @@
-# Verification
+# Creative Memory verification
 
-Run `python3 core-tests/db_contract.py`, then
-`bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`.
-Run `bash gradlew :app:connectedDebugAndroidTest` on a device/emulator.
-Instrumentation covers note creation, save, reopen, prefix retrieval, SQLite
-edit/delete, bounded previews, packaged permissions and a traversal attempt.
+The compile workflow pins Gradle/AGP/Kotlin/ORT/model revision, prepares the local
+model pack plus ground-truth test corpus, then runs JVM tests, lint and Android
+builds. See `.github/workflows/keep-local-compile.yml` at repository root.
+The signing workflow consumes an exact unsigned artifact and public detached
+signatures, verifies the retained certificate and tests actual in-place updates.
 
-The Share Export workflow passed 6 JVM tests and 8 instrumentation tests on
-each of API 29/36. It uploads an unsigned APK and reports; release signing is
-blocked by the missing original private key. Emulator checks do not prove
-physical-phone recording or memory performance.
-See docs/VERIFICATION.txt for executed results and docs/acceptance.md for
-physical-device gates. Keep Play Protect enabled throughout installation tests.
+`CreativeMemoryTest` verifies v1-to-v2 data preservation and stable IDs, deletion
+races, model checksum installation, reference BPE tokenization, real-photo visual
+retrieval, montage timestamps/video distractor and the real search/preview UI.
+`MediaExportTest` preserves the existing sharing/Gallery/Files suite. Notes/FTS,
+permission boundaries, cancellation and large-copy tests remain included.
 
-Share/export adds JVM filename/streaming/error tests and Android tests using a
-seeded v1 CAD Test MP4. `scripts/export-emulator.sh` runs only on emulators,
-checks the original signing mismatch, then tests same-key fixture upgrades,
-chooser grants to a separate test APK, Gallery copies, Files export, cancellation,
-provider access boundaries and large-file streaming. CI's fixture certificate
-is never evidence of compatibility with the originally delivered APK.
-See docs/SHARE_EXPORT.txt for current limitations and key requirements.
+`scripts/creative-emulator.sh` runs only on a disposable emulator, installs the
+baseline, seeds a known original, updates without uninstalling, disables radios,
+executes instrumentation and verifies original bytes after restart. Never use
+the fixture-seeding scripts on a phone containing real recordings.
+
+Metrics and screenshots are retained as evidence. The corpus is four real photos
+and two constructed videos; it does not prove temporal action recognition or
+real flagship performance. Detailed executed results and limitations are in
+`docs/CREATIVE_RESULTS.txt`. Historical reports describe their own app versions.
