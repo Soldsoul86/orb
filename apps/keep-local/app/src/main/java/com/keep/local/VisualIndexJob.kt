@@ -65,7 +65,7 @@ class VisualIndexJob : JobService() {
                         if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) { again=true;break }
                         val db=MemoryDb.get(this).writableDatabase
                         val id=db.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE m.kind IN ('image','video') AND a.state IN ('not_indexed','indexing') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) ORDER BY m.created_at LIMIT 1",null).use { if(it.moveToFirst())it.getLong(0) else null } ?: break
-                        try { indexOne(this,id,engine,stop) } catch(e: SecurityException) {AuthorizedLibrary.invalidate(this,id)} catch(e: java.io.FileNotFoundException) {AuthorizedLibrary.invalidate(this,id)} catch(e: Exception) { if(!stop.get()) {db.execSQL("UPDATE assets SET state='error',error=? WHERE memory_id=?",arrayOf("Visual indexing failed",id));db.execSQL("UPDATE source_items SET state='failed',error='Visual indexing failed' WHERE memory_id=?",arrayOf(id))} }
+                        try { indexOne(this,id,engine,stop) } catch(e: SecurityException) {AuthorizedLibrary.invalidate(this,id)} catch(e: java.io.FileNotFoundException) {if(MemoryDb.get(this).get(id)?.let{MediaSource.external(it)}==true)AuthorizedLibrary.invalidate(this,id)else db.execSQL("UPDATE assets SET state='error',error='Original missing' WHERE memory_id=?",arrayOf(id))} catch(e: Exception) { if(!stop.get()) {db.execSQL("UPDATE assets SET state='error',error=? WHERE memory_id=?",arrayOf("Visual indexing failed",id));db.execSQL("UPDATE source_items SET state='failed',error='Visual indexing failed' WHERE memory_id=?",arrayOf(id))} }
                         again=true
                     }
                 }
@@ -88,7 +88,7 @@ class VisualIndexJob : JobService() {
             db.rawQuery("SELECT next_ms,sha256 FROM assets WHERE memory_id=?",arrayOf(id.toString())).use { if(!it.moveToFirst())return;ms=it.getLong(0);hash=it.getString(1) }
             if(hash==null) {
                 val digest=MessageDigest.getInstance("SHA-256")
-                MediaSource.open(c,item).use { input -> val buf=ByteArray(65536);while(true){if(stop.get())return;val n=input.read(buf);if(n<0)break;digest.update(buf,0,n)} }
+                MediaSource.open(c,item).use { input -> val buf=ByteArray(65536);while(true){if(stop.get()||VoiceService.active||ScreenService.active){stop.set(true);return};val n=input.read(buf);if(n<0)break;digest.update(buf,0,n)} }
                 hash=digest.digest().joinToString(""){"%02x".format(it)}
             }
             var duration=0L

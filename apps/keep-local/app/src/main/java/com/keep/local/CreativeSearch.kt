@@ -8,14 +8,18 @@ object CreativeSearch {
     fun search(c:Context,query:String,kind:String?):CreativeResults {
         AuthorizedLibrary.reconcile(c)
         val db=MemoryDb.get(c)
-        val text=db.search(query,kind)
+        val text=db.search(query,kind).filter { available(c,it) }
         if(query.isBlank() || !ModelPack.ready(c) || kind !in listOf(null,"image","video")) return CreativeResults(text, emptyMap(),text.map{it.id}.toSet(),if(!ModelPack.ready(c))"Visual model not installed · text search available" else "")
         val started=android.os.SystemClock.elapsedRealtime()
         val visual=try { ClipEncoder(c).use { rank(c,it.text(query),kind) } } catch(e:Exception) { return CreativeResults(text,emptyMap(),text.map{it.id}.toSet(),"Visual search unavailable: ${e.message}") }
         val ids=(visual.map{it.id}+text.map{it.id}).distinct().take(150)
         val byId=text.associateBy{it.id}
-        val results=ids.mapNotNull{byId[it]?:db.get(it)}
+        val results=ids.mapNotNull{byId[it]?:db.get(it)}.filter { available(c,it) }
         return CreativeResults(results,visual.associateBy{it.id},text.map{it.id}.toSet(),"Visual suggestions · ${android.os.SystemClock.elapsedRealtime()-started} ms · similarity is not certainty")
+    }
+    fun available(c:Context,item:MemoryItem):Boolean {
+        if(!MediaSource.external(item))return true
+        return try {MediaSource.check(c,item);true}catch(e:Exception){AuthorizedLibrary.invalidate(c,item.id);false}
     }
     fun rank(c:Context,query:FloatArray,kind:String?=null):List<VisualHit> {
         val best=mutableMapOf<Long,VisualHit>()
