@@ -59,4 +59,11 @@ class ExportNamesTest {
             }, 100) {}
         }
     }
+    @org.junit.Test fun unknownProviderLengthStillStreamsCompleteBytes() {
+        val bytes="provider stream".toByteArray()
+        val out=java.io.ByteArrayOutputStream()
+        org.junit.Assert.assertEquals(bytes.size.toLong(),ExportNames.copy(java.io.ByteArrayInputStream(bytes),out,-1L){})
+        org.junit.Assert.assertArrayEquals(bytes,out.toByteArray())
+    }
+
 }

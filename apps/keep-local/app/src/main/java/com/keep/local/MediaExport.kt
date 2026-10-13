@@ -120,7 +120,7 @@ object MediaExport {
 
     private fun copyTo(context: Context, original: MemoryItem, uri: Uri, cancel: CancellationSignal) {
         cancel.throwIfCanceled()
-        val expected = original.bytes
+        val expected = MediaSource.descriptor(context,original).use { it.statSize }
         context.contentResolver.openAssetFileDescriptor(uri, "w", cancel)?.use { descriptor ->
             descriptor.createOutputStream().use { output ->
                 MediaSource.open(context,original).use { input ->

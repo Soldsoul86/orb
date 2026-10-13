@@ -16,5 +16,5 @@ object MediaSource {
     }
     fun open(c: Context,item: MemoryItem): InputStream = c.contentResolver.openInputStream(uri(c,item)) ?: throw FileNotFoundException("Original unavailable")
     fun descriptor(c:Context,item:MemoryItem):ParcelFileDescriptor = c.contentResolver.openFileDescriptor(uri(c,item),"r") ?: throw FileNotFoundException("Original unavailable")
-    fun check(c:Context,item:MemoryItem) { descriptor(c,item).use { } }
+    fun check(c:Context,item:MemoryItem) { descriptor(c,item).use { if(it.statSize==0L) throw FileNotFoundException("Original is empty") } }
 }

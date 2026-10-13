@@ -45,7 +45,7 @@ class LibrarySettingsActivity:Activity(){
     private fun manageSources(){
         val sources=mutableListOf<Pair<Long,String>>()
         AuthorizedLibrary.db(this).rawQuery("SELECT id,label,status FROM library_sources",null).use{while(it.moveToNext())sources.add(it.getLong(0) to "${it.getString(1)} · ${it.getString(2)}")}
-        if(sources.isEmpty()){Toast.makeText(this,"No authorized sources",0).show();return}
+        if(sources.isEmpty()){Toast.makeText(this,"No authorized sources",Toast.LENGTH_SHORT).show();return}
         AlertDialog.Builder(this).setTitle("Authorized sources").setItems(sources.map{it.second}.toTypedArray()){_,i->
             val id=sources[i].first
             AlertDialog.Builder(this).setItems(arrayOf("Revoke access and remove derived content","Exclude a folder path / document ID prefix","Reset file/folder exclusions")){_,choice->when(choice){
@@ -65,12 +65,12 @@ class LibrarySettingsActivity:Activity(){
     }
     override fun onRequestPermissionsResult(code:Int,permissions:Array<out String>,results:IntArray){super.onRequestPermissionsResult(code,permissions,results)
         if(code==70){val kind=pendingKind?:return;pendingKind=null
-            if(AuthorizedLibrary.granted(this,kind)){AuthorizedLibrary.enableMedia(this,kind);renderStatus()}else Toast.makeText(this,"Permission denied; this category stays off",1).show()
+            if(AuthorizedLibrary.granted(this,kind)){AuthorizedLibrary.enableMedia(this,kind);renderStatus()}else Toast.makeText(this,"Permission denied; this category stays off",Toast.LENGTH_LONG).show()
         }
     }
     @Deprecated("Platform callback") override fun onActivityResult(code:Int,result:Int,data:Intent?){super.onActivityResult(code,result,data)
         if(code==71&&result==RESULT_OK){val uri=data?.data?:return
-            try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);AuthorizedLibrary.enableTree(this,uri);renderStatus()}catch(e:Exception){Toast.makeText(this,"Folder access could not be retained",1).show()}
+            try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);AuthorizedLibrary.enableTree(this,uri);renderStatus()}catch(e:Exception){Toast.makeText(this,"Folder access could not be retained",Toast.LENGTH_LONG).show()}
         }
     }
     override fun onResume(){super.onResume();AuthorizedLibrary.reconcile(this);handler.post(refresh)}
