@@ -23,8 +23,8 @@ class PlaybackActivity : MediaActionsActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val item = MemoryDb.get(this).get(intent.getLongExtra("id", -1))
-        val file = AppFiles.safeFile(this, item?.path)
-        if (item == null || file == null || item.kind !in listOf("audio", "video")) {
+        val source = item?.let { runCatching { MediaSource.uri(this,it) }.getOrNull() }
+        if (item == null || source == null || item.kind !in listOf("audio", "video")) {
             Toast.makeText(this, "Recording not found", Toast.LENGTH_LONG).show(); finish(); return
         }
         val root = LinearLayout(this).apply {
@@ -40,7 +40,7 @@ class PlaybackActivity : MediaActionsActivity() {
         val seekStart = intent.getLongExtra("start_ms", 0).toInt().coerceAtLeast(0)
         if (item.kind == "video") {
             video = VideoView(this).apply {
-                setVideoPath(file.absolutePath)
+                setVideoURI(source)
                 setMediaController(MediaController(this@PlaybackActivity).also { it.setAnchorView(this) })
                 setOnPreparedListener {
                     if (seekStart > 0) seekTo(seekStart)
@@ -59,7 +59,7 @@ class PlaybackActivity : MediaActionsActivity() {
             root.addView(button); root.addView(seek); root.addView(elapsed)
             try {
                 player = MediaPlayer().apply {
-                    setDataSource(file.absolutePath)
+                    setDataSource(this@PlaybackActivity,source)
                     setOnPreparedListener { p ->
                         seek.max = p.duration.coerceAtLeast(1)
                         button.isEnabled = true

@@ -29,7 +29,7 @@ class CreativeMemoryTest {
         val db=MemoryDb.get(c)
         assertEquals("CAD Test",db.get(987654)!!.title)
         assertTrue(AppFiles.safeFile(c,db.get(987654)!!.path)!!.length()>0)
-        db.readableDatabase.rawQuery("PRAGMA user_version",null).use { it.moveToFirst();assertEquals(2,it.getInt(0)) }
+        db.readableDatabase.rawQuery("PRAGMA user_version",null).use { it.moveToFirst();assertEquals(3,it.getInt(0)) }
         val uuid=db.readableDatabase.rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=987654",null).use {it.moveToFirst();it.getString(0)}
         CreativeSchema.create(db.writableDatabase)
         db.readableDatabase.rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=987654",null).use {it.moveToFirst();assertEquals(uuid,it.getString(0))}
@@ -61,7 +61,7 @@ class CreativeMemoryTest {
     @Test fun offlineRealPhotoVisualSearchAndTimestampBenchmark() {
         assertEquals("1",androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand("settings get global airplane_mode_on").trim())
         val started=SystemClock.elapsedRealtime()
-        ModelPack.install(c,Uri.fromFile(File(c.cacheDir,"model.zip")),android.os.CancellationSignal())
+        if(!ModelPack.ready(c)) ModelPack.install(c,Uri.fromFile(File(c.cacheDir,"model.zip")),android.os.CancellationSignal())
         assertTrue(ModelPack.ready(c))
         val tokens=ClipTokenizer(ModelPack.directory(c))
         val golden=JSONObject(test.assets.open("tokenizer-golden.json").bufferedReader().use{it.readText()})

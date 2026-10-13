@@ -19,7 +19,7 @@ object VisualIndex {
     fun setEnabled(c: Context, yes: Boolean) { c.getSharedPreferences("visual",0).edit().putBoolean("enabled",yes).apply()
         if (yes) schedule(c) else c.getSystemService(JobScheduler::class.java).cancel(JOB) }
     fun schedule(c: Context) {
-        if (!enabled(c) || !ModelPack.ready(c)) return
+        if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c))) return
         val scheduler=c.getSystemService(JobScheduler::class.java)
         if (scheduler.getPendingJob(JOB)!=null) return
         scheduler.schedule(JobInfo.Builder(JOB, ComponentName(c, VisualIndexJob::class.java))
@@ -53,14 +53,19 @@ class VisualIndexJob : JobService() {
         stopped=AtomicBoolean(false);val stop=stopped
         worker.execute {
             var again=false
-            try { if(ModelPack.ready(this) && VisualIndex.enabled(this)) {
-                ClipEncoder(this).use { engine ->
-                    val deadline=SystemClock.elapsedRealtime()+25000
+            try { if(VisualIndex.enabled(this)) {
+                val deadline=SystemClock.elapsedRealtime()+25000
+                while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
+                    if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) {again=true;break}
+                    if(!AuthorizedLibrary.step(this,stop))break
+                    again=true
+                }
+                if(ModelPack.ready(this) && !stop.get() && !VoiceService.active && !ScreenService.active && SystemClock.elapsedRealtime()<deadline) ClipEncoder(this).use { engine ->
                     while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
-                        if(getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) { again=true;break }
+                        if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) { again=true;break }
                         val db=MemoryDb.get(this).writableDatabase
-                        val id=db.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE m.kind IN ('image','video') AND a.state IN ('not_indexed','indexing') ORDER BY m.created_at LIMIT 1",null).use { if(it.moveToFirst())it.getLong(0) else null } ?: break
-                        try { indexOne(this,id,engine,stop) } catch(e: Exception) { if(!stop.get()) db.execSQL("UPDATE assets SET state='error',error=? WHERE memory_id=?",arrayOf((e.message ?: "Indexing failed").take(200),id)) }
+                        val id=db.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE m.kind IN ('image','video') AND a.state IN ('not_indexed','indexing') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) ORDER BY m.created_at LIMIT 1",null).use { if(it.moveToFirst())it.getLong(0) else null } ?: break
+                        try { indexOne(this,id,engine,stop) } catch(e: SecurityException) {AuthorizedLibrary.invalidate(this,id)} catch(e: java.io.FileNotFoundException) {AuthorizedLibrary.invalidate(this,id)} catch(e: Exception) { if(!stop.get()) {db.execSQL("UPDATE assets SET state='error',error=? WHERE memory_id=?",arrayOf("Visual indexing failed",id));db.execSQL("UPDATE source_items SET state='failed',error='Visual indexing failed' WHERE memory_id=?",arrayOf(id))} }
                         again=true
                     }
                 }
@@ -77,19 +82,20 @@ class VisualIndexJob : JobService() {
             val generation=c.getSharedPreferences("visual",0).getLong("generation",0)
             val db=MemoryDb.get(c).writableDatabase
             val item=MemoryDb.get(c).get(id) ?: return
-            val file=AppFiles.safeFile(c,item.path) ?: error("Original file unavailable")
+            val source=MediaSource.uri(c,item)
+            if(MediaSource.external(item))db.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             var ms=0L;var hash:String?=null
             db.rawQuery("SELECT next_ms,sha256 FROM assets WHERE memory_id=?",arrayOf(id.toString())).use { if(!it.moveToFirst())return;ms=it.getLong(0);hash=it.getString(1) }
             if(hash==null) {
                 val digest=MessageDigest.getInstance("SHA-256")
-                file.inputStream().use { input -> val buf=ByteArray(65536);while(true){if(stop.get())return;val n=input.read(buf);if(n<0)break;digest.update(buf,0,n)} }
+                MediaSource.open(c,item).use { input -> val buf=ByteArray(65536);while(true){if(stop.get())return;val n=input.read(buf);if(n<0)break;digest.update(buf,0,n)} }
                 hash=digest.digest().joinToString(""){"%02x".format(it)}
             }
             var duration=0L
-            val bitmap=if(item.kind=="image") ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder,info,_ ->
+            val bitmap=if(item.kind=="image") ImageDecoder.decodeBitmap(ImageDecoder.createSource(c.contentResolver,source)) { decoder,info,_ ->
                 val scale=448f/maxOf(info.size.width,info.size.height);decoder.setTargetSize((info.size.width*scale).toInt().coerceAtLeast(1),(info.size.height*scale).toInt().coerceAtLeast(1));decoder.allocator=ImageDecoder.ALLOCATOR_SOFTWARE
             } else MediaMetadataRetriever().use { retriever ->
-                retriever.setDataSource(file.absolutePath)
+                retriever.setDataSource(c,source)
                 duration=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: error("Duration unavailable")
                 val w=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 448
                 val h=retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 448
@@ -109,12 +115,13 @@ class VisualIndexJob : JobService() {
                 if(stop.get() || generation!=c.getSharedPreferences("visual",0).getLong("generation",0)) { thumb.delete(); return }
                 db.beginTransaction()
                 try {
-                    if(MemoryDb.get(c).get(id)==null) { thumb.delete(); return }
+                    if(MemoryDb.get(c).get(id)==null || (MediaSource.external(item)&&!AuthorizedLibrary.accessible(c,id))) { thumb.delete(); return }
                     db.insertWithOnConflict("representations",null,ContentValues().apply {
                         put("memory_id",id);put("modality","visual");put("model_id",engine.modelId);put("start_ms",ms);put("end_ms",end)
                         put("vector",VisualIndex.blob(embedding));put("created_at",System.currentTimeMillis())
                     },android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
                     db.execSQL("UPDATE assets SET sha256=?,state=?,next_ms=?,total_ms=?,model_id=?,error=NULL,updated_at=? WHERE memory_id=?",arrayOf(hash,if(item.kind=="image"||next>=duration)"ready" else "indexing",next,duration,engine.modelId,System.currentTimeMillis(),id))
+                    db.execSQL("UPDATE source_items SET state=?,error=NULL WHERE memory_id=?",arrayOf(if(item.kind=="image"||next>=duration)"completed" else "processing",id))
                     db.setTransactionSuccessful()
                 } finally {db.endTransaction()}
                 }

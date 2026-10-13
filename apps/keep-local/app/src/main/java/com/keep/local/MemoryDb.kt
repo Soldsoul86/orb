@@ -23,7 +23,7 @@ data class MemoryItem(
 )
 
 /** App-private SQLite + local FTS4. Sources stay separate from AI/OCR extractions. */
-class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 2) {
+class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 3) {
     private val appContext=context.applicationContext
     companion object {
         @Volatile private var instance: MemoryDb? = null
@@ -71,12 +71,14 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
             END
         """.trimIndent())
         CreativeSchema.create(db)
+        LibrarySchema.create(db)
     }
 
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) CreativeSchema.create(db)
+        if (oldVersion < 3) LibrarySchema.create(db)
     }
 
     fun add(
@@ -118,7 +120,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
     fun search(query: String, kind: String?, max: Int = 150): List<MemoryItem> {
         val match = CoreLogic.ftsQuery(query)
         val args = arrayListOf<String>()
-        val where = arrayListOf<String>()
+        val where = arrayListOf(LibrarySchema.VISIBLE)
         if (match.isNotEmpty()) { where.add("memory_fts MATCH ?"); args.add(match) }
         else if (query.isNotBlank()) { return emptyList() }
         if (kind != null) { where.add("memories.kind=?"); args.add(kind) }

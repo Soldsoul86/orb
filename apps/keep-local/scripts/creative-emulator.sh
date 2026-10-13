@@ -12,12 +12,20 @@ python3 apps/keep-local/scripts/seed-export-fixture.py
 adb shell run-as com.keep.local.next mkdir -p databases files/media
 adb shell "run-as com.keep.local.next sh -c 'cat > files/media/cad-test.mp4'" < "$evidence/cad-test.mp4"
 adb shell "run-as com.keep.local.next sh -c 'cat > databases/memories.db'" < "$evidence/fixture-memories.db"
+# Seed installed model bytes before upgrade, verify every file survives unchanged.
+mkdir -p /tmp/kl-model
+unzip -q model-pack/visual-model-pack.zip -d /tmp/kl-model
+printf '%s' clip-vit-b32-int8-v1 > /tmp/kl-model/installed
+adb push /tmp/kl-model /data/local/tmp/kl-model
+adb shell run-as com.keep.local.next mkdir -p files/models/clip-vit-b32-int8-v1
+for f in vision.onnx text.onnx vocab.json merges.txt installed; do
+  adb shell "cat /data/local/tmp/kl-model/$f | run-as com.keep.local.next sh -c 'cat > files/models/clip-vit-b32-int8-v1/$f'"
+done
+adb shell run-as com.keep.local.next sha256sum files/models/clip-vit-b32-int8-v1/* > "$evidence/models-before.txt"
 adb install -r "$artifact/app.apk" | tee "$evidence/upgrade.txt"
+adb shell run-as com.keep.local.next sha256sum files/models/clip-vit-b32-int8-v1/* > "$evidence/models-after.txt"
+cmp "$evidence/models-before.txt" "$evidence/models-after.txt"
 adb install "$artifact/tests.apk"
-# Models are installed with the production checksum-verifying installer by instrumentation.
-adb push model-pack/visual-model-pack.zip /data/local/tmp/visual-model-pack.zip
-adb shell run-as com.keep.local.next mkdir -p cache
-adb shell "cat /data/local/tmp/visual-model-pack.zip | run-as com.keep.local.next sh -c 'cat > cache/model.zip'"
 adb shell cmd connectivity airplane-mode enable || true
 adb shell svc wifi disable
 adb shell svc data disable

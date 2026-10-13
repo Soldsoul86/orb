@@ -100,7 +100,7 @@ class MainActivity : Activity() {
         screenButton = actionButton("▣ Screen", actions2) { captureScreen() }
         actions2.addView(voiceButton)
         actions2.addView(screenButton)
-        actions2.addView(actionButton("Visual memory", actions2) { startActivity(Intent(this, ModelsActivity::class.java)) })
+        actions2.addView(actionButton("Settings", actions2) { startActivity(Intent(this, LibrarySettingsActivity::class.java)) })
         top.addView(actions2)
         micCheckbox = CheckBox(this).apply {
             text = "Include microphone in screen recording (not app audio)"

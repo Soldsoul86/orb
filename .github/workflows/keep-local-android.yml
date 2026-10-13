@@ -1,4 +1,4 @@
-name: Sign and Verify Keep Local Creative Memory
+name: Compile and Test Keep Local Discovery
 on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/keep-local
@@ -25,43 +25,57 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - run: sdkmanager 'build-tools;35.0.0'
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Prepare pinned local model and real-photo test corpus
+        run: |
+          python3 -m pip install onnxruntime==1.22.0 transformers==4.51.3 scikit-image==0.25.2 imageio-ffmpeg==0.6.0 pillow
+          python3 scripts/prepare-visual-model.py
+      - name: Compile and test
+        run: |
+          python3 core-tests/db_contract.py
+          bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38363198553
+          run-id: 38364349728
           github-token: ${{ github.token }}
-          name: creative-build
-          path: apps/keep-local/compiled
-      - uses: actions/download-artifact@v4
-        with:
-          run-id: 38363198553
-          github-token: ${{ github.token }}
-          name: creative-test-fixtures-NOT-PHONE-UPDATE
-          path: apps/keep-local/fixtures
-      - uses: actions/download-artifact@v4
-        with:
-          run-id: 38276184828
-          github-token: ${{ github.token }}
-          name: Keep-Local-Next-installable-APK
+          name: Keep-Local-0.3.0-signed-APK
           path: apps/keep-local/previous
-      - name: Sign exact built APKs using public detached responses
-        run: bash scripts/signing/sign-built-apks.sh
+      - name: Prepare emulator fixtures and offline signing request
+        run: |
+          mkdir -p evidence delivery test-artifacts signing/responses
+          cp app/build/outputs/apk/debug/app-debug-unsigned.apk delivery/Keep-Local-0.4.0-unsigned.apk
+          keytool -genkeypair -keystore "$RUNNER_TEMP/test.jks" -storepass android -alias test -dname CN=Disposable-Emulator-Only -keyalg RSA -validity 2
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/app.apk delivery/Keep-Local-0.4.0-unsigned.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/baseline.apk previous/Keep-Local-0.3.0.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/tests.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          rm "$RUNNER_TEMP/test.jks"
+          apkanalyzer manifest print delivery/Keep-Local-0.4.0-unsigned.apk > evidence/manifest.xml
+          python3 scripts/check_packaged_manifest.py evidence/manifest.xml
+          javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/classes" scripts/signing/DetachedSigner.java
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.4.0-unsigned.apk delivery/Keep-Local-0.4.0.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
+          cat evidence/offline-signing-request.txt
+          sha256sum delivery/Keep-Local-0.4.0-unsigned.apk | tee evidence/unsigned-sha256.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: creative-signing-evidence
-          path: apps/keep-local/evidence/
+          name: creative-build
+          path: |
+            apps/keep-local/delivery/
+            apps/keep-local/evidence/
+            apps/keep-local/app/build/reports/
+            apps/keep-local/app/src/main/assets/visual-model.json
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: Keep-Local-0.3.0-signed-APK
-          path: apps/keep-local/delivery/
-          retention-days: 90
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
+          path: apps/keep-local/test-artifacts/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: creative-signed-test-fixtures
-          path: apps/keep-local/signed-fixtures/
-          retention-days: 7
+          name: visual-model-pack
+          path: apps/keep-local/model-delivery/
+          retention-days: 90
   emulator:
     needs: build
     runs-on: ubuntu-24.04
@@ -81,12 +95,10 @@ jobs:
           packages: platform-tools
       - uses: actions/download-artifact@v4
         with:
-          name: creative-signed-test-fixtures
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
           path: creative-fixtures
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38363198553
-          github-token: ${{ github.token }}
           name: visual-model-pack
           path: model-pack
       - name: Enable KVM

@@ -40,7 +40,7 @@ object MediaExport {
     }
 
     fun sendIntent(context: Context, item: MemoryItem): Intent {
-        source(context, item)
+        MediaSource.check(context, item)
         val uri = AppFiles.itemUri(item.id)
         return Intent(Intent.ACTION_SEND).apply {
             type = mime(item)
@@ -62,11 +62,12 @@ object MediaExport {
 
     @Synchronized
     fun saveToGallery(context: Context, item: MemoryItem, cancel: CancellationSignal): Uri {
-        val original = source(context, item)
+        MediaSource.check(context,item)
+        val original = item
         require(isGalleryItem(item)) { "Use Save to Files for this format" }
         cancel.throwIfCanceled()
         val free = StatFs(Environment.getExternalStorageDirectory().absolutePath).availableBytes
-        if (original.length() > free - 16L * 1024 * 1024) throw IOException("Not enough storage")
+        if (original.bytes > free - 16L * 1024 * 1024) throw IOException("Not enough storage")
         val video = mime(item).startsWith("video/")
         val collection = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -109,7 +110,7 @@ object MediaExport {
     fun saveToDocument(context: Context, item: MemoryItem, uri: Uri, cancel: CancellationSignal) {
         require(uri.scheme == "content" && uri.authority != "com.keep.local.next.media") { "Invalid destination" }
         try {
-            copyTo(context, source(context, item), uri, cancel)
+            copyTo(context, item, uri, cancel)
         } catch (e: Exception) {
             // ACTION_CREATE_DOCUMENT returned a new document; remove an incomplete copy.
             runCatching { DocumentsContract.deleteDocument(context.contentResolver, uri) }
@@ -117,12 +118,12 @@ object MediaExport {
         }
     }
 
-    private fun copyTo(context: Context, original: File, uri: Uri, cancel: CancellationSignal) {
+    private fun copyTo(context: Context, original: MemoryItem, uri: Uri, cancel: CancellationSignal) {
         cancel.throwIfCanceled()
-        val expected = original.length()
+        val expected = original.bytes
         context.contentResolver.openAssetFileDescriptor(uri, "w", cancel)?.use { descriptor ->
             descriptor.createOutputStream().use { output ->
-                original.inputStream().use { input ->
+                MediaSource.open(context,original).use { input ->
                     ExportNames.copy(input, output, expected, cancel::throwIfCanceled)
                 }
             }
