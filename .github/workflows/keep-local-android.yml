@@ -1,4 +1,4 @@
-name: Verify Existing Keep Local Next APK
+name: Sign and Verify Keep Local Creative Memory
 on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
@@ -7,7 +7,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: keep-local-next-${{ github.sha }}
+  group: keep-local-creative-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   build:
@@ -28,57 +28,44 @@ jobs:
       - run: sdkmanager 'build-tools;35.0.0'
       - uses: actions/download-artifact@v4
         with:
+          run-id: 38363198553
+          github-token: ${{ github.token }}
+          name: creative-build
+          path: apps/keep-local/compiled
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38363198553
+          github-token: ${{ github.token }}
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
+          path: apps/keep-local/fixtures
+      - uses: actions/download-artifact@v4
+        with:
           run-id: 38276184828
           github-token: ${{ github.token }}
           name: Keep-Local-Next-installable-APK
-          path: apps/keep-local/delivery
-      - uses: actions/download-artifact@v4
+          path: apps/keep-local/previous
+      - name: Sign exact built APKs using public detached responses
+        run: bash scripts/signing/sign-built-apks.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          run-id: 38276184828
-          github-token: ${{ github.token }}
-          name: next-emulator-fixtures
-          path: apps/keep-local/test-artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          run-id: 38276184828
-          github-token: ${{ github.token }}
-          name: Keep-Local-Next-ENCRYPTED-signing-backup
-          path: apps/keep-local/encrypted-signing-backup
-      - name: Verify exact recovered APK, original certificate and encrypted backup
-        run: |
-          mkdir -p evidence
-          echo 'b084edca59a156bc9f98ccc1ced38de45c0c1637c143b3eb82b75a5745c09f07  delivery/Keep-Local-Next-0.2.0.apk' | sha256sum -c -
-          cmp delivery/Keep-Local-Next-0.2.0.apk test-artifacts/app.apk
-          echo 'e2b823fe7ee9d4f242b20d781c76b283060c0ff441fc2862a3f2adf7d36dfa2a  test-artifacts/original.apk' | sha256sum -c -
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs delivery/Keep-Local-Next-0.2.0.apk | tee evidence/signing-certificate.txt
-          grep -F "$(cat signing/expected-certificate.sha256)" evidence/signing-certificate.txt
-          apkanalyzer manifest print delivery/Keep-Local-Next-0.2.0.apk > evidence/packaged-manifest.xml
-          python3 scripts/check_packaged_manifest.py evidence/packaged-manifest.xml
-          openssl cms -cmsout -inform DER -in encrypted-signing-backup/keep-local-next.p12.cms -noout
-          # Encrypted bytes only, for recovery into the user's private workspace.
-          printf 'ENCRYPTED_BACKUP_BASE64='
-          base64 -w0 encrypted-signing-backup/keep-local-next.p12.cms
-          printf '\n'
+          name: creative-signing-evidence
+          path: apps/keep-local/evidence/
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: Keep-Local-Next-installable-APK-RECOVERED
+          name: Keep-Local-0.3.0-signed-APK
           path: apps/keep-local/delivery/
           retention-days: 90
       - uses: actions/upload-artifact@v4
         with:
-          name: next-emulator-fixtures
-          path: apps/keep-local/test-artifacts/
+          name: creative-signed-test-fixtures
+          path: apps/keep-local/signed-fixtures/
           retention-days: 7
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: recovered-apk-verification
-          path: apps/keep-local/evidence/
-          retention-days: 30
   emulator:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -94,24 +81,30 @@ jobs:
           packages: platform-tools
       - uses: actions/download-artifact@v4
         with:
-          name: next-emulator-fixtures
-          path: next-fixtures
+          name: creative-signed-test-fixtures
+          path: creative-fixtures
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38363198553
+          github-token: ${{ github.token }}
+          name: visual-model-pack
+          path: model-pack
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Verify side-by-side installation and exports
-        uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
+          ram-size: 4096M
           disable-animations: true
-          script: bash apps/keep-local/scripts/standalone-emulator.sh next-fixtures
+          script: bash apps/keep-local/scripts/creative-emulator.sh creative-fixtures
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: next-evidence-api-${{ matrix.api }}
+          name: creative-evidence-api-${{ matrix.api }}
           path: apps/keep-local/evidence/
           retention-days: 30

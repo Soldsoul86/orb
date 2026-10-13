@@ -1,0 +1,25 @@
+The 0.3.0 release retains com.keep.local.next and certificate SHA-256
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d.
+
+Private key: recovered from the 0.2.0 encrypted backup into the private workspace.
+It is never committed or uploaded to Actions. The CI signer has only the public
+certificate and a JCA provider that requests the exact APK v3 signed-data bytes.
+The local SignResponse utility signs that payload with the retained PKCS12 key.
+The resulting public RSA signature is bound to the APK content digest and is safe
+to commit. CI reconstructs the signing block, verifies it with Android apksigner,
+checks the pinned certificate, then tests an actual in-place install over the
+previously delivered APK. Instrumentation APK is signed through the same path.
+
+Reproduction: use keep-local-compile.yml or scripts/prepare-visual-model.py plus
+Gradle tasks from that workflow. Preserve the exact unsigned APK artifact and its
+SHA-256. Set the signing password only in KEEP_LOCAL_KEYSTORE_PASSWORD locally,
+then run SignResponse.java with keystore path, request binary, output directory
+and the requested JCA algorithm. Update the signing workflow to consume that
+exact build run and its expected unsigned hash; commit only public responses.
+A conventional secure signing runner with the original keystore is also valid.
+Never mint a replacement identity for this package.
+
+DetachedSigner will refuse to proceed without a response for the exact payload
+hash. A signature from a different build cannot authorize changed APK contents.
+The emulator tests use the real retained certificate for final release validation;
+earlier compilation tests used clearly labelled disposable fixtures only.

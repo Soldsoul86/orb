@@ -1,0 +1,63 @@
+Keep Local — Your creative memory.
+Find the right material for your next creation, wherever you choose to make it.
+
+Scope: Milestone A and a small Milestone B slice, not the complete A-D roadmap.
+Package com.keep.local.next retained. Existing 0.2.0 certificate retained:
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d.
+Version 3 / 0.3.0. This upgrades Next; it cannot update the old com.keep.local.
+The old app and its recordings must remain installed.
+
+Audit: no AGENTS.md in the repository. Read root CLAUDE, MASTER, CONSTITUTION,
+and docs/SETTLED. Keep Local remains the standalone Kotlin application under
+apps/keep-local; this change does not alter the Orb runtime or journal.
+0.2.0 verified 8 instrumentation tests on API29/36; playback, share, Gallery,
+Files and basic notes/FTS are verified there. Existing microphone/screen capture,
+Android dictation and OCR code are preserved; full physical-device lifecycle
+verification is not implied. Saved-audio transcription is absent.
+
+A: SQLite v1 -> v2 adds assets, representations and asset_relationships only.
+Existing memories, IDs, FTS, metadata and paths are retained. Asset UUIDs are
+assigned once by migration/insert trigger. Representations retain source ID,
+model version, modality, time range and generation time. The original remains
+unchanged. Explicit deletion cascades derived rows. Original SAF source URI and
+local reference are separate. SHA-256 detects equal content during indexing;
+duplicates are not automatically deleted or merged. Relationship schema is ready
+for derivatives; collections and trimming UI are not yet implemented.
+
+B: CLIP image and text embeddings, cosine ranking, image pixels only. Video
+frames sampled every 2 seconds; result intervals describe sampling, NOT verified
+action boundaries. Existing text/metadata/OCR results are labeled separately.
+A score is similarity, not calibrated probability. No face identity inference.
+"Me" cannot identify a subject; explicit notes are the only identity context.
+
+Visual model is optional. Install visual-model-pack.zip using Visual memory.
+Its exact byte size is shown before installation; each file is size/hash checked
+against a manifest packaged by the build. No INTERNET permission or uploads.
+Without the model: capture, import, OCR, text/metadata search and exports work.
+With the model: opt in to index authorized private library assets, then search.
+Progress is committed per frame and resumed after reopening/restart. Android
+JobScheduler waits for sufficient battery/storage; severe heat pauses work.
+Pause and remove controls preserve originals. No continuous capture is added.
+Models unload when each search/index batch finishes. One image/frame is decoded
+at a time. Images respect decoder orientation. Storage, not a fixed 1 GiB cap,
+limits imports. No chipset assumptions or entry-level phone target remain.
+
+Validation corpus: real scikit-image sample photos of cat, coffee, astronaut,
+and rocket, with opaque filenames and blank notes/OCR. A synthetic montage
+places cat at 0-4s, coffee at 4-8s and astronaut at 8-12s; a separate rocket-only
+video is a distractor. It is NOT a real action video. Tests compare CLIP tokenizer against a reference tokenizer, measure visual
+hit rate and montage timestamp, indexing/search time and memory samples. Emulator
+metrics are not flagship-device, battery or thermal benchmarks. The noodles
+versus noodles-on-table action demo remains UNVERIFIED; no claims based on this
+montage establish temporal action recognition.
+
+Build: GitHub Actions fetches pinned weights, builds/tests the app, creates
+model pack and requests a detached APK signature. The recovered private key stays
+in the private workspace. Only its public certificate and signatures can enter
+Git. The final workflow reuses exact unsigned bytes and verifies the certificate
+and actual in-place upgrade against the previously delivered signed APK.
+
+Hardware qualification: ORT CPU compatibility is verified on emulators; this is
+not a claim of an optimal flagship model/runtime. The prototype does not enable
+unbenchmarked GPU/NPU providers. Representative ARM64 flagship benchmarking and
+a larger real-video corpus are gates before choosing an accelerated default.

@@ -22,6 +22,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
+        <activity android:name=".ModelsActivity" android:exported="false" />
+        <service android:name=".VisualIndexJob" android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE" />
         <activity android:name=".PlaybackActivity" android:exported="false" />
         <activity android:name=".EditorActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">

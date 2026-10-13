@@ -1,21 +1,27 @@
-# Standalone Keep Local MVP
+# Keep Local — creative memory
 
-User-authorized import of `keep-local-android-mvp.zip` for independent Android
-build verification. Keep Local is a separate product hosted in this repository;
-it does not use or change the Orb runtime, Event Journal, package IDs or data.
-The supplied product contract uses editable/deletable local SQLite memories.
-Integrating it into Orb would require a separate architectural decision.
+Keep Local is an independent native Kotlin product hosted in the Orb repository.
+It preserves its existing editable/deletable local SQLite contract and does not
+change Orb's runtime, journal or identities.
 
-See docs/architecture.md for the existing design. This milestone fixes FTS4
-prefix syntax, limits list previews, handles target-36 window insets, preserves
-editor view state, avoids destroyed-activity callbacks and releases failed
-recorders. No new AI capabilities are added.
+Version 0.3.0 adds an additive asset/representation/relationship layer while
+preserving existing source IDs, paths and user metadata. Visual interpretations
+reference originals and a model version. They are disposable; originals are not.
 
-Share/export extends the existing read-only per-item provider, without a new
-storage model. Android MediaStore owns Gallery copies; the local destination
-picker owns other export locations. Copying uses a background worker and a
-bounded buffer; pending Gallery rows are published only after a complete write.
-Activity retention carries in-progress exports across rotation without keeping
-the destroyed Activity alive. No database migration or new permission is needed.
-Signing fails closed against the original certificate; absent keys yield an
-unsigned build. Disposable emulator certificates are not release identities.
+The first visual slice uses CLIP image/text embeddings through ONNX Runtime CPU.
+Models are explicit local-file installs with pinned hashes. Images and video
+frames become vector representations, never fabricated captions. Video timestamps
+refer to sampled frames, not certified actions or inferred identities.
+
+Indexing is incremental and opt-in. It pauses for battery/storage/thermal pressure,
+checks cancellation, and resumes from committed checkpoints. Model instances are
+closed after work. Source deletion and visual-index removal cannot resurrect a
+late preview from an in-flight indexing operation. Original export/share flows
+remain intact.
+
+Flagship-first is the product strategy. There are no budget-phone/RAM product
+constraints. Hardware acceleration and stronger models require actual compatibility
+and quality measurements; CPU emulator success does not establish NPU/phone speed.
+
+See docs/CREATIVE_MEMORY.txt, docs/MODELS_AND_LICENSES.txt and
+ docs/CREATIVE_RESULTS.txt for exact scope, evidence and unverified gates.

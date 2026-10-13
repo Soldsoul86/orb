@@ -1,0 +1,108 @@
+Keep Local 0.3.0 — validation report, 2026-10-13
+
+DELIVERY AND IDENTITY
+Final Kotlin/build source: 409648104d0178fb24189f27f10443eda838e39a.
+Signing/verification commit: c798b582bfa98db72bc302038ced4e25dda84047.
+Package and namespace: com.keep.local.next, unchanged from Next 0.2.0.
+Version code 3, version name 0.3.0. Database schema 1 -> 2, additive migration.
+Certificate SHA-256 (unchanged):
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d
+Signed APK SHA-256:
+0a216042706e546794f9791e3be6ed6d3096d8587fee0f2f5e14e9116a83ff60
+Unsigned APK SHA-256:
+e4fe07231e402451d4a5abaca0d0a55ab562604f849f6192c47beff201c74b01
+
+Signed APK ZIP (extract Keep-Local-0.3.0.apk):
+https://github.com/Soldsoul86/orb/actions/runs/38364349728/artifacts/11795963326
+Optional model download (extract and install the INNER visual-model-pack.zip):
+https://github.com/Soldsoul86/orb/actions/runs/38363198553/artifacts/11796076617
+Source / review: https://github.com/Soldsoul86/orb/pull/4
+
+This is an upgrade for Keep Local Next 0.2.0. It cannot upgrade the separate
+original com.keep.local app: that original signing key is unavailable. Keep the
+old app installed and do not clear its storage; its CAD Test is not automatically
+accessible to Next through Android's private-storage boundary. The recovered
+Next signing key was retained locally, never committed or uploaded to CI.
+
+EXECUTED CHECKS
+Compile / JVM tests / lint workflow: success
+https://github.com/Soldsoul86/orb/actions/runs/38363198553
+Final retained-key signing / real baseline upgrade workflow: success
+https://github.com/Soldsoul86/orb/actions/runs/38364349728
+11 instrumentation tests passed on EACH Android 10/API29 and Android 16/API36.
+Final emulator run installs the actual previously delivered signed 0.2.0 APK,
+seeds a v1 CAD Test fixture, installs the actual 0.3.0 APK with adb install -r,
+then checks migration, access and original file bytes after app restart.
+No uninstall or replacement signing identity is used in final upgrade checks.
+
+API29 evidence (tests, screenshot, metrics, original/readback, logcat):
+https://github.com/Soldsoul86/orb/actions/runs/38364349728/artifacts/11796282700
+API36 evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38364349728/artifacts/11796925125
+Signing evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38364349728/artifacts/11796003210
+Build reports:
+https://github.com/Soldsoul86/orb/actions/runs/38363198553/artifacts/11795922201
+APK/model artifacts expire 2027-01-11; final emulator evidence expires 2026-11-12.
+Download evidence before expiry. The separate repository-root Orb verify job
+still fails in its unrelated trading demo; Keep Local jobs above all passed.
+
+MEASURED MODEL RESULTS — FINAL SIGNED APK
+                               API29           API36
+Photo precision/recall @1       4/4, 1.0        4/4, 1.0
+Video top-1, vs one distractor  1/1             1/1
+Coffee sample timestamp        6,000 ms        6,000 ms
+Ground-truth coffee scene       4,000–8,000 ms  4,000–8,000 ms
+Index corpus elapsed           8,103 ms        7,511 ms
+Montage index per video minute  16,765 ms       15,075 ms
+Four text-embedding queries     766 ms          548 ms
+CPU 1 thread load+one inference 527 ms          454 ms
+CPU 2 threads load+inference    436 ms          306 ms
+Process peak RSS (VmHWM)        531,544 kB      477,096 kB
+Sampled process PSS             185,986 kB      114,382 kB
+Model files on disk             155,008,455 bytes (~147.8 MiB)
+
+These are x86 Android emulator results, not ARM64 flagship/battery/thermal
+measurements. RSS is whole-process high-water mark, not isolated model RAM.
+CPU timings are single load+inference samples, not a statistically robust runtime
+comparison. Query timings cover the four test embedding/ranking calls, not a
+large-library end-to-end UI latency benchmark. Four known photos do not establish
+general retrieval precision/recall. Videos are constructed from real photos:
+they demonstrate pixel-based source/time retrieval, NOT temporal action ability.
+
+VERIFIED IN EMULATORS
+- Real CLIP ONNX image/text inference and reference-tokenizer parity.
+- Opaque asset names, blank annotations and no searchable coffee text.
+- Airplane mode enabled; Wi-Fi/mobile data disabled; no INTERNET permission.
+- UI search opens the matched image with visual-evidence explanation/preview.
+- Best video timestamp falls inside the labeled montage scene; rocket distractor
+  is not the top video. Every result exposes visual similarity as uncalibrated.
+- CAD Test fixture playback and existing export test suite: temporary share grants,
+  MediaStore copies/duplicates, SAF picker, missing/cancelled export paths,
+  bounded large-file copy and original retention.
+- Additive migration preserves original rows/path/bytes, assigns stable IDs once,
+  and cascades deleted representations. Delete-during-inference regression
+  confirms no resurrected embedding or cached thumbnail.
+
+IMPLEMENTED, NOT FULLY STRESS-VERIFIED
+- Per-frame index checkpoints/resumption, opt-in/pause/remove controls,
+  battery/storage/thermal scheduling, model unloading, incremental search.
+- Stable relationships schema and source hashes during visual indexing.
+- Model ZIP size/hash validation and staged installation. Full installation fault
+  matrix, abrupt process-death stress, sustained resource behavior remain pending.
+
+UNVERIFIED / INCOMPLETE
+- Real person-eating-noodles video versus noodles-on-table hard negatives.
+- Action boundaries, identity recognition, scene-change detection, saved-audio
+  transcription, semantic document embeddings, collections, trimming and
+  source-clip export with collection manifests.
+- Physical-device installation/Play Protect, ChatGPT/other third-party receipt,
+  battery/thermal behavior, GPU/NPU compatibility and large-library latency.
+- Old com.keep.local private recordings cannot be read by this separate package.
+
+NEXT MILESTONE
+Qualify visual retrieval on a larger real-video corpus including eating/table-only
+hard negatives and a physical flagship. Select an accelerated/stronger model from
+measured results before speech unification or creative collections. Current
+release delivers the foundation and a tested first visual-retrieval slice;
+it does not claim completion of the full A-D roadmap or the main action demo.

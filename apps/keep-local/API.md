@@ -1,20 +1,24 @@
-# Android entry points
+# Android interfaces
 
-Application ID: `com.keep.local`; minimum Android API 29, target 36.
-MainActivity accepts user-initiated SEND/SEND_MULTIPLE text and content URIs.
-System document picker imports bytes into private storage. MediaProvider serves
-read-only per-item URIs to explicitly granted viewers. Recording services are
-not exported. Screen recording requires fresh Android MediaProjection consent;
-microphone capture requires RECORD_AUDIO. No network API exists.
+Application ID and provider authority stay `com.keep.local.next` and
+`com.keep.local.next.media`. Minimum API 29, target 36. No network API exists.
+MainActivity accepts explicit SEND/SEND_MULTIPLE and document-picker imports.
+Recording services remain private; screen capture requires fresh system consent.
 
-## Media export
+`MemoryDb` v2 preserves original memories and adds `assets`, `representations`
+and `asset_relationships`. `CreativeSchema.create` backfills stable IDs once.
+`VisualEncoder` exposes normalized image/text vectors and model version, keeping
+inference separate from original records. `VisualIndexJob.indexOne` commits one
+frame/checkpoint; interrupted steps do not advance it. `CreativeSearch` combines
+visual rankings with separately labeled existing text/metadata results.
 
-`MediaExport.sendIntent(context, item)` returns ACTION_SEND with a read-only
-per-item content URI, correct MIME, EXTRA_STREAM and ClipData. The caller opens
-the native chooser after explicit user action. `saveToGallery` and
-`saveToDocument` stream original bytes with CancellationSignal and never write
-back to the source or MemoryDb. `ExportNames.filename` supplies sanitized names.
+`ModelPack.install` accepts a local ZIP, verifies each allowed file against the
+bundled descriptor, then atomically installs it. No arbitrary model code is
+executed and no user data is uploaded. See docs/MODELS_AND_LICENSES.txt for the
+specific model/runtime and current limitations.
 
-`MediaProvider` remains non-exported, grants only explicit temporary read access,
-and exposes sanitized display names and current file sizes. Package and URI
-identity are unchanged. See docs/SHARE_EXPORT.txt for the signing release blocker.
+`MediaExport.sendIntent` uses a read-only item content URI, correct MIME,
+EXTRA_STREAM and ClipData. Gallery and Files exports stream original bytes with
+cancellation. The non-exported provider grants only item-scoped temporary reads.
+Derived visual results never change originals; explicit deletion cascades their
+index rows and clears cached previews.

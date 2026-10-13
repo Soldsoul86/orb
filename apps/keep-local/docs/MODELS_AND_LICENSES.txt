@@ -1,0 +1,49 @@
+Model/runtime evaluation — 2026-10-13
+
+Selected initial slice: OpenAI CLIP ViT-B/32, Xenova ONNX int8 conversion at
+6ef1ebc8b0766a7a8d11b146462c99cdf74dd22d. Independent image/text encoders expose
+512-dimensional vectors through VisualEncoder. Retrieval storage keys include
+model version; future encoders need not rewrite original memory records.
+https://huggingface.co/Xenova/clip-vit-base-patch32
+https://github.com/openai/CLIP/blob/main/LICENSE
+https://huggingface.co/openai/clip-vit-base-patch32
+CLIP code/weights are released under MIT. Preserve the OpenAI copyright/license
+with the distributed pack. Model-card research/deployment limitations still
+apply: English-centric, biased, unreliable for fine-grained actions/counting.
+The conversion repository identifies its source weights as OpenAI CLIP. The
+pinned files and hashes are recorded in model-manifest.json in the artifact.
+
+ONNX Runtime Android 1.22.0 (MIT) selected for direct Android execution of these
+available encoders. Initial implementation uses CPU, with bounded thread count
+based on available processors, never inferred chipset capability. CPU 1 vs 2
+thread measurements are in the emulator report. GPU/NPU are NOT claimed enabled.
+https://onnxruntime.ai/docs/tutorials/mobile/
+https://onnxruntime.ai/docs/execution-providers/NNAPI-ExecutionProvider.html
+https://onnxruntime.ai/docs/execution-providers/Xnnpack-ExecutionProvider.html
+NNAPI/XNNPACK partition support can change results/performance; physical-device
+profiling is required before enabling an accelerator as the default. No claim
+that this int8 baseline is the best flagship model or best runtime overall.
+
+Other evaluated integration options (documentation review, not benchmarks):
+MobileCLIP2: attractive mobile retrieval model; Apple research model terms differ
+from MIT. Not bundled pending model-license review and a verified Android export.
+https://github.com/apple-aiml-research/ml-mobileclip
+LiteRT: Android CPU/GPU/NPU support exists, but this ONNX model is not a verified
+LiteRT graph; no claim of identical operators/quality after conversion.
+https://ai.google.dev/edge/litert/android
+llama.cpp: relevant to optional local language/vision understanding, not needed
+for this embedding slice; extra runtime and weights are deferred.
+whisper.cpp: MIT local saved-audio transcription candidate for Milestone C; no
+speech model, JNI integration or transcription benchmark is included here.
+https://github.com/ggml-org/whisper.cpp
+OCR: existing bundled ML Kit text-recognition 16.0.1 preserved. Its service/model
+terms are separate from CLIP/ORT; no OCR output is labeled visual-semantic proof.
+
+Ground truth sample photographs come from scikit-image data; see individual
+attribution in https://scikit-image.org/docs/stable/api/skimage.data.html .
+They are test fixtures only, not bundled in the production APK. The generated
+montage is labeled synthetic and establishes no action/identity accuracy.
+
+Unmeasured: physical flagship latency, sustained battery drain, thermal behavior,
+GPU/NPU compatibility, full-precision-vs-int8 retrieval quality, large-library
+scale, saved-audio speech recognition, real noodle-eating distractor benchmark.

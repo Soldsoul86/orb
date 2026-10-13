@@ -49,6 +49,8 @@ class MainActivity : Activity() {
     private lateinit var listAdapter: MemoryAdapter
     private lateinit var micCheckbox: CheckBox
     private var searchToken = 0
+    private var visualHits: Map<Long,VisualHit> = emptyMap()
+    private var textMatches: Set<Long> = emptySet()
     private var pendingSearch: Runnable? = null
     private var speech: SpeechRecognizer? = null
     private var pendingScreenMic = false
@@ -83,7 +85,7 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(18), dp(16), dp(12))
         }
         top.addView(text("Keep Local", 30, fg).apply { typeface = Typeface.DEFAULT_BOLD })
-        top.addView(text("Capture • Remember • Retrieve   ·   Private / offline", 12, accent).apply {
+        top.addView(text("Your creative memory.   ·   Private / offline", 12, accent).apply {
             setPadding(0, dp(3), 0, dp(12))
         })
         status = text("Your memories stay on this device", 12, sub)
@@ -98,6 +100,7 @@ class MainActivity : Activity() {
         screenButton = actionButton("▣ Screen", actions2) { captureScreen() }
         actions2.addView(voiceButton)
         actions2.addView(screenButton)
+        actions2.addView(actionButton("Visual memory", actions2) { startActivity(Intent(this, ModelsActivity::class.java)) })
         top.addView(actions2)
         micCheckbox = CheckBox(this).apply {
             text = "Include microphone in screen recording (not app audio)"
@@ -135,7 +138,8 @@ class MainActivity : Activity() {
             isFastScrollEnabled = true
             setOnItemClickListener { _, _, pos, _ ->
                 startActivity(Intent(this@MainActivity, EditorActivity::class.java)
-                    .putExtra("id", listAdapter.items[pos].id).putExtra("query", query.text.toString()))
+                    .putExtra("id", listAdapter.items[pos].id).putExtra("query", query.text.toString())
+                    .putExtra("visual_start_ms", visualHits[listAdapter.items[pos].id]?.startMs ?: -1L))
             }
             emptyView = text("Nothing saved yet. Share from any app or capture something above.", 15, sub)
         }
@@ -161,15 +165,18 @@ class MainActivity : Activity() {
         val kind = kindValue.getOrNull(filter.selectedItemPosition)
         val ticket = ++searchToken
         io.execute {
+            if(ticket!=searchToken) return@execute
             try {
                 val db = MemoryDb.get(this)
-                val items = db.search(term, kind)
+                val found = CreativeSearch.search(this,term,kind)
+                val items = found.items
                 val stats = db.stats()
                 runOnUiThread {
                     if (ticket != searchToken || isFinishing || isDestroyed) return@runOnUiThread
+                    visualHits=found.visual; textMatches=found.textIds
                     listAdapter.items = items
                     listAdapter.notifyDataSetChanged()
-                    status.text = "${stats.first} saved  ·  ${CoreLogic.prettyBytes(stats.second)} stored locally"
+                    status.text = "${stats.first} saved  ·  ${CoreLogic.prettyBytes(stats.second)} local\n${found.message}"
                     voiceButton.text = if (VoiceService.active) "■ Stop voice" else "● Voice"
                     screenButton.text = if (ScreenService.active) "■ Stop screen" else "▣ Screen"
                 }
@@ -177,7 +184,7 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun onResume() { super.onResume(); if (::status.isInitialized) refresh() }
+    override fun onResume() { super.onResume(); VisualIndex.schedule(this); if (::status.isInitialized) refresh() }
 
     private fun captureVoice() {
         if (VoiceService.active) {
@@ -397,6 +404,9 @@ class MainActivity : Activity() {
             (layout.getChildAt(1) as TextView).text = (item.body.ifBlank { item.extracted }.ifBlank { "Tap to add context" }).replace('\n', ' ').take(170)
             (layout.getChildAt(2) as TextView).text = "${item.kind.uppercase()}  ·  ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(item.createdAt))}" +
                 (item.suggestion?.let { "  ·  Suggested to review" } ?: "")
+            val hit=visualHits[item.id]
+            if(hit!=null) (layout.getChildAt(1) as TextView).text = "Visual similarity ${"%.3f".format(hit.similarity)}" + (if(item.kind=="video") " · sampled near ${hit.startMs/1000}s (activity unconfirmed)" else " · image pixels") + (if(item.id in textMatches) " + text match" else "")
+            else if(query.text.isNotBlank()) (layout.getChildAt(2) as TextView).append(" · text / metadata match")
             return layout
         }
     }

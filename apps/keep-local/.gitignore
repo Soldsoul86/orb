@@ -14,3 +14,11 @@ __pycache__/
 signing.properties
 previous/
 test-artifacts/
+
+model-work/
+model-delivery/
+model-pack/
+delivery/
+compiled/
+fixtures/
+signed-fixtures/
