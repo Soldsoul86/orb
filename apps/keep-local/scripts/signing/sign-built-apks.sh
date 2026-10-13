@@ -2,7 +2,7 @@
 set -euo pipefail
 mkdir -p delivery signed-fixtures evidence signing/responses
 javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/sign-classes" scripts/signing/DetachedSigner.java
-echo '66eda135ae2f1784614a70fbfe90bff891e3045e4174dd2513845057a89aa226  compiled/delivery/Keep-Local-0.4.0-unsigned.apk' | sha256sum -c -
+echo '53154434c9dcd2323aa83d6e80aa080b2a3c2d66841dc3de13168575a5554119  compiled/delivery/Keep-Local-0.4.0-unsigned.apk' | sha256sum -c -
 pending=0
 for name in app tests; do
   if [ "$name" = app ]; then
