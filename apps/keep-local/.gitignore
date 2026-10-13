@@ -19,4 +19,6 @@ model-work/
 model-delivery/
 model-pack/
 delivery/
-*.sig
+compiled/
+fixtures/
+signed-fixtures/

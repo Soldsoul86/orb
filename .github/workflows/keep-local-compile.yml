@@ -1,0 +1,120 @@
+name: Compile Keep Local Creative Memory
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: keep-local-creative-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/keep-local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Prepare pinned local model and real-photo test corpus
+        run: |
+          python3 -m pip install onnxruntime==1.22.0 transformers==4.51.3 scikit-image==0.25.2 imageio-ffmpeg==0.6.0 pillow
+          python3 scripts/prepare-visual-model.py
+      - name: Compile and test
+        run: |
+          python3 core-tests/db_contract.py
+          bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38276184828
+          github-token: ${{ github.token }}
+          name: Keep-Local-Next-installable-APK
+          path: apps/keep-local/previous
+      - name: Prepare emulator fixtures and offline signing request
+        run: |
+          mkdir -p evidence delivery test-artifacts signing/responses
+          cp app/build/outputs/apk/debug/app-debug-unsigned.apk delivery/Keep-Local-0.3.0-unsigned.apk
+          keytool -genkeypair -keystore "$RUNNER_TEMP/test.jks" -storepass android -alias test -dname CN=Disposable-Emulator-Only -keyalg RSA -validity 2
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/app.apk delivery/Keep-Local-0.3.0-unsigned.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/baseline.apk previous/Keep-Local-Next-0.2.0.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/tests.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          rm "$RUNNER_TEMP/test.jks"
+          apkanalyzer manifest print delivery/Keep-Local-0.3.0-unsigned.apk > evidence/manifest.xml
+          python3 scripts/check_packaged_manifest.py evidence/manifest.xml
+          javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/classes" scripts/signing/DetachedSigner.java
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.3.0-unsigned.apk delivery/Keep-Local-0.3.0.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
+          cat evidence/offline-signing-request.txt
+          sha256sum delivery/Keep-Local-0.3.0-unsigned.apk | tee evidence/unsigned-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creative-build
+          path: |
+            apps/keep-local/delivery/
+            apps/keep-local/evidence/
+            apps/keep-local/app/build/reports/
+            apps/keep-local/app/src/main/assets/visual-model.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
+          path: apps/keep-local/test-artifacts/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-model-pack
+          path: apps/keep-local/model-delivery/
+          retention-days: 90
+  emulator:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 36]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
+          path: creative-fixtures
+      - uses: actions/download-artifact@v4
+        with:
+          name: visual-model-pack
+          path: model-pack
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disable-animations: true
+          script: bash apps/keep-local/scripts/creative-emulator.sh creative-fixtures
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creative-evidence-api-${{ matrix.api }}
+          path: apps/keep-local/evidence/
+          retention-days: 30
