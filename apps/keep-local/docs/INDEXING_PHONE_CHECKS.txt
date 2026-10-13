@@ -1,5 +1,9 @@
 Physical-phone acceptance — not yet executed by CI or the engineer
 
+Reported phone: Pixel 10a, visual model installed, original observation 3–4 minutes.
+Android version is still unknown. Resume/Rescan repetition was not remembered.
+These are user observations, not measured throughput or a verified device run.
+
 Keep the current installation and its data. Do not uninstall, clear app data,
 remove the derived index, reinstall models, or disable Android security protections.
 

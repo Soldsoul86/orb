@@ -74,3 +74,9 @@ JobScheduler was binding. OS log recorded a bind timeout. The test now performs
 one explicit force-stop then reopens via ActivityScenario inside the new test
 process; it still asserts real worker commits and retained checkpoints. No timeout
 assertion was relaxed and no production scheduling bypass was used.
+
+User-supplied phone context (not a measured device run): Pixel 10a, visual model
+installed, observation interval approximately 3–4 minutes; repeated Resume/Rescan
+use not remembered. Android version was not supplied. Do not attribute the exact
+phone session to repeated Resume taps without logs. This context supports the
+scan-first hypothesis but does not replace physical upgrade/throughput testing.
