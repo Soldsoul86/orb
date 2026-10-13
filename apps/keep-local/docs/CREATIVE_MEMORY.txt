@@ -44,7 +44,7 @@ limits imports. No chipset assumptions or entry-level phone target remain.
 
 Validation corpus: real scikit-image sample photos of cat, coffee, astronaut,
 and rocket, with opaque filenames and blank notes/OCR. A synthetic montage
-places cat at 0-4s, coffee at 4-8s and astronaut at 8-12s. It is NOT a real action
+places cat at 0-4s, coffee at 4-8s and astronaut at 8-12s; a separate rocket-only video is a distractor. It is NOT a real action
 video. Tests compare CLIP tokenizer against a reference tokenizer, measure visual
 hit rate and montage timestamp, indexing/search time and memory samples. Emulator
 metrics are not flagship-device, battery or thermal benchmarks. The noodles

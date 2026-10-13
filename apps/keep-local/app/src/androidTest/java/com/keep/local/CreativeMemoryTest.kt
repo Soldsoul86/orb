@@ -9,7 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.*
+import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.uiautomator.*
@@ -91,7 +91,7 @@ class CreativeMemoryTest {
                 assertTrue(device.wait(Until.hasObject(By.textContains("Matched image pixels")),5000))
                 val screenshot=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
                 File(c.filesDir,"creative-demo.png").outputStream().use { out -> screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out) };screenshot.recycle()
-                pressBack()
+                androidx.test.espresso.Espresso.pressBack()
             }
             val image=BitmapFactory.decodeFile(files[0].absolutePath)
             val timings=JSONObject();var baseline:FloatArray?=null

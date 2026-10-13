@@ -1,12 +1,30 @@
-# Keep Local — Android MVP (source, v0.1)
+# Keep Local — Your creative memory.
 
-**Capture → Remember → Retrieve, on a budget Android phone.**
+Find the right material for your next creation, wherever you choose to make it.
 
-A native Kotlin Android project intended for 4 GB RAM devices, running on Android 10+ (API 29). All user memories remain in app-private storage; the application does **not** request internet access, broad file permissions, or accessibility permission. Android's file-based device encryption protects app-private data when configured; this version has no separate in-app password or encryption key.
+Native Kotlin, Android 10+. Flagship-first and adaptive; there is no entry-level
+phone or 4 GB product constraint. All core memory functions are local. No
+INTERNET, broad storage, analytics or cloud AI permission/capability is added.
 
-**Status: signed debug APK built and installed on Android 10 and Android 16 emulators.** Three JVM tests and three instrumentation tests on each emulator pass, including capture → save → reopen → prefix retrieval. [Download APK and reports](https://github.com/Soldsoul86/orb/actions/runs/38257971597/artifacts/11751510965). See `docs/VERIFICATION.txt` for hashes, measurements and feature status. Physical-phone installation, Play Protect behavior, recording lifecycle and 4 GB performance remain unverified.
+Version 0.3.0 implements the Creative Memory foundation and a first offline
+visual-search slice. It retains application ID `com.keep.local.next` and the
+recovered signing identity of Keep Local Next 0.2.0. Keep the separate original
+`com.keep.local` installation intact; its signing key remains unavailable.
 
-## Implemented in source (runtime status in docs/VERIFICATION.txt)
+Install the APK over Next, then choose **Visual memory → Install local model
+pack** and select `visual-model-pack.zip` from local Files. The ~148 MiB model
+pack is optional: notes, imports, OCR, text search, playback and sharing already
+work without it. Tap **Index / resume my library** to opt in. Search descriptions
+in the main search field; visual matches explain their source and approximate
+video-frame timestamp. No filename/tag vocabulary or example query is hardcoded.
+
+See `docs/CREATIVE_MEMORY.txt` for verified scope and limitations,
+`docs/MODELS_AND_LICENSES.txt` for model choices and licenses, and the final
+verification report for measured results. Historical 0.1/0.2 reports describe
+those versions only. Physical flagship benchmarks, robust temporal action
+recognition, saved-audio transcription and creative collections remain pending.
+
+## Preserved capabilities (historical verification in docs/VERIFICATION.txt)
 
 | Flow | Capability |
 |---|---|
