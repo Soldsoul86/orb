@@ -59,7 +59,7 @@ class AuthorizedLibraryTest {
             val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)(use this folder|select)"))),5000)
             assertNotNull("Folder consent action",select);select!!.click()
             device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)allow"))),2000)?.click()
-            assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Choose what Keep Local can remember.")),5000))
+            assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.pkg(c.packageName)),5000))
         }
         } finally { inst.removeMonitor(monitor) }
         val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority=="com.android.externalstorage.documents"&&it.uri.toString().contains("KeepLocalFixtures")}

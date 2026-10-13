@@ -15,9 +15,9 @@ class DocumentParserTest {
         val word=File(AppFiles.mediaDir(c),"parser-fixture.docx")
         java.util.zip.ZipOutputStream(word.outputStream()).use{z->z.putNextEntry(java.util.zip.ZipEntry("word/document.xml"));z.write("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>Warranty expires 2028-06-30</w:t></w:r></w:p></w:body></w:document>".toByteArray());z.closeEntry()}
         val pdf=File(AppFiles.mediaDir(c),"parser-fixture.pdf")
-        android.graphics.pdf.PdfDocument().use{doc->val page=doc.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(600,800,1).create());page.canvas.drawColor(android.graphics.Color.WHITE)
+        val doc=android.graphics.pdf.PdfDocument();try{val page=doc.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(600,800,1).create());page.canvas.drawColor(android.graphics.Color.WHITE)
             val paint=android.graphics.Paint().apply{color=android.graphics.Color.BLACK;textSize=28f}
-            page.canvas.drawText("Purchase receipt",40f,80f,paint);page.canvas.drawText("Invoice date 2026-09-17",40f,130f,paint);doc.finishPage(page);pdf.outputStream().use{doc.writeTo(it)}}
+            page.canvas.drawText("Purchase receipt",40f,80f,paint);page.canvas.drawText("Invoice date 2026-09-17",40f,130f,paint);doc.finishPage(page);pdf.outputStream().use{doc.writeTo(it)}}finally{doc.close()}
         for((file,mime,needle) in listOf(Triple(word,"application/vnd.openxmlformats-officedocument.wordprocessingml.document","2028-06-30"),Triple(pdf,"application/pdf","receipt"))){
             val before=file.readBytes();val id=MemoryDb.get(c).add("file",file.name,path=AppFiles.relativePath(c,file),mime=mime,bytes=file.length())
             try{val text=DocumentText.extract(c,MemoryDb.get(c).get(id)!!,AtomicBoolean(false))!!;assertTrue(text,text.contains(needle,true));assertArrayEquals(before,file.readBytes())}
