@@ -27,25 +27,28 @@ class DiscoveryFlowTest {
     private val ledger get()=File(c.filesDir,"discovery-flow.json")
     private fun hash(uri:Uri)=c.contentResolver.openInputStream(uri)!!.use{input->val d=java.security.MessageDigest.getInstance("SHA-256");val b=ByteArray(65536);while(true){val n=input.read(b);if(n<0)break;d.update(b,0,n)};d.digest().joinToString(""){"%02x".format(it)}}
     private fun databaseBytes()=listOf("", "-wal", "-shm").sumOf{File(c.getDatabasePath("memories.db").path+it).length()}
+    private fun tapVisible(label:String){
+        // Use real accessibility scroll gestures: native focus restoration can undo
+        // Espresso requestRectangleOnScreen after returning from another Activity.
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        val visible=device.findObject(By.text(label))
+        if(visible==null || visible.visibleBounds.height()<30){
+            val scroller=UiScrollable(UiSelector().className("android.widget.ScrollView")).setAsVerticalList()
+            assertTrue("Review label reachable by scrolling: $label",scroller.scrollIntoView(UiSelector().text(label)))
+        }
+        val labelView=device.wait(Until.findObject(By.text(label)),3000)
+        assertNotNull(labelView);labelView!!.click()
+    }
     private fun choose(id:String,action:String,reason:String?=null){
         ActivityScenario.launch<ReviewActivity>(Intent(c,ReviewActivity::class.java).putExtra("discovery_id",id)).use {
             assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
             val source=MemoryDb.get(c).get(Discoveries.get(c,id)!!.evidence.first().id)!!
-            onView(withText("Open source: ${source.title}")).perform(scrollTo(),click())
+            tapVisible("Open source: ${source.title}")
             assertTrue(device.wait(Until.hasObject(By.text("Memory details")),5000))
             onView(withId(R.id.memory_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(withText(source.title)))
             androidx.test.espresso.Espresso.pressBack()
             assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
-            // Use real accessibility scroll gestures: native focus restoration can undo
-            // Espresso requestRectangleOnScreen after returning from another Activity.
-            androidx.test.espresso.Espresso.closeSoftKeyboard()
-            val visible=device.findObject(By.text(action))
-            if(visible==null || visible.visibleBounds.height()<30){
-                val scroller=UiScrollable(UiSelector().className("android.widget.ScrollView")).setAsVerticalList()
-                assertTrue("Review action reachable by scrolling: $action",scroller.scrollIntoView(UiSelector().text(action)))
-            }
-            val actionView=device.wait(Until.findObject(By.text(action)),3000)
-            assertNotNull(actionView);actionView!!.click()
+            tapVisible(action)
             if(action=="Correct"){
                 onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
                 onView(withText("Save correction")).perform(click())
