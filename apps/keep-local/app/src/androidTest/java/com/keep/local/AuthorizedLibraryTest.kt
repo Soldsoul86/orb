@@ -52,6 +52,7 @@ class AuthorizedLibraryTest {
             device.waitForIdle()
             if(!device.hasObject(roots)) device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.desc("Show roots")),5000)?.click()
             val fixture=device.wait(androidx.test.uiautomator.Until.findObject(roots),5000)
+            if(fixture==null){val dump=java.io.ByteArrayOutputStream();device.dumpWindowHierarchy(dump);println("PICKER_HIERARCHY "+dump.toString("UTF-8"));println(device.executeShellCommand("content query --uri content://${LibraryFixtureProvider.AUTH}/root"))}
             assertNotNull("Fixture folder must appear in Android document picker",fixture);fixture!!.click()
             val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)(use this folder|select)"))),5000)
             assertNotNull("Folder consent action",select);select!!.click()
