@@ -24,6 +24,7 @@ class CaptureFlowTest {
         val body = "Remember budget deadlines tomorrow"
         try {
             ActivityScenario.launch(MainActivity::class.java).use {
+                onView(withText("Capture")).perform(click())
                 onView(withText("+ Note")).perform(click())
                 onView(withId(R.id.memory_title)).perform(replaceText(title))
                 onView(withId(R.id.memory_note)).perform(replaceText(body), closeSoftKeyboard())

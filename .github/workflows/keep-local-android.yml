@@ -10,16 +10,6 @@ concurrency:
   group: keep-local-creative-${{ github.sha }}
   cancel-in-progress: true
 jobs:
-  diagnostics:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          run-id: 38382709825
-          github-token: ${{ github.token }}
-          name: creative-evidence-api-29
-          path: prior-evidence
-      - run: rg -n 'AndroidRuntime|Exception|Permission Denial|Displayed.*documents|cmp=.*documents|ActivityTaskManager' prior-evidence/logcat.txt | tail -80 || true
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

@@ -47,6 +47,7 @@ object VisualIndex {
         prefs.edit().putLong("generation",prefs.getLong("generation",0)+1).commit()
         val db=MemoryDb.get(c).writableDatabase
         db.delete("representations","modality='visual'",null)
+        db.delete("discoveries","type='reusable'",null)
         db.execSQL("UPDATE assets SET state='not_indexed',next_ms=0,model_id=NULL,error=NULL")
         File(c.cacheDir,"visual").deleteRecursively()
     }
@@ -76,6 +77,7 @@ class VisualIndexJob : JobService() {
                         again=true
                     }
                 }
+                if(!stop.get() && !VoiceService.active && !ScreenService.active) DiscoveryEngine.generate(this,stop)
             } } catch(e: IndexDeferred) { again=true } catch(e: OutOfMemoryError) { again=false } catch(e: Exception) { again=false }
             finally { if(!stop.get()) { jobFinished(params,again && VisualIndex.enabled(this));if(!again)VisualIndex.scheduleRescan(this) } }
         }

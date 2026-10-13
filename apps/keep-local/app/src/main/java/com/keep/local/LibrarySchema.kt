@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 /** v3 is additive. Existing private media, UUIDs, vectors and models are untouched. */
 object LibrarySchema {
     fun create(db: SQLiteDatabase) {
+        DiscoverySchema.create(db)
         db.execSQL("""CREATE TABLE IF NOT EXISTS library_sources (
             id INTEGER PRIMARY KEY, source_key TEXT UNIQUE NOT NULL, kind TEXT NOT NULL,
             label TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,

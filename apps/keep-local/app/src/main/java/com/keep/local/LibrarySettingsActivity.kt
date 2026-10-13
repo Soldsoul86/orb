@@ -38,7 +38,7 @@ class LibrarySettingsActivity:Activity(){
         progress=label("Checking sources…")
         button("Manage authorized sources"){manageSources()}
         button("Remove derived index (keep originals)"){
-            AlertDialog.Builder(this).setMessage("Remove derived text, visual vectors and suggestions? Originals, your notes and installed models remain. Indexing will pause.").setNegativeButton("Cancel",null).setPositiveButton("Remove"){_,_->io.execute{AuthorizedLibrary.clearDerived(this);runOnUiThread{renderStatus()}}}.show()
+            AlertDialog.Builder(this).setMessage("Remove derived text, visual vectors and suggestions? Originals, your notes, review decisions and installed models remain. Indexing will pause.").setNegativeButton("Cancel",null).setPositiveButton("Remove"){_,_->io.execute{AuthorizedLibrary.clearDerived(this);runOnUiThread{renderStatus()}}}.show()
         }
         button("Android app permission settings"){startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))}
     }

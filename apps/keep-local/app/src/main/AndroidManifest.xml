@@ -27,6 +27,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
+        <activity android:name=".ReviewActivity" android:exported="false" />
         <activity android:name=".LibrarySettingsActivity" android:exported="false" />
         <activity android:name=".ModelsActivity" android:exported="false" />
         <service android:name=".VisualIndexJob" android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE" />
