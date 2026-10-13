@@ -23,7 +23,7 @@ data class MemoryItem(
 )
 
 /** App-private SQLite + local FTS4. Sources stay separate from AI/OCR extractions. */
-class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 3) {
+class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 4) {
     private val appContext=context.applicationContext
     companion object {
         @Volatile private var instance: MemoryDb? = null
@@ -72,6 +72,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
         """.trimIndent())
         CreativeSchema.create(db)
         LibrarySchema.create(db)
+        IndexSchema.create(db)
     }
 
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
@@ -79,6 +80,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) CreativeSchema.create(db)
         if (oldVersion < 3) LibrarySchema.create(db)
+        if (oldVersion < 4) IndexSchema.create(db)
     }
 
     fun add(

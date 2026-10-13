@@ -29,7 +29,7 @@ class CreativeMemoryTest {
         val db=MemoryDb.get(c)
         assertEquals("CAD Test",db.get(987654)!!.title)
         assertTrue(AppFiles.safeFile(c,db.get(987654)!!.path)!!.length()>0)
-        db.readableDatabase.rawQuery("PRAGMA user_version",null).use { it.moveToFirst();assertEquals(3,it.getInt(0)) }
+        db.readableDatabase.rawQuery("PRAGMA user_version",null).use { it.moveToFirst();assertEquals(4,it.getInt(0)) }
         val uuid=db.readableDatabase.rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=987654",null).use {it.moveToFirst();it.getString(0)}
         assertEquals("retained-0.3-asset-fixture",uuid)
         db.readableDatabase.rawQuery("SELECT text_value FROM representations WHERE memory_id=987654 AND modality='migration_fixture'",null).use{assertTrue(it.moveToFirst());assertEquals("Retain this prior derived row",it.getString(0))}

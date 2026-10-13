@@ -16,7 +16,7 @@ legacy=next(p for p in root.findall('uses-permission') if p.get(a+'name')=='andr
 assert legacy.get(a+'maxSdkVersion')=='32'
 assert perms <= allowed, f'Unexpected packaged permissions: {perms - allowed}'
 assert root.get('package') == 'com.keep.local.next'
-assert root.get(a + 'versionCode') == '4'
+assert root.get(a + 'versionCode') == '5'
 assert root.find('application').get(a + 'allowBackup') == 'false'
 provider = next(p for p in root.find('application').findall('provider') if p.get(a + 'authorities') == 'com.keep.local.next.media')
 assert provider.get(a + 'exported') == 'false'

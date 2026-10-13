@@ -17,14 +17,14 @@ object VisualIndex {
     const val JOB = 901
     fun enabled(c: Context) = c.getSharedPreferences("visual",0).getBoolean("enabled",false)
     fun setEnabled(c: Context, yes: Boolean) { c.getSharedPreferences("visual",0).edit().putBoolean("enabled",yes).apply()
-        if (yes) schedule(c) else c.getSystemService(JobScheduler::class.java).cancel(JOB) }
-    fun schedule(c: Context) {
+        if (yes) schedule(c) else { IndexProgress.activeStop?.set(true); c.getSystemService(JobScheduler::class.java).cancel(JOB) } }
+    fun schedule(c: Context, delay:Long=1000, replace:Boolean=false) {
         if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c) && !MemoryDb.get(c).readableDatabase.rawQuery("SELECT 1 FROM memories WHERE kind='file' LIMIT 1",null).use{it.moveToFirst()})) return
         val scheduler=c.getSystemService(JobScheduler::class.java)
         val pending=scheduler.getPendingJob(JOB)
-        if (pending!=null && !pending.extras.getBoolean("rescan",false)) return
+        if (!replace && pending!=null && !pending.extras.getBoolean("rescan",false)) return
         scheduler.schedule(JobInfo.Builder(JOB, ComponentName(c, VisualIndexJob::class.java))
-            .setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).setMinimumLatency(1000)
+            .setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).setMinimumLatency(delay.coerceAtLeast(1000))
             .setBackoffCriteria(10000, JobInfo.BACKOFF_POLICY_LINEAR).build())
     }
     fun scheduleRescan(c:Context) {
@@ -33,11 +33,10 @@ object VisualIndex {
         c.getSystemService(JobScheduler::class.java).schedule(JobInfo.Builder(JOB,ComponentName(c,VisualIndexJob::class.java)).setExtras(extras).setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).setMinimumLatency(30*60*1000L).build())
     }
     fun status(c: Context): String {
-        val db=MemoryDb.get(c).readableDatabase
-        return db.rawQuery("SELECT state,COUNT(*) FROM assets JOIN memories ON memories.id=assets.memory_id WHERE kind IN ('image','video') GROUP BY state",null).use { q ->
-            buildList { while(q.moveToNext()) add("${q.getInt(1)} ${q.getString(0).replace('_',' ')}") }.joinToString(" · ")
-        }
+        val rows=IndexProgress.counts(c)
+        return "${rows.sumOf{it.basic}} basic searchable · ${rows.sumOf{it.fully}} fully indexed · ${rows.sumOf{it.waiting+it.partial}} awaiting deep processing"
     }
+
     fun blob(v: FloatArray): ByteArray = ByteBuffer.allocate(v.size*4).order(ByteOrder.LITTLE_ENDIAN).apply { v.forEach { putFloat(it) } }.array()
     fun vector(v: ByteArray): FloatArray { require(v.size==2048); val b=ByteBuffer.wrap(v).order(ByteOrder.LITTLE_ENDIAN);return FloatArray(512){b.float} }
     fun thumbnail(c: Context,id: Long,ms: Long) = File(c.cacheDir,"visual/${id}_${ms}.jpg")
@@ -53,47 +52,67 @@ object VisualIndex {
     }
 }
 
+/** Constrained, finite JobScheduler batches. Successful continuation is not a failed job. */
 class VisualIndexJob : JobService() {
     private val worker=Executors.newSingleThreadExecutor()
     private var stopped=AtomicBoolean(false)
     override fun onStartJob(params: JobParameters): Boolean {
         stopped=AtomicBoolean(false);val stop=stopped
         worker.execute {
-            var again=false
+            var more=false;var defer=false;var engine:VisualEncoder?=null
+            IndexProgress.activeStop=stop;IndexProgress.running=true
             try { if(VisualIndex.enabled(this)) {
+                AuthorizedLibrary.reconcile(this)
                 if(params.extras.getBoolean("rescan",false)) AuthorizedLibrary.rescan(this,wake=false)
-                val deadline=SystemClock.elapsedRealtime()+25000
+                // Well below JobScheduler's execution limit. Reuse one model across fair rounds.
+                val deadline=SystemClock.elapsedRealtime()+120000
                 while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
-                    if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) {again=true;break}
-                    if(!AuthorizedLibrary.step(this,stop))break
-                    again=true
+                    if(IndexPipeline.restricted(this)){defer=true;break}
+                    more=IndexPipeline.round(this,stop) {
+                        engine ?: ClipEncoder(this).also{engine=it}
+                    }
+                    if(!more)break
                 }
-                if(ModelPack.ready(this) && !stop.get() && !VoiceService.active && !ScreenService.active && SystemClock.elapsedRealtime()<deadline) ClipEncoder(this).use { engine ->
-                    while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
-                        if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) { again=true;break }
-                        val db=MemoryDb.get(this).writableDatabase
-                        val id=db.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE m.kind IN ('image','video') AND a.state IN ('not_indexed','indexing') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) ORDER BY m.created_at LIMIT 1",null).use { if(it.moveToFirst())it.getLong(0) else null } ?: break
-                        try { indexOne(this,id,engine,stop) } catch(e: IndexDeferred) {throw e} catch(e: SecurityException) {AuthorizedLibrary.invalidate(this,id)} catch(e: java.io.FileNotFoundException) {if(MemoryDb.get(this).get(id)?.let{MediaSource.external(it)}==true)AuthorizedLibrary.invalidate(this,id)else db.execSQL("UPDATE assets SET state='error',error='Original missing' WHERE memory_id=?",arrayOf(id))} catch(e: Exception) { if(!stop.get()) {db.execSQL("UPDATE assets SET state='error',error=? WHERE memory_id=?",arrayOf("Visual indexing failed",id));db.execSQL("UPDATE source_items SET state='failed',error='Visual indexing failed' WHERE memory_id=?",arrayOf(id))} }
-                        again=true
+                // Context/suggestions use already committed evidence; do not run while paused.
+                if(!stop.get()&&VisualIndex.enabled(this)&&!IndexPipeline.restricted(this)) {
+                    engine?.close();engine=null
+                    IndexProgress.phase(this,"Connecting committed evidence")
+                    DiscoveryEngine.generate(this,stop)
+                }
+            } } catch(e:IndexDeferred){defer=true}
+            catch(e:OutOfMemoryError){defer=true;IndexProgress.problem(this,"Memory pressure; postponed")}
+            catch(e:Exception){defer=true;IndexProgress.problem(this,"Worker: "+e.javaClass.simpleName)}
+            finally {
+                runCatching{engine?.close()}
+                if(IndexProgress.activeStop===stop){IndexProgress.activeStop=null;IndexProgress.activeId=null;IndexProgress.running=false}
+                if(!stop.get()) {
+                    // Never request Android's growing failure backoff after useful processing.
+                    jobFinished(params,false)
+                    if(VisualIndex.enabled(this)) {
+                        val retry=IndexProgress.retryDelay(this)
+                        when{defer->VisualIndex.schedule(this,60_000,replace=true);more->VisualIndex.schedule(this,replace=true);retry!=null->VisualIndex.schedule(this,retry,replace=true);else->VisualIndex.scheduleRescan(this)}
                     }
                 }
-                if(!stop.get() && !VoiceService.active && !ScreenService.active) DiscoveryEngine.generate(this,stop)
-            } } catch(e: IndexDeferred) { again=true } catch(e: OutOfMemoryError) { again=false } catch(e: Exception) { again=false }
-            finally { if(!stop.get()) { jobFinished(params,again && VisualIndex.enabled(this));if(!again)VisualIndex.scheduleRescan(this) } }
+            }
         }
         return true
     }
     override fun onStopJob(params: JobParameters): Boolean { stopped.set(true); return VisualIndex.enabled(this) }
-    override fun onDestroy() { stopped.set(true);worker.shutdownNow();super.onDestroy() }
+    override fun onDestroy() { stopped.set(true);worker.shutdown();super.onDestroy() }
     companion object {
         /** One bounded, durable step. Cancellation never advances its checkpoint. */
         fun indexOne(c: Context,id: Long,engine: VisualEncoder,stop: AtomicBoolean) {
+            val started=SystemClock.elapsedRealtime()
+            IndexProgress.phase(c,"Processing one image / video checkpoint",id)
             val generation=c.getSharedPreferences("visual",0).getLong("generation",0)
             val db=MemoryDb.get(c).writableDatabase
             val item=MemoryDb.get(c).get(id) ?: return
             val source=MediaSource.uri(c,item)
             if(MediaSource.external(item))db.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             var ms=0L;var hash:String?=null
+            // Optional original-capture metadata is enrichment, never inventory I/O.
+            val needsCapture=MediaSource.external(item)&&item.kind=="image"&&db.rawQuery("SELECT 1 FROM source_items WHERE memory_id=? AND time_basis NOT IN ('capture_time','exif_local_time')",arrayOf(id.toString())).use{it.moveToFirst()}
+            val capture=if(needsCapture)CaptureMetadata.read(c,source)else null
             db.rawQuery("SELECT next_ms,sha256 FROM assets WHERE memory_id=?",arrayOf(id.toString())).use { if(!it.moveToFirst())return;ms=it.getLong(0);hash=it.getString(1) }
             if(hash==null) {
                 val digest=MessageDigest.getInstance("SHA-256")
@@ -131,6 +150,8 @@ class VisualIndexJob : JobService() {
                     },android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
                     db.execSQL("UPDATE assets SET sha256=?,state=?,next_ms=?,total_ms=?,model_id=?,error=NULL,updated_at=? WHERE memory_id=?",arrayOf(hash,if(item.kind=="image"||next>=duration)"ready" else "indexing",next,duration,engine.modelId,System.currentTimeMillis(),id))
                     db.execSQL("UPDATE source_items SET state=?,error=NULL WHERE memory_id=?",arrayOf(if(item.kind=="image"||next>=duration)"completed" else "processing",id))
+                    if(capture!=null)db.execSQL("UPDATE source_items SET content_time=?,time_basis=? WHERE memory_id=?",arrayOf(capture.time,capture.basis,id))
+                    IndexProgress.committed(c,id,"visual",SystemClock.elapsedRealtime()-started,item.kind=="image"||next>=duration)
                     db.setTransactionSuccessful()
                 } finally {db.endTransaction()}
                 }

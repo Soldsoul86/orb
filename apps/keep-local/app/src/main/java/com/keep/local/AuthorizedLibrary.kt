@@ -36,10 +36,10 @@ object AuthorizedLibrary {
         d.execSQL("UPDATE library_sources SET enabled=1 WHERE id=?",arrayOf(id));rescan(c,id);id
     }
     fun rescan(c:Context,id:Long?=null,wake:Boolean=true) {
-        val d=db(c);val where=if(id==null)"enabled=1" else "enabled=1 AND id=$id"
-        d.execSQL("UPDATE library_sources SET status='queued',cursor=0,scan_epoch=scan_epoch+1,error=NULL WHERE $where")
+        val d=db(c);val where=if(id==null)"enabled=1 AND status NOT IN ('queued','processing')" else "enabled=1 AND id=$id AND status NOT IN ('queued','processing')"
         d.execSQL("DELETE FROM scan_folders WHERE source_id IN (SELECT id FROM library_sources WHERE $where)")
-        d.execSQL("UPDATE source_items SET state='queued',error=NULL WHERE excluded=0 AND state IN ('failed','access_revoked','not_indexed') AND source_id IN (SELECT id FROM library_sources WHERE $where)")
+        d.execSQL("UPDATE library_sources SET status='queued',cursor=0,scan_epoch=scan_epoch+1,error=NULL WHERE $where")
+        // Failed enrichments retain their bounded retry history; scanning does not reset it.
         if(wake)VisualIndex.schedule(c)
     }
     fun hasSources(c:Context)=db(c).rawQuery("SELECT 1 FROM library_sources WHERE enabled=1 LIMIT 1",null).use{it.moveToFirst()}
@@ -58,6 +58,7 @@ object AuthorizedLibrary {
         d.execSQL("UPDATE memories SET extracted='' WHERE id=?",arrayOf(id))
         d.delete("representations","memory_id=?",arrayOf(id.toString()))
         d.execSQL("UPDATE assets SET state='not_indexed',next_ms=0,sha256=NULL WHERE memory_id=?",arrayOf(id))
+        d.delete("index_retry","memory_id=?",arrayOf(id.toString()))
         if(clearThumb)File(c.cacheDir,"visual").listFiles()?.filter{it.name.startsWith("${id}_")}?.forEach{it.delete()}
         // Discovery tables are installed by the same additive migration in milestone B.
         if(d.rawQuery("SELECT name FROM sqlite_master WHERE name='discovery_evidence'",null).use{it.moveToFirst()}) {
@@ -107,8 +108,8 @@ object AuthorizedLibrary {
             if(existing!=null){val old=existing[0].toLong();d.execSQL("UPDATE source_items SET seen=? WHERE memory_id=?",arrayOf(epoch,old));exclude(c,old);return@synchronized old}
             return@synchronized -1L
         }
-        val capture=if(mime.startsWith("image/")&&basis!="capture_time")CaptureMetadata.read(c,uri)else null
-        val effectiveTime=capture?.time?:time;val effectiveBasis=capture?.basis?:basis
+        // Inventory never opens media. EXIF belongs to the bounded enrichment unit.
+        val effectiveTime=time;val effectiveBasis=basis
         if(existing!=null){
             val id=existing[0].toLong()
             if(existing[1]!=fingerprint||existing[3]=="access_revoked"){
@@ -116,7 +117,7 @@ object AuthorizedLibrary {
                 d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,effectiveTime,effectiveBasis,group,id))
                 d.execSQL("UPDATE memories SET bytes=?,mime=? WHERE id=?",arrayOf(size,mime,id))
             }
-            d.execSQL("UPDATE source_items SET seen=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(epoch,effectiveTime,effectiveBasis,group,id))
+            d.execSQL("UPDATE source_items SET seen=?,group_path=? WHERE memory_id=?",arrayOf(epoch,group,id))
             val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{q->var yes=false;while(q.moveToNext())if(group.startsWith(q.getString(0)))yes=true;yes}
             if(blocked)exclude(c,id)
             return@synchronized id
@@ -130,19 +131,31 @@ object AuthorizedLibrary {
             d.setTransactionSuccessful();id
         }finally{d.endTransaction()}
     }
-    /** One discover batch, then one textual asset. Caller owns thermal/time/capture policy. */
+    /** Compatibility helper for callers explicitly draining inventory and documents. */
     fun step(c:Context,stop:AtomicBoolean):Boolean {
-        reconcile(c);if(stop.get())return false
+        reconcile(c)
+        return discoverStep(c,stop) || textStep(c,stop)
+    }
+    /** Inventory and enrichment are independently schedulable; source cursor rotates. */
+    fun discoverStep(c:Context,stop:AtomicBoolean):Boolean {
+        if(stop.get())return false
+        val d=db(c);val prefs=c.getSharedPreferences("index_runtime",0)
+        val after=prefs.getLong("source_cursor",0)
+        val source=d.rawQuery("SELECT id,source_key,kind,scan_epoch,cursor FROM library_sources WHERE enabled=1 AND status IN ('queued','processing') ORDER BY CASE WHEN id>? THEN 0 ELSE 1 END,id LIMIT 1",arrayOf(after.toString())).use{if(it.moveToFirst())arrayOf(it.getLong(0).toString(),it.getString(1),it.getString(2),it.getLong(3).toString(),it.getLong(4).toString())else null} ?: return false
+        val id=source[0].toLong()
+        IndexProgress.phase(c,"Discovering authorized files")
+        try { if(source[2]=="tree")scanTree(c,source,stop)else scanMedia(c,source,stop) }
+        catch(e:SecurityException){revoke(c,id)}
+        catch(e:Exception){d.execSQL("UPDATE library_sources SET status='failed',error=? WHERE id=?",arrayOf("Scan failed; use Rescan to retry",id));IndexProgress.problem(c,"Source scan failed: "+e.javaClass.simpleName)}
+        prefs.edit().putLong("source_cursor",id).apply()
+        return true
+    }
+    fun textStep(c:Context,stop:AtomicBoolean):Boolean {
+        if(stop.get())return false
         val d=db(c)
-        val source=d.rawQuery("SELECT id,source_key,kind,scan_epoch,cursor FROM library_sources WHERE enabled=1 AND status IN ('queued','processing') ORDER BY id LIMIT 1",null).use{if(it.moveToFirst())arrayOf(it.getLong(0).toString(),it.getString(1),it.getString(2),it.getLong(3).toString(),it.getLong(4).toString())else null}
-        if(source!=null){
-            val id=source[0].toLong()
-            try { if(source[2]=="tree")scanTree(c,source,stop)else scanMedia(c,source,stop) }
-            catch(e:SecurityException){revoke(c,id)}
-            catch(e:Exception){d.execSQL("UPDATE library_sources SET status='failed',error=? WHERE id=?",arrayOf("Scan failed; retry or reauthorize folder",id))}
-            return true
-        }
-        val id=d.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE a.state IN ('not_indexed','indexing') AND m.kind IN ('file','audio') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) LIMIT 1",null).use{if(it.moveToFirst())it.getLong(0)else null} ?: return false
+        val id=IndexProgress.next(c,"'file','audio'") ?: return false
+        val started=SystemClock.elapsedRealtime()
+        IndexProgress.phase(c,"Extracting document text / checking audio support",id)
         try {
             val item=MemoryDb.get(c).get(id)?:return true
             val generation=c.getSharedPreferences("visual",0).getLong("generation",0)
@@ -151,11 +164,15 @@ object AuthorizedLibrary {
             val text=if(item.kind=="audio")null else DocumentText.extract(c,item,stop)
             if(stop.get())return true
             synchronized(VisualIndex){if(generation==c.getSharedPreferences("visual",0).getLong("generation",0) && (!MediaSource.external(item)||accessible(c,id))){
+                d.beginTransaction();try {
                 if(text!=null)MemoryDb.get(c).setExtracted(id,text)
                 d.execSQL("UPDATE assets SET state=? WHERE memory_id=?",arrayOf(if(text!=null)"ready" else "unsupported",id))
                 d.execSQL("UPDATE source_items SET state=?,error=? WHERE memory_id=?",arrayOf(if(text!=null)"completed" else "unsupported",if(text==null)"Text extraction/transcription unavailable for this format" else null,id))
+                IndexProgress.committed(c,id,"text",SystemClock.elapsedRealtime()-started,text!=null)
+                d.setTransactionSuccessful()
+                }finally{d.endTransaction()}
             }}
-        }catch(e:IndexDeferred){throw e}catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id));d.execSQL("UPDATE source_items SET state='failed',error='Extraction failed; retry available' WHERE memory_id=?",arrayOf(id))}
+        }catch(e:IndexDeferred){throw e}catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){if(!stop.get())IndexProgress.failed(c,id,e)}
         return true
     }
     private fun completedScan(c:Context,id:Long,epoch:Long) {
@@ -167,11 +184,24 @@ object AuthorizedLibrary {
         val collection=when(s[2]){"image"->MS.Images.Media.EXTERNAL_CONTENT_URI;"video"->MS.Video.Media.EXTERNAL_CONTENT_URI;else->MS.Audio.Media.EXTERNAL_CONTENT_URI}
         val cols=arrayOf("_id","_display_name","mime_type","_size","date_modified","date_added","relative_path") + if(s[2]!="audio")arrayOf("datetaken")else emptyArray()
         var n=0;var last=cursor
-        c.contentResolver.query(collection,cols,"_id>? AND is_pending=0",arrayOf(cursor.toString()),"_id ASC")?.use{r->
+        val args=android.os.Bundle().apply {
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION,"_id>? AND is_pending=0")
+            putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,arrayOf(cursor.toString()))
+            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS,arrayOf("_id"))
+            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION,ContentResolver.QUERY_SORT_DIRECTION_ASCENDING)
+            putInt(ContentResolver.QUERY_ARG_LIMIT,100)
+        }
+        val d=db(c)
+        c.contentResolver.query(collection,cols,args,null)?.use{r->
+            synchronized(VisualIndex){
+            d.beginTransaction();try {
             while(n<100&&!stop.get()&&r.moveToNext()){
                 last=r.getLong(0);val taken=if(s[2]!="audio")r.getLong(7) else 0L;val added=if(taken>0)taken else r.getLong(5)*1000
                 upsert(c,id,ContentUris.withAppendedId(collection,last),r.getString(1)?:"Untitled",r.getString(2)?:"application/octet-stream",r.getLong(3),r.getLong(4),added,if(taken>0)"capture_time" else "media_added",r.getString(6)?:"",epoch);n++
-                db(c).execSQL("UPDATE library_sources SET status='processing',cursor=? WHERE id=?",arrayOf(last,id))
+                            }
+            d.execSQL("UPDATE library_sources SET status='processing',cursor=? WHERE id=?",arrayOf(last,id))
+            d.setTransactionSuccessful()
+            }finally{d.endTransaction()}
             }
         }?:error("Media query unavailable")
         if(n<100&&!stop.get())completedScan(c,id,epoch)

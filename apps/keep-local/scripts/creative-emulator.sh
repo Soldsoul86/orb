@@ -62,7 +62,9 @@ cat "$evidence/discovery-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/visual-benchmark.json > "$evidence/visual-benchmark.json"
 adb exec-out run-as com.keep.local.next cat files/creative-demo.png > "$evidence/creative-demo.png"
 cat "$evidence/visual-benchmark.json"
+adb exec-out run-as com.keep.local.next cat files/indexing-benchmark.json > "$evidence/indexing-benchmark.json"
+cat "$evidence/indexing-benchmark.json"
 adb shell dumpsys meminfo com.keep.local.next > "$evidence/meminfo.txt"
 adb pull /sdcard/Documents/KeepLocalFixtures "$evidence/documents-after"
 diff -r "$evidence/document-originals" "$evidence/documents-after"
-echo 'PASS: same-package upgrade, v2-to-v3 migration, original retention, offline visual retrieval and export suite.'
+echo 'PASS: same-package upgrade, v3-to-v4 migration, original retention, offline visual retrieval and export suite.'
