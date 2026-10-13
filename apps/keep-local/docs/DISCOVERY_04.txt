@@ -1,0 +1,84 @@
+Keep Local 0.4 — implementation and acceptance ledger
+Your creative memory.
+
+Package: com.keep.local.next (unchanged). Version code 4 / 0.4.0.
+Database v2 -> v3 is additive; private media, asset UUIDs, prior representations,
+user metadata and installed CLIP pack are retained. The original separate
+com.keep.local app is not upgraded and must remain installed.
+
+Authorized Library implementation:
+- Independent Photos, Videos and Audio consent; scoped MediaStore enumeration.
+- Android 10–12 uses READ_EXTERNAL_STORAGE capped at API32, gated per category.
+  Android 13+ uses category permissions; Android 14+ accepts selected visual media.
+- Local ACTION_OPEN_DOCUMENT_TREE and persisted read-only tree grants.
+- No MANAGE_EXTERNAL_STORAGE, INTERNET, accessibility, location or new capture access.
+- External originals remain content URI references; no automatic copies or writes.
+- Durable per-source scan cursors and folder work queue; batches of 100 entries.
+- Existing JobScheduler pipeline handles scans, document extraction, visual frames,
+  cancellation/resumption, battery/storage constraints and thermal/capture pauses.
+- New/changed sources are found by explicit rescan and delayed background rescans.
+  Timing is best effort under Android's scheduling and standby restrictions.
+- Changed size/modification metadata invalidates old derived content; unchanged
+  URI references retain the same UUID. Moved/deleted/revoked sources become unavailable.
+- File exclusions and folder/document-ID prefix exclusions persist; source access
+  and index removal preserve originals. Revoking a tree releases its OS grant;
+  category opt-out blocks all app reads; OS permission controls are also linked.
+- Source access is checked before display/share/open. Revocation removes extracted
+  text and visual previews/vectors; cached matches cannot provide a back door.
+
+Local text support:
+UTF-8 text, Markdown, CSV: <=2 MiB input and 250,000 searchable characters.
+DOCX: word/document.xml <=2 MiB, other decompressed entries <=16 MiB, <=500 entries.
+PDF: bounded Latin-script OCR, first 20 pages at <=1280 pixels on the long side,
+up to 250,000 characters. Page markers label OCR uncertainty and truncation.
+Encrypted/corrupt/non-seekable PDFs may fail. DOC, XLS/XLSX, PPT/PPTX, archive
+contents and arbitrary proprietary formats are not parsed. Audio retains metadata;
+saved-audio transcription is not included. No new model or cloud dependency.
+
+Implementation boundaries:
+Media timestamps distinguish actual capture metadata from added/modified times;
+when MediaStore omits it, images can supply explicit EXIF DateTimeOriginal.
+EXIF clocks without timezone are labelled as such and grouped separately from
+absolute timestamps. No timezone or location is invented; generic file mtime
+never substitutes for a capture date. Reading EXIF does not request GPS access;
+added/modified time alone must not be presented as proof of a trip or event.
+CLIP sampled-frame similarity does not establish activities, identities or location.
+Folder exclusion currently uses an explicit path/document-ID prefix, shown in
+source details. A source moving to a new URI is not guessed to be the old asset.
+Filesystem providers can reorder child cursors during a scan; a subsequent rescan
+is idempotent and reconciles membership. A source that changes bytes without
+changing provider size/modification metadata needs explicit index removal/rebuild.
+
+Evidence-backed discoveries and review:
+- Literal document rules propose possible warranty/receipt information or explicitly
+  written dates. They quote source text, label uncertainty and never infer a deadline.
+  These English rules are intentionally narrow; usefulness is for the user to judge.
+- Experience grouping requires >=3 capture-time records in the same folder within
+  10 minutes. Added/modified times alone are excluded. Exact byte copies are deduped
+  after visual hashing. This is a grouping hypothesis, never a claimed trip/location.
+- Reuse proposals compare real stored CLIP image/frame embeddings (cosine >=0.88),
+  with timestamped evidence. No new model, action recognition or identity inference.
+  The threshold is uncalibrated. Batches page 160 anchor frames against a bounded
+  first/last-frame candidate bank (256 rows); this is not exhaustive all-pairs search.
+  Experience groups page 200 source rows and can miss relationships across pages.
+- At most 20 pending records, 12 shown in the queue. Document/experience batches and
+  top-five visual pairs favor a small queue over volume; this is not a trained ranker.
+- Deterministic discovery keys and evidence-revision suppression prevent repeat
+  dismissals from resurfacing on ordinary rescans. Material changes can be reviewed.
+- Separate tables store source evidence, machine wording, corrections, review state
+  and decision events. Corrections do not rewrite source assets or machine evidence.
+- Review displays source previews/excerpts/timestamps. Open the source to play,
+  inspect, Share, Save to Gallery or Save to Files. Multi-source sharing sends
+  originals via temporary content URI grants; it does not trim clips or auto-upload.
+- Index removal preserves review decisions and installed models, but removes derived
+  source excerpts/vectors/suggestions. Reauthorization and rescan can rebuild evidence.
+- Metrics distinguish sharing requests from verified recipient receipt. The app shows
+  accepted/corrected/requested discoveries per 100 currently indexed assets. Automated
+  fixture decisions do not measure real-user usefulness, time saved or satisfaction.
+
+Executed results and signed release identity are recorded in DISCOVERY_RESULTS.txt.
+No physical phone is attached. Thermal/battery scheduling is implemented but has
+not been benchmarked on a flagship; inference remains CPU ONNX Runtime. GPU/NPU
+acceleration is not claimed. Android's JobScheduler defers work under OS restrictions;
+force-stop resumes on the next app launch, not while the app remains force-stopped.
+

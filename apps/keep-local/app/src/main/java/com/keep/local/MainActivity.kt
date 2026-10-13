@@ -90,18 +90,25 @@ class MainActivity : Activity() {
         })
         status = text("Your memories stay on this device", 12, sub)
         top.addView(status)
+        val capture = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility=View.GONE }
+        val nav=horizontal()
+        nav.addView(actionButton("Library",nav){query.setText("");filter.setSelection(0)})
+        nav.addView(actionButton("Worth Reviewing",nav){startActivity(Intent(this,ReviewActivity::class.java))})
+        nav.addView(actionButton("Capture",nav){capture.visibility=if(capture.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
+        top.addView(nav)
+        top.addView(Button(this).apply{text="Settings · sources and indexing";isAllCaps=false;setOnClickListener{startActivity(Intent(this@MainActivity,LibrarySettingsActivity::class.java))}})
         val actions1 = horizontal()
         actions1.addView(actionButton("+ Note", actions1) { startActivity(Intent(this, EditorActivity::class.java)) })
         actions1.addView(actionButton("Import", actions1) { importMedia() })
         actions1.addView(actionButton("Dictate", actions1) { dictateOffline() })
-        top.addView(actions1)
+        capture.addView(actions1)
         val actions2 = horizontal()
         voiceButton = actionButton("● Voice", actions2) { captureVoice() }
         screenButton = actionButton("▣ Screen", actions2) { captureScreen() }
         actions2.addView(voiceButton)
         actions2.addView(screenButton)
-        actions2.addView(actionButton("Visual memory", actions2) { startActivity(Intent(this, ModelsActivity::class.java)) })
-        top.addView(actions2)
+        
+        capture.addView(actions2)
         micCheckbox = CheckBox(this).apply {
             text = "Include microphone in screen recording (not app audio)"
             textSize = 12f
@@ -109,7 +116,8 @@ class MainActivity : Activity() {
             isChecked = savedPrefs().getBoolean("mic_screen", false)
             setOnCheckedChangeListener { _, yes -> savedPrefs().edit().putBoolean("mic_screen", yes).apply() }
         }
-        top.addView(micCheckbox)
+        capture.addView(micCheckbox)
+        top.addView(capture)
         query = EditText(this).apply {
             id = R.id.search_query
             setSingleLine(true)

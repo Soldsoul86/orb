@@ -32,6 +32,7 @@ class EditorActivity : MediaActionsActivity() {
         window.statusBarColor = Color.rgb(16, 20, 27)
         window.navigationBarColor = Color.rgb(16, 20, 27)
         item = intent.getLongExtra("id", -1L).takeIf { it > 0 }?.let { MemoryDb.get(this).get(it) }
+        if(item?.let{MediaSource.external(it)&&!CreativeSearch.available(this,it)}==true){ Toast.makeText(this,"Source access unavailable",Toast.LENGTH_LONG).show();finish();return }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(16, 20, 27))
@@ -47,6 +48,7 @@ class EditorActivity : MediaActionsActivity() {
             val i = item!!
             root.addView(text("${i.kind.uppercase()}  ·  ${DateFormat.getDateTimeInstance().format(Date(i.createdAt))}", 13, secondary))
             root.addView(text("Source: ${i.source}", 13, secondary))
+            if(MediaSource.external(i)) MemoryDb.get(this).readableDatabase.rawQuery("SELECT group_path,state,error FROM source_items WHERE memory_id=?",arrayOf(i.id.toString())).use{r->if(r.moveToFirst())root.addView(text("Folder/document: ${r.getString(0)}\n${r.getString(1)} · ${r.getString(2).orEmpty()}",13,secondary))}
             MemoryDb.get(this).readableDatabase.rawQuery("SELECT asset_uuid,state FROM assets WHERE memory_id=?",arrayOf(i.id.toString())).use { a ->
                 if(a.moveToFirst())root.addView(text("Asset ${a.getString(0)} · visual ${a.getString(1)}",11,secondary))
             }
@@ -112,12 +114,12 @@ class EditorActivity : MediaActionsActivity() {
         } else if (i?.kind in listOf("audio", "video")) {
             root.addView(text("Searchable captions require a note or visible video text. Automatic audio transcription is not included in this build.", 13, secondary))
         }
-        if (i != null) root.addView(button("Delete permanently", root) {
+        if (i != null) root.addView(button(if(MediaSource.external(i)) "Exclude from memory" else "Delete permanently", root) {
             AlertDialog.Builder(this)
-                .setTitle("Delete this memory?")
-                .setMessage("The original file and its index will be deleted from this phone. This cannot be undone.")
+                .setTitle(if(MediaSource.external(i)) "Exclude this file?" else "Delete this memory?")
+                .setMessage(if(MediaSource.external(i)) "Only this reference and its derived index will be excluded. The original stays unchanged." else "The original file and its index will be deleted from this phone. This cannot be undone.")
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Delete") { _, _ -> delete() }
+                .setPositiveButton(if(MediaSource.external(i)) "Exclude" else "Delete") { _, _ -> delete() }
                 .show()
         })
     }
@@ -148,7 +150,7 @@ class EditorActivity : MediaActionsActivity() {
         val i = item ?: return
         try {
             val intent = if (i.path != null) {
-                if (AppFiles.safeFile(this, i.path) == null) error("File no longer available")
+                MediaSource.check(this,i)
                 Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(AppFiles.itemUri(i.id), i.mime ?: "application/octet-stream")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -164,6 +166,7 @@ class EditorActivity : MediaActionsActivity() {
 
     private fun delete() {
         val i = item ?: return
+        if(MediaSource.external(i)){ AuthorizedLibrary.exclude(this,i.id);finish();return }
         val file = AppFiles.safeFile(this, i.path)
         if (file != null && !file.delete()) {
             Toast.makeText(this, "Cannot delete original file", Toast.LENGTH_LONG).show(); return

@@ -1,4 +1,4 @@
-name: Sign and Verify Keep Local Creative Memory
+name: Sign and Verify Keep Local 0.4 Discovery
 on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
@@ -28,24 +28,26 @@ jobs:
       - run: sdkmanager 'build-tools;35.0.0'
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38363198553
+          run-id: 38394037385
           github-token: ${{ github.token }}
           name: creative-build
           path: apps/keep-local/compiled
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38363198553
+          run-id: 38394037385
           github-token: ${{ github.token }}
           name: creative-test-fixtures-NOT-PHONE-UPDATE
           path: apps/keep-local/fixtures
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38276184828
+          run-id: 38364349728
           github-token: ${{ github.token }}
-          name: Keep-Local-Next-installable-APK
+          name: Keep-Local-0.3.0-signed-APK
           path: apps/keep-local/previous
       - name: Sign exact built APKs using public detached responses
         run: bash scripts/signing/sign-built-apks.sh
+      - name: Package committed source
+        run: git -C ../.. archive --format=zip --output=apps/keep-local/delivery/Keep-Local-0.4.0-source.zip HEAD apps/keep-local .github/workflows/keep-local-compile.yml .github/workflows/keep-local-android.yml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -54,7 +56,7 @@ jobs:
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: Keep-Local-0.3.0-signed-APK
+          name: Keep-Local-0.4.0-signed-APK
           path: apps/keep-local/delivery/
           retention-days: 90
       - uses: actions/upload-artifact@v4
@@ -85,7 +87,7 @@ jobs:
           path: creative-fixtures
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38363198553
+          run-id: 38394037385
           github-token: ${{ github.token }}
           name: visual-model-pack
           path: model-pack

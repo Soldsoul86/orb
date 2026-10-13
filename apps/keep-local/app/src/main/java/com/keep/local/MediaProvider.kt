@@ -18,14 +18,14 @@ class MediaProvider : ContentProvider() {
             throw FileNotFoundException("Invalid item URI")
         }
         val id = uri.lastPathSegment?.toLongOrNull() ?: throw FileNotFoundException("Invalid id")
-        return MemoryDb.get(requireNotNull(context)).get(id) ?: throw FileNotFoundException("Deleted item")
+        val memory = MemoryDb.get(requireNotNull(context)).get(id) ?: throw FileNotFoundException("Deleted item")
+        if (MediaSource.external(memory)) MediaSource.check(requireNotNull(context), memory) // also enforce Android selected-photo revocation before disclosing metadata
+        return memory
     }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (mode != "r") throw FileNotFoundException("Read-only provider")
-        val file = AppFiles.safeFile(requireNotNull(context), item(uri).path)
-            ?: throw FileNotFoundException("No local media")
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        return MediaSource.descriptor(requireNotNull(context), item(uri))
     }
 
     override fun getType(uri: Uri): String = MediaExport.mime(item(uri))
@@ -36,7 +36,7 @@ class MediaProvider : ContentProvider() {
         c.addRow(cols.map {
             when (it) {
                 OpenableColumns.DISPLAY_NAME -> MediaExport.filename(memory)
-                OpenableColumns.SIZE -> AppFiles.safeFile(requireNotNull(context), memory.path)?.length()
+                OpenableColumns.SIZE -> memory.bytes
                 else -> null
             }
         })

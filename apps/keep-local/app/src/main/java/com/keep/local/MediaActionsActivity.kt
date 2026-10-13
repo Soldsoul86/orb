@@ -52,7 +52,7 @@ abstract class MediaActionsActivity : Activity() {
                 message("Finish or cancel the current export first.")
             } else try {
                 val fresh = MemoryDb.get(this).get(item.id) ?: throw FileNotFoundException()
-                MediaExport.source(this, fresh)
+                MediaSource.check(this, fresh)
                 pendingItemId = item.id
                 startActivityForResult(MediaExport.destinationIntent(fresh), CREATE_DOCUMENT)
             } catch (_: Exception) {

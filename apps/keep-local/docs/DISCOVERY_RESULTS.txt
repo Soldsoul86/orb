@@ -1,0 +1,161 @@
+Keep Local 0.4.0 — verified release evidence, 2026-10-13
+Your creative memory.
+
+APK and committed source
+------------------------
+Signed APK bundle (APK, SHA256SUMS, install notes and source ZIP):
+https://github.com/Soldsoul86/orb/actions/runs/38394887256/artifacts/11811169811
+Source / implementation review: https://github.com/Soldsoul86/orb/pull/5
+Compiled source: 2a4dcd24ea52434b9dae7a66703b561770deab09
+Release/signing/source-package commit: 6fa0a6a6b873d1722b44473edd95370e02f0b846
+APK SHA-256:
+86b01e6cf1655b535c6d74ec890ab78c7738b03edfcacf21874c71ba10bacce9
+Unsigned APK SHA-256:
+5032860db4780c1e680af1bc6bd3e9eb1f2528a351ca49074dd91589d0bc0b8f
+
+Install Keep-Local-0.4.0.apk over 0.3.0. Do not uninstall first.
+Package AND namespace: com.keep.local.next, unchanged. Version code 4.
+Signer certificate SHA-256, identical to the delivered 0.3.0 APK:
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d
+The separate older com.keep.local app is not updated or accessed; keep it installed.
+This is a signed, debuggable testing APK. Private signing credentials were not
+committed or uploaded; CI uses only public, exact-content detached signatures.
+
+Build and upgrade evidence
+--------------------------
+Compilation / tests / lint: https://github.com/Soldsoul86/orb/actions/runs/38394037385
+Signed release / real-certificate upgrade tests:
+https://github.com/Soldsoul86/orb/actions/runs/38394887256
+JDK17, SDK36, build-tools35.0.0, checked Gradle wrapper and pinned dependencies.
+9 JVM tests passed; Android lint passed; SQLite/FTS/migration contracts passed.
+22 instrumentation executions passed on EACH API29 and API36 emulator (44 total).
+These are 20 distinct test methods per platform; indexing and review restart tests
+run twice in separate processes around an actual force-stop and relaunch.
+
+Both final emulator runs installed the ACTUAL delivered 0.3.0 APK, then used
+adb install -r for the signed 0.4.0 APK. The baseline was NOT re-signed for these
+final runs. Its SHA-256 was pinned and verified:
+0a216042706e546794f9791e3be6ed6d3096d8587fee0f2f5e14e9116a83ff60
+The additive v2 -> v3 database migration retained a seeded CAD Test video,
+its exact asset UUID, a prior derived-row sentinel and metadata. Original video
+bytes and every installed model file were compared before/after upgrade.
+This is fixture-data preservation evidence, not a test of the user's actual phone.
+No destructive migration, application-ID change or signing-identity change.
+
+Verified on both emulators
+--------------------------
+- Capture, note search, recording lifecycle, playback, original Share, Gallery
+  and Files export; duplicate names, cancellation and missing-file handling.
+- 256 MiB file streaming on Android; 300 MiB generated-stream JVM test plus
+  simulated truncation/cancellation/full-destination errors. No real full-phone
+  storage exhaustion was induced.
+- Scoped MediaStore references, stable URI/asset IDs on rescans, exclusions,
+  read-only system-folder selection and persisted grants. OS grant revocation
+  removed derived excerpts and blocked subsequent access/sharing.
+- 100/105-file checkpoint followed by actual process death; reopening resumed
+  discovery and visual indexing. All 105 source files were byte-identical.
+- Native PDF OCR and DOCX/text parsing; bounded input and unsupported formats.
+- Real CLIP image/video indexing and visual-only retrieval with timestamps;
+  existing private capture, text search and export tests continue to pass.
+- Evidence-linked document clues, possible experience groups and reusable visual
+  pairs generated from actual fixture content and metadata, not titles/tags.
+- Source screens opened through Review; Keep, Correct and Dismiss performed through
+  visible UI gestures. Machine evidence/source records stayed unchanged.
+- Decisions and corrections survived process death; dismissal/duplicate suppression
+  persisted; missing/bad source references were rejected. Stale scan cursors wrap.
+- Removing the derived index preserved originals, models and human review decisions.
+- Tests ran with airplane mode enabled, Wi-Fi/data disabled. Packaged manifest
+  excludes INTERNET/all-files/accessibility/location permissions and app backups.
+
+Feature demonstration and raw evidence
+--------------------------------------
+Android10 logs, screenshots and JSON:
+https://github.com/Soldsoul86/orb/actions/runs/38394887256/artifacts/11811411487
+Android16 logs, screenshots and JSON:
+https://github.com/Soldsoul86/orb/actions/runs/38394887256/artifacts/11811701396
+Signing/packaged-manifest evidence:
+https://github.com/Soldsoul86/orb/actions/runs/38394887256/artifacts/11811279702
+Files include discovery-review.png, discovery-benchmark.json, review-before.txt,
+review-after.txt, library-tests.txt, restart-before/after.txt, tests.txt,
+models-before/after.txt, upgrade.txt, visual-benchmark.json and original readback.
+DISCOVERY_BENCHMARKS.json in this repository preserves the raw measured summaries.
+GitHub artifacts have retention limits; the release bundle is retained 90 days.
+
+Measured fixture results (emulators, NOT physical flagship benchmarks)
+--------------------------------------------------------------------
+Discovery corpus: four real scikit-image photographs, a 12-second constructed
+scene montage, three fixture documents, and the retained CAD Test surrogate
+video as another available source. Filenames are opaque; production rules never
+look for fixture filenames or example queries. Embedded capture clocks support
+three photos close in time, with a photo three days later as a grouping negative.
+The document negative contains no warranty/receipt/date clues.
+
+Measure                                             Android10       Android16
+Literal document suggestions                        2               2
+Capture-time experience groups                      1               1
+Reusable visual pairs                               4               4
+Strict labeled visual pair matches                  3/4             4/4
+Matches allowing 100ms scene-boundary uncertainty    4/4             4/4
+Unsupported pairs after that tolerance               0               0
+Duplicate suggestions on three repeat passes         0               0
+Indexing 4 photos + 6 sampled video frames            2093 ms         1992 ms
+Discovery rule/similarity pass                       296 ms          126 ms
+Demo elapsed to first batch (includes authorization) 8966 ms         8444 ms
+Discovery-process peak RSS (VmHWM)                   382260 KiB      355548 KiB
+PSS sampled after indexing/model unload              76456 KiB       85183 KiB
+Allocated database/WAL/SHM file growth                0 bytes         0 bytes
+
+Android10 selected a neighboring cat frame at the montage's 4-second cut; the
+strict interval label at 4 seconds is coffee. This is recorded as one strict
+mismatch, not silently discarded. The 100ms tolerance is just over one 12fps
+frame. Approximate sampled timestamps are not precise action boundaries.
+Database file growth reused pages from earlier checkpoint fixtures; zero allocated
+file growth does NOT mean the new index consumes no storage. Thumbnail-cache
+storage was not isolated in this benchmark. No large-library scaling claim.
+
+Preserved visual-search benchmark: 4/4 image top-1 queries and 1/1 correct video
+on both emulators, with the coffee result at 6000ms inside the labeled 4000–8000ms
+scene. Four warm queries took 705ms / 673ms. Normalized video indexing took
+8045ms / 5790ms per minute, extrapolated from a 12-second, six-frame fixture;
+this is not a measured full-minute, real-world video benchmark. The separate
+visual-search process peaked at 520096 / 470904 KiB RSS. One/two CPU-thread
+load-plus-inference microbenchmarks were 595/317ms and 489/310ms respectively.
+Model files total 155008455 bytes, unchanged from 0.3. Existing CLIP/ONNX architecture
+and licenses are documented in MODELS_AND_LICENSES.txt; no model was added.
+
+Limitations and unverified work
+------------------------------
+No physical device was attached. Phone installation, actual user-recording
+preservation, Play Protect behavior, real-library usefulness, battery/thermals,
+large-library latency and recipient-specific uploads remain UNVERIFIED.
+Single-item sharing/export is instrumented; Review's multi-item sharing is
+implemented but third-party interoperability is not verified.
+All review decisions above are automated fixture decisions. They do not establish
+useful discoveries accepted per 100 real assets, dismissal preference, time saved,
+or a general precision/recall rate. No action recognition or identity inference.
+
+Saved-audio transcription is INCOMPLETE/unsupported; audio metadata/playback/export
+work. English literal document rules and Latin OCR are limited. PDF OCR covers
+only the first 20 pages; UTF-8 text/DOCX limits and unsupported DOC/XLS/PPT/archive,
+encrypted/non-seekable formats are detailed in DISCOVERY_04.txt. New authorized
+photos/videos use CLIP and metadata; automatic OCR for those external visual
+sources is not added. Existing private-import OCR remains available.
+
+Similarity thresholds are uncalibrated and candidate batches are bounded, not
+exhaustive all-pairs retrieval. Experience groups can miss page-boundary relations.
+Folder exclusions use explicit path/document-ID prefixes. URI aliases can represent
+the same physical file; references are idempotent per URI and visual-pair suppression
+uses exact byte hashes. Sources changed without provider size/modification changes
+need a derived-index rebuild. Storage indicators show database and model components;
+thumbnail-cache usage is not separately presented. CPU inference is verified;
+GPU/NPU acceleration and real-device energy gains are not claimed.
+
+The unrelated Orb 'verify' workflow still fails in scripts/simulate-hard-exit.mjs
+at event.risk.measured.toFixed. Keep Local's dedicated build/sign/emulator pipelines
+pass. No unrelated trading-runtime source was changed.
+
+Next smallest improvement: an opt-in physical-phone pilot with a small personal
+library, measuring accepted/acted-on discoveries per 100 indexed assets and
+labelling dismissals. Tune queue priorities and similarity thresholds from that
+feedback before adding another model or discovery type. See DISCOVERY_PHONE_CHECKS.txt.
+Never disable Play Protect or device security protections for installation.

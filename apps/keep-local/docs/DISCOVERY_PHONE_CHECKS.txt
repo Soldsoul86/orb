@@ -1,0 +1,40 @@
+Keep Local 0.4 — remaining physical-device acceptance
+
+No physical Android device was attached during development. Emulator results
+cannot establish battery life, thermals, Play Protect status or compatibility
+with a particular phone or third-party receiving app.
+
+1. Keep the existing application installed. Install the supplied 0.4.0 APK over
+   com.keep.local.next / 0.3.0. If Android rejects the update, retain the app and
+   report the exact installer message; do not uninstall to resolve a mismatch.
+   The separate older com.keep.local application is not accessed or upgraded.
+2. Open several existing recordings and confirm playback, titles and notes.
+   Confirm the previously installed visual model pack is still available.
+3. In Settings, authorize only desired categories and a small document folder.
+   Test denial of another category and Android's selected-photo access option.
+4. Start indexing, pause, resume, close and reopen the application. Search while
+   indexing is incomplete. Observe progress, storage and responsiveness.
+5. In airplane mode, open Worth Reviewing. Inspect the source evidence, Keep
+   one useful suggestion, Correct another and Dismiss an unwanted/duplicate one.
+   Restart and confirm the decisions persist. Check that dismissal stays suppressed.
+6. Play a timestamped video source. Test single and multiple-item Sharesheet
+   attachments in the actual receiving apps. Save a video to Gallery/Files and
+   attach it manually when a receiver does not accept the shared content URI.
+   A Sharesheet launch alone does not prove a successful third-party upload.
+7. Revoke the document folder through Manage authorized sources and revoke a
+   category in Android permission settings. Confirm unavailable sources and their
+   derived content disappear from search/review. Originals must remain unchanged.
+8. Remove the derived index. Confirm originals, notes, models and human decisions
+   remain; rebuild only if desired. Do not use Android Clear storage for this test.
+9. With a larger consented library, measure time to first useful discovery,
+   accepted/acted-on discoveries per 100 indexed assets, dismissal rate, unsupported
+   claims, indexing time, peak memory, storage growth, battery drain and thermals.
+
+Do not disable Play Protect or device security protections. English literal
+rules, Latin PDF OCR, sampled-frame CLIP similarity and bounded candidate batches
+have the limits described in DISCOVERY_04.txt. No action/identity inference,
+saved-audio transcription or new model is claimed.
+
+Recommended next smallest improvement: run a small opt-in personal-library pilot,
+label accepted/dismissed suggestions, and tune queue priorities and similarity
+thresholds from that evidence before adding another model or discovery category.

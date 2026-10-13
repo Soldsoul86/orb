@@ -32,7 +32,7 @@ object ExportNames {
             copied += count
         }
         checkCancelled()
-        if (copied != expected) throw IOException("Source changed during export")
+        if (expected >= 0 && copied != expected) throw IOException("Source changed during export")
         output.flush()
         return copied
     }

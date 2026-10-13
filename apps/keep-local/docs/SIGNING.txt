@@ -1,4 +1,4 @@
-The 0.3.0 release retains com.keep.local.next and certificate SHA-256
+The 0.4.0 release retains com.keep.local.next and certificate SHA-256
 37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d.
 
 Private key: recovered from the 0.2.0 encrypted backup into the private workspace.

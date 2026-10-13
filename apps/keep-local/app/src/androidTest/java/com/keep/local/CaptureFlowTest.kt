@@ -24,6 +24,7 @@ class CaptureFlowTest {
         val body = "Remember budget deadlines tomorrow"
         try {
             ActivityScenario.launch(MainActivity::class.java).use {
+                onView(withText("Capture")).perform(click())
                 onView(withText("+ Note")).perform(click())
                 onView(withId(R.id.memory_title)).perform(replaceText(title))
                 onView(withId(R.id.memory_note)).perform(replaceText(body), closeSoftKeyboard())
@@ -65,8 +66,10 @@ class CaptureFlowTest {
         val permissions = context.packageManager.getPackageInfo(context.packageName,
             PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
         for (permission in listOf(Manifest.permission.INTERNET,
-            Manifest.permission.MANAGE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.MANAGE_EXTERNAL_STORAGE,
             Manifest.permission.SYSTEM_ALERT_WINDOW)) assertFalse(permission, permission in permissions)
+        assertTrue(Manifest.permission.READ_MEDIA_IMAGES in permissions)
+        assertTrue(Manifest.permission.READ_MEDIA_VIDEO in permissions)
         assertNull(AppFiles.safeFile(context, "../databases/memories.db"))
     }
 }
