@@ -13,6 +13,7 @@ object IndexSchema {
             memory_id INTEGER PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
             attempts INTEGER NOT NULL DEFAULT 0, retry_at INTEGER NOT NULL DEFAULT 0,
             error TEXT)""")
+        db.execSQL("CREATE TABLE IF NOT EXISTS index_source_revision (memory_id INTEGER PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE, generation INTEGER NOT NULL)")
         db.execSQL("""CREATE TABLE IF NOT EXISTS index_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT, committed_at INTEGER NOT NULL,
             stage TEXT NOT NULL, kind TEXT NOT NULL, elapsed_ms INTEGER NOT NULL,

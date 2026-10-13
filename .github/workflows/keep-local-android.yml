@@ -55,6 +55,7 @@ jobs:
         run: |
           python3 core-tests/db_contract.py
           python3 core-tests/library_contract.py
+          python3 core-tests/indexing_contract.py
           bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
       - name: Summarize JVM test results
         run: |

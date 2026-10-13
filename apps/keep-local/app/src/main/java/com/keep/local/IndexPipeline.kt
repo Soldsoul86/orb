@@ -19,6 +19,7 @@ object IndexPipeline {
             val id=IndexProgress.next(c,"'image','video'")
             if(id!=null) {
                 try{VisualIndexJob.indexOne(c,id,encoder(),stop)}
+                catch(e:OutOfMemoryError){IndexProgress.failed(c,id,e);throw IndexDeferred()}
                 catch(e:IndexDeferred){throw e}
                 catch(e:SecurityException){AuthorizedLibrary.invalidate(c,id)}
                 catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)AuthorizedLibrary.invalidate(c,id)else IndexProgress.failed(c,id,e)}

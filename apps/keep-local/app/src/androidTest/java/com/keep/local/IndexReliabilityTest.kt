@@ -104,6 +104,53 @@ class IndexReliabilityTest {
             assertTrue(file.exists())
         }finally{IndexProgress.activeStop=null;MemoryDb.get(c).remove(id);file.delete()}
     }
+    @Test fun corruptOriginalDoesNotBlockFollowingImage(){
+        VisualIndex.setEnabled(c,false)
+        val bad=File(c.filesDir,"media/reliability-bad.jpg").apply{parentFile!!.mkdirs();writeText("not a JPEG")}
+        val good=File(c.filesDir,"media/reliability-good.jpg").apply{inst.context.assets.open("a.jpg").use{input->outputStream().use{input.copyTo(it)}}}
+        val a=MemoryDb.get(c).add("image","corrupt fixture",path="media/reliability-bad.jpg",mime="image/jpeg")
+        val b=MemoryDb.get(c).add("image","healthy fixture",path="media/reliability-good.jpg",mime="image/jpeg")
+        d.execSQL("UPDATE assets SET updated_at=-1000 WHERE memory_id=?",arrayOf(a));d.execSQL("UPDATE assets SET updated_at=-999 WHERE memory_id=?",arrayOf(b))
+        try{
+            ClipEncoder(c).use{model->
+                assertEquals(a,IndexProgress.next(c,"'image','video'"))
+                IndexPipeline.round(c,AtomicBoolean(false)){model}
+                assertEquals(1L,value("SELECT attempts FROM index_retry WHERE memory_id=$a"))
+                assertTrue(value("SELECT retry_at FROM index_retry WHERE memory_id=$a")>System.currentTimeMillis())
+                IndexPipeline.round(c,AtomicBoolean(false)){model}
+                assertEquals(1L,value("SELECT count(*) FROM assets WHERE memory_id=$b AND state='ready'"))
+            }
+            assertTrue(bad.exists());assertTrue(good.exists())
+        }finally{MemoryDb.get(c).remove(a);MemoryDb.get(c).remove(b);bad.delete();good.delete()}
+    }
+    @Test fun sourceChangeDuringInferenceCannotCommitStaleEvidence(){
+        VisualIndex.setEnabled(c,false)
+        AuthorizedLibrary.permissions("image").filter{!it.endsWith("VISUAL_USER_SELECTED")}.forEach{inst.uiAutomation.grantRuntimePermission(c.packageName,it)}
+        val uri=c.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,ContentValues().apply{put("_display_name","revision.jpg");put("mime_type","image/jpeg");put("relative_path","Pictures/KeepLocalRevision/");put("is_pending",1)})!!
+        c.contentResolver.openOutputStream(uri)!!.use{out->inst.context.assets.open("a.jpg").use{it.copyTo(out)}}
+        c.contentResolver.update(uri,ContentValues().apply{put("is_pending",0)},null,null)
+        val source=AuthorizedLibrary.enableMedia(c,"image")
+        val epoch=value("SELECT scan_epoch FROM library_sources WHERE id=$source")
+        val id=AuthorizedLibrary.upsert(c,source,uri,"revision","image/jpeg",100,100,100,"media_added","Pictures/",epoch,1)
+        val uuid=d.rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=?",arrayOf(id.toString())).use{it.moveToFirst();it.getString(0)}
+        val fake=object:VisualEncoder{
+            override val modelId="test-revision-only"
+            override fun image(bitmap:Bitmap):FloatArray{
+                // Android 11+ can signal a change even when size and second-resolution mtime match.
+                assertEquals(id,AuthorizedLibrary.upsert(c,source,uri,"revision","image/jpeg",100,100,100,"media_added","Pictures/",epoch,2))
+                return FloatArray(512){1f}
+            }
+            override fun text(query:String)=FloatArray(512)
+            override fun close(){}
+        }
+        try{
+            VisualIndexJob.indexOne(c,id,fake,AtomicBoolean(false))
+            assertEquals(0L,value("SELECT count(*) FROM representations WHERE memory_id=$id"))
+            assertEquals(0L,value("SELECT next_ms FROM assets WHERE memory_id=$id"))
+            assertEquals(uuid,d.rawQuery("SELECT asset_uuid FROM assets WHERE memory_id=?",arrayOf(id.toString())).use{it.moveToFirst();it.getString(0)})
+            assertTrue(c.contentResolver.openInputStream(uri)!!.use{it.read()>=0})
+        }finally{MemoryDb.get(c).remove(id);c.contentResolver.delete(uri,null,null)}
+    }
     @Test fun v04ReviewAndSourceStateSurvivesMigration(){
         assertEquals(4L,value("PRAGMA user_version"))
         assertEquals(1L,value("SELECT count(*) FROM review_state WHERE discovery_id='upgrade-kept' AND status='kept'"))

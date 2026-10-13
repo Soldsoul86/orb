@@ -35,7 +35,7 @@ object AuthorizedLibrary {
         val id=d.rawQuery("SELECT id FROM library_sources WHERE source_key=?",arrayOf(key)).use{it.moveToFirst();it.getLong(0)}
         d.execSQL("UPDATE library_sources SET enabled=1 WHERE id=?",arrayOf(id));rescan(c,id);id
     }
-    fun rescan(c:Context,id:Long?=null,wake:Boolean=true) {
+    fun rescan(c:Context,id:Long?=null,wake:Boolean=true) = synchronized(VisualIndex) {
         val d=db(c);val where=if(id==null)"enabled=1 AND status NOT IN ('queued','processing')" else "enabled=1 AND id=$id AND status NOT IN ('queued','processing')"
         d.execSQL("DELETE FROM scan_folders WHERE source_id IN (SELECT id FROM library_sources WHERE $where)")
         d.execSQL("UPDATE library_sources SET status='queued',cursor=0,scan_epoch=scan_epoch+1,error=NULL WHERE $where")
@@ -98,10 +98,11 @@ object AuthorizedLibrary {
         if(d.rawQuery("SELECT name FROM sqlite_master WHERE name='discoveries'",null).use{it.moveToFirst()})d.delete("discoveries",null,null)
     }
     /** Idempotent URI identity; content changes invalidate only derived data. */
-    fun upsert(c:Context,source:Long,uri:Uri,title:String,mime:String,size:Long,modified:Long,time:Long,basis:String,group:String,epoch:Long):Long = synchronized(VisualIndex) {
+    fun upsert(c:Context,source:Long,uri:Uri,title:String,mime:String,size:Long,modified:Long,time:Long,basis:String,group:String,epoch:Long,generation:Long?=null):Long = synchronized(VisualIndex) {
         val d=db(c)
         if(!d.rawQuery("SELECT 1 FROM library_sources WHERE id=? AND enabled=1",arrayOf(source.toString())).use{it.moveToFirst()})return@synchronized -1L
         val fingerprint="$size:$modified"
+        val priorGeneration=d.rawQuery("SELECT ir.generation FROM index_source_revision ir JOIN source_items si ON si.memory_id=ir.memory_id WHERE si.uri=?",arrayOf(uri.toString())).use{if(it.moveToFirst())it.getLong(0)else null}
         val existing=d.rawQuery("SELECT memory_id,fingerprint,excluded,state FROM source_items WHERE uri=?",arrayOf(uri.toString())).use{if(it.moveToFirst())listOf(it.getLong(0).toString(),it.getString(1),it.getInt(2).toString(),it.getString(3))else null}
         val excludedBeforeRead=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{r->var yes=false;while(r.moveToNext())if(group.startsWith(r.getString(0)))yes=true;yes}
         if(excludedBeforeRead || existing?.get(2)=="1"){
@@ -112,7 +113,7 @@ object AuthorizedLibrary {
         val effectiveTime=time;val effectiveBasis=basis
         if(existing!=null){
             val id=existing[0].toLong()
-            if(existing[1]!=fingerprint||existing[3]=="access_revoked"){
+            if(existing[1]!=fingerprint||existing[3]=="access_revoked"||(generation!=null&&priorGeneration!=null&&generation!=priorGeneration)){
                 invalidate(c,id,"queued")
                 d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,effectiveTime,effectiveBasis,group,id))
                 d.execSQL("UPDATE memories SET bytes=?,mime=? WHERE id=?",arrayOf(size,mime,id))
@@ -120,6 +121,7 @@ object AuthorizedLibrary {
             d.execSQL("UPDATE source_items SET seen=?,group_path=? WHERE memory_id=?",arrayOf(epoch,group,id))
             val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{q->var yes=false;while(q.moveToNext())if(group.startsWith(q.getString(0)))yes=true;yes}
             if(blocked)exclude(c,id)
+            if(generation!=null)d.execSQL("INSERT OR REPLACE INTO index_source_revision VALUES(?,?)",arrayOf(id,generation))
             return@synchronized id
         }
         val excluded=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{r->var yes=false;while(r.moveToNext())if(group.startsWith(r.getString(0)))yes=true;yes}
@@ -128,6 +130,7 @@ object AuthorizedLibrary {
         d.beginTransaction();try{
             val id=MemoryDb.get(c).add(kind,title,source="Authorized device content",path=uri.toString(),mime=mime,bytes=size)
             d.insertOrThrow("source_items",null,ContentValues().apply{put("memory_id",id);put("source_id",source);put("uri",uri.toString());put("fingerprint",fingerprint);put("content_time",effectiveTime);put("time_basis",effectiveBasis);put("group_path",group);put("seen",epoch);put("excluded",if(excluded)1 else 0)})
+            if(generation!=null)d.execSQL("INSERT OR REPLACE INTO index_source_revision VALUES(?,?)",arrayOf(id,generation))
             d.setTransactionSuccessful();id
         }finally{d.endTransaction()}
     }
@@ -155,6 +158,7 @@ object AuthorizedLibrary {
         val d=db(c)
         val id=IndexProgress.next(c,"'file','audio'") ?: return false
         val started=SystemClock.elapsedRealtime()
+        val revision=IndexProgress.revision(c,id)
         IndexProgress.phase(c,"Extracting document text / checking audio support",id)
         try {
             val item=MemoryDb.get(c).get(id)?:return true
@@ -163,7 +167,7 @@ object AuthorizedLibrary {
             d.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             val text=if(item.kind=="audio")null else DocumentText.extract(c,item,stop)
             if(stop.get())return true
-            synchronized(VisualIndex){if(generation==c.getSharedPreferences("visual",0).getLong("generation",0) && (!MediaSource.external(item)||accessible(c,id))){
+            synchronized(VisualIndex){if(!stop.get() && MemoryDb.get(c).get(id)!=null && revision==IndexProgress.revision(c,id) && generation==c.getSharedPreferences("visual",0).getLong("generation",0) && (!MediaSource.external(item)||accessible(c,id))){
                 d.beginTransaction();try {
                 if(text!=null)MemoryDb.get(c).setExtracted(id,text)
                 d.execSQL("UPDATE assets SET state=? WHERE memory_id=?",arrayOf(if(text!=null)"ready" else "unsupported",id))
@@ -172,10 +176,11 @@ object AuthorizedLibrary {
                 d.setTransactionSuccessful()
                 }finally{d.endTransaction()}
             }}
-        }catch(e:IndexDeferred){throw e}catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){if(!stop.get())IndexProgress.failed(c,id,e)}
+        }catch(e:OutOfMemoryError){IndexProgress.failed(c,id,e);throw IndexDeferred()}catch(e:IndexDeferred){throw e}catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){if(!stop.get())IndexProgress.failed(c,id,e)}
         return true
     }
-    private fun completedScan(c:Context,id:Long,epoch:Long) {
+    private fun completedScan(c:Context,id:Long,epoch:Long) = synchronized(VisualIndex) {
+        if(!db(c).rawQuery("SELECT 1 FROM library_sources WHERE id=? AND scan_epoch=? AND enabled=1",arrayOf(id.toString(),epoch.toString())).use{it.moveToFirst()})return@synchronized
         db(c).execSQL("UPDATE library_sources SET status='completed',error=NULL WHERE id=?",arrayOf(id))
         db(c).rawQuery("SELECT memory_id FROM source_items WHERE source_id=? AND seen<>? AND excluded=0",arrayOf(id.toString(),epoch.toString())).use{while(it.moveToNext())invalidate(c,it.getLong(0))}
     }
@@ -183,6 +188,7 @@ object AuthorizedLibrary {
         val id=s[0].toLong();val epoch=s[3].toLong();val cursor=s[4].toLong()
         val collection=when(s[2]){"image"->MS.Images.Media.EXTERNAL_CONTENT_URI;"video"->MS.Video.Media.EXTERNAL_CONTENT_URI;else->MS.Audio.Media.EXTERNAL_CONTENT_URI}
         val cols=arrayOf("_id","_display_name","mime_type","_size","date_modified","date_added","relative_path") + if(s[2]!="audio")arrayOf("datetaken")else emptyArray()
+        val projection=cols + if(Build.VERSION.SDK_INT>=30)arrayOf("generation_modified")else emptyArray()
         var n=0;var last=cursor
         val args=android.os.Bundle().apply {
             putString(ContentResolver.QUERY_ARG_SQL_SELECTION,"_id>? AND is_pending=0")
@@ -192,12 +198,12 @@ object AuthorizedLibrary {
             putInt(ContentResolver.QUERY_ARG_LIMIT,100)
         }
         val d=db(c)
-        c.contentResolver.query(collection,cols,args,null)?.use{r->
+        c.contentResolver.query(collection,projection,args,null)?.use{r->
             synchronized(VisualIndex){
             d.beginTransaction();try {
             while(n<100&&!stop.get()&&r.moveToNext()){
                 last=r.getLong(0);val taken=if(s[2]!="audio")r.getLong(7) else 0L;val added=if(taken>0)taken else r.getLong(5)*1000
-                upsert(c,id,ContentUris.withAppendedId(collection,last),r.getString(1)?:"Untitled",r.getString(2)?:"application/octet-stream",r.getLong(3),r.getLong(4),added,if(taken>0)"capture_time" else "media_added",r.getString(6)?:"",epoch);n++
+                upsert(c,id,ContentUris.withAppendedId(collection,last),r.getString(1)?:"Untitled",r.getString(2)?:"application/octet-stream",r.getLong(3),r.getLong(4),added,if(taken>0)"capture_time" else "media_added",r.getString(6)?:"",epoch,if(Build.VERSION.SDK_INT>=30)r.getLong(cols.size)else null);n++
                             }
             d.execSQL("UPDATE library_sources SET status='processing',cursor=? WHERE id=?",arrayOf(last,id))
             d.setTransactionSuccessful()
@@ -213,10 +219,12 @@ object AuthorizedLibrary {
         if(folder==null){completedScan(c,id,epoch);return}
         val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(id.toString())).use{q->var yes=false;while(q.moveToNext())if(folder.first.startsWith(q.getString(0)))yes=true;yes}
         if(blocked){d.execSQL("UPDATE scan_folders SET done=1 WHERE source_id=? AND document_id=?",arrayOf(id,folder.first));return}
-        val uri=DC.buildChildDocumentsUriUsingTree(tree,folder.first);var n=0;var position=0
+        val uri=DC.buildChildDocumentsUriUsingTree(tree,folder.first);var n=0;var position=folder.second
         c.contentResolver.query(uri,arrayOf(DC.Document.COLUMN_DOCUMENT_ID,DC.Document.COLUMN_DISPLAY_NAME,DC.Document.COLUMN_MIME_TYPE,DC.Document.COLUMN_SIZE,DC.Document.COLUMN_LAST_MODIFIED),null,null,null)?.use{r->
+            // Absolute seek avoids transferring all earlier rows on every resumed page.
+            r.moveToPosition(folder.second-1)
             while(n<100&&!stop.get()&&r.moveToNext()){
-                if(position++<folder.second)continue
+                position++
                 val doc=r.getString(0);val mime=r.getString(2)?:"application/octet-stream"
                 val excluded=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(id.toString())).use{q->var yes=false;while(q.moveToNext())if(doc.startsWith(q.getString(0)))yes=true;yes}
                 if(!excluded){if(mime==DC.Document.MIME_TYPE_DIR)d.execSQL("INSERT OR IGNORE INTO scan_folders(source_id,document_id) VALUES(?,?)",arrayOf(id,doc)) else upsert(c,id,DC.buildDocumentUriUsingTree(tree,doc),r.getString(1)?:"Untitled",mime,r.getLong(3),r.getLong(4),r.getLong(4),"file_modified",doc,epoch)}

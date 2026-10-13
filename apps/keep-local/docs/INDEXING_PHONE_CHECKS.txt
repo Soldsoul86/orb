@@ -1,0 +1,39 @@
+Physical-phone acceptance — not yet executed by CI or the engineer
+
+Keep the current installation and its data. Do not uninstall, clear app data,
+remove the derived index, reinstall models, or disable Android security protections.
+
+1. Record Android version, phone model, available storage, battery/charging status,
+   approximate library size and model-installed status. Capture the existing CAD Test
+   recording, a search result and a Keep/Correct/Dismiss decision for comparison.
+2. Install the signed 0.4.1 APK over 0.4.0 (com.keep.local.next). If Android rejects
+   the update, stop and report the exact error; do not uninstall as a workaround.
+3. Confirm recordings play, prior review decisions remain and the model is installed.
+   Keep airplane mode enabled. Open Settings, copy the indexing diagnostics.
+4. Tap Start / resume once. Avoid Rescan and Retry initially. Keep app visible and
+   phone cool for a controlled 5-minute observation, noting battery/charging.
+5. Copy diagnostics at start and after ~1, 3 and 5 min. Discovered/basic counts may
+   grow while deep processing advances; look for recent committed units, last commit
+   and newly fully indexed images/documents. Large videos may have partial checkpoints.
+6. Search a known discovered filename and a previously indexed visual result before
+   the library completes. Confirm basic search works even while deep work remains.
+7. Pause during active processing. Verify no additional unit starts, worker settles
+   to zero currently processing, and committed counts stop advancing. One in-flight
+   platform decode/inference may need to return before cancellation settles.
+8. Force-stop through Android app settings; reopen. It must stay paused. Resume once;
+   completed units and inventory cursor must be retained, with no duplicated entries.
+9. Add one photo, one short video and one text document to authorized sources. Use
+   Rescan; confirm new items become basic-searchable and reach supported deep states.
+   Edit a test file; verify its stable asset remains and derived data refreshes.
+10. Revoke a disposable test folder grant. Its sources must become unavailable and
+    no longer appear in search/share. Unrelated sources and originals remain intact.
+11. Compare original bytes using Android Files or a trusted checksum tool if available.
+    Check recording playback and existing Keep/Correct/Dismiss history again.
+12. Share/export a test item, keeping Play Protect enabled. Actual ChatGPT/WhatsApp
+    attachment acceptance requires separate real-device verification.
+
+Report: committed units/time, fully indexed growth by kind, failed/unsupported/
+revoked counts, diagnostic error class, database/WAL size change, and whether Android
+scheduled work. Record heat/battery changes only as observations with duration and
+screen/charging state. Physical peak RAM needs adb/profiler access; do not infer it
+from emulator RSS. If stalled, send the copied diagnostic text rather than resetting.

@@ -85,7 +85,7 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(18), dp(16), dp(12))
         }
         top.addView(text("Keep Local", 30, fg).apply { typeface = Typeface.DEFAULT_BOLD })
-        top.addView(text("Your creative memory.   ·   Private / offline", 12, accent).apply {
+        top.addView(text("Remember what matters.   ·   Private / offline", 12, accent).apply {
             setPadding(0, dp(3), 0, dp(12))
         })
         status = text("Your memories stay on this device", 12, sub)

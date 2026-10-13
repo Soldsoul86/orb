@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object VisualIndex {
     const val JOB = 901
     fun enabled(c: Context) = c.getSharedPreferences("visual",0).getBoolean("enabled",false)
-    fun setEnabled(c: Context, yes: Boolean) { c.getSharedPreferences("visual",0).edit().putBoolean("enabled",yes).apply()
+    fun setEnabled(c: Context, yes: Boolean) { c.getSharedPreferences("visual",0).edit().putBoolean("enabled",yes).putBoolean("paused_explicitly",!yes).apply()
         if (yes) schedule(c) else { IndexProgress.activeStop?.set(true); c.getSystemService(JobScheduler::class.java).cancel(JOB) } }
     fun schedule(c: Context, delay:Long=1000, replace:Boolean=false) {
         if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c) && !MemoryDb.get(c).readableDatabase.rawQuery("SELECT 1 FROM memories WHERE kind='file' LIMIT 1",null).use{it.moveToFirst()})) return
@@ -108,6 +108,7 @@ class VisualIndexJob : JobService() {
             val db=MemoryDb.get(c).writableDatabase
             val item=MemoryDb.get(c).get(id) ?: return
             val source=MediaSource.uri(c,item)
+            val revision=IndexProgress.revision(c,id)
             if(MediaSource.external(item))db.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             var ms=0L;var hash:String?=null
             // Optional original-capture metadata is enrichment, never inventory I/O.
@@ -115,10 +116,12 @@ class VisualIndexJob : JobService() {
             val capture=if(needsCapture)CaptureMetadata.read(c,source)else null
             db.rawQuery("SELECT next_ms,sha256 FROM assets WHERE memory_id=?",arrayOf(id.toString())).use { if(!it.moveToFirst())return;ms=it.getLong(0);hash=it.getString(1) }
             if(hash==null) {
+                IndexProgress.phase(c,"Reading original checksum (cancellable)",id)
                 val digest=MessageDigest.getInstance("SHA-256")
                 MediaSource.open(c,item).use { input -> val buf=ByteArray(65536);while(true){if(stop.get())return;if(VoiceService.active||ScreenService.active||c.getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE)throw IndexDeferred();val n=input.read(buf);if(n<0)break;digest.update(buf,0,n)} }
                 hash=digest.digest().joinToString(""){"%02x".format(it)}
             }
+            IndexProgress.phase(c,"Decoding image / sampled video frame",id)
             var duration=0L
             val bitmap=if(item.kind=="image") ImageDecoder.decodeBitmap(ImageDecoder.createSource(c.contentResolver,source)) { decoder,info,_ ->
                 val scale=448f/maxOf(info.size.width,info.size.height);decoder.setTargetSize((info.size.width*scale).toInt().coerceAtLeast(1),(info.size.height*scale).toInt().coerceAtLeast(1));decoder.allocator=ImageDecoder.ALLOCATOR_SOFTWARE
@@ -132,18 +135,20 @@ class VisualIndexJob : JobService() {
             }
             try {
                 if(stop.get()) return
+                IndexProgress.phase(c,"Running local visual model",id)
                 val embedding=engine.image(bitmap)
                 if(stop.get()) return
                 val next=if(item.kind=="image")1 else ms+2000
                 val end=if(item.kind=="image")0 else minOf(ms+2000,duration)
                 val thumb=VisualIndex.thumbnail(c,id,ms);thumb.parentFile!!.mkdirs()
-                val small=Bitmap.createScaledBitmap(bitmap,160,(bitmap.height*160/bitmap.width).coerceAtLeast(1),true)
+                val thumbScale=160f/maxOf(bitmap.width,bitmap.height)
+                val small=Bitmap.createScaledBitmap(bitmap,(bitmap.width*thumbScale).toInt().coerceAtLeast(1),(bitmap.height*thumbScale).toInt().coerceAtLeast(1),true)
                 try { thumb.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG,75,it) } } finally { if(small!==bitmap)small.recycle() }
                 synchronized(VisualIndex) {
                 if(stop.get() || generation!=c.getSharedPreferences("visual",0).getLong("generation",0)) { thumb.delete(); return }
                 db.beginTransaction()
                 try {
-                    if(MemoryDb.get(c).get(id)==null || (MediaSource.external(item)&&!AuthorizedLibrary.accessible(c,id))) { thumb.delete(); return }
+                    if(revision!=IndexProgress.revision(c,id) || MemoryDb.get(c).get(id)==null || (MediaSource.external(item)&&!AuthorizedLibrary.accessible(c,id))) { thumb.delete(); return }
                     db.insertWithOnConflict("representations",null,ContentValues().apply {
                         put("memory_id",id);put("modality","visual");put("model_id",engine.modelId);put("start_ms",ms);put("end_ms",end)
                         put("vector",VisualIndex.blob(embedding));put("created_at",System.currentTimeMillis())
