@@ -20,7 +20,7 @@ class LibraryFixtureProvider:DocumentsProvider(){
     }
     override fun queryRoots(projection:Array<out String>?):Cursor {
         val cols=projection?:arrayOf(DC.Root.COLUMN_ROOT_ID,DC.Root.COLUMN_DOCUMENT_ID,DC.Root.COLUMN_TITLE,DC.Root.COLUMN_FLAGS,DC.Root.COLUMN_MIME_TYPES)
-        return MatrixCursor(cols).apply{addRow(cols.map{when(it){DC.Root.COLUMN_ROOT_ID->"fixtures";DC.Root.COLUMN_DOCUMENT_ID->"root";DC.Root.COLUMN_TITLE->"Keep Local fixtures";DC.Root.COLUMN_FLAGS->DC.Root.FLAG_SUPPORTS_IS_CHILD;DC.Root.COLUMN_MIME_TYPES->"*/*";else->null}})}
+        return MatrixCursor(cols).apply{addRow(cols.map{when(it){DC.Root.COLUMN_ROOT_ID->"fixtures";DC.Root.COLUMN_DOCUMENT_ID->"root";DC.Root.COLUMN_TITLE->"Keep Local fixtures";DC.Root.COLUMN_FLAGS->DC.Root.FLAG_SUPPORTS_IS_CHILD or DC.Root.FLAG_LOCAL_ONLY;DC.Root.COLUMN_MIME_TYPES->"*/*";else->null}})}
     }
     private fun row(out:MatrixCursor,id:String){out.addRow(out.columnNames.map{when(it){DC.Document.COLUMN_DOCUMENT_ID->id;DC.Document.COLUMN_DISPLAY_NAME->if(id=="root")"Keep Local fixtures" else id;DC.Document.COLUMN_MIME_TYPE->if(id=="root")DC.Document.MIME_TYPE_DIR else "text/plain";DC.Document.COLUMN_FLAGS->if(id=="root")DC.Document.FLAG_DIR_PREFERS_LAST_MODIFIED else 0;DC.Document.COLUMN_SIZE->if(id=="root")0 else File(folder(),id).length();DC.Document.COLUMN_LAST_MODIFIED->1700000000000L;else->null}})}
     private fun cols(projection:Array<out String>?)=projection?:arrayOf(DC.Document.COLUMN_DOCUMENT_ID,DC.Document.COLUMN_DISPLAY_NAME,DC.Document.COLUMN_MIME_TYPE,DC.Document.COLUMN_FLAGS,DC.Document.COLUMN_SIZE,DC.Document.COLUMN_LAST_MODIFIED)

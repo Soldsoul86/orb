@@ -21,10 +21,16 @@ object VisualIndex {
     fun schedule(c: Context) {
         if (!enabled(c) || (!ModelPack.ready(c) && !AuthorizedLibrary.hasSources(c) && !MemoryDb.get(c).readableDatabase.rawQuery("SELECT 1 FROM memories WHERE kind='file' LIMIT 1",null).use{it.moveToFirst()})) return
         val scheduler=c.getSystemService(JobScheduler::class.java)
-        if (scheduler.getPendingJob(JOB)!=null) return
+        val pending=scheduler.getPendingJob(JOB)
+        if (pending!=null && !pending.extras.getBoolean("rescan",false)) return
         scheduler.schedule(JobInfo.Builder(JOB, ComponentName(c, VisualIndexJob::class.java))
             .setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).setMinimumLatency(1000)
             .setBackoffCriteria(10000, JobInfo.BACKOFF_POLICY_LINEAR).build())
+    }
+    fun scheduleRescan(c:Context) {
+        if(!enabled(c)||!AuthorizedLibrary.hasSources(c))return
+        val extras=android.os.PersistableBundle().apply{putBoolean("rescan",true)}
+        c.getSystemService(JobScheduler::class.java).schedule(JobInfo.Builder(JOB,ComponentName(c,VisualIndexJob::class.java)).setExtras(extras).setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).setMinimumLatency(30*60*1000L).build())
     }
     fun status(c: Context): String {
         val db=MemoryDb.get(c).readableDatabase
@@ -54,6 +60,7 @@ class VisualIndexJob : JobService() {
         worker.execute {
             var again=false
             try { if(VisualIndex.enabled(this)) {
+                if(params.extras.getBoolean("rescan",false)) AuthorizedLibrary.rescan(this,wake=false)
                 val deadline=SystemClock.elapsedRealtime()+25000
                 while(!stop.get() && VisualIndex.enabled(this) && SystemClock.elapsedRealtime()<deadline) {
                     if(VoiceService.active || ScreenService.active || getSystemService(PowerManager::class.java).currentThermalStatus>=PowerManager.THERMAL_STATUS_SEVERE) {again=true;break}
@@ -70,7 +77,7 @@ class VisualIndexJob : JobService() {
                     }
                 }
             } } catch(e: OutOfMemoryError) { again=false } catch(e: Exception) { again=false }
-            finally { if(!stop.get()) jobFinished(params,again && VisualIndex.enabled(this)) }
+            finally { if(!stop.get()) { jobFinished(params,again && VisualIndex.enabled(this));if(!again)VisualIndex.scheduleRescan(this) } }
         }
         return true
     }

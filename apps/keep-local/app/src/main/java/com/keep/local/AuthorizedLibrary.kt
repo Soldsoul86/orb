@@ -35,12 +35,12 @@ object AuthorizedLibrary {
         val id=d.rawQuery("SELECT id FROM library_sources WHERE source_key=?",arrayOf(key)).use{it.moveToFirst();it.getLong(0)}
         d.execSQL("UPDATE library_sources SET enabled=1 WHERE id=?",arrayOf(id));rescan(c,id);id
     }
-    fun rescan(c:Context,id:Long?=null) {
+    fun rescan(c:Context,id:Long?=null,wake:Boolean=true) {
         val d=db(c);val where=if(id==null)"enabled=1" else "enabled=1 AND id=$id"
         d.execSQL("UPDATE library_sources SET status='queued',cursor=0,scan_epoch=scan_epoch+1,error=NULL WHERE $where")
         d.execSQL("DELETE FROM scan_folders WHERE source_id IN (SELECT id FROM library_sources WHERE $where)")
         d.execSQL("UPDATE source_items SET state='queued',error=NULL WHERE excluded=0 AND state IN ('failed','access_revoked','not_indexed') AND source_id IN (SELECT id FROM library_sources WHERE $where)")
-        VisualIndex.schedule(c)
+        if(wake)VisualIndex.schedule(c)
     }
     fun hasSources(c:Context)=db(c).rawQuery("SELECT 1 FROM library_sources WHERE enabled=1 LIMIT 1",null).use{it.moveToFirst()}
     fun accessible(c:Context,id:Long):Boolean {
