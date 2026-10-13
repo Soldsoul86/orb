@@ -23,7 +23,7 @@ data class MemoryItem(
 )
 
 /** App-private SQLite + local FTS4. Sources stay separate from AI/OCR extractions. */
-class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 1) {
+class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 2) {
     companion object {
         @Volatile private var instance: MemoryDb? = null
         fun get(context: Context): MemoryDb = instance ?: synchronized(this) {
@@ -69,10 +69,13 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
                 DELETE FROM memory_fts WHERE docid=old.id;
             END
         """.trimIndent())
+        CreativeSchema.create(db)
     }
 
+    override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        error("No schema migration defined from $oldVersion to $newVersion")
+        if (oldVersion < 2) CreativeSchema.create(db)
     }
 
     fun add(

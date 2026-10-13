@@ -47,6 +47,15 @@ class EditorActivity : MediaActionsActivity() {
             val i = item!!
             root.addView(text("${i.kind.uppercase()}  ·  ${DateFormat.getDateTimeInstance().format(Date(i.createdAt))}", 13, secondary))
             root.addView(text("Source: ${i.source}", 13, secondary))
+            MemoryDb.get(this).readableDatabase.rawQuery("SELECT asset_uuid,state FROM assets WHERE memory_id=?",arrayOf(i.id.toString())).use { a ->
+                if(a.moveToFirst())root.addView(text("Asset ${a.getString(0)} · visual ${a.getString(1)}",11,secondary))
+            }
+            val visualMs=intent.getLongExtra("visual_start_ms",-1)
+            if(visualMs>=0) {
+                root.addView(text("Matched image pixels${if(i.kind=="video") " near ${visualMs/1000}s" else ""}. Similarity is not proof of activity or identity.",13,secondary))
+                val thumb=VisualIndex.thumbnail(this,i.id,visualMs)
+                if(thumb.isFile) root.addView(android.widget.ImageView(this).apply { setImageBitmap(android.graphics.BitmapFactory.decodeFile(thumb.absolutePath));adjustViewBounds=true },LinearLayout.LayoutParams(-1,dp(150)))
+            }
             if (i.bytes > 0) root.addView(text("${CoreLogic.prettyBytes(i.bytes)}  ·  ${i.durationMs / 1000}s", 12, secondary))
             if (i.suggestion != null) root.addView(text("Suggestion: ${i.suggestion}", 13, Color.rgb(199, 192, 126)))
         }
@@ -69,7 +78,7 @@ class EditorActivity : MediaActionsActivity() {
             val seek = Regex("^@(\\d+)s —").find(matched ?: "")?.groupValues?.getOrNull(1)?.toLongOrNull() ?: 0L
             val play: (() -> Unit)? = if (i.kind in listOf("video", "audio")) ({
                 startActivity(Intent(this, PlaybackActivity::class.java)
-                    .putExtra("id", i.id).putExtra("start_ms", seek * 1000))
+                    .putExtra("id", i.id).putExtra("start_ms", intent.getLongExtra("visual_start_ms",-1).takeIf { it>=0 } ?: (seek * 1000)))
             }) else null
             addMediaActions(root, i, play)
         }

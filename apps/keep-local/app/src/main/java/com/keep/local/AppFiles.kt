@@ -16,7 +16,7 @@ import java.util.UUID
 
 /** Byte-streaming imports; no file or video is buffered entirely in memory. */
 object AppFiles {
-    private const val MAX_IMPORT_BYTES = 1_073_741_824L // 1 GiB per file
+    private const val MAX_IMPORT_BYTES = Long.MAX_VALUE // available storage is the limit
     private const val SAFETY_FREE_BYTES = 500L * 1024 * 1024
 
     fun mediaDir(context: Context): File = File(context.filesDir, "media").also { it.mkdirs() }
@@ -92,6 +92,8 @@ object AppFiles {
                     kind, title.ifBlank { "Imported $kind" }, source = source,
                     path = relativePath(context, file), mime = mime, bytes = count
                 )
+                MemoryDb.get(context).writableDatabase.execSQL("UPDATE assets SET origin_ref=? WHERE memory_id=?", arrayOf(uri.toString(),id))
+                runCatching { VisualIndex.schedule(context) }
                 // Indexing is best effort: a scheduler failure must not delete saved media.
                 if (kind == "image" || kind == "video") runCatching { scheduleOcr(context, id) }
                 id
