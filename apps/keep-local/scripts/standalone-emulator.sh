@@ -23,7 +23,7 @@ adb install "$artifact/original.apk"
 seed com.keep.local
 adb install "$artifact/app.apk" | tee "$evidence/side-by-side-install.txt"
 check_media com.keep.local
-adb shell am start -W -n com.keep.local.next/.MainActivity
+# Seed before first launch: an existing SQLite WAL can supersede an injected fixture DB.
 seed com.keep.local.next
 adb install "$artifact/tests.apk"
 timeout 240s adb shell am instrument -w com.keep.local.next.test/androidx.test.runner.AndroidJUnitRunner | tee "$evidence/standalone-tests.txt"

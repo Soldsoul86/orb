@@ -7,8 +7,8 @@ trap 'rm -rf "$work"' EXIT
 if [ -n "${KEEP_LOCAL_NEXT_KEYSTORE_BASE64:-}" ]; then
   printf '%s' "$KEEP_LOCAL_NEXT_KEYSTORE_BASE64" | base64 -d > "$work/keep-local-next.p12"
 else
-  test "${ALLOW_INITIAL_SIGNING:-false}" = true || { echo 'Signing backup must be restored to KEEP_LOCAL_NEXT_KEYSTORE_BASE64; refusing a replacement key.'; exit 1; }
-  keytool -genkeypair -storetype PKCS12 -keystore "$work/keep-local-next.p12" -storepass android -keypass android -alias keep-local-next -dname 'CN=Keep Local Next' -keyalg RSA -keysize 3072 -validity 10000 -noprompt
+  echo 'Restore the existing signing backup to KEEP_LOCAL_NEXT_KEYSTORE_BASE64; replacement keys are forbidden.'
+  exit 1
 fi
 # Only the recipient PUBLIC certificate is committed. The private decryption key
 # remains in the user's workspace, never in Git or an Actions artifact.
