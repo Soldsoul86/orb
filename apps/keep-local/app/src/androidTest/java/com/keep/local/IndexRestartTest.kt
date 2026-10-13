@@ -42,6 +42,8 @@ class IndexRestartTest {
                 val vectors=AuthorizedLibrary.db(c).rawQuery("SELECT count(*) FROM representations r JOIN memories m ON m.id=r.memory_id WHERE m.title LIKE 'resume-fixture-%' AND r.modality='visual'",null).use{it.moveToFirst();it.getInt(0)}
                 if(count==105&&vectors>0){resumed=true;break};Thread.sleep(250)
             }
+            println("RESTART_DIAGNOSTICS "+IndexProgress.report(c))
+            println("RESTART_COUNTS "+AuthorizedLibrary.db(c).rawQuery("SELECT state,count(*) FROM assets GROUP BY state",null).use{q->buildList{while(q.moveToNext())add(q.getString(0)+":"+q.getInt(1))}})
             VisualIndex.setEnabled(c,false)
             assertTrue("App relaunch must schedule and resume discovery + visual indexing",resumed)
             val expected=inst.context.assets.open("a.jpg").use{it.readBytes()}

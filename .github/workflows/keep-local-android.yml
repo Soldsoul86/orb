@@ -18,6 +18,20 @@ jobs:
         working-directory: apps/keep-local
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38404708024
+          github-token: ${{ github.token }}
+          name: creative-evidence-api-29
+          path: prior-failure
+      - name: Inspect prior Android 10 restart failure
+        working-directory: .
+        run: |
+          python3 - <<'PYLOG'
+          import pathlib,re
+          lines=pathlib.Path('prior-failure/logcat.txt').read_text(errors='replace').splitlines()
+          print('\n'.join(x for x in lines if re.search(r'SQLiteLog|VisualIndex|com.keep.local.next|FATAL EXCEPTION|JobScheduler',x))[-28000:])
+          PYLOG
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
