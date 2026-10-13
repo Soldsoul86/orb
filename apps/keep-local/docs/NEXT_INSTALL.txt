@@ -20,8 +20,10 @@ Retain BOTH the encrypted backup artifact and private recovery key outside chat.
 
 Future builds must restore the same keystore to the GitHub Actions secret
 KEEP_LOCAL_NEXT_KEYSTORE_BASE64. Alias keep-local-next, password android.
-The initial key generation flag is disabled after the first delivery and the
-new signing certificate is pinned. A missing key must block future signing.
+Replacement key generation is disabled and the existing signing certificate
+is pinned. The current workflow verifies the recovered APK byte-for-byte. A missing key must block future signing.
 
 Historical SHARE_EXPORT.txt describes the previous package's blocked update.
 Next is a separate application, not a workaround for Android's signature check.
+
+See NEXT_VALIDATION.txt for completed Android 10/16 verification and download.
