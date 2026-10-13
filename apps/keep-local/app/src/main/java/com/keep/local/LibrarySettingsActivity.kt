@@ -20,7 +20,7 @@ class LibrarySettingsActivity:Activity(){
     override fun onCreate(state:Bundle?){super.onCreate(state);pendingKind=state?.getString("kind");draw()}
     override fun onSaveInstanceState(out:Bundle){out.putString("kind",pendingKind);super.onSaveInstanceState(out)}
     private fun draw(){
-        root=LinearLayout(this).apply{orientation=1;setPadding(24,24,24,24)}
+        root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,24,24,24)}
         val scroll=ScrollView(this);scroll.addView(root);setContentView(scroll);WindowInsetsHelper.applyTo(scroll)
         label("Choose what Keep Local can remember.",24f)
         label("Only sources you authorize are read. Originals stay where they are. Everything is processed on this device; no location or identity is inferred.")
