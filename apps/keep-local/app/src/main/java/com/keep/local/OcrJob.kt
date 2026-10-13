@@ -31,13 +31,13 @@ class OcrJob : JobService() {
             var retry=false
             val generation=getSharedPreferences("visual",0).getLong("generation",0)
             try {
-                if (paused() || VoiceService.active || ScreenService.active || getSystemService(android.os.PowerManager::class.java).currentThermalStatus >= android.os.PowerManager.THERMAL_STATUS_SEVERE) { retry=true;return@execute }
+                if (paused() || IndexPipeline.restricted(this)) { retry=true;return@execute }
                 val id = params.extras.getLong("memory_id", -1)
                 val item = MemoryDb.get(this).get(id)
                 val file = item?.path?.let { AppFiles.safeFile(this, it) }
                 if (item != null && file != null && item.kind in listOf("image", "video")) {
                     val extracted = extractText(item, file, stopped)
-                    if (paused() || VoiceService.active || ScreenService.active) retry=true
+                    if (paused() || IndexPipeline.restricted(this)) retry=true
                     else synchronized(VisualIndex) { if (!stopped.get() && generation==getSharedPreferences("visual",0).getLong("generation",0)) MemoryDb.get(this).setExtracted(id, extracted) }
                 }
             } catch (_: Exception) { /* keep media even if OCR fails */ }
@@ -71,7 +71,7 @@ class OcrJob : JobService() {
             val smallW = (rawW * scale).toInt().coerceAtLeast(16)
             val smallH = (rawH * scale).toInt().coerceAtLeast(16)
             for (ms in samplesMs) {
-                if (paused() || stopped.get() || VoiceService.active || ScreenService.active || getSystemService(android.os.PowerManager::class.java).currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_SEVERE) break
+                if (paused() || stopped.get() || IndexPipeline.restricted(this)) break
                 var frame: Bitmap? = null
                 try {
                     frame = if (retriever == null) decodeSmall(file) else

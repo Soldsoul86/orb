@@ -126,7 +126,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
         val where = arrayListOf(LibrarySchema.VISIBLE)
         if(date!=null){
             val start=date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
-            where.add("(memories.id IN (SELECT docid FROM memory_fts WHERE memory_fts MATCH ?) OR coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) >= ? AND coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) < ?)")
+            where.add("(memories.id IN (SELECT docid FROM memory_fts WHERE memory_fts MATCH ?) OR coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) >= CAST(? AS INTEGER) AND coalesce((SELECT nullif(content_time,0) FROM source_items WHERE memory_id=memories.id),memories.created_at) < CAST(? AS INTEGER))")
             args.add(match);args.add(start.toString());args.add((start+86_400_000).toString())
         } else if (match.isNotEmpty()) { where.add("memory_fts MATCH ?"); args.add(match) }
         else if (query.isNotBlank()) { return emptyList() }
