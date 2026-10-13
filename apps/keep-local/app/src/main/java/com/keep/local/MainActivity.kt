@@ -165,6 +165,7 @@ class MainActivity : Activity() {
         val kind = kindValue.getOrNull(filter.selectedItemPosition)
         val ticket = ++searchToken
         io.execute {
+            if(ticket!=searchToken) return@execute
             try {
                 val db = MemoryDb.get(this)
                 val found = CreativeSearch.search(this,term,kind)

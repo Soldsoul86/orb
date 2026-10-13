@@ -8,6 +8,11 @@ import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.*
+import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.uiautomator.*
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -48,16 +53,16 @@ class CreativeMemoryTest {
         try {
             val indexStart=SystemClock.elapsedRealtime()
             ClipEncoder(c,2).use { model ->
-                for((i,name) in listOf("a.jpg","b.jpg","c.jpg","d.jpg","m0.mp4").withIndex()) {
+                for((i,name) in listOf("a.jpg","b.jpg","c.jpg","d.jpg","m0.mp4","m1.mp4").withIndex()) {
                     val target=File(AppFiles.mediaDir(c),"vfixture_$i.${name.substringAfterLast('.')}")
                     test.assets.open(name).use{input->target.outputStream().use{input.copyTo(it)}};files.add(target)
-                    val id=MemoryDb.get(c).add(if(i==4)"video" else "image","opaque_$i",path=AppFiles.relativePath(c,target),mime=if(i==4)"video/mp4" else "image/jpeg",bytes=target.length())
+                    val id=MemoryDb.get(c).add(if(i>=4)"video" else "image","opaque_$i",path=AppFiles.relativePath(c,target),mime=if(i>=4)"video/mp4" else "image/jpeg",bytes=target.length())
                     ids.add(id)
                     // An interrupted step must not create any representation.
                     VisualIndexJob.indexOne(c,id,model,AtomicBoolean(true))
                     MemoryDb.get(c).readableDatabase.rawQuery("SELECT COUNT(*) FROM representations WHERE memory_id=?",arrayOf(id.toString())).use{it.moveToFirst();assertEquals(0,it.getInt(0))}
                     val perAssetStart=SystemClock.elapsedRealtime()
-                    repeat(if(i==4)6 else 1){VisualIndexJob.indexOne(c,id,model,AtomicBoolean(false))}
+                    repeat(if(i>=4)6 else 1){VisualIndexJob.indexOne(c,id,model,AtomicBoolean(false))}
                     if(i==4)report.put("montage_index_ms_per_minute",(SystemClock.elapsedRealtime()-perAssetStart)*5)
                 }
                 report.put("index_ms",SystemClock.elapsedRealtime()-indexStart)
@@ -71,10 +76,22 @@ class CreativeMemoryTest {
                 }
                 report.put("queries",rows).put("precision_at_1",hits/4.0).put("recall_at_1",hits/4.0).put("search_4_queries_ms",SystemClock.elapsedRealtime()-searchStart)
                 assertEquals("Visual-only real photograph hit rate",4,hits)
-                val moment=CreativeSearch.rank(c,model.text("a cup of coffee"),"video").first{it.id==ids[4]}
+                val moment=CreativeSearch.rank(c,model.text("a cup of coffee"),"video").first()
+                assertEquals("Correct montage versus rocket video distractor",ids[4],moment.id)
+                report.put("correct_video_queries",1).put("video_query_count",1)
                 report.put("coffee_moment_ms",moment.startMs).put("coffee_ground_truth_ms",JSONArray(listOf(4000,8000)))
                 assertTrue("Coffee frame must fall inside 4–8 second montage scene",moment.startMs in 4000..7999)
                 assertTrue("Titles and OCR must not supply visual query",MemoryDb.get(c).search("coffee",null).isEmpty())
+            }
+            ActivityScenario.launch(MainActivity::class.java).use {
+                onView(withId(R.id.search_query)).perform(replaceText("a cup of coffee"),closeSoftKeyboard())
+                val device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                assertTrue("Visual query must be discoverable through the real UI",device.wait(Until.hasObject(By.textContains("opaque_1")),30000))
+                onView(withSubstring("opaque_1")).perform(click())
+                assertTrue(device.wait(Until.hasObject(By.textContains("Matched image pixels")),5000))
+                val screenshot=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                File(c.filesDir,"creative-demo.png").outputStream().use { out -> screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out) };screenshot.recycle()
+                pressBack()
             }
             val image=BitmapFactory.decodeFile(files[0].absolutePath)
             val timings=JSONObject();var baseline:FloatArray?=null

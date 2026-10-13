@@ -29,5 +29,6 @@ adb shell am start -W -n com.keep.local.next/.MainActivity
 adb exec-out run-as com.keep.local.next cat files/media/cad-test.mp4 > "$evidence/readback.mp4"
 cmp "$evidence/readback.mp4" "$evidence/cad-test.mp4"
 adb exec-out run-as com.keep.local.next cat files/visual-benchmark.json > "$evidence/visual-benchmark.json"
+adb exec-out run-as com.keep.local.next cat files/creative-demo.png > "$evidence/creative-demo.png"
 adb shell dumpsys meminfo com.keep.local.next > "$evidence/meminfo.txt"
 echo 'PASS: same-package upgrade, v1 migration, original retention, offline visual retrieval and export suite.'

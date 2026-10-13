@@ -14,7 +14,9 @@ def get(entry):
 with ThreadPoolExecutor(4) as pool: info=dict(pool.map(get,files.items()))
 manifest={'id':'clip-vit-b32-int8-v1','repository':repo,'revision':revision,'files':info}
 assets=root/'app/src/main/assets';assets.mkdir(parents=True,exist_ok=True)
-(assets/'visual-model.json').write_text(json.dumps(manifest,indent=2))
+expected=assets/'visual-model.json'
+if expected.exists():assert json.loads(expected.read_text())==manifest, 'Pinned model content changed'
+else:expected.write_text(json.dumps(manifest,indent=2))
 delivery=root/'model-delivery';delivery.mkdir(exist_ok=True)
 with zipfile.ZipFile(delivery/'visual-model-pack.zip','w',zipfile.ZIP_STORED) as z:
     for name in files:z.write(model/name,name)
@@ -38,3 +40,5 @@ for name,loader in [('a',data.chelsea),('b',data.coffee),('c',data.astronaut),('
 import subprocess,imageio_ffmpeg
 subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-y','-loop','1','-t','4','-i',str(testassets/'a.jpg'),'-loop','1','-t','4','-i',str(testassets/'b.jpg'),'-loop','1','-t','4','-i',str(testassets/'c.jpg'),'-filter_complex','[0:v]scale=384:384,setsar=1[v0];[1:v]scale=384:384,setsar=1[v1];[2:v]scale=384:384,setsar=1[v2];[v0][v1][v2]concat=n=3:v=1:a=0[v]','-map','[v]','-r','12','-c:v','libx264','-pix_fmt','yuv420p',str(testassets/'m0.mp4')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 (testassets/'corpus.json').write_text(json.dumps({'source':'scikit-image sample photographs; see https://scikit-image.org/docs/stable/api/skimage.data.html','images':{'a.jpg':'cat','b.jpg':'coffee','c.jpg':'astronaut','d.jpg':'rocket'},'video':'m0.mp4 is a synthetic montage, not a real action video','intervals_ms':[[0,4000,'cat'],[4000,8000,'coffee'],[8000,12000,'astronaut']]}))
+
+subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-y','-loop','1','-t','12','-i',str(testassets/'d.jpg'),'-vf','scale=384:384','-r','12','-c:v','libx264','-pix_fmt','yuv420p',str(testassets/'m1.mp4')],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

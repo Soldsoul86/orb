@@ -24,6 +24,7 @@ data class MemoryItem(
 
 /** App-private SQLite + local FTS4. Sources stay separate from AI/OCR extractions. */
 class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.applicationContext, "memories.db", null, 2) {
+    private val appContext=context.applicationContext
     companion object {
         @Volatile private var instance: MemoryDb? = null
         fun get(context: Context): MemoryDb = instance ?: synchronized(this) {
@@ -139,6 +140,7 @@ class MemoryDb private constructor(context: Context) : SQLiteOpenHelper(context.
 
     fun remove(id: Long) {
         writableDatabase.delete("memories", "id=?", arrayOf(id.toString()))
+        java.io.File(appContext.cacheDir,"visual").listFiles()?.filter { it.name.startsWith("${id}_") }?.forEach { it.delete() }
     }
 
     fun stats(): Pair<Int, Long> = readableDatabase.rawQuery(
