@@ -38,6 +38,26 @@ class CreativeMemoryTest {
         db.remove(id)
         db.readableDatabase.rawQuery("SELECT COUNT(*) FROM assets WHERE memory_id=?",arrayOf(id.toString())).use {it.moveToFirst();assertEquals(0,it.getInt(0))}
     }
+    @Test fun deletingSourceDuringInferenceDoesNotResurrectThumbnailOrIndex() {
+        val file=File(AppFiles.mediaDir(c),"deletion-race.jpg")
+        test.assets.open("a.jpg").use { input -> file.outputStream().use { input.copyTo(it) } }
+        val id=MemoryDb.get(c).add("image","delete-race",path=AppFiles.relativePath(c,file),mime="image/jpeg",bytes=file.length())
+        val model=object:VisualEncoder {
+            override val modelId=ModelPack.ID
+            override fun image(bitmap:android.graphics.Bitmap):FloatArray {
+                MemoryDb.get(c).remove(id)
+                return FloatArray(512){if(it==0)1f else 0f}
+            }
+            override fun text(query:String)=error("unused")
+            override fun close(){}
+        }
+        try {
+            VisualIndexJob.indexOne(c,id,model,AtomicBoolean(false))
+            assertNull(MemoryDb.get(c).get(id))
+            assertFalse(VisualIndex.thumbnail(c,id,0).exists())
+            MemoryDb.get(c).readableDatabase.rawQuery("SELECT COUNT(*) FROM representations WHERE memory_id=?",arrayOf(id.toString())).use{it.moveToFirst();assertEquals(0,it.getInt(0))}
+        } finally { MemoryDb.get(c).remove(id);file.delete() }
+    }
     @Test fun offlineRealPhotoVisualSearchAndTimestampBenchmark() {
         assertEquals("1",androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand("settings get global airplane_mode_on").trim())
         val started=SystemClock.elapsedRealtime()

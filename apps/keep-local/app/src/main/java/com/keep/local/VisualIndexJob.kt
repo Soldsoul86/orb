@@ -109,7 +109,7 @@ class VisualIndexJob : JobService() {
                 if(stop.get() || generation!=c.getSharedPreferences("visual",0).getLong("generation",0)) { thumb.delete(); return }
                 db.beginTransaction()
                 try {
-                    if(MemoryDb.get(c).get(id)==null) return
+                    if(MemoryDb.get(c).get(id)==null) { thumb.delete(); return }
                     db.insertWithOnConflict("representations",null,ContentValues().apply {
                         put("memory_id",id);put("modality","visual");put("model_id",engine.modelId);put("start_ms",ms);put("end_ms",end)
                         put("vector",VisualIndex.blob(embedding));put("created_at",System.currentTimeMillis())
