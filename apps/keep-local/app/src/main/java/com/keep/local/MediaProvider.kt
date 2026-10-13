@@ -19,7 +19,7 @@ class MediaProvider : ContentProvider() {
         }
         val id = uri.lastPathSegment?.toLongOrNull() ?: throw FileNotFoundException("Invalid id")
         val memory = MemoryDb.get(requireNotNull(context)).get(id) ?: throw FileNotFoundException("Deleted item")
-        if (MediaSource.external(memory) && !AuthorizedLibrary.accessible(requireNotNull(context),id)) throw FileNotFoundException("Access revoked")
+        if (MediaSource.external(memory)) MediaSource.check(requireNotNull(context), memory) // also enforce Android selected-photo revocation before disclosing metadata
         return memory
     }
 

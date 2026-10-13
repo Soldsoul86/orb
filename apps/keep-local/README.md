@@ -6,23 +6,25 @@ Native Kotlin, Android 10+. Flagship-first and adaptive; there is no entry-level
 phone or 4 GB product constraint. All core memory functions are local. No
 INTERNET, broad storage, analytics or cloud AI permission/capability is added.
 
-Version 0.3.0 implements the Creative Memory foundation and a first offline
-visual-search slice. It retains application ID `com.keep.local.next` and the
-recovered signing identity of Keep Local Next 0.2.0. Keep the separate original
-`com.keep.local` installation intact; its signing key remains unavailable.
+Version 0.4.0 adds opt-in authorized-library discovery and **Worth Reviewing**.
+The application ID remains `com.keep.local.next`; update the existing 0.3 app
+without uninstalling. Keep the separate original `com.keep.local` app installed.
 
-Install the APK over Next, then choose **Visual memory → Install local model
-pack** and select `visual-model-pack.zip` from local Files. The ~148 MiB model
-pack is optional: notes, imports, OCR, text search, playback and sharing already
-work without it. Tap **Index / resume my library** to opt in. Search descriptions
-in the main search field; visual matches explain their source and approximate
-video-frame timestamp. No filename/tag vocabulary or example query is hardcoded.
+Open **Settings → Choose what Keep Local can remember**. Authorize individual
+media categories and/or a document folder, then **Start / resume indexing**.
+Originals remain in their source locations. Review suggested document clues,
+capture-time groups and similar visual material in **Worth Reviewing**. Keep,
+Correct and Dismiss are stored locally, separately from original evidence.
 
-See `docs/CREATIVE_MEMORY.txt` for verified scope and limitations,
-`docs/MODELS_AND_LICENSES.txt` for model choices and licenses, and the final
-verification report for measured results. Historical 0.1/0.2 reports describe
-those versions only. Physical flagship benchmarks, robust temporal action
-recognition, saved-audio transcription and creative collections remain pending.
+The existing ~148 MiB local CLIP model pack remains optional and is preserved
+on upgrade. Install it through **Settings → Models and visual index** if absent.
+Without it, notes, imports, text/document extraction, literal document suggestions,
+metadata grouping, playback, text search and sharing work locally. Visual search
+and visual-similarity suggestions require the pack. No extra model was introduced.
+
+See `docs/DISCOVERY_04.txt` for implementation limits and acceptance evidence,
+and `docs/MODELS_AND_LICENSES.txt` for model/runtime choices and licenses.
+Historical reports describe their corresponding versions only.
 
 ## Preserved capabilities (historical verification in docs/VERIFICATION.txt)
 
@@ -39,8 +41,8 @@ recognition, saved-audio transcription and creative collections remain pending.
 
 Saved-audio transcription, temporal action recognition, identities, collections,
 trimming and semantic document search are not included yet. Visual search ranks
-actual image pixels and sampled frames; it does not certify actions. Existing
-PDF imports are searchable by title/context but not automatically parsed.
+actual image pixels and sampled frames; it does not certify actions. PDFs use bounded local Latin OCR (first 20 pages); UTF-8 text and DOCX
+text are supported. Other office formats and encrypted PDFs are unsupported.
 
 ## Build and verification
 
@@ -51,9 +53,9 @@ Never replace the signing identity or uninstall an app to fix a mismatch.
 
 `keep-local-compile.yml` prepares pinned models/test fixtures and runs Gradle
 assembly, JVM tests and lint. `keep-local-android.yml` signs exact compiled
-artifacts and tests an in-place update against the delivered 0.2.0 APK on API29
+artifacts and tests an in-place update against the delivered 0.3.0 APK on API29
 and API36. Model fixtures and unsigned/test APKs are not phone releases.
 
 The app never requires disabling Play Protect. Emulator installation does not
 establish physical-device compatibility or Play Protect approval. See
-`docs/CREATIVE_RESULTS.txt` for evidence and remaining gates.
+`docs/DISCOVERY_04.txt` for evidence and remaining gates.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create v1 fixture DB from unchanged schema; no production database is touched."""
+"""Create a v2 fixture DB from the retained 0.3 schema; no production database is touched."""
 from pathlib import Path
 import sqlite3
 import re

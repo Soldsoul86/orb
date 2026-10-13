@@ -11,7 +11,7 @@ object DiscoveryEngine {
     private fun db(c:Context)=MemoryDb.get(c).readableDatabase
     fun generate(c:Context,stop:AtomicBoolean=AtomicBoolean(false)):Long {
         val started=SystemClock.elapsedRealtime()
-        if(stop.get()||VoiceService.active||ScreenService.active)return 0
+        if(stop.get()||VoiceService.active||ScreenService.active||c.getSystemService(android.os.PowerManager::class.java).currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_SEVERE)return 0
         documents(c,stop);if(!stop.get())experiences(c);if(!stop.get())reusable(c)
         return SystemClock.elapsedRealtime()-started
     }

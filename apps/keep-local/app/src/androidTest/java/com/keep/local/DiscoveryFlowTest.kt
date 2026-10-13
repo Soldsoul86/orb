@@ -29,7 +29,7 @@ class DiscoveryFlowTest {
     private fun databaseBytes()=listOf("", "-wal", "-shm").sumOf{File(c.getDatabasePath("memories.db").path+it).length()}
     private fun choose(id:String,action:String,reason:String?=null){
         ActivityScenario.launch<ReviewActivity>(Intent(c,ReviewActivity::class.java).putExtra("discovery_id",id)).use {
-            assertTrue(device.wait(Until.hasObject(By.text("Evidence")),5000))
+            assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
             onView(withText(action)).perform(scrollTo(),click())
             if(action=="Correct"){
                 onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
@@ -59,7 +59,12 @@ class DiscoveryFlowTest {
             assertTrue(MemoryDb.get(c).search("Manufacturer warranty",null).none{it.path?.contains("KeepLocalFixtures")==true})
             assertTrue(Discoveries.list(c,true).none{d->d.evidence.any{it.source.contains("KeepLocalFixtures")}})
             ActivityScenario.launch(ReviewActivity::class.java).use{assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))}
-            val report=JSONObject(File(c.filesDir,"discovery-benchmark.json").readText()).put("review_survived_process_death",true).put("folder_revocation_hid_evidence",true).put("original_media_hashes_unchanged",true)
+            AuthorizedLibrary.clearDerived(c)
+            assertFalse(VisualIndex.enabled(c));assertTrue(ModelPack.ready(c))
+            for(i in 0 until files.length()){val f=files.getJSONObject(i);assertEquals(f.getString("sha256"),hash(Uri.parse(f.getString("uri"))))}
+            for(id in decisions.keys())AuthorizedLibrary.db(c).rawQuery("SELECT status FROM review_state WHERE discovery_id=?",arrayOf(id)).use{assertTrue(it.moveToFirst());assertEquals(decisions.getString(id),it.getString(0))}
+            assertEquals(0,AuthorizedLibrary.db(c).rawQuery("SELECT count(*) FROM representations",null).use{it.moveToFirst();it.getInt(0)})
+            val report=JSONObject(File(c.filesDir,"discovery-benchmark.json").readText()).put("index_removal_preserved_originals_models_and_review_decisions",true).put("review_survived_process_death",true).put("folder_revocation_hid_evidence",true).put("original_media_hashes_unchanged",true)
             File(c.filesDir,"discovery-benchmark.json").writeText(report.toString(2));return
         }
         val start=SystemClock.elapsedRealtime();val beforeBytes=databaseBytes()
@@ -91,10 +96,10 @@ class DiscoveryFlowTest {
         assertEquals("Warranty and receipt; plain negative text yields no suggestion",2,doc.size)
         assertTrue("Captured-photo group",experience.isNotEmpty());assertTrue("Real CLIP reuse evidence",reuse.isNotEmpty())
         assertTrue(experience.all{d->d.evidence.none{labels[it.id]=="rocket"}})
-        var unsupported=0
+        var unsupported=0;var evaluated=0;var unlabeled=0
         for(d in reuse){
             val concepts=d.evidence.map{e->when(labels[e.id]){"montage"->when{e.start<4000->"cat";e.start<8000->"coffee";else->"astronaut"};null->if(MemoryDb.get(c).get(e.id)?.title=="CAD Test")"rocket" else "unlabeled";else->labels[e.id]}}
-            if("unlabeled" !in concepts && concepts.distinct().size!=1)unsupported++
+            if("unlabeled" in concepts)unlabeled++ else {evaluated++;if(concepts.distinct().size!=1)unsupported++}
         }
         assertEquals("No wrong visual pair in this small labeled corpus",0,unsupported)
         val count=AuthorizedLibrary.db(c).rawQuery("SELECT count(*) FROM discoveries",null).use{it.moveToFirst();it.getInt(0)}
@@ -117,7 +122,7 @@ class DiscoveryFlowTest {
         val memory=Debug.MemoryInfo();Debug.getMemoryInfo(memory)
         val report=JSONObject().put("environment","Android emulator; fixture documents and real photos / constructed video; no physical device")
             .put("airplane_mode",true).put("authorized_visual_assets",5).put("authorized_documents",3)
-            .put("useful_document_suggestions",doc.size).put("experience_groups",experience.size).put("reusable_pairs",reuse.size).put("unsupported_visual_pairs",unsupported)
+            .put("literal_document_suggestions",doc.size).put("experience_groups",experience.size).put("reusable_pairs",reuse.size).put("unsupported_visual_pairs",unsupported).put("evaluated_labeled_pairs",evaluated).put("unlabeled_pairs_not_scored",unlabeled)
             .put("duplicate_suggestions_on_repeat",after-count).put("index_visual_ms",indexMs).put("discovery_generation_ms",generation)
             .put("time_to_first_discovery_ms",firstDiscoveryMs).put("sampled_pss_kb",memory.totalPss)
             .put("database_and_wal_growth_bytes",databaseBytes()-beforeBytes)

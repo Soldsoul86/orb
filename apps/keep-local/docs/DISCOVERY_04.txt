@@ -45,5 +45,36 @@ Filesystem providers can reorder child cursors during a scan; a subsequent resca
 is idempotent and reconciles membership. A source that changes bytes without
 changing provider size/modification metadata needs explicit index removal/rebuild.
 
-Executed CI results, final APK identity and measured discovery quality will be
-recorded after the integrated signed build passes. No physical phone is attached.
+Evidence-backed discoveries and review:
+- Literal document rules propose possible warranty/receipt information or explicitly
+  written dates. They quote source text, label uncertainty and never infer a deadline.
+  These English rules are intentionally narrow; usefulness is for the user to judge.
+- Experience grouping requires >=3 capture-time records in the same folder within
+  10 minutes. Added/modified times alone are excluded. Exact byte copies are deduped
+  after visual hashing. This is a grouping hypothesis, never a claimed trip/location.
+- Reuse proposals compare real stored CLIP image/frame embeddings (cosine >=0.88),
+  with timestamped evidence. No new model, action recognition or identity inference.
+  The threshold is uncalibrated. Batches page 160 anchor frames against a bounded
+  first/last-frame candidate bank (256 rows); this is not exhaustive all-pairs search.
+  Experience groups page 200 source rows and can miss relationships across pages.
+- At most 20 pending records, 12 shown in the queue. Document/experience batches and
+  top-five visual pairs favor a small queue over volume; this is not a trained ranker.
+- Deterministic discovery keys and evidence-revision suppression prevent repeat
+  dismissals from resurfacing on ordinary rescans. Material changes can be reviewed.
+- Separate tables store source evidence, machine wording, corrections, review state
+  and decision events. Corrections do not rewrite source assets or machine evidence.
+- Review displays source previews/excerpts/timestamps. Open the source to play,
+  inspect, Share, Save to Gallery or Save to Files. Multi-source sharing sends
+  originals via temporary content URI grants; it does not trim clips or auto-upload.
+- Index removal preserves review decisions and installed models, but removes derived
+  source excerpts/vectors/suggestions. Reauthorization and rescan can rebuild evidence.
+- Metrics distinguish sharing requests from verified recipient receipt. The app shows
+  accepted/corrected/requested discoveries per 100 currently indexed assets. Automated
+  fixture decisions do not measure real-user usefulness, time saved or satisfaction.
+
+Executed results and signed release identity are recorded in DISCOVERY_RESULTS.txt.
+No physical phone is attached. Thermal/battery scheduling is implemented but has
+not been benchmarked on a flagship; inference remains CPU ONNX Runtime. GPU/NPU
+acceleration is not claimed. Android's JobScheduler defers work under OS restrictions;
+force-stop resumes on the next app launch, not while the app remains force-stopped.
+

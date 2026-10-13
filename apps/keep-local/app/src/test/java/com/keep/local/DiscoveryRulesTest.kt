@@ -11,6 +11,6 @@ class DiscoveryRulesTest {
         assertNull(DiscoveryRules.document("We discussed the word warranty in class."))
         assertNull(DiscoveryRules.document("The receipt is an interesting word."))
         assertEquals("Possible purchase receipt",DiscoveryRules.document("Purchase receipt\nTotal INR 1250.00")!!.title)
-        assertEquals("A date is explicitly written in this document",DiscoveryRules.document("Meeting 2027-01-03")!!.title)
+        assertEquals("Date-like text to review",DiscoveryRules.document("Meeting 2027-01-03")!!.title)
     }
 }

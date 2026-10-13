@@ -35,6 +35,13 @@ jobs:
           python3 core-tests/db_contract.py
           python3 core-tests/library_contract.py
           bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+      - name: Summarize JVM test results
+        run: |
+          python3 - <<'PYRESULTS'
+          import pathlib,xml.etree.ElementTree as E
+          roots=[E.parse(p).getroot() for p in pathlib.Path('app/build/test-results').rglob('TEST-*.xml')]
+          print('JVM_TEST_TOTALS', {k:sum(int(r.get(k,0)) for r in roots) for k in ('tests','failures','errors','skipped')})
+          PYRESULTS
       - uses: actions/download-artifact@v4
         with:
           run-id: 38364349728

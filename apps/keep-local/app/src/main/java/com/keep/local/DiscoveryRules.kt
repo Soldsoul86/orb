@@ -13,7 +13,7 @@ object DiscoveryRules {
         val category=when {
             warranty.containsMatchIn(text)&&coverage.containsMatchIn(text)->"Possible warranty information"
             receipt.containsMatchIn(text)&&(date.containsMatchIn(text)||total.containsMatchIn(text))->"Possible purchase receipt"
-            date.containsMatchIn(text)->"A date is explicitly written in this document"
+            date.containsMatchIn(text)->"Date-like text to review"
             else->return null
         }
         val lines=text.lineSequence().filter{warranty.containsMatchIn(it)||receipt.containsMatchIn(it)||coverage.containsMatchIn(it)||date.containsMatchIn(it)||total.containsMatchIn(it)}.take(4).joinToString("\n").take(1200)

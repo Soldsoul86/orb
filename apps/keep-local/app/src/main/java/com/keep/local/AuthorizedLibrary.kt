@@ -91,6 +91,7 @@ object AuthorizedLibrary {
         VisualIndex.clear(c)
         val d=db(c)
         d.execSQL("UPDATE memories SET extracted=''")
+        d.delete("representations",null,null)
         c.getSystemService(android.app.job.JobScheduler::class.java).allPendingJobs.filter{it.service.className==OcrJob::class.java.name}.forEach{c.getSystemService(android.app.job.JobScheduler::class.java).cancel(it.id)}
         d.execSQL("UPDATE source_items SET state='not_indexed' WHERE excluded=0 AND state!='access_revoked'")
         if(d.rawQuery("SELECT name FROM sqlite_master WHERE name='discoveries'",null).use{it.moveToFirst()})d.delete("discoveries",null,null)
