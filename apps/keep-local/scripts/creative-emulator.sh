@@ -6,8 +6,7 @@ mkdir -p "$evidence"
 trap 'timeout 10s adb logcat -d > "$evidence/logcat.txt" || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true' EXIT
 test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 adb install "$artifact/baseline.apk"
-adb shell screenrecord --size 320x480 --time-limit 2 /data/local/tmp/cad-test.mp4
-adb pull /data/local/tmp/cad-test.mp4 "$evidence/cad-test.mp4"
+unzip -p "$artifact/tests.apk" assets/m0.mp4 > "$evidence/cad-test.mp4"
 python3 apps/keep-local/scripts/seed-export-fixture.py
 adb shell run-as com.keep.local.next mkdir -p databases files/media
 adb shell "run-as com.keep.local.next sh -c 'cat > files/media/cad-test.mp4'" < "$evidence/cad-test.mp4"

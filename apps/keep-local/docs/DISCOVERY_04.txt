@@ -1,0 +1,49 @@
+Keep Local 0.4 — implementation and acceptance ledger
+Your creative memory.
+
+Package: com.keep.local.next (unchanged). Version code 4 / 0.4.0.
+Database v2 -> v3 is additive; private media, asset UUIDs, prior representations,
+user metadata and installed CLIP pack are retained. The original separate
+com.keep.local app is not upgraded and must remain installed.
+
+Authorized Library implementation:
+- Independent Photos, Videos and Audio consent; scoped MediaStore enumeration.
+- Android 10–12 uses READ_EXTERNAL_STORAGE capped at API32, gated per category.
+  Android 13+ uses category permissions; Android 14+ accepts selected visual media.
+- Local ACTION_OPEN_DOCUMENT_TREE and persisted read-only tree grants.
+- No MANAGE_EXTERNAL_STORAGE, INTERNET, accessibility, location or new capture access.
+- External originals remain content URI references; no automatic copies or writes.
+- Durable per-source scan cursors and folder work queue; batches of 100 entries.
+- Existing JobScheduler pipeline handles scans, document extraction, visual frames,
+  cancellation/resumption, battery/storage constraints and thermal/capture pauses.
+- New/changed sources are found by explicit rescan and delayed background rescans.
+  Timing is best effort under Android's scheduling and standby restrictions.
+- Changed size/modification metadata invalidates old derived content; unchanged
+  URI references retain the same UUID. Moved/deleted/revoked sources become unavailable.
+- File exclusions and folder/document-ID prefix exclusions persist; source access
+  and index removal preserve originals. Revoking a tree releases its OS grant;
+  category opt-out blocks all app reads; OS permission controls are also linked.
+- Source access is checked before display/share/open. Revocation removes extracted
+  text and visual previews/vectors; cached matches cannot provide a back door.
+
+Local text support:
+UTF-8 text, Markdown, CSV: <=2 MiB input and 250,000 searchable characters.
+DOCX: word/document.xml <=2 MiB, other decompressed entries <=16 MiB, <=500 entries.
+PDF: bounded Latin-script OCR, first 20 pages at <=1280 pixels on the long side,
+up to 250,000 characters. Page markers label OCR uncertainty and truncation.
+Encrypted/corrupt/non-seekable PDFs may fail. DOC, XLS/XLSX, PPT/PPTX, archive
+contents and arbitrary proprietary formats are not parsed. Audio retains metadata;
+saved-audio transcription is not included. No new model or cloud dependency.
+
+Implementation boundaries:
+Media timestamps distinguish actual capture metadata from added/modified times;
+added/modified time alone must not be presented as proof of a trip or event.
+CLIP sampled-frame similarity does not establish activities, identities or location.
+Folder exclusion currently uses an explicit path/document-ID prefix, shown in
+source details. A source moving to a new URI is not guessed to be the old asset.
+Filesystem providers can reorder child cursors during a scan; a subsequent rescan
+is idempotent and reconciles membership. A source that changes bytes without
+changing provider size/modification metadata needs explicit index removal/rebuild.
+
+Executed CI results, final APK identity and measured discovery quality will be
+recorded after the integrated signed build passes. No physical phone is attached.

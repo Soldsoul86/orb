@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RunWith(AndroidJUnit4::class)
 class AuthorizedLibraryTest {
     private val c=InstrumentationRegistry.getInstrumentation().targetContext
+    @org.junit.After fun leaveSystemPicker(){ val d=androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());d.pressBack();d.pressHome() }
     @Test fun mediaReferenceIdentityChangesRevocationAndExclusion(){
         val inst=InstrumentationRegistry.getInstrumentation()
         AuthorizedLibrary.permissions("image").filter{!it.endsWith("VISUAL_USER_SELECTED")}.forEach{inst.uiAutomation.grantRuntimePermission(c.packageName,it)}

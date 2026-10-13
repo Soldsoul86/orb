@@ -109,6 +109,10 @@ object MediaExport {
 
     fun saveToDocument(context: Context, item: MemoryItem, uri: Uri, cancel: CancellationSignal) {
         require(uri.scheme == "content" && uri.authority != "com.keep.local.next.media") { "Invalid destination" }
+        if(MediaSource.external(item)){
+            val original=Uri.parse(item.path)
+            require(uri!=original && !(uri.authority==original.authority && runCatching { DocumentsContract.getDocumentId(uri)==DocumentsContract.getDocumentId(original) }.getOrDefault(false))) { "Choose a new destination; originals cannot be overwritten" }
+        }
         try {
             copyTo(context, item, uri, cancel)
         } catch (e: Exception) {
