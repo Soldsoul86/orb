@@ -36,7 +36,16 @@ class DiscoveryFlowTest {
             onView(withId(R.id.memory_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(withText(source.title)))
             androidx.test.espresso.Espresso.pressBack()
             assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
-            onView(withText(action)).perform(scrollTo(),click())
+            // Use real accessibility scroll gestures: native focus restoration can undo
+            // Espresso requestRectangleOnScreen after returning from another Activity.
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            val visible=device.findObject(By.text(action))
+            if(visible==null || visible.visibleBounds.height()<30){
+                val scroller=UiScrollable(UiSelector().className("android.widget.ScrollView")).setAsVerticalList()
+                assertTrue("Review action reachable by scrolling: $action",scroller.scrollIntoView(UiSelector().text(action)))
+            }
+            val actionView=device.wait(Until.findObject(By.text(action)),3000)
+            assertNotNull(actionView);actionView!!.click()
             if(action=="Correct"){
                 onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
                 onView(withText("Save correction")).perform(click())

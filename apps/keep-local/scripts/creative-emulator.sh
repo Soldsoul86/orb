@@ -3,7 +3,7 @@ set -euo pipefail
 artifact="${1:?artifact}"
 evidence=apps/keep-local/evidence
 mkdir -p "$evidence"
-trap 'timeout 10s adb logcat -d > "$evidence/logcat.txt" || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true' EXIT
+trap 'timeout 10s adb logcat -d > "$evidence/logcat.txt" || true; timeout 10s adb exec-out screencap -p > "$evidence/screen.png" || true; grep -E "DISCOVERY_(CAPTURE|PAIR)" "$evidence/logcat.txt" || true' EXIT
 test "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" = 1
 adb install "$artifact/baseline.apk"
 unzip -p "$artifact/tests.apk" assets/m1.mp4 > "$evidence/cad-test.mp4"
