@@ -96,6 +96,8 @@ class DiscoveryFlowTest {
         val indexing=SystemClock.elapsedRealtime()
         ClipEncoder(c,2).use{model->for((id,label) in labels)repeat(if(label=="montage")6 else 1){VisualIndexJob.indexOne(c,id,model,AtomicBoolean(false))}}
         val indexMs=SystemClock.elapsedRealtime()-indexing
+        // A previous batch can have higher row IDs than the current corpus after deletions.
+        c.getSharedPreferences("discovery",0).edit().putLong("document_cursor",Long.MAX_VALUE).putLong("experience_cursor",Long.MAX_VALUE).putLong("visual_cursor",Long.MAX_VALUE).commit()
         val generation=DiscoveryEngine.generate(c)
         val firstDiscoveryMs=SystemClock.elapsedRealtime()-start
         val records=Discoveries.list(c);val doc=records.filter{it.type=="document"&&it.evidence.any{e->e.source.contains("KeepLocalFixtures")}}

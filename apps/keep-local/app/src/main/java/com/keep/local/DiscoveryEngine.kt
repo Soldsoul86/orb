@@ -24,12 +24,14 @@ object DiscoveryEngine {
             Discoveries.propose(c,"document",hint.title,hint.reason,"Possible usefulness, not a factual classification. OCR may be wrong; inspect the original.",listOf(evidence))
         }}
         prefs.edit().putLong("document_cursor",last).apply()
+        if(last==0L && after>0 && !stop.get())documents(c,stop) // wrap after deletions or a completed page cycle
     }
     private data class Timed(val id:Long,val time:Long,val folder:String,val hash:String)
     private fun experiences(c:Context){
         val prefs=c.getSharedPreferences("discovery",0);val after=prefs.getLong("experience_cursor",0)
         val rows=db(c).rawQuery("SELECT si.memory_id,si.content_time,si.group_path,a.sha256 FROM source_items si JOIN assets a ON a.memory_id=si.memory_id JOIN memories ON memories.id=si.memory_id WHERE si.memory_id>? AND si.time_basis='capture_time' AND si.content_time>0 AND memories.kind IN ('image','video') AND ${LibrarySchema.VISIBLE} ORDER BY si.memory_id LIMIT 200",arrayOf(after.toString())).use{r->buildList{while(r.moveToNext())add(Timed(r.getLong(0),r.getLong(1),r.getString(2),r.getString(3).orEmpty()))}}
         prefs.edit().putLong("experience_cursor",rows.lastOrNull()?.id?:0).apply()
+        if(rows.isEmpty() && after>0){experiences(c);return}
         var proposed=0
         for((folder,assets) in rows.groupBy{it.folder}){
             if(folder.isBlank())continue
@@ -50,6 +52,7 @@ object DiscoveryEngine {
         val base="SELECT r.id,r.memory_id,r.start_ms,r.end_ms,r.vector,a.sha256 FROM representations r JOIN assets a ON a.memory_id=r.memory_id JOIN memories ON memories.id=r.memory_id WHERE r.modality='visual' AND r.model_id='${ModelPack.ID}' AND ${LibrarySchema.VISIBLE}"
         val anchors=readFrames(c,"$base AND r.id>? ORDER BY r.id LIMIT 160",arrayOf(after.toString()))
         prefs.edit().putLong("visual_cursor",anchors.lastOrNull()?.row?:0).apply()
+        if(anchors.isEmpty() && after>0){reusable(c);return}
         // Bounded candidate bank: first/last sampled frame of up to 128 recent assets.
         // Anchors page through every frame. This is approximate, not all-pairs retrieval.
         val bank=readFrames(c,"$base AND r.id IN (SELECT MIN(id) FROM representations WHERE modality='visual' GROUP BY memory_id UNION SELECT MAX(id) FROM representations WHERE modality='visual' GROUP BY memory_id) ORDER BY r.memory_id DESC LIMIT 256")
