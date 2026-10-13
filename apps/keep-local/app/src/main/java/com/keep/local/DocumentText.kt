@@ -16,6 +16,8 @@ import java.util.zip.ZipInputStream
 import org.xmlpull.v1.XmlPullParser
 
 /** Local bounded parsers. Limits are disclosed; no inferred dates or amounts. */
+class IndexDeferred:RuntimeException()
+
 object DocumentText {
     private const val LIMIT=2*1024*1024
     fun extract(c:Context,item:MemoryItem,stop:AtomicBoolean):String? {
@@ -55,7 +57,8 @@ object DocumentText {
         val out=StringBuilder();val recognizer=TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try { MediaSource.descriptor(c,item).use{fd->PdfRenderer(fd).use{pdf->
             for(p in 0 until minOf(pdf.pageCount,20)){
-                if(stop.get()||VoiceService.active||ScreenService.active) {stop.set(true);break}
+                if(stop.get())break
+                if(VoiceService.active||ScreenService.active||c.getSystemService(android.os.PowerManager::class.java).currentThermalStatus>=android.os.PowerManager.THERMAL_STATUS_SEVERE)throw IndexDeferred()
                 pdf.openPage(p).use{page->
                     val scale=1280f/maxOf(page.width,page.height)
                     val bitmap=Bitmap.createBitmap((page.width*scale).toInt().coerceAtLeast(1),(page.height*scale).toInt().coerceAtLeast(1),Bitmap.Config.ARGB_8888)

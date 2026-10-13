@@ -52,13 +52,13 @@ object AuthorizedLibrary {
         }
     }
     /** Remove all derived excerpts/vectors immediately when authorization disappears. */
-    fun invalidate(c:Context,id:Long,state:String="access_revoked") = synchronized(VisualIndex) {
+    fun invalidate(c:Context,id:Long,state:String="access_revoked",clearThumb:Boolean=true) = synchronized(VisualIndex) {
         val d=db(c)
         d.execSQL("UPDATE source_items SET state=?,error=? WHERE memory_id=?",arrayOf(state,if(state=="access_revoked")"Source unavailable or permission revoked" else null,id))
         d.execSQL("UPDATE memories SET extracted='' WHERE id=?",arrayOf(id))
         d.delete("representations","memory_id=?",arrayOf(id.toString()))
         d.execSQL("UPDATE assets SET state='not_indexed',next_ms=0,sha256=NULL WHERE memory_id=?",arrayOf(id))
-        File(c.cacheDir,"visual").listFiles()?.filter{it.name.startsWith("${id}_")}?.forEach{it.delete()}
+        if(clearThumb)File(c.cacheDir,"visual").listFiles()?.filter{it.name.startsWith("${id}_")}?.forEach{it.delete()}
         // Discovery tables are installed by the same additive migration in milestone B.
         if(d.rawQuery("SELECT name FROM sqlite_master WHERE name='discovery_evidence'",null).use{it.moveToFirst()}) {
             d.execSQL("DELETE FROM discoveries WHERE id IN (SELECT discovery_id FROM discovery_evidence WHERE memory_id=?)",arrayOf(id))
@@ -68,7 +68,10 @@ object AuthorizedLibrary {
         val d=db(c)
         val key=d.rawQuery("SELECT source_key FROM library_sources WHERE id=?",arrayOf(sourceId.toString())).use{if(it.moveToFirst())it.getString(0)else return@synchronized}
         d.execSQL("UPDATE library_sources SET enabled=0,status='access_revoked' WHERE id=?",arrayOf(sourceId))
-        d.rawQuery("SELECT memory_id FROM source_items WHERE source_id=?",arrayOf(sourceId.toString())).use{while(it.moveToNext())invalidate(c,it.getLong(0))}
+        val ids=mutableSetOf<Long>()
+        d.rawQuery("SELECT memory_id FROM source_items WHERE source_id=?",arrayOf(sourceId.toString())).use{while(it.moveToNext()){val id=it.getLong(0);ids.add(id);invalidate(c,id,clearThumb=false)}}
+        File(c.cacheDir,"visual").listFiles()?.filter{it.name.substringBefore('_').toLongOrNull() in ids}?.forEach{it.delete()}
+        ids.forEach{c.revokeUriPermission(AppFiles.itemUri(it),Intent.FLAG_GRANT_READ_URI_PERMISSION)}
         if(key.startsWith("content://"))runCatching{c.contentResolver.releasePersistableUriPermission(Uri.parse(key),Intent.FLAG_GRANT_READ_URI_PERMISSION)}
     }
     fun reconcile(c:Context) {
@@ -131,16 +134,17 @@ object AuthorizedLibrary {
         val id=d.rawQuery("SELECT a.memory_id FROM assets a JOIN memories m ON m.id=a.memory_id WHERE a.state IN ('not_indexed','indexing') AND m.kind IN ('file','audio') AND NOT EXISTS(SELECT 1 FROM source_items si JOIN library_sources ls ON ls.id=si.source_id WHERE si.memory_id=m.id AND (si.excluded=1 OR si.state='access_revoked' OR ls.enabled=0)) LIMIT 1",null).use{if(it.moveToFirst())it.getLong(0)else null} ?: return false
         try {
             val item=MemoryDb.get(c).get(id)?:return true
+            val generation=c.getSharedPreferences("visual",0).getLong("generation",0)
             d.execSQL("UPDATE assets SET state='indexing' WHERE memory_id=?",arrayOf(id))
             d.execSQL("UPDATE source_items SET state='processing' WHERE memory_id=?",arrayOf(id))
             val text=if(item.kind=="audio")null else DocumentText.extract(c,item,stop)
             if(stop.get())return true
-            synchronized(VisualIndex){if(!MediaSource.external(item)||accessible(c,id)){
+            synchronized(VisualIndex){if(generation==c.getSharedPreferences("visual",0).getLong("generation",0) && (!MediaSource.external(item)||accessible(c,id))){
                 if(text!=null)MemoryDb.get(c).setExtracted(id,text)
                 d.execSQL("UPDATE assets SET state=? WHERE memory_id=?",arrayOf(if(text!=null)"ready" else "unsupported",id))
                 d.execSQL("UPDATE source_items SET state=?,error=? WHERE memory_id=?",arrayOf(if(text!=null)"completed" else "unsupported",if(text==null)"Text extraction/transcription unavailable for this format" else null,id))
             }}
-        }catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id));d.execSQL("UPDATE source_items SET state='failed',error='Extraction failed; retry available' WHERE memory_id=?",arrayOf(id))}
+        }catch(e:IndexDeferred){throw e}catch(e:SecurityException){invalidate(c,id)}catch(e:java.io.FileNotFoundException){if(MemoryDb.get(c).get(id)?.let{MediaSource.external(it)}==true)invalidate(c,id)else d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id))}catch(e:Exception){d.execSQL("UPDATE assets SET state='error' WHERE memory_id=?",arrayOf(id));d.execSQL("UPDATE source_items SET state='failed',error='Extraction failed; retry available' WHERE memory_id=?",arrayOf(id))}
         return true
     }
     private fun completedScan(c:Context,id:Long,epoch:Long) {

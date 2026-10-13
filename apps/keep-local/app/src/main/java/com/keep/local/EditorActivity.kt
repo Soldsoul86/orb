@@ -116,10 +116,10 @@ class EditorActivity : MediaActionsActivity() {
         }
         if (i != null) root.addView(button(if(MediaSource.external(i)) "Exclude from memory" else "Delete permanently", root) {
             AlertDialog.Builder(this)
-                .setTitle("Delete this memory?")
+                .setTitle(if(MediaSource.external(i)) "Exclude this file?" else "Delete this memory?")
                 .setMessage(if(MediaSource.external(i)) "Only this reference and its derived index will be excluded. The original stays unchanged." else "The original file and its index will be deleted from this phone. This cannot be undone.")
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Delete") { _, _ -> delete() }
+                .setPositiveButton(if(MediaSource.external(i)) "Exclude" else "Delete") { _, _ -> delete() }
                 .show()
         })
     }

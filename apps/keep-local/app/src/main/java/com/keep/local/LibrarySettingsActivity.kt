@@ -73,7 +73,7 @@ class LibrarySettingsActivity:Activity(){
             try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);AuthorizedLibrary.enableTree(this,uri);renderStatus()}catch(e:Exception){Toast.makeText(this,"Folder access could not be retained",Toast.LENGTH_LONG).show()}
         }
     }
-    override fun onResume(){super.onResume();AuthorizedLibrary.reconcile(this);handler.post(refresh)}
+    override fun onResume(){super.onResume();io.execute{AuthorizedLibrary.reconcile(this)};handler.post(refresh)}
     override fun onPause(){handler.removeCallbacks(refresh);super.onPause()}
     override fun onDestroy(){io.shutdown();super.onDestroy()}
     private fun label(s:String,size:Float=14f)=TextView(this).apply{text=s;textSize=size;setPadding(0,12,0,12);root.addView(this)}
