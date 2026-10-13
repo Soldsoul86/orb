@@ -14,9 +14,9 @@ object Discoveries {
     fun hash(value:String)=MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString(""){"%02x".format(it)}
     fun revision(c:Context,item:MemoryItem,type:String):String {
         if(type=="document")return hash(if(item.kind=="note")item.body else item.extracted)
-        return db(c).rawQuery("SELECT a.sha256,si.content_time,si.group_path FROM assets a LEFT JOIN source_items si ON si.memory_id=a.memory_id WHERE a.memory_id=?",arrayOf(item.id.toString())).use{r->
+        return db(c).rawQuery("SELECT a.sha256,si.content_time,si.group_path,si.time_basis FROM assets a LEFT JOIN source_items si ON si.memory_id=a.memory_id WHERE a.memory_id=?",arrayOf(item.id.toString())).use{r->
             if(!r.moveToFirst())return@use "missing"
-            if(type=="experience")hash("${r.getLong(1)}:${r.getString(2)}")else r.getString(0)?:"not-indexed"
+            if(type=="experience")hash("${r.getLong(1)}:${r.getString(2)}:${r.getString(3)}")else r.getString(0)?:"not-indexed"
         }
     }
     fun evidence(c:Context,id:Long,type:String,start:Long=0,end:Long=0,excerpt:String=""):DiscoveryEvidence? {

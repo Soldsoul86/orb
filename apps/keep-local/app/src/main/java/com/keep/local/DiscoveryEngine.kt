@@ -26,22 +26,27 @@ object DiscoveryEngine {
         prefs.edit().putLong("document_cursor",last).apply()
         if(last==0L && after>0 && !stop.get())documents(c,stop) // wrap after deletions or a completed page cycle
     }
-    private data class Timed(val id:Long,val time:Long,val folder:String,val hash:String)
+    private data class Timed(val id:Long,val time:Long,val folder:String,val hash:String,val basis:String)
     private fun experiences(c:Context){
         val prefs=c.getSharedPreferences("discovery",0);val after=prefs.getLong("experience_cursor",0)
-        val rows=db(c).rawQuery("SELECT si.memory_id,si.content_time,si.group_path,a.sha256 FROM source_items si JOIN assets a ON a.memory_id=si.memory_id JOIN memories ON memories.id=si.memory_id WHERE si.memory_id>? AND si.time_basis='capture_time' AND si.content_time>0 AND memories.kind IN ('image','video') AND ${LibrarySchema.VISIBLE} ORDER BY si.memory_id LIMIT 200",arrayOf(after.toString())).use{r->buildList{while(r.moveToNext())add(Timed(r.getLong(0),r.getLong(1),r.getString(2),r.getString(3).orEmpty()))}}
+        val rows=db(c).rawQuery("SELECT si.memory_id,si.content_time,si.group_path,a.sha256,si.time_basis FROM source_items si JOIN assets a ON a.memory_id=si.memory_id JOIN memories ON memories.id=si.memory_id WHERE si.memory_id>? AND si.time_basis IN ('capture_time','exif_local_time') AND si.content_time>0 AND memories.kind IN ('image','video') AND ${LibrarySchema.VISIBLE} ORDER BY si.memory_id LIMIT 200",arrayOf(after.toString())).use{r->buildList{while(r.moveToNext())add(Timed(r.getLong(0),r.getLong(1),r.getString(2).let{if(it.endsWith("/"))it else it.substringBeforeLast('/',"")},r.getString(3).orEmpty(),r.getString(4)))}}
         prefs.edit().putLong("experience_cursor",rows.lastOrNull()?.id?:0).apply()
         if(rows.isEmpty() && after>0){experiences(c);return}
         var proposed=0
-        for((folder,assets) in rows.groupBy{it.folder}){
+        for((clockGroup,assets) in rows.groupBy{it.folder to (it.basis=="exif_local_time")}){
+            val folder=clockGroup.first
             if(folder.isBlank())continue
             val sorted=assets.distinctBy{it.hash.ifBlank{it.id.toString()}}.sortedBy{it.time};var start=0
             while(start<sorted.size && proposed<5){
                 val group=sorted.drop(start).takeWhile{it.time-sorted[start].time<=10*60*1000L}.take(12)
                 start+=group.size
                 if(group.size<3)continue
-                val evidence=group.mapNotNull{a->Discoveries.evidence(c,a.id,"experience",excerpt="Capture time metadata: ${DateFormat.getDateTimeInstance().format(Date(a.time))}\nFolder: $folder")}
-                if(evidence.size>=3){Discoveries.propose(c,"experience","These ${evidence.size} files may belong to one experience.","Capture timestamps are within 10 minutes and the files share a folder. They may be useful to review together.","A grouping hypothesis only. No trip, location, identity or activity has been inferred.",evidence);proposed++}
+                val evidence=group.mapNotNull{a->
+                    val local=a.basis=="exif_local_time"
+                    val format=DateFormat.getDateTimeInstance().apply{if(local)timeZone=java.util.TimeZone.getTimeZone("UTC")}
+                    Discoveries.evidence(c,a.id,"experience",excerpt="${if(local)"EXIF original capture clock (timezone unspecified)" else "Capture time metadata"}: ${format.format(Date(a.time))}\nFolder: $folder")
+                }
+                if(evidence.size>=3){Discoveries.propose(c,"experience","These ${evidence.size} files may belong to one experience.","Capture clock values are within 10 minutes and the files share a folder. They may be useful to review together.","A grouping hypothesis only. No trip, location, identity or activity has been inferred.",evidence);proposed++}
             }
         }
     }

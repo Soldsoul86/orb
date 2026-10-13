@@ -37,6 +37,10 @@ saved-audio transcription is not included. No new model or cloud dependency.
 
 Implementation boundaries:
 Media timestamps distinguish actual capture metadata from added/modified times;
+when MediaStore omits it, images can supply explicit EXIF DateTimeOriginal.
+EXIF clocks without timezone are labelled as such and grouped separately from
+absolute timestamps. No timezone or location is invented; generic file mtime
+never substitutes for a capture date. Reading EXIF does not request GPS access;
 added/modified time alone must not be presented as proof of a trip or event.
 CLIP sampled-frame similarity does not establish activities, identities or location.
 Folder exclusion currently uses an explicit path/document-ID prefix, shown in

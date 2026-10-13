@@ -95,7 +95,7 @@ class DiscoveryFlowTest {
             val path=File(android.os.Environment.getExternalStorageDirectory(),"${if(video)"Movies" else "Pictures"}/DiscoveryFixtures/opaque-discovery-$i.${if(video)"mp4" else "jpg"}")
             android.media.MediaScannerConnection.scanFile(c,arrayOf(path.path),arrayOf(if(video)"video/mp4" else "image/jpeg")){_,_->scanned.countDown()}
             assertTrue("Android metadata scan completed",scanned.await(15,java.util.concurrent.TimeUnit.SECONDS))
-            if(!video)c.contentResolver.query(uri,arrayOf("datetaken"),null,null,null)!!.use{assertTrue(it.moveToFirst());assertTrue("Fixture must have actual EXIF capture metadata",it.getLong(0)>0)}
+            if(!video){val captured=CaptureMetadata.read(c,uri);assertNotNull("Fixture has embedded original-capture EXIF",captured);assertEquals(time/1000,captured!!.time/1000)}
             files.put(JSONObject().put("uri",uri.toString()).put("sha256",hash(uri)).put("label",listOf("cat","coffee","astronaut","rocket","montage")[i]))
         }
         AuthorizedLibrary.enableMedia(c,"image");AuthorizedLibrary.enableMedia(c,"video");AuthorizedLibrary.enableTree(c,folder)

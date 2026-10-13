@@ -98,16 +98,25 @@ object AuthorizedLibrary {
     }
     /** Idempotent URI identity; content changes invalidate only derived data. */
     fun upsert(c:Context,source:Long,uri:Uri,title:String,mime:String,size:Long,modified:Long,time:Long,basis:String,group:String,epoch:Long):Long = synchronized(VisualIndex) {
-        val d=db(c);val fingerprint="$size:$modified"
+        val d=db(c)
+        if(!d.rawQuery("SELECT 1 FROM library_sources WHERE id=? AND enabled=1",arrayOf(source.toString())).use{it.moveToFirst()})return@synchronized -1L
+        val fingerprint="$size:$modified"
         val existing=d.rawQuery("SELECT memory_id,fingerprint,excluded,state FROM source_items WHERE uri=?",arrayOf(uri.toString())).use{if(it.moveToFirst())listOf(it.getLong(0).toString(),it.getString(1),it.getInt(2).toString(),it.getString(3))else null}
+        val excludedBeforeRead=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{r->var yes=false;while(r.moveToNext())if(group.startsWith(r.getString(0)))yes=true;yes}
+        if(excludedBeforeRead || existing?.get(2)=="1"){
+            if(existing!=null){val old=existing[0].toLong();d.execSQL("UPDATE source_items SET seen=? WHERE memory_id=?",arrayOf(epoch,old));exclude(c,old);return@synchronized old}
+            return@synchronized -1L
+        }
+        val capture=if(mime.startsWith("image/")&&basis!="capture_time")CaptureMetadata.read(c,uri)else null
+        val effectiveTime=capture?.time?:time;val effectiveBasis=capture?.basis?:basis
         if(existing!=null){
             val id=existing[0].toLong()
             if(existing[1]!=fingerprint||existing[3]=="access_revoked"){
                 invalidate(c,id,"queued")
-                d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,time,basis,group,id))
+                d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,effectiveTime,effectiveBasis,group,id))
                 d.execSQL("UPDATE memories SET bytes=?,mime=? WHERE id=?",arrayOf(size,mime,id))
             }
-            d.execSQL("UPDATE source_items SET seen=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(epoch,time,basis,group,id))
+            d.execSQL("UPDATE source_items SET seen=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(epoch,effectiveTime,effectiveBasis,group,id))
             val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{q->var yes=false;while(q.moveToNext())if(group.startsWith(q.getString(0)))yes=true;yes}
             if(blocked)exclude(c,id)
             return@synchronized id
@@ -117,7 +126,7 @@ object AuthorizedLibrary {
         val kind=when{mime.startsWith("image/")->"image";mime.startsWith("video/")->"video";mime.startsWith("audio/")->"audio";else->"file"}
         d.beginTransaction();try{
             val id=MemoryDb.get(c).add(kind,title,source="Authorized device content",path=uri.toString(),mime=mime,bytes=size)
-            d.insertOrThrow("source_items",null,ContentValues().apply{put("memory_id",id);put("source_id",source);put("uri",uri.toString());put("fingerprint",fingerprint);put("content_time",time);put("time_basis",basis);put("group_path",group);put("seen",epoch);put("excluded",if(excluded)1 else 0)})
+            d.insertOrThrow("source_items",null,ContentValues().apply{put("memory_id",id);put("source_id",source);put("uri",uri.toString());put("fingerprint",fingerprint);put("content_time",effectiveTime);put("time_basis",effectiveBasis);put("group_path",group);put("seen",epoch);put("excluded",if(excluded)1 else 0)})
             d.setTransactionSuccessful();id
         }finally{d.endTransaction()}
     }
