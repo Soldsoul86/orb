@@ -20,6 +20,7 @@ class ReviewActivity:Activity(){
     override fun onResume(){super.onResume();load()}
     override fun onDestroy(){io.shutdown();super.onDestroy()}
     private fun load(generate:Boolean=false){
+        if(isFinishing || isDestroyed)return
         io.execute{try{
             if(generate)DiscoveryEngine.generate(this)
             val detail=selected?.let{Discoveries.get(this,it)}?.takeIf{Discoveries.valid(this,it)}
