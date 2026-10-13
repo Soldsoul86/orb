@@ -21,9 +21,9 @@ adb shell run-as com.keep.local.next mkdir -p files/models/clip-vit-b32-int8-v1
 for f in vision.onnx text.onnx vocab.json merges.txt installed; do
   adb shell "cat /data/local/tmp/kl-model/$f | run-as com.keep.local.next sh -c 'cat > files/models/clip-vit-b32-int8-v1/$f'"
 done
-adb shell run-as com.keep.local.next sha256sum files/models/clip-vit-b32-int8-v1/* > "$evidence/models-before.txt"
+adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-before.txt"
 adb install -r "$artifact/app.apk" | tee "$evidence/upgrade.txt"
-adb shell run-as com.keep.local.next sha256sum files/models/clip-vit-b32-int8-v1/* > "$evidence/models-after.txt"
+adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-after.txt"
 cmp "$evidence/models-before.txt" "$evidence/models-after.txt"
 adb install "$artifact/tests.apk"
 adb shell cmd connectivity airplane-mode enable || true

@@ -15,5 +15,7 @@ for m in re.finditer(r'db\.execSQL\((?:"""(?P<triple>.*?)"""|"(?P<single>[^"]*)"
     con.executescript((m.group('triple') or m.group('single')).strip())
 con.execute('PRAGMA user_version=2')
 con.execute("INSERT INTO memories(id,kind,title,body,source,path,mime,created_at,bytes,duration_ms) VALUES(987654,'video','CAD Test','Existing recording retained across update','Emulator fixture','media/cad-test.mp4','video/mp4',1700000000000,?,2000)", ((root/'evidence/cad-test.mp4').stat().st_size,))
+con.execute("UPDATE assets SET asset_uuid='retained-0.3-asset-fixture' WHERE memory_id=987654")
+con.execute("INSERT INTO representations(memory_id,modality,model_id,start_ms,end_ms,text_value,created_at) VALUES(987654,'migration_fixture','test-only',0,2000,'Retain this prior derived row',1700000000000)")
 con.commit()
 con.close()
