@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.app.Notification
 import android.app.NotificationChannel

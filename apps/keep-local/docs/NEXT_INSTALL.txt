@@ -1,0 +1,29 @@
+Keep Local Next 0.2.0 — separate installation
+
+The user authorized an installable app without updating the previous app.
+This independent build uses com.keep.local.next and label Keep Local Next.
+It does not uninstall, overwrite, read or migrate com.keep.local or its data.
+Existing CAD Test is NOT automatically accessible in the new app. Recover/copy
+it from the original with the documented USB route, then import it if desired.
+
+Share, Save to Gallery and Save to Files are included. Core behavior stays
+local, with no network or broad filesystem permissions. Android 10+ is required.
+Device installation, Play Protect and third-party upload acceptance remain
+unverified until tested on the user's phone. Do not disable Play Protect.
+
+CI signs this independent application with a NEW identity, never pretending it
+matches the old application. The new keystore is backed up using CMS AES-256
+encryption to signing/recovery-certificate.pem (public certificate only).
+The matching private decryption key is delivered privately from the workspace.
+Never commit that key, decrypted keystores or signing credentials.
+Retain BOTH the encrypted backup artifact and private recovery key outside chat.
+
+Future builds must restore the same keystore to the GitHub Actions secret
+KEEP_LOCAL_NEXT_KEYSTORE_BASE64. Alias keep-local-next, password android.
+Replacement key generation is disabled and the existing signing certificate
+is pinned. The current workflow verifies the recovered APK byte-for-byte. A missing key must block future signing.
+
+Historical SHARE_EXPORT.txt describes the previous package's blocked update.
+Next is a separate application, not a workaround for Android's signature check.
+
+See NEXT_VALIDATION.txt for completed Android 10/16 verification and download.

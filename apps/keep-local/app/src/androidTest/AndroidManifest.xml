@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application android:label="Keep Local test fixtures">
-        <activity android:name="com.keep.local.ShareReceiverActivity" android:exported="true"
+        <activity android:name="com.keep.local.next.ShareReceiverActivity" android:exported="true"
             android:label="KL Receiver">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

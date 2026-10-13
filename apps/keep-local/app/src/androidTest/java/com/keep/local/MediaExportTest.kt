@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.content.Context
 import android.content.Intent
@@ -78,12 +78,12 @@ class MediaExportTest {
             onView(withId(R.id.media_play)).perform(scrollTo(), click())
             assertTrue(device.wait(Until.hasObject(By.clazz("android.widget.VideoView")), 5000))
             repeat(3) {
-                if (!device.hasObject(By.res("com.keep.local", "memory_title"))) {
+                if (!device.hasObject(By.res("com.keep.local.next", "memory_title"))) {
                     device.pressBack()
-                    device.wait(Until.hasObject(By.res("com.keep.local", "memory_title")), 1000)
+                    device.wait(Until.hasObject(By.res("com.keep.local.next", "memory_title")), 1000)
                 }
             }
-            assertTrue(device.hasObject(By.res("com.keep.local", "memory_title")))
+            assertTrue(device.hasObject(By.res("com.keep.local.next", "memory_title")))
             device.waitForIdle()
             onView(withId(R.id.media_share)).perform(scrollTo(), click())
             // Native resolver is actually displayed; select a real separate-UID receiver.

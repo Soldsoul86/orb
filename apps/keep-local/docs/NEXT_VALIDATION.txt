@@ -1,0 +1,51 @@
+Keep Local Next — existing APK recovery and verification
+
+APK: Keep-Local-Next-0.2.0.apk
+Source commit: cb3b69cd95c144be4753f502af803e557007b0f1
+Package: com.keep.local.next; version: 2 / 0.2.0; minimum Android: 10/API29.
+Original Keep Local package: com.keep.local (keep installed).
+APK SHA-256:
+b084edca59a156bc9f98ccc1ced38de45c0c1637c143b3eb82b75a5745c09f07
+Signing certificate SHA-256:
+37683d94addd08972d1f3aa0280d0680210bff18fc35a5f46dcdf923b65ae21d
+
+The existing signed APK is reused byte-for-byte, not rebuilt or re-signed.
+Download archive (extract and tap Keep-Local-Next-0.2.0.apk):
+https://github.com/Soldsoul86/orb/actions/runs/38276184828/artifacts/11759645460
+
+Build and signing succeeded in run 38276184828. Initial emulator installation
+succeeded beside the original on API29 and API36, but five export tests on each
+failed because the test database fixture was injected after first launch, when
+SQLite WAL state could supersede it. The harness now seeds before first launch.
+No application code, test APK or signed product APK was changed by that fix.
+Verification run: https://github.com/Soldsoul86/orb/actions/runs/38341939378
+Results: SUCCESS on Android 10/API29 and Android 16/API36.
+- 8 instrumentation tests passed on EACH emulator using the recovered APK.
+- Native Sharesheet grants a playable MP4 to a separate test application UID;
+  ungranted item access is denied. Actual third-party apps are unverified.
+- Save to Gallery publishes playable, byte-identical copies with distinct names.
+- Save to Files uses the native picker and produces a byte-identical MP4.
+- Cancelled picker, missing files, filenames, MIME mapping and 256 MiB streaming.
+- Existing note capture/save/retrieve and SQLite contract tests also pass.
+- Both original and Next remain installed. Seeded video hashes are unchanged in
+  both apps after tests, same-key reinstall of Next and process restart.
+- Packaged identity, permission allowlist and signing verification pass.
+- APK SHA-256 equals the requested original artifact; no re-signing performed.
+
+Recovered copy of the same APK archive:
+https://github.com/Soldsoul86/orb/actions/runs/38341939378/artifacts/11787545399
+
+The new app has separate private storage. Existing CAD Test remains in the old
+app and is not automatically imported. The original signing key is still lost;
+this download is a separate installation, not an upgrade of the old app.
+Do not uninstall the old app or clear its storage. Keep Play Protect enabled.
+
+The new app's encrypted signing backup was recovered and successfully decrypted
+in the private workspace. keytool confirms it is a PrivateKeyEntry and its
+certificate SHA-256 matches the APK. A private recovery bundle is delivered. Future signing refuses to generate another key
+and checks the pinned certificate. Store the recovery bundle securely outside
+chat. Never commit the private key or decrypted keystore.
+
+Physical phone behavior, Play Protect and ChatGPT/WhatsApp/Drive receiving
+behavior are unverified. Existing limitations in SHARE_EXPORT.txt still apply
+except for the separate app's now-available signed installation.

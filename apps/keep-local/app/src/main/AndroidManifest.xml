@@ -47,7 +47,7 @@
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true">
             <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
         </service>
-        <provider android:name=".MediaProvider" android:authorities="com.keep.local.media"
+        <provider android:name=".MediaProvider" android:authorities="com.keep.local.next.media"
             android:grantUriPermissions="true" android:exported="false"/>
     </application>
 </manifest>

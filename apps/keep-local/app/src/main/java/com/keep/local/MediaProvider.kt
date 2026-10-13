@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -14,7 +14,7 @@ class MediaProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
 
     private fun item(uri: Uri): MemoryItem {
-        if (uri.authority != "com.keep.local.media" || uri.pathSegments.size != 2 || uri.pathSegments[0] != "item") {
+        if (uri.authority != "com.keep.local.next.media" || uri.pathSegments.size != 2 || uri.pathSegments[0] != "item") {
             throw FileNotFoundException("Invalid item URI")
         }
         val id = uri.lastPathSegment?.toLongOrNull() ?: throw FileNotFoundException("Invalid id")

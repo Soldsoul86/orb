@@ -1,4 +1,4 @@
-name: Keep Local Share Export Verification
+name: Verify Existing Keep Local Next APK
 on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
@@ -7,12 +7,12 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: keep-local-export-${{ github.sha }}
+  group: keep-local-next-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: apps/keep-local
@@ -25,48 +25,56 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-          cmdline-tools-version: '13114758'
-          log-accepted-android-sdk-licenses: false
-      - name: Install SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
-      - name: Schema and privacy checks
-        run: |
-          python3 core-tests/db_contract.py
-          python3 core-tests/recovery_contract.py
-      - name: Compile unsigned product, tests, JVM tests and lint
-        run: bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+      - run: sdkmanager 'build-tools;35.0.0'
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38257971597
+          run-id: 38276184828
           github-token: ${{ github.token }}
-          name: keep-local-debug-a5f34df0abb12e65758f81addbbb5ec3411fe9fe
-          path: apps/keep-local/previous
-      - name: Prepare disposable emulator APKs; original-key release remains blocked
-        run: bash scripts/prepare-export-verification.sh
-      - name: Inspect compiled product
+          name: Keep-Local-Next-installable-APK
+          path: apps/keep-local/delivery
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38276184828
+          github-token: ${{ github.token }}
+          name: next-emulator-fixtures
+          path: apps/keep-local/test-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 38276184828
+          github-token: ${{ github.token }}
+          name: Keep-Local-Next-ENCRYPTED-signing-backup
+          path: apps/keep-local/encrypted-signing-backup
+      - name: Verify exact recovered APK, original certificate and encrypted backup
         run: |
-          apkanalyzer manifest print app/build/outputs/apk/debug/app-debug-unsigned.apk > evidence/packaged-manifest.xml
+          mkdir -p evidence
+          echo 'b084edca59a156bc9f98ccc1ced38de45c0c1637c143b3eb82b75a5745c09f07  delivery/Keep-Local-Next-0.2.0.apk' | sha256sum -c -
+          cmp delivery/Keep-Local-Next-0.2.0.apk test-artifacts/app.apk
+          echo 'e2b823fe7ee9d4f242b20d781c76b283060c0ff441fc2862a3f2adf7d36dfa2a  test-artifacts/original.apk' | sha256sum -c -
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs delivery/Keep-Local-Next-0.2.0.apk | tee evidence/signing-certificate.txt
+          grep -F "$(cat signing/expected-certificate.sha256)" evidence/signing-certificate.txt
+          apkanalyzer manifest print delivery/Keep-Local-Next-0.2.0.apk > evidence/packaged-manifest.xml
           python3 scripts/check_packaged_manifest.py evidence/packaged-manifest.xml
-          git rev-parse HEAD > evidence/commit.txt
-      - name: Test summaries
-        if: always()
-        run: |
-          if [ -f app/build/reports/lint-results-debug.txt ]; then cat app/build/reports/lint-results-debug.txt; fi
-          if [ -d app/build/test-results/testDebugUnitTest ]; then cat app/build/test-results/testDebugUnitTest/TEST-*.xml; fi
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: keep-local-UNSIGNED-release-blocked-${{ github.sha }}
-          path: |
-            apps/keep-local/app/build/outputs/apk/debug/*unsigned.apk
-            apps/keep-local/app/build/reports/
-            apps/keep-local/evidence/
-          retention-days: 30
+          openssl cms -cmsout -inform DER -in encrypted-signing-backup/keep-local-next.p12.cms -noout
+          # Encrypted bytes only, for recovery into the user's private workspace.
+          printf 'ENCRYPTED_BACKUP_BASE64='
+          base64 -w0 encrypted-signing-backup/keep-local-next.p12.cms
+          printf '\n'
       - uses: actions/upload-artifact@v4
         with:
-          name: disposable-emulator-fixtures-NOT-A-PHONE-UPDATE
+          name: Keep-Local-Next-installable-APK-RECOVERED
+          path: apps/keep-local/delivery/
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-emulator-fixtures
           path: apps/keep-local/test-artifacts/
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recovered-apk-verification
+          path: apps/keep-local/evidence/
+          retention-days: 30
   emulator:
     needs: build
     runs-on: ubuntu-24.04
@@ -84,28 +92,26 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-          cmdline-tools-version: '13114758'
-          log-accepted-android-sdk-licenses: false
       - uses: actions/download-artifact@v4
         with:
-          name: disposable-emulator-fixtures-NOT-A-PHONE-UPDATE
-          path: export-fixtures
+          name: next-emulator-fixtures
+          path: next-fixtures
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Verify sharing, export and fixture upgrade
+      - name: Verify side-by-side installation and exports
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: bash apps/keep-local/scripts/export-emulator.sh export-fixtures
+          script: bash apps/keep-local/scripts/standalone-emulator.sh next-fixtures
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: share-export-evidence-api-${{ matrix.api }}
+          name: next-evidence-api-${{ matrix.api }}
           path: apps/keep-local/evidence/
           retention-days: 30

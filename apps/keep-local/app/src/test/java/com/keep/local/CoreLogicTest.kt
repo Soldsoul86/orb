@@ -1,4 +1,4 @@
-package com.keep.local
+package com.keep.local.next
 
 import org.junit.Assert.*
 import org.junit.Test
