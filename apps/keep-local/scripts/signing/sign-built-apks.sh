@@ -2,12 +2,12 @@
 set -euo pipefail
 mkdir -p delivery signed-fixtures evidence signing/responses
 javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/sign-classes" scripts/signing/DetachedSigner.java
-echo 'e4fe07231e402451d4a5abaca0d0a55ab562604f849f6192c47beff201c74b01  compiled/delivery/Keep-Local-0.3.0-unsigned.apk' | sha256sum -c -
+echo '66eda135ae2f1784614a70fbfe90bff891e3045e4174dd2513845057a89aa226  compiled/delivery/Keep-Local-0.4.0-unsigned.apk' | sha256sum -c -
 pending=0
 for name in app tests; do
   if [ "$name" = app ]; then
-    input=compiled/delivery/Keep-Local-0.3.0-unsigned.apk
-    output=delivery/Keep-Local-0.3.0.apk
+    input=compiled/delivery/Keep-Local-0.4.0-unsigned.apk
+    output=delivery/Keep-Local-0.4.0.apk
   else
     input=fixtures/tests.apk
     output=signed-fixtures/tests.apk
@@ -24,8 +24,12 @@ for name in app tests; do
   fi
 done
 test "$pending" = 0
-cp delivery/Keep-Local-0.3.0.apk signed-fixtures/app.apk
-cp previous/Keep-Local-Next-0.2.0.apk signed-fixtures/baseline.apk
-echo 'b084edca59a156bc9f98ccc1ced38de45c0c1637c143b3eb82b75a5745c09f07  signed-fixtures/baseline.apk' | sha256sum -c -
-sha256sum delivery/Keep-Local-0.3.0.apk | tee delivery/SHA256SUMS.txt
-printf '%s\n' 'Install this update over Keep Local Next (com.keep.local.next). No uninstall needed.' 'The older separate com.keep.local app is not updated; keep it installed.' 'For visual retrieval, install visual-model-pack.zip from Visual memory, then opt in to indexing.' 'Core text search and exports work without the model. Visual suggestions are not proof of an action or identity.' > delivery/INSTALL.txt
+cp delivery/Keep-Local-0.4.0.apk signed-fixtures/app.apk
+cp previous/Keep-Local-0.3.0.apk signed-fixtures/baseline.apk
+echo '0a216042706e546794f9791e3be6ed6d3096d8587fee0f2f5e14e9116a83ff60  signed-fixtures/baseline.apk' | sha256sum -c -
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs signed-fixtures/baseline.apk | tee evidence/baseline-certificate.txt
+grep -F "$(cat signing/expected-certificate.sha256)" evidence/baseline-certificate.txt
+apkanalyzer manifest print delivery/Keep-Local-0.4.0.apk > evidence/manifest.xml
+python3 scripts/check_packaged_manifest.py evidence/manifest.xml
+sha256sum delivery/Keep-Local-0.4.0.apk | tee delivery/SHA256SUMS.txt
+printf '%s\n' 'Install Keep-Local-0.4.0.apk over Keep Local 0.3.0 / Next (com.keep.local.next). Do not uninstall.' 'The separate original com.keep.local app is not updated; keep it installed.' 'Settings: authorize photos/videos/audio or a document folder; then Start / resume indexing.' 'Worth Reviewing: inspect evidence, then Keep, Correct or Dismiss. All processing is local.' 'Existing model packs are preserved. Visual search/reuse suggestions require the optional CLIP pack.' 'No physical-device or Play Protect approval is claimed. Never disable security protections.' > delivery/INSTALL.txt
