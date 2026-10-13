@@ -1,0 +1,19 @@
+Keep Local 0.4 build evidence
+
+Compiled Kotlin source: bd2f078db66505e2e09b2ed7711e30669a5b821a
+Build: https://github.com/Soldsoul86/orb/actions/runs/38390387247
+Kotlin/application/instrumentation assembly, lint and 9 JVM tests passed.
+SQLite migration/FTS/provenance contracts passed.
+Unsigned APK SHA-256:
+7cd1f5075e049f1817e0da86f74d4493323ce6247743b14b60616f00a3e7e62f
+
+The final signed-emulator outcomes and measurements are maintained at:
+https://github.com/Soldsoul86/orb/blob/codex/keep-local-discovery/apps/keep-local/docs/DISCOVERY_RESULTS.txt
+See the signed release workflow artifacts for complete logs, screenshots and
+JSON benchmarks. This source archive is created before emulator verification;
+it does not by itself assert that those later tests passed.
+
+No physical-device, Play Protect or third-party upload approval is claimed.
+The test corpus contains real sample photographs, constructed scene video and
+fixture documents, not a user's personal library. Automated review choices do
+not measure actual user usefulness. See DISCOVERY_04.txt for product limits.
