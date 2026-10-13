@@ -27,6 +27,7 @@ class OcrJob : JobService() {
         cancelled[params.jobId] = stopped
         worker.execute {
             var retry=false
+            val generation=getSharedPreferences("visual",0).getLong("generation",0)
             try {
                 if (VoiceService.active || ScreenService.active || getSystemService(android.os.PowerManager::class.java).currentThermalStatus >= android.os.PowerManager.THERMAL_STATUS_SEVERE) { retry=true;return@execute }
                 val id = params.extras.getLong("memory_id", -1)
@@ -35,7 +36,7 @@ class OcrJob : JobService() {
                 if (item != null && file != null && item.kind in listOf("image", "video")) {
                     val extracted = extractText(item, file, stopped)
                     if (VoiceService.active || ScreenService.active) retry=true
-                    else if (!stopped.get()) MemoryDb.get(this).setExtracted(id, extracted)
+                    else synchronized(VisualIndex) { if (!stopped.get() && generation==getSharedPreferences("visual",0).getLong("generation",0)) MemoryDb.get(this).setExtracted(id, extracted) }
                 }
             } catch (_: Exception) { /* keep media even if OCR fails */ }
             finally {

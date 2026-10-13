@@ -32,7 +32,7 @@ class EditorActivity : MediaActionsActivity() {
         window.statusBarColor = Color.rgb(16, 20, 27)
         window.navigationBarColor = Color.rgb(16, 20, 27)
         item = intent.getLongExtra("id", -1L).takeIf { it > 0 }?.let { MemoryDb.get(this).get(it) }
-        if(item?.let{MediaSource.external(it)&&!AuthorizedLibrary.accessible(this,it.id)}==true){ Toast.makeText(this,"Source access unavailable",Toast.LENGTH_LONG).show();finish();return }
+        if(item?.let{MediaSource.external(it)&&!CreativeSearch.available(this,it)}==true){ Toast.makeText(this,"Source access unavailable",Toast.LENGTH_LONG).show();finish();return }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(16, 20, 27))

@@ -26,7 +26,7 @@ object DocumentText {
         }
         if(mime=="application/vnd.openxmlformats-officedocument.wordprocessingml.document" || item.title.endsWith(".docx",true)) {
             ZipInputStream(MediaSource.open(c,item)).use{zip->
-                var count=0
+                var count=0;var skipped=0L
                 while(!stop.get() && count++<500){val entry=zip.nextEntry?:break
                     if(entry.name=="word/document.xml") {
                         val data=bounded(zip);require(data.size<=LIMIT){"Document XML exceeds 2 MiB"}
@@ -39,6 +39,8 @@ object DocumentText {
                             parser.next()
                         };return out.toString()
                     }
+                    val discard=ByteArray(8192)
+                    while(true){val n=zip.read(discard);if(n<0)break;skipped+=n;require(skipped<=16L*1024*1024){"DOCX skipped content exceeds 16 MiB"};if(stop.get())return null}
                 }
             };return null
         }

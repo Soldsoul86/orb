@@ -87,7 +87,8 @@ object AuthorizedLibrary {
     fun clearDerived(c:Context) = synchronized(VisualIndex) {
         VisualIndex.clear(c)
         val d=db(c)
-        d.execSQL("UPDATE memories SET extracted='' WHERE id IN (SELECT memory_id FROM source_items)")
+        d.execSQL("UPDATE memories SET extracted=''")
+        c.getSystemService(android.app.job.JobScheduler::class.java).allPendingJobs.filter{it.service.className==OcrJob::class.java.name}.forEach{c.getSystemService(android.app.job.JobScheduler::class.java).cancel(it.id)}
         d.execSQL("UPDATE source_items SET state='not_indexed' WHERE excluded=0 AND state!='access_revoked'")
         if(d.rawQuery("SELECT name FROM sqlite_master WHERE name='discoveries'",null).use{it.moveToFirst()})d.delete("discoveries",null,null)
     }
