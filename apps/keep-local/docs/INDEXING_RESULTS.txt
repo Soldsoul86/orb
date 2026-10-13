@@ -3,10 +3,10 @@ Keep Local 0.4.1 indexing stability — release evidence
 Application: com.keep.local.next, versionCode 5 / versionName 0.4.1, minSDK29,
 targetSDK36. No new permissions or models. Database v3 -> v4 is additive.
 
-Runtime/test source: 25693d6ef73cc2822d57222808da38f9f99db04e
-Compile: https://github.com/Soldsoul86/orb/actions/runs/38407853634
+Runtime/test source: 7fd20f0ddcc0e39cc726f80766286e9dc8a425c1
+Compile: https://github.com/Soldsoul86/orb/actions/runs/38409291889
 Unsigned APK SHA256:
-595b837ac277ced67ea7ec1b6c74875558fb7892718f20d5c99c2069ba5d3325
+d804b09e0c599e9ce67d6193fc508f5e4797d499a98a4a3c914a3eac1e795679
 
 Verified compile: assembleDebug, assembleDebugAndroidTest, lintDebug, 9 JVM tests
 (0 failures/errors/skips) and 3 Python SQLite/manifest contracts. The SQL scale
