@@ -46,20 +46,23 @@ class AuthorizedLibraryTest {
     }
     @Test fun realFolderPickerPersistsReadGrantAndRevocationErasesExtractedText(){
         val device=androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        androidx.test.core.app.ActivityScenario.launch(LibrarySettingsActivity::class.java).use {
+        val inst=InstrumentationRegistry.getInstrumentation()
+        val monitor=object:android.app.Instrumentation.ActivityMonitor(){
+            override fun onStartActivity(intent:android.content.Intent):android.app.Instrumentation.ActivityResult? {
+                if(intent.action==android.content.Intent.ACTION_OPEN_DOCUMENT_TREE) intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents","primary:Documents/KeepLocalFixtures"))
+                return null
+            }
+        }
+        inst.addMonitor(monitor)
+        try { androidx.test.core.app.ActivityScenario.launch(LibrarySettingsActivity::class.java).use {
             androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Choose document folder")).perform(androidx.test.espresso.action.ViewActions.scrollTo(),androidx.test.espresso.action.ViewActions.click())
-            val roots=androidx.test.uiautomator.By.text("Keep Local fixtures")
-            device.waitForIdle()
-            if(!device.hasObject(roots)) device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.desc("Show roots")),5000)?.click()
-            val fixture=device.wait(androidx.test.uiautomator.Until.findObject(roots),5000)
-            if(fixture==null){val dump=java.io.ByteArrayOutputStream();device.dumpWindowHierarchy(dump);println("PICKER_HIERARCHY "+dump.toString("UTF-8"));println(device.executeShellCommand("content query --uri content://${LibraryFixtureProvider.AUTH}/root"))}
-            assertNotNull("Fixture folder must appear in Android document picker",fixture);fixture!!.click()
             val select=device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)(use this folder|select)"))),5000)
             assertNotNull("Folder consent action",select);select!!.click()
             device.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)allow"))),2000)?.click()
             assertTrue(device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Choose what Keep Local can remember.")),5000))
         }
-        val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority==LibraryFixtureProvider.AUTH}
+        } finally { inst.removeMonitor(monitor) }
+        val grant=c.contentResolver.persistedUriPermissions.firstOrNull{it.uri.authority=="com.android.externalstorage.documents"&&it.uri.toString().contains("KeepLocalFixtures")}
         assertNotNull("Persisted read grant",grant)
         val source=AuthorizedLibrary.enableTree(c,grant!!.uri)
         // One scan batch, then a fresh caller resumes durable processing.
@@ -67,7 +70,7 @@ class AuthorizedLibraryTest {
         assertFalse(AuthorizedLibrary.step(c,AtomicBoolean(true)))
         repeat(20){AuthorizedLibrary.step(c,AtomicBoolean(false))}
         val matches=MemoryDb.get(c).search("Manufacturer warranty",null)
-        val item=matches.first{it.path?.contains(LibraryFixtureProvider.AUTH)==true}
+        val item=matches.first{it.path?.contains("KeepLocalFixtures")==true}
         assertTrue(MemoryDb.get(c).get(item.id)!!.extracted.contains("2028-06-30"))
         val original=MediaSource.open(c,item).use{it.readBytes()}
         // Revoke at the OS boundary, not merely through our source table.

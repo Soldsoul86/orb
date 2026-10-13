@@ -25,6 +25,13 @@ adb install -r "$artifact/app.apk" | tee "$evidence/upgrade.txt"
 adb shell "run-as com.keep.local.next sh -c 'sha256sum files/models/clip-vit-b32-int8-v1/*'" > "$evidence/models-after.txt"
 cmp "$evidence/models-before.txt" "$evidence/models-after.txt"
 adb install "$artifact/tests.apk"
+mkdir -p "$evidence/document-originals"
+printf 'Manufacturer warranty\nWarranty expires 2028-06-30\nKeep this document for your records.\n' > "$evidence/document-originals/warranty.txt"
+printf 'Purchase receipt\nInvoice date 2026-09-17\nTotal INR 1250.00\n' > "$evidence/document-originals/receipt.txt"
+printf 'A quiet afternoon with blue skies. No special plans.\n' > "$evidence/document-originals/negative.txt"
+adb shell mkdir -p /sdcard/Documents/KeepLocalFixtures
+adb push "$evidence/document-originals/." /sdcard/Documents/KeepLocalFixtures/
+
 adb shell cmd connectivity airplane-mode enable || true
 adb shell svc wifi disable
 adb shell svc data disable
@@ -47,4 +54,6 @@ adb exec-out run-as com.keep.local.next cat files/visual-benchmark.json > "$evid
 adb exec-out run-as com.keep.local.next cat files/creative-demo.png > "$evidence/creative-demo.png"
 cat "$evidence/visual-benchmark.json"
 adb shell dumpsys meminfo com.keep.local.next > "$evidence/meminfo.txt"
+adb pull /sdcard/Documents/KeepLocalFixtures "$evidence/documents-after"
+diff -r "$evidence/document-originals" "$evidence/documents-after"
 echo 'PASS: same-package upgrade, v1 migration, original retention, offline visual retrieval and export suite.'
