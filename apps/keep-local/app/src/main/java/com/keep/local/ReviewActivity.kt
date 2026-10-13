@@ -21,6 +21,7 @@ class ReviewActivity:Activity(){
     override fun onDestroy(){io.shutdown();super.onDestroy()}
     private fun load(generate:Boolean=false){
         if(isFinishing || isDestroyed)return
+        shell();label(if(generate)"Finding suggestions…" else "Loading review…")
         io.execute{try{
             if(generate)DiscoveryEngine.generate(this)
             val detail=selected?.let{Discoveries.get(this,it)}?.takeIf{Discoveries.valid(this,it)}

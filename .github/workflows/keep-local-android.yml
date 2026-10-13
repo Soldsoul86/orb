@@ -1,4 +1,4 @@
-name: Sign and Verify Keep Local 0.4 Discovery
+name: Compile and Test Keep Local Discovery
 on:
   pull_request:
     paths: ['apps/keep-local/**', '.github/workflows/keep-local-android.yml']
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/keep-local
@@ -25,45 +25,88 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - run: sdkmanager 'build-tools;35.0.0'
+      - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38390387247
+          run-id: 38387344356
           github-token: ${{ github.token }}
-          name: creative-build
-          path: apps/keep-local/compiled
+          name: visual-model-pack
+          path: apps/keep-local/model-delivery
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38390387247
+          run-id: 38387344356
           github-token: ${{ github.token }}
           name: creative-test-fixtures-NOT-PHONE-UPDATE
-          path: apps/keep-local/fixtures
+          path: apps/keep-local/prior-corpus
+      - name: Verify pinned model and reuse unchanged real-photo corpus
+        run: |
+          python3 - <<'PYCORPUS'
+          import pathlib,zipfile,hashlib,json
+          model=json.loads(pathlib.Path('app/src/main/assets/visual-model.json').read_text())
+          with zipfile.ZipFile('model-delivery/visual-model-pack.zip') as z:
+              for name,meta in model['files'].items():
+                  data=z.read(name);assert len(data)==meta['bytes'] and hashlib.sha256(data).hexdigest()==meta['sha256']
+          out=pathlib.Path('app/src/androidTest/assets');out.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile('prior-corpus/tests.apk') as z:
+              for name in ['a.jpg','b.jpg','c.jpg','d.jpg','m0.mp4','m1.mp4','tokenizer-golden.json','corpus.json']:
+                  (out/name).write_bytes(z.read('assets/'+name))
+          PYCORPUS
+      - name: Compile and test
+        run: |
+          python3 core-tests/db_contract.py
+          python3 core-tests/library_contract.py
+          bash gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+      - name: Summarize JVM test results
+        run: |
+          python3 - <<'PYRESULTS'
+          import pathlib,xml.etree.ElementTree as E
+          roots=[E.parse(p).getroot() for p in pathlib.Path('app/build/test-results').rglob('TEST-*.xml')]
+          print('JVM_TEST_TOTALS', {k:sum(int(r.get(k,0)) for r in roots) for k in ('tests','failures','errors','skipped')})
+          PYRESULTS
       - uses: actions/download-artifact@v4
         with:
           run-id: 38364349728
           github-token: ${{ github.token }}
           name: Keep-Local-0.3.0-signed-APK
           path: apps/keep-local/previous
-      - name: Sign exact built APKs using public detached responses
-        run: bash scripts/signing/sign-built-apks.sh
-      - name: Package committed source
-        run: git -C ../.. archive --format=zip --output=apps/keep-local/delivery/Keep-Local-0.4.0-source.zip HEAD apps/keep-local .github/workflows/keep-local-compile.yml .github/workflows/keep-local-android.yml
+      - name: Prepare emulator fixtures and offline signing request
+        run: |
+          mkdir -p evidence delivery test-artifacts signing/responses
+          cp app/build/outputs/apk/debug/app-debug-unsigned.apk delivery/Keep-Local-0.4.0-unsigned.apk
+          keytool -genkeypair -keystore "$RUNNER_TEMP/test.jks" -storepass android -alias test -dname CN=Disposable-Emulator-Only -keyalg RSA -validity 2
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/app.apk delivery/Keep-Local-0.4.0-unsigned.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/baseline.apk previous/Keep-Local-0.3.0.apk
+          "$signer" sign --ks "$RUNNER_TEMP/test.jks" --ks-key-alias test --ks-pass pass:android --out test-artifacts/tests.apk app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          rm "$RUNNER_TEMP/test.jks"
+          apkanalyzer manifest print delivery/Keep-Local-0.4.0-unsigned.apk > evidence/manifest.xml
+          python3 scripts/check_packaged_manifest.py evidence/manifest.xml
+          javac -cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" -d "$RUNNER_TEMP/classes" scripts/signing/DetachedSigner.java
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner delivery/Keep-Local-0.4.0-unsigned.apk delivery/Keep-Local-0.4.0.apk signing/app-certificate.pem signing/responses > evidence/offline-signing-request.txt 2>&1 || true
+          cat evidence/offline-signing-request.txt
+          java -cp "$RUNNER_TEMP/classes:$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" DetachedSigner test-artifacts/tests.apk delivery/tests-signed.apk signing/app-certificate.pem signing/responses > evidence/test-offline-signing-request.txt 2>&1 || true
+          cat evidence/test-offline-signing-request.txt
+          sha256sum delivery/Keep-Local-0.4.0-unsigned.apk | tee evidence/unsigned-sha256.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: creative-signing-evidence
-          path: apps/keep-local/evidence/
+          name: creative-build
+          path: |
+            apps/keep-local/delivery/
+            apps/keep-local/evidence/
+            apps/keep-local/app/build/reports/
+            apps/keep-local/app/src/main/assets/visual-model.json
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: Keep-Local-0.4.0-signed-APK
-          path: apps/keep-local/delivery/
-          retention-days: 90
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
+          path: apps/keep-local/test-artifacts/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: creative-signed-test-fixtures
-          path: apps/keep-local/signed-fixtures/
-          retention-days: 7
+          name: visual-model-pack
+          path: apps/keep-local/model-delivery/
+          retention-days: 90
   emulator:
     needs: build
     runs-on: ubuntu-24.04
@@ -83,12 +126,10 @@ jobs:
           packages: platform-tools
       - uses: actions/download-artifact@v4
         with:
-          name: creative-signed-test-fixtures
+          name: creative-test-fixtures-NOT-PHONE-UPDATE
           path: creative-fixtures
       - uses: actions/download-artifact@v4
         with:
-          run-id: 38390387247
-          github-token: ${{ github.token }}
           name: visual-model-pack
           path: model-pack
       - name: Enable KVM
@@ -110,3 +151,4 @@ jobs:
           name: creative-evidence-api-${{ matrix.api }}
           path: apps/keep-local/evidence/
           retention-days: 30
+
