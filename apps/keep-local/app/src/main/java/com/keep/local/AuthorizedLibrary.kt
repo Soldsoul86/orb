@@ -103,7 +103,10 @@ object AuthorizedLibrary {
                 d.execSQL("UPDATE source_items SET fingerprint=?,content_time=?,time_basis=?,group_path=? WHERE memory_id=?",arrayOf(fingerprint,time,basis,group,id))
                 d.execSQL("UPDATE memories SET bytes=?,mime=? WHERE id=?",arrayOf(size,mime,id))
             }
-            d.execSQL("UPDATE source_items SET seen=? WHERE memory_id=?",arrayOf(epoch,id));return@synchronized id
+            d.execSQL("UPDATE source_items SET seen=? WHERE memory_id=?",arrayOf(epoch,id))
+            val blocked=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{q->var yes=false;while(q.moveToNext())if(group.startsWith(q.getString(0)))yes=true;yes}
+            if(blocked)exclude(c,id)
+            return@synchronized id
         }
         val excluded=d.rawQuery("SELECT prefix FROM source_exclusions WHERE source_id=?",arrayOf(source.toString())).use{r->var yes=false;while(r.moveToNext())if(group.startsWith(r.getString(0)))yes=true;yes}
         val kind=when{mime.startsWith("image/")->"image";mime.startsWith("video/")->"video";mime.startsWith("audio/")->"audio";else->"file"}

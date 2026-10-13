@@ -34,6 +34,7 @@ class IndexRestartTest {
             c.getSharedPreferences("visual",0).edit().putBoolean("enabled",true).commit()
             println("RESTART_CHECKPOINT before: 100/105 references, durable scan cursor")
         }else{
+            val activity=androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java)
             val deadline=System.currentTimeMillis()+60000
             var resumed=false
             while(System.currentTimeMillis()<deadline){
@@ -50,7 +51,7 @@ class IndexRestartTest {
                 val id=AuthorizedLibrary.db(c).rawQuery("SELECT memory_id FROM source_items WHERE uri=?",arrayOf(uri.toString())).use{if(it.moveToFirst())it.getLong(0)else null}
                 if(id!=null)MemoryDb.get(c).remove(id);c.contentResolver.delete(uri,null,null)
             }
-            ledger.delete()
+            ledger.delete();activity.close()
             println("RESTART_CHECKPOINT after: 105/105 references, visual indexing resumed, 105 originals byte-identical")
         }
     }
