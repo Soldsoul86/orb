@@ -30,6 +30,12 @@ class DiscoveryFlowTest {
     private fun choose(id:String,action:String,reason:String?=null){
         ActivityScenario.launch<ReviewActivity>(Intent(c,ReviewActivity::class.java).putExtra("discovery_id",id)).use {
             assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
+            val source=MemoryDb.get(c).get(Discoveries.get(c,id)!!.evidence.first().id)!!
+            onView(withText("Open source: ${source.title}")).perform(scrollTo(),click())
+            assertTrue(device.wait(Until.hasObject(By.text("Memory details")),5000))
+            onView(withId(R.id.memory_title)).check(androidx.test.espresso.assertion.ViewAssertions.matches(withText(source.title)))
+            androidx.test.espresso.Espresso.pressBack()
+            assertTrue(device.wait(Until.hasObject(By.text("Worth Reviewing")),5000))
             onView(withText(action)).perform(scrollTo(),click())
             if(action=="Correct"){
                 onView(withClassName(org.hamcrest.Matchers.equalTo("android.widget.EditText"))).perform(replaceText("Useful for my next creation"),closeSoftKeyboard())
@@ -84,7 +90,12 @@ class DiscoveryFlowTest {
                 android.media.ExifInterface(photo.path).apply{setAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL,stamp);setAttribute(android.media.ExifInterface.TAG_DATETIME,stamp);saveAttributes()}
                 c.contentResolver.openOutputStream(uri)!!.use{out->photo.inputStream().use{it.copyTo(out)}};photo.delete()
             }
-            c.contentResolver.update(uri,ContentValues().apply{put("is_pending",0);put("datetaken",time)},null,null)
+            c.contentResolver.update(uri,ContentValues().apply{put("is_pending",0)},null,null)
+            val scanned=java.util.concurrent.CountDownLatch(1)
+            val path=File(android.os.Environment.getExternalStorageDirectory(),"${if(video)"Movies" else "Pictures"}/DiscoveryFixtures/opaque-discovery-$i.${if(video)"mp4" else "jpg"}")
+            android.media.MediaScannerConnection.scanFile(c,arrayOf(path.path),arrayOf(if(video)"video/mp4" else "image/jpeg")){_,_->scanned.countDown()}
+            assertTrue("Android metadata scan completed",scanned.await(15,java.util.concurrent.TimeUnit.SECONDS))
+            if(!video)c.contentResolver.query(uri,arrayOf("datetaken"),null,null,null)!!.use{assertTrue(it.moveToFirst());assertTrue("Fixture must have actual EXIF capture metadata",it.getLong(0)>0)}
             files.put(JSONObject().put("uri",uri.toString()).put("sha256",hash(uri)).put("label",listOf("cat","coffee","astronaut","rocket","montage")[i]))
         }
         AuthorizedLibrary.enableMedia(c,"image");AuthorizedLibrary.enableMedia(c,"video");AuthorizedLibrary.enableTree(c,folder)
