@@ -1,14 +1,28 @@
-# Keep Local — Your creative memory.
+# Keep Local
 
-Find the right material for your next creation, wherever you choose to make it.
+Remember what matters. Recognize when it matters. Prepare what helps.
 
 Native Kotlin, Android 10+. Flagship-first and adaptive; there is no entry-level
 phone or 4 GB product constraint. All core memory functions are local. No
 INTERNET, broad storage, analytics or cloud AI permission/capability is added.
 
-Version 0.4.0 adds opt-in authorized-library discovery and **Worth Reviewing**.
-The application ID remains `com.keep.local.next`; update the existing 0.3 app
-without uninstalling. Keep the separate original `com.keep.local` app installed.
+Version **0.4.1** is the Phase A indexing-stability release. There is one Keep Local
+application. The package remains `com.keep.local.next`, with the retained signing
+certificate; install over the delivered 0.4.0 APK without uninstalling or clearing
+its data. Existing recordings, model packs, permissions and review decisions stay.
+
+Discovery, document extraction and visual processing now take turns. Resume keeps
+saved scan cursors. Successful work continues without failure-retry backoff; corrupt
+files have bounded retries. Settings separates basic-searchable metadata, deep work,
+partial video checkpoints, completed assets and failures. **Copy indexing diagnostics**
+contains counts and worker status, without filenames or private excerpts. Date searches
+accept YYYY-MM-DD (UTC / recorded date where EXIF has no timezone).
+
+For the existing paused phone library, tap **Start / resume indexing** once. Do not
+reset the index to make counters change. Search already discovered filenames while
+deep work continues. Physical acceptance remains required before advancing to new
+personal-intelligence features. See `docs/INDEXING_AUDIT.txt`,
+`docs/INDEXING_RESULTS.txt` and `docs/INDEXING_PHONE_CHECKS.txt`.
 
 Open **Settings → Choose what Keep Local can remember**. Authorize individual
 media categories and/or a document folder, then **Start / resume indexing**.
@@ -53,9 +67,9 @@ Never replace the signing identity or uninstall an app to fix a mismatch.
 
 `keep-local-compile.yml` prepares pinned models/test fixtures and runs Gradle
 assembly, JVM tests and lint. `keep-local-android.yml` signs exact compiled
-artifacts and tests an in-place update against the delivered 0.3.0 APK on API29
+artifacts and tests an in-place update against the delivered 0.4.0 APK on API29
 and API36. Model fixtures and unsigned/test APKs are not phone releases.
 
 The app never requires disabling Play Protect. Emulator installation does not
 establish physical-device compatibility or Play Protect approval. See
-`docs/DISCOVERY_04.txt` for evidence and remaining gates.
+`docs/INDEXING_RESULTS.txt` for release evidence and remaining gates.
