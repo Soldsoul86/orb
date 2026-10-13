@@ -67,6 +67,7 @@ object Discoveries {
         val d=db(c);val now=System.currentTimeMillis();d.beginTransaction();try {
             if(status!="share_requested")d.insertWithOnConflict("review_state",null,ContentValues().apply{put("discovery_id",id);put("status",status);put("feedback",feedback);put("correction",correction.take(4000));put("reviewed_at",now)},SQLiteDatabase.CONFLICT_REPLACE)
             d.insertOrThrow("review_events",null,ContentValues().apply{put("discovery_id",id);put("action",status);put("feedback",feedback);put("correction",correction.take(4000));put("created_at",now)})
+            if(status in listOf("kept","corrected"))record.evidence.forEach{e->d.delete("dismissed_evidence","type=? AND asset_uuid=? AND revision=?",arrayOf(record.type,e.uuid,e.revision))}
             if(status=="dismissed")record.evidence.forEach{e->d.execSQL("INSERT OR IGNORE INTO dismissed_evidence VALUES(?,?,?)",arrayOf(record.type,e.uuid,e.revision))}
             d.setTransactionSuccessful()
         }finally{d.endTransaction()}

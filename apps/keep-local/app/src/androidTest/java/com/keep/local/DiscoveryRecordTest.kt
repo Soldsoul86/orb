@@ -16,6 +16,10 @@ class DiscoveryRecordTest {
             assertEquals(original,db.get(id));assertEquals(evidence,Discoveries.get(c,key)!!.evidence)
             assertEquals("This is the spare camera warranty",Discoveries.get(c,key)!!.correction)
             Discoveries.review(c,key,"dismissed","duplicate")
+            // An explicit later Keep overrides prior dismissal for this evidence.
+            Discoveries.review(c,key,"kept","relevant")
+            assertEquals(0,db.readableDatabase.rawQuery("SELECT count(*) FROM dismissed_evidence WHERE asset_uuid=?",arrayOf(e.uuid)).use{it.moveToFirst();it.getInt(0)})
+            Discoveries.review(c,key,"dismissed","duplicate")
             db.writableDatabase.delete("discoveries","id=?",arrayOf(key))
             assertNull(Discoveries.propose(c,"document","New phrasing","Exact words","Unverified",listOf(e)))
             val fake=e.copy(uuid="wrong-identity",revision="not-a-real-revision")
