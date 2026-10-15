@@ -188,8 +188,8 @@ private fun contactStatus(s:String)=when(s) {
     }
 }
 
-@Composable internal fun PurposeEditor(existing:PurposeFacet?,onCancel:()->Unit,confirm:(PurposePolicy,Boolean)->Unit) {
-    var p by remember(existing?.id) { mutableStateOf(existing?.policy ?: PurposePolicy.template("Professional")) }
+@Composable internal fun PurposeEditor(existing:PurposeFacet?,onCancel:()->Unit,portable:Boolean=false,confirm:(PurposePolicy,Boolean)->Unit) {
+    var p by remember(existing?.id) { mutableStateOf(existing?.policy ?: PurposePolicy.template("Professional").let { if(portable)it.copy(timezone=java.time.ZoneId.systemDefault().id) else it }) }
     var description by remember { mutableStateOf("") }
     var problem by remember { mutableStateOf("") }
     var instructionPending by remember { mutableStateOf(false) }
@@ -211,12 +211,12 @@ private fun contactStatus(s:String)=when(s) {
     }
     if(existing==null) {
         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            listOf("Professional","Personal","Temporary sale").forEach { name -> TextButton({p=PurposePolicy.template(name);problem="";description="";instructionPending=false},contentPadding=PaddingValues(4.dp)) { Text(name,fontSize=11.sp) } }
+            listOf("Professional","Personal","Temporary sale").forEach { name -> TextButton({p=PurposePolicy.template(name).let {if(portable)it.copy(timezone=java.time.ZoneId.systemDefault().id) else it};problem="";description="";instructionPending=false},contentPadding=PaddingValues(4.dp)) { Text(name,fontSize=11.sp) } }
         }
         OutlinedTextField(description,{if(it.length<=500)description=it;instructionPending=it.isNotBlank()},label={Text("Describe your rules (optional)")},modifier=Modifier.fillMaxWidth())
-        TextButton({runCatching { PurposePolicy.interpret(description) }.onSuccess { p=it;problem="";instructionPending=false }.onFailure { instructionPending=true;problem=it.message.orEmpty() }}) { Text("Interpret supported wording") }
+        TextButton({runCatching { if(portable) PurposePolicy.interpretGlobal(description) else PurposePolicy.interpret(description) }.onSuccess { p=it;problem="";instructionPending=false }.onFailure { instructionPending=true;problem=it.message.orEmpty() }}) { Text("Interpret supported wording") }
         if(instructionPending)TextButton({description="";problem="";instructionPending=false}) { Text("Discard instruction and use the form") }
-        Text("Supported example: Weekdays, 9-6 India time; intro allowed, further messages require approval; text only.",fontSize=11.sp,color=PurposeMuted)
+        Text(if(portable) "Supported example: Weekdays, 9-6 local time; intro allowed, further messages require approval; text only." else "Supported example: Weekdays, 9-6 India time; intro allowed, further messages require approval; text only.",fontSize=11.sp,color=PurposeMuted)
     }
     if(problem.isNotEmpty())Text(problem,color=Color(0xFFFFD5A0),fontSize=12.sp)
     OutlinedTextField(p.displayName,{p=p.copy(displayName=it.take(60))},label={Text("Purpose name")},modifier=Modifier.fillMaxWidth())
@@ -224,12 +224,12 @@ private fun contactStatus(s:String)=when(s) {
     Text("Who can discover this?",fontWeight=FontWeight.Medium)
     DiscoveryMode.entries.forEach { d -> FilterChip(p.discovery==d,{p=p.copy(discovery=d)},label={Text(PurposePolicy.discoveryLabel(d))}) }
     Text("Contact requests",fontWeight=FontWeight.Medium)
-    listOf(RequestMode.REQUEST_APPROVAL to "One intro, then approval",RequestMode.AUTO_ACCEPT_WITH_LIMITS to "Auto-approve, with rate limits",RequestMode.DISABLED to "No new requests").forEach { (r,label) -> FilterChip(p.requests==r,{p=p.copy(requests=r)},label={Text(label)}) }
+    listOf(RequestMode.REQUEST_APPROVAL to "One intro, then approval",RequestMode.AUTO_ACCEPT_WITH_LIMITS to "Auto-approve, with rate limits",RequestMode.DISABLED to "No new requests").filter { !portable || it.first!=RequestMode.AUTO_ACCEPT_WITH_LIMITS }.forEach { (r,label) -> FilterChip(p.requests==r,{p=p.copy(requests=r)},label={Text(label)}) }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         FilterChip(p.weekdays==(1..5).toList(),{p=p.copy(weekdays=(1..5).toList())},label={Text("Weekdays")})
         FilterChip(p.weekdays==(1..7).toList(),{p=p.copy(weekdays=(1..7).toList())},label={Text("Every day")})
     }
-    OutlinedTextField(p.timezone,{p=p.copy(timezone=it)},label={Text("Timezone, e.g. Asia/Kolkata")},modifier=Modifier.fillMaxWidth())
+    OutlinedTextField(p.timezone,{p=p.copy(timezone=it)},label={Text("IANA timezone, e.g. Europe/London")},modifier=Modifier.fillMaxWidth())
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(start,{start=it.take(5)},label={Text("From HH:MM")},modifier=Modifier.weight(1f))
         OutlinedTextField(end,{end=it.take(5)},label={Text("Until HH:MM")},modifier=Modifier.weight(1f))
@@ -244,7 +244,7 @@ private fun contactStatus(s:String)=when(s) {
         FilterChip(p.expiresAt>0,{p=p.copy(expiresAt=now()/1000+7*86400)},label={Text("Expires in 7 days")})
     }
     if(existing!=null) PurposeStatus.entries.forEach { status -> FilterChip(p.status==status,{p=p.copy(status=status)},label={Text(status.name.lowercase().replaceFirstChar { it.uppercase() })}) }
-    Text("Text only · one introduction · silent in-app delivery. Documents, media, holidays and recovery are not enabled for purposes yet. Original chat media remains available.",fontSize=12.sp,color=PurposeMuted)
+    Text(if(portable) "Text only · one introduction · silent in-app delivery. Encrypted recovery preserves control and approved grants, not message history. Original chat media remains available." else "Text only · one introduction · silent in-app delivery. Documents, media, holidays and recovery are not enabled for purposes yet. Original chat media remains available.",fontSize=12.sp,color=PurposeMuted)
     Button({
         runCatching {
             fun minutes(v:String):Int { require(v.matches(Regex("[0-9]{2}:[0-9]{2}")));val parts=v.split(':').map(String::toInt);require(parts[1] in 0..59);return parts[0]*60+parts[1] }

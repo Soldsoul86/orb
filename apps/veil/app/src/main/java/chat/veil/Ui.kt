@@ -60,13 +60,14 @@ private val Shape = RoundedCornerShape(22.dp)
                     val snap = activity.snapshot
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         listOf("Chats","Discover","My identity").forEachIndexed { i,label ->
-                            TextButton({activity.closeViewer();activity.section=i}) { Text(label,color=if(activity.section==i)Mint else Muted,fontSize=12.sp) }
+                            TextButton({activity.closeViewer();activity.section=i;if(i==2)activity.portableScreen=true}) { Text(label,color=if(activity.section==i)Mint else Muted,fontSize=12.sp) }
                         }
                     }
                     if(activity.section==0) TextButton({activity.closeViewer();activity.legacyChat=!activity.legacyChat}) {
                         Text(if(activity.legacyChat) "Purpose chats · ${activity.purposeSnapshot?.contacts?.count { it.owner && it.status == "PENDING" } ?: 0} requests" else "Open personal chat",fontSize=11.sp)
                     }
                     when {
+                        activity.section==2 && activity.portableScreen -> PortableHome(activity)
                         activity.section!=0 || !activity.legacyChat -> PurposeHome(activity)
                         snap == null -> Text("Opening your private space…", color = Muted)
                         !snap.ready -> Setup(activity)

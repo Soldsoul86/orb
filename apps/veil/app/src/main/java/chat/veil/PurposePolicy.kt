@@ -62,6 +62,11 @@ data class PurposePolicy(
             "Temporary sale" -> PurposePolicy("Sale enquiry",discovery=DiscoveryMode.LINK_ONLY,expiresAt=at+7*86400)
             else -> error("Choose a supported template")
         }
+        fun interpretGlobal(text:String):PurposePolicy {
+            val normalized=text.trim().lowercase(java.util.Locale.ROOT).replace(Regex("\\s+")," ")
+            require(normalized=="weekdays, 9-6 local time; intro allowed, further messages require approval; text only.") {"Unsupported wording. Use the form and confirm every rule. Documents, exceptions and overnight hours are not supported."}
+            return template("Professional").copy(timezone=ZoneId.systemDefault().id)
+        }
         fun interpret(text: String): PurposePolicy {
             val normalized=text.trim().lowercase(java.util.Locale.ROOT).replace(Regex("\\s+")," ")
             // Deliberately exact grammar. No keyword-only inference that ignores negation/exceptions.

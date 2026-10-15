@@ -17,6 +17,12 @@ class PortableSession(
     private val transport: (String,String,JSONObject)->JSONObject,
     private val clock: ()->Long = {System.currentTimeMillis()/1000}
 ) {
+    private fun same(a:Any?,b:Any?):Boolean = when {
+        a is JSONObject && b is JSONObject -> a.keys().asSequence().toSet()==b.keys().asSequence().toSet() && a.keys().asSequence().all {same(a.get(it),b.get(it))}
+        a is JSONArray && b is JSONArray -> a.length()==b.length() && (0 until a.length()).all {same(a.get(it),b.get(it))}
+        a is Number && b is Number -> a.toString()==b.toString()
+        else -> a==b
+    }
     private fun commit() = save(db)
     private fun facets()=db.getJSONObject("facets")
     private fun contacts()=db.getJSONObject("contacts")
@@ -116,13 +122,13 @@ class PortableSession(
         require(r.getString("id")==c.getString("id") && r.getString("owner")==c.getString("owner") && r.getString("peer")==c.getString("peer"))
         val old=validateState(c.getString("owner_state"),c.getString("owner"))
         val owner=validateState(r.getString("owner_state"),c.getString("owner"),old.getLong("revision"))
-        if(owner.getLong("revision")==old.getLong("revision"))require(owner.similar(old))
+        if(owner.getLong("revision")==old.getLong("revision"))require(same(owner,old))
         require(owner.getString("route")==c.getString("route") && owner.getString("epoch")==old.getString("epoch")) {"New route/session requires explicit acceptance"}
         val peer=validateState(r.getString("peer_state"),c.getString("peer"))
         if(c.has("peer_state")) {
             val previous=validateState(c.getString("peer_state"),c.getString("peer"))
             require(peer.getLong("revision")>=previous.getLong("revision"))
-            if(peer.getLong("revision")==previous.getLong("revision"))require(peer.similar(previous))
+            if(peer.getLong("revision")==previous.getLong("revision"))require(same(peer,previous))
         }
         require(r.getString("epoch")==owner.getString("epoch"))
         val slot=channel(r.getString("slot"),c.getString("owner"),"owner",owner.getString("epoch"))
@@ -132,12 +138,15 @@ class PortableSession(
             if(c.has("grant")) {
                 val oldGrant=grant(c.getString("grant"),c.getString("owner"),c.getString("peer"),c.getString("id"))
                 require(g.getLong("revision")>=oldGrant.getLong("revision"))
-                if(g.getLong("revision")==oldGrant.getLong("revision"))require(g.similar(oldGrant))
-                require(oldGrant.getString("status")=="APPROVED" || g.similar(oldGrant))
+                if(g.getLong("revision")==oldGrant.getLong("revision"))require(same(g,oldGrant))
+                require(oldGrant.getString("status")=="APPROVED" || same(g,oldGrant))
             }
             c.put("grant",r.getString("grant"))
         } else require(!c.has("grant"))
         c.put("owner_state",r.getString("owner_state")).put("peer_state",r.getString("peer_state")).put("slot",slot.getString("slot")).put("slot_token",r.getString("slot")).put("status",r.getString("status"))
+        if(c.getString("local")==c.getString("owner")) {
+            require(values(contacts()).none {it.getString("id")!=c.getString("id") && it.getString("owner")==c.getString("owner") && it.optString("slot")==slot.getString("slot")}) {"Prekey slot reuse"}
+        }
         if(!c.has("signal")) {
             val signal=if(c.getString("local")==c.getString("owner")) {
                 JSONObject(facet(c.getString("local")).getJSONObject("slots").getJSONObject(slot.getString("slot")).getJSONObject("signal").toString())
@@ -148,7 +157,7 @@ class PortableSession(
         }
         if(!r.isNull("channel")) {
             val cp=channel(r.getString("channel"),c.getString("peer"),"peer",owner.getString("epoch"),slot.getString("slot"),c.getString("id"))
-            if(c.has("channel"))require(Core.verify(c.getString("channel"),c.getString("peer"),Core.CHANNEL).similar(cp))
+            if(c.has("channel"))require(same(Core.verify(c.getString("channel"),c.getString("peer"),Core.CHANNEL),cp))
             c.put("channel",r.getString("channel"))
             if(c.getString("local")==c.getString("owner")) c.getJSONObject("signal").put("peer",cp.getJSONObject("bundle"))
         }
@@ -243,6 +252,7 @@ class PortableSession(
                 val e=messages.getJSONObject(n);val seen=c.getJSONArray("seen");val mid=e.getString("id")
                 if((0 until seen.length()).none {seen.getString(it)==mid}) {
                     require(seen.length()<10000) {"Conversation limit reached"}
+                    if(c.getString("status")!="APPROVED")require(c.getString("local")==c.getString("owner") && seen.length()==0) {"Only one introduction before approval"}
                     val decoded=PurposeCipher.open(c.getJSONObject("signal"),e.getString("body").unb64())
                     require(decoded.getString("id")==mid && decoded.getLong("expires")==e.getLong("expires"))
                     if(decoded.getLong("expires")>clock())c.getJSONArray("messages").put(decoded.put("mine",false))

@@ -32,6 +32,24 @@ class MainActivity : FragmentActivity() {
     var attachment by mutableStateOf<Pair<String, ByteArray>?>(null); private set
     var invitation by mutableStateOf(""); private set
     var section by mutableStateOf(0)
+    var portableScreen by mutableStateOf(true)
+    var portableSnapshot by mutableStateOf<org.json.JSONObject?>(null); private set
+    var portableNotice by mutableStateOf(""); private set
+    var portableBackup by mutableStateOf(""); private set
+    var portableFileName by mutableStateOf(""); private set
+    private var pendingPortableFile: Uri? = null
+    private var encryptedExport: String? = null
+    private val portableOpen = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        pendingPortableFile=uri
+        if(unlocked)readPortableFile()
+    }
+    private val portableSave = registerForActivityResult(ActivityResultContracts.CreateDocument("application/jose")) { uri ->
+        val encrypted=encryptedExport;encryptedExport=null
+        if(uri!=null && encrypted!=null)lifecycleScope.launch(Dispatchers.IO) {
+            val ok=runCatching {contentResolver.openOutputStream(uri,"wt")!!.use {it.write(encrypted.toByteArray())}}.isSuccess
+            withContext(Dispatchers.Main) {if(unlocked)portableNotice=if(ok) "Encrypted backup saved. Keep the recovery key separately." else "Backup could not be saved. Try again."}
+        }
+    }
     var legacyChat by mutableStateOf(true)
     var purposeSnapshot by mutableStateOf<PurposeSnapshot?>(null); private set
     var purposeListings by mutableStateOf<List<PurposeListing>>(emptyList()); private set
@@ -109,6 +127,7 @@ class MainActivity : FragmentActivity() {
         attachment?.second?.fill(0); attachment = null
         invitation = ""; snapshot = null; notice = ""
         purposeSnapshot = null; purposeListings = emptyList(); purposeTarget = null; purposeNotice = ""; purposeLinkInput = ""
+        portableSnapshot=null;portableNotice="";portableBackup="";portableFileName=""
         polling?.cancel(); polling = null
     }
     fun unlock() {
@@ -232,6 +251,45 @@ class MainActivity : FragmentActivity() {
         pendingQr=null
         purposeAction({ contentResolver.openInputStream(uri)?.use(PurposeQr::read) ?: error("Image unavailable") }) {
             purposeLinkInput=it;section=1
+        }
+    }
+    fun portableAction(block: PortableSession.()->Unit = {}) {
+        if(!unlocked || busy)return
+        busy=true;portableNotice="";val token=generation
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) {mutex.withLock {runCatching {
+                val vault=Vault(this@MainActivity,"identity.v1")
+                val session=PortableSession(vault.read(),vault::write,{origin,path,data -> RelayClient(origin).request("POST",path,data=data)})
+                session.block();session.snapshot()
+            }}}
+            if(unlocked && generation==token) {
+                busy=false;result.onSuccess {portableSnapshot=it;readPortableFile()}.onFailure {portableNotice="Action incomplete. Check the provider, signed identity, permissions or recovery key. Stored identities were not reset. Refresh to retry delivery."}
+            }
+        }
+    }
+    fun choosePortableFile() {if(unlocked && !busy)portableOpen.launch(arrayOf("*/*"))}
+    private fun readPortableFile() {
+        val uri=pendingPortableFile ?: return
+        if(!unlocked || busy)return
+        pendingPortableFile=null;val token=generation;busy=true
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) {runCatching {contentResolver.openInputStream(uri)!!.use {input ->
+                val out=ByteArrayOutputStream();val buffer=ByteArray(8192)
+                while(true) {val n=input.read(buffer);if(n<0)break;require(out.size()+n<=6*1024*1024);out.write(buffer,0,n)}
+                out.toString("UTF-8")
+            }}}
+            if(unlocked && generation==token) {busy=false;result.onSuccess {portableBackup=it;portableFileName="Encrypted package selected"}.onFailure {portableNotice="Could not read the encrypted package."}}
+        }
+    }
+    fun savePortableBackup(key:String) {
+        if(!unlocked || busy)return
+        busy=true;val token=generation
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) {mutex.withLock {runCatching {
+                val vault=Vault(this@MainActivity,"identity.v1")
+                PortableSession(vault.read(),vault::write,{_,_,_->error("Export is offline")}).exportIdentity(key)
+            }}}
+            if(unlocked && generation==token) {busy=false;result.onSuccess {encryptedExport=it;portableSave.launch("identity-backup.jwe")}.onFailure {portableNotice="Could not create backup."}}
         }
     }
     fun prepareAndShareInvite() = action({ invitation() }) {
