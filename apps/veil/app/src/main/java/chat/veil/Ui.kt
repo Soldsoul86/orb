@@ -71,33 +71,54 @@ private val Shape = RoundedCornerShape(22.dp)
     }
 }
 
+// Default for new installations only; an existing inbox keeps its stored relay and identity.
+private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
+
 @Composable private fun Setup(a: MainActivity) {
-    var relay by remember { mutableStateOf("") }
+    var customServer by remember { mutableStateOf(false) }
+    var relay by remember { mutableStateOf(DefaultRelay) }
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Spacer(Modifier.height(28.dp))
         Text("A quiet place\nfor two.", fontSize = 36.sp, lineHeight = 41.sp, fontWeight = FontWeight.SemiBold)
-        Text("Connect both phones to the same relay. It delivers encrypted envelopes; your keys stay on your phones.", color = Muted, lineHeight = 23.sp)
-        OutlinedTextField(relay, { relay = it }, label = { Text("Relay HTTPS address") }, placeholder = { Text("https://relay.example.com") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
-        Button({ a.setup(relay) }, enabled = !a.busy && relay.startsWith("https://"), modifier = Modifier.fillMaxWidth()) { Text("Create my private inbox") }
-        PrivacyCard("01  Pair privately", "Exchange invitations, then compare identity codes together.")
-        PrivacyCard("02  Choose the moment", "Protected is the default. Eyes-Only adds hold-to-read text and concealed media.")
+        Text("Start your private space, then invite one person. Only your phones hold the keys to your conversations.", color = Muted, lineHeight = 23.sp)
+        Button({ a.setup(if (customServer) relay.trim() else DefaultRelay) },
+            enabled = !a.busy && (!customServer || relay.trim().startsWith("https://")),
+            modifier = Modifier.fillMaxWidth().height(54.dp)) {
+            Text(if (a.busy) "Connecting…" else "Get started")
+        }
+        if (a.busy) Text("The first connection can take a moment.", color = Muted, fontSize = 12.sp)
+        TextButton({ customServer = !customServer }, enabled = !a.busy) {
+            Text(if (customServer) "Use Veil’s server" else "Use another server", fontSize = 12.sp)
+        }
+        if (customServer) {
+            OutlinedTextField(relay, { relay = it }, label = { Text("Server HTTPS address") },
+                singleLine = true, enabled = !a.busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
+            Text("You and your friend need the same server.", color = Muted, fontSize = 12.sp)
+        }
+        PrivacyCard("01  Invite your person", "Share an invitation privately and paste the one they send back.")
+        PrivacyCard("02  Make sure it’s them", "Compare identity codes together, then start your conversation.")
         Text("Early development build · one conversation per installation", fontSize = 12.sp, color = Muted)
     }
 }
 @Composable private fun Pairing(a: MainActivity) {
     var invite by remember { mutableStateOf("") }
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Invite one person.", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
-        Text("Both phones exchange an invitation. Share yours before importing theirs. Invitations expire after 24 hours.", color = Muted)
-        Button(a::createInvite, enabled = !a.busy, modifier = Modifier.fillMaxWidth()) { Text("Prepare my invitation") }
-        if (a.invitation.isNotEmpty()) {
-            Text("Invitation ready. Send it through a trusted channel, or transfer it in person.", color = Mint)
-            OutlinedButton(a::shareInvite, modifier = Modifier.fillMaxWidth()) { Text("Share invitation") }
+        Text("Invite your person.", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
+        Text("You each send one invitation. Both of you should send yours before connecting.", color = Muted)
+        Text("1  Send yours", color = Mint, fontWeight = FontWeight.Medium)
+        Button(a::prepareAndShareInvite, enabled = !a.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+            Text("Share my invitation")
         }
-        OutlinedTextField(invite, { if (it.length < 8192) invite = it }, label = { Text("Their invitation") }, minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth())
-        Button({ a.pair(invite.trim()) }, enabled = !a.busy && invite.startsWith("veil1:"), modifier = Modifier.fillMaxWidth()) { Text("Connect this person") }
-        Text("Invitations contain public encryption keys and permission to send to your inbox. They never contain your private keys.", color = Muted, fontSize = 12.sp)
+        Text("Send it privately through an app you already use. Return to Veil and unlock when you’re done.", color = Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(4.dp))
+        Text("2  Add theirs", color = Mint, fontWeight = FontWeight.Medium)
+        OutlinedTextField(invite, { if (it.length < 8192) invite = it },
+            label = { Text("Paste their invitation") }, minLines = 3, maxLines = 5,
+            modifier = Modifier.fillMaxWidth())
+        Button({ a.pair(invite.trim()) }, enabled = !a.busy && invite.trim().startsWith("veil1:"),
+            modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Connect with my person") }
+        Text("Next: compare identity codes together. Invitations expire after 24 hours.", color = Muted, fontSize = 12.sp)
     }
 }
 @Composable private fun Identity(a: MainActivity, s: Snapshot) {

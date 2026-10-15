@@ -145,8 +145,11 @@ class MainActivity : FragmentActivity() {
         }
     }
     fun setup(url: String) = action({ setup(url); snapshot() }) { snapshot = it }
-    fun createInvite() = action({ invitation() }) { invitation = it }
-    fun shareInvite() {
+    fun prepareAndShareInvite() = action({ invitation() }) {
+        invitation = it
+        shareInvite()
+    }
+    private fun shareInvite() {
         if (invitation.isNotEmpty()) startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"; putExtra(Intent.EXTRA_TEXT, invitation)
         }, "Exchange privately"))

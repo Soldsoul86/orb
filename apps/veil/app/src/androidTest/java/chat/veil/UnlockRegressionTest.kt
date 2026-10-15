@@ -31,7 +31,7 @@ class UnlockRegressionTest {
 
     private fun awaitSetup() {
         compose.waitUntil(10_000) { compose.activity.snapshot != null }
-        compose.onNodeWithText("Relay HTTPS address").assertIsDisplayed()
+        compose.onNodeWithText("Get started").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(compose.activity.unlocked)
             // Compose semantics alone would pass even with the opaque native cover on top.
