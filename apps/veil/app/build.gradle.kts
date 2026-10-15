@@ -31,7 +31,7 @@ android {
             keyPassword = "android"
         }
     }
-    testOptions { unitTests.all { it.systemProperty("veil.relayDir", rootProject.file("relay").absolutePath) } }
+    testOptions { unitTests.all { it.systemProperty("veil.relayDir", rootProject.file("relay").absolutePath); it.systemProperty("veil.providerDir", rootProject.file("portable-provider").absolutePath) } }
     buildFeatures { compose = true }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -44,6 +44,7 @@ android {
         resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "libsignal_jni*.dylib", "signal_jni*.dll", "libsignal_jni*.so") }
 }
 dependencies {
+    implementation(project(":identity-core"))
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.material3:material3")

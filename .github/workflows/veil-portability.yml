@@ -22,10 +22,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r apps/veil/portable-provider/requirements.txt
+      - run: python -m unittest discover -s apps/veil/portable-provider -v
+      - uses: android-actions/setup-android@v3
       - name: Provider-neutral identity core
-        run: gradle -p apps/veil --no-daemon :identity-core:test --stacktrace
+        run: gradle -p apps/veil --no-daemon :identity-core:test :app:testDebugUnitTest --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: portability-core-reports
-          path: apps/veil/identity-core/build/reports/
+          path: |
+            apps/veil/identity-core/build/reports/
+            apps/veil/app/build/reports/tests/
