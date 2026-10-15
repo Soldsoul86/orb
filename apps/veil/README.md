@@ -4,6 +4,12 @@ An Android-first, one-to-one messenger with concealed media, hold-to-reveal inte
 
 **Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy tests and all 10 relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. Two-device delivery and physical capture tests remain NOT TESTED. Do not use this development build for consequential secrets.
 
+## Latest download / unlock fix
+
+[Download 0.1.1-dev APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411). Extract and install `veil-debug.apk`. This fixes the privacy cover remaining after successful unlock. Four Android 15 emulator tests now verify the unlock/native concealment transitions. The tests inject the accepted authentication callback; physical fingerprint/PIN behavior still needs a retest.
+
+The previous APK used a different temporary debug signing key. Uninstall the old **Veil** first, then install this version. Uninstalling clears Veil’s local identity and messages. [Details and checksum](docs/STATUS.md).
+
 ## Implemented in source
 
 - Two-way invitation exchange, pinned peer identity and explicit full-code comparison.

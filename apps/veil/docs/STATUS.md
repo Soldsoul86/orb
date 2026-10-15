@@ -1,5 +1,23 @@
 # Delivery report — 2026-10-15
 
+## Latest APK: 0.1.1-dev — unlock cover fix
+
+**Use this replacement:** [APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411) · [successful build](https://github.com/Soldsoul86/orb/actions/runs/38707141433).
+
+The user installed 0.1.0 on a phone and reported that “Veil is locked / Tap to unlock” remained after authentication. Fixed the Compose state observation that left the native privacy cover on top. [Cause, test design and upgrade instructions](UNLOCK_FIX.md).
+
+- Code commit `598746ab36d6329d369e0d65c8c234ae4e6c40d2`; version code 2, `0.1.1-dev`.
+- **PASS:** 4 Android 15/API 35 x86_64 emulator instrumentation tests: successful unlock removes the native cover; background/focus loss and repeated unlock; native hold/release/cancel/focus concealment; FLAG_SECURE present before authentication.
+- The unlock tests supply an accepted authentication callback using test-only reflection. They do not test the OS biometric/PIN matcher. A retest on the affected phone is required.
+- **PASS:** 10 relay tests, 6 JVM tests including actual native Signal, debug/test APK compilation, APK v2 signature and downloaded checksum.
+- Lint: **0 errors, 27 warnings**, unchanged from the previous build.
+- APK: 72,714,690 bytes. ZIP: 32,470,903 bytes.
+- APK SHA-256: `465e294593ea868ed34bddfd8963d1b2a79c33b4b613f37b2550355af3cd4aba`.
+- The old and new APK signing certificates differ (confirmed from their v2 signing blocks). **Uninstall the old Veil before installing this replacement; uninstall deletes its local identity/messages.** Do not uninstall unrelated Orb applications. The new debug key is cached for future CI builds; cache eviction remains a limitation.
+- Two-phone end-to-end delivery, Android-native Signal tests, OS capture/recording/casting and optical watermark tests remain **NOT TESTED / DEVICE REQUIRED**. Passing view tests on an emulator is not a physical capture guarantee.
+
+The sections below preserve the original 0.1.0 delivery record; the newer results above supersede its build/emulator status.
+
 ## 1. Actually built
 
 An Android Kotlin/Compose source project named **Veil**, with setup/pairing, an identity-comparison gate, one-conversation list, chat composer, media picker, Normal/Protected/Eyes-Only selection, a native protected media viewer, animated repeated watermark and sender expiration controls. Source includes real libsignal calls, Android Keystore vault encryption, HTTP relay transport, persistent ratchet/outbox/inbox handling and biometric/device-credential app entry. The Python/SQLite relay and local tests execute without external packages.
