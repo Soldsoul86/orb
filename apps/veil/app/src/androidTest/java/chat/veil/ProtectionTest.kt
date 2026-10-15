@@ -12,6 +12,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(AndroidJUnit4::class)
 class ProtectionTest {
@@ -33,6 +34,14 @@ class ProtectionTest {
                 a.addContentView(view, android.view.ViewGroup.LayoutParams(300, 300))
             }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            // Activity RESUMED / main-loop idle can precede window focus on a cold emulator.
+            // Wait for the actual precondition instead of mistaking that race for a reveal failure.
+            val focused = AtomicBoolean(false)
+            val deadline = SystemClock.uptimeMillis() + 10_000
+            while (!focused.get() && SystemClock.uptimeMillis() < deadline) {
+                scenario.onActivity { focused.set(view!!.hasWindowFocus()) }
+                if (!focused.get()) Thread.sleep(50)
+            }
             scenario.onActivity {
                 val v = view!!
                 assertTrue("Device must be awake and unlocked", v.hasWindowFocus())
