@@ -1,0 +1,54 @@
+name: Veil APK
+on:
+  push:
+    branches: ['codex/veil-apk']
+    paths: ['apps/veil/**', '.github/workflows/veil-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: veil-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/veil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android platform
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Relay tests
+        run: python3 -m unittest discover -s relay -v
+      - name: Compile and test Android
+        run: gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --stacktrace
+      - name: Verify signed APK
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk veil-debug.apk
+          sha256sum veil-debug.apk > veil-debug.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veil-debug-apk
+          path: |
+            apps/veil/veil-debug.apk
+            apps/veil/veil-debug.apk.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: veil-build-reports
+          path: |
+            apps/veil/app/build/reports/
+            apps/veil/app/build/outputs/logs/
+          if-no-files-found: ignore

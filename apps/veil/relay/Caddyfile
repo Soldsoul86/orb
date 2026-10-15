@@ -1,0 +1,16 @@
+{$VEIL_DOMAIN} {
+    request_body {
+        max_size 12MB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        Cache-Control "no-store"
+        -Server
+    }
+    reverse_proxy 127.0.0.1:8080 {
+        header_up -X-Forwarded-For
+        header_up -X-Forwarded-Host
+        header_up -X-Forwarded-Proto
+    }
+    # Intentionally no access-log directive. Do not add request body/header logging.
+}
