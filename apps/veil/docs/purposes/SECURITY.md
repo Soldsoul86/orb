@@ -1,0 +1,21 @@
+# Purpose threat model
+
+| Threat | Protection / verification | Residual risk |
+|---|---|---|
+| Guessing private addresses | Random 128-bit aliases; UNLISTED additionally checks a hashed 256-bit invite capability; search omits private/link-only facets; API tests | Link forwarding, clipboard/browser history, compromised device can leak invitations |
+| Public scraping | Explicit publication consent, registered device, query/rate/result bounds, no account IDs; policy/UI/API tests | Public descriptions are public. Sybil accounts and offline correlation remain possible |
+| Spam / harassment | One introduction per account/facet, atomic limits, per-facet grants, rejection/block, quotas and abuse reports; concurrency tests | A new device account can bypass account-specific blocking; global caps can be exhausted for denial of service |
+| Persona correlation | Independent random addresses; independent per-contact Signal identities; no public account-wide key; response tests | Operator sees account→facet/grant mappings, IPs, timing and sizes; users can correlate names, prose and schedules |
+| Forged or rerouted request | Fresh consumed Signal bundle for each contact, authenticated encrypted grant/facet/message context, exact bound requester capability; native crypto and network tests | Directory supplies first-contact keys (TOFU). A compromised directory can substitute keys before comparison; safety numbers require independent trusted comparison |
+| Replay / concurrent quota bypass | Durable ciphertext retries, receipts, transaction/advisory lock, consumed slot never reused; two-connection tests | Availability attacks; client crash boundaries still need physical stress testing |
+| Stale client after revocation | Server checks current grant/purpose every PUT/GET, queued deletion; API tests | Cannot retract plaintext already received; compromised server can disregard permission policy |
+| Timezones / clock manipulation | Trusted server UTC→IANA local conversion; half-open intervals; Kolkata, Auckland spring/fall tests | Bad server clock/tzdata or compromised server; cached local messages and sender UI expiry still depend on device clock |
+| Device loss / recovery compromise | Existing Keystore wrapping, no auto-backup; visible recovery-unavailable warning | No recovery export/transfer yet. Clearing data/lost device loses all keys. Debuggable development builds are not production secret stores |
+| Backend/database compromise | Only ciphertext and public bundles, auth hashes and necessary routing/policy metadata stored; actual Signal/HTTP canary test | Initial key substitution, metadata exposure, policy bypass/denial, traffic analysis. No anonymity or audited integration claim |
+| Logs / previews / browser | No app/relay content logs; search uses POST body; private invite in URL fragment; static no-message landing, CSP/no-referrer/no third-party assets; source/tests | Hosting logs, OS/browser history/clipboard and system intent logging are not fully controlled |
+| Untrusted policy prose | Exact narrow grammar plus editable typed form; unsupported input blocks review until corrected or explicitly discarded; tests | Human confirmation can still approve unintended rules; no open-ended language understanding is claimed |
+| Content policy evasion | Server checks declared type, recipient checks authenticated type and text length | Text can encode files or other information. Encrypted bytes cannot be semantically inspected without weakening E2EE |
+
+Existing capture restrictions, watermark limitations and second-camera/root-device bypasses remain as documented in ../SECURITY.md. New screens use the same secure Activity and immediate lock curtain. Purpose chat currently supports text only; no new media-export surface exists. Copy/share controls intentionally expose purpose links, not private message bodies. Clipboard retention is explained at the copy action.
+
+Do not deploy this as an audited production identity system. Highest release gates: durable private app-signing custody, first-contact key-authenticity review, deterministic multi-device state/rollback tests, recovery design and physical UX/capture testing. No server-held decryption master key exists. The uploaded task does not authorize publishing the user's actual profiles; listings are created only by explicit in-app confirmation.

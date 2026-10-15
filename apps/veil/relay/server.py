@@ -129,7 +129,8 @@ def handler(relay):
             self.connection.settimeout(15)
             try:
                 length = int(self.headers.get('Content-Length', '0'))
-                if length < 0 or length > MAX_BODY:
+                limit = 128*1024 if self.path.startswith('/v2/') else MAX_BODY
+                if length < 0 or length > limit:
                     self.reply(413, {'error': 'too large'}); return
                 data = json.loads(self.rfile.read(length)) if length else {}
                 if not isinstance(data, dict): raise ValueError()

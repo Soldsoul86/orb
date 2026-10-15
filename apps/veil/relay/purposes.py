@@ -94,9 +94,11 @@ class Purposes:
         if not a: return 401,{'error':'unknown device credential'}
         account=a[0]
         if not self.limit('api:'+account,180,60,at): return 429,{'error':'request limit'}
-        if method=='GET' and u.path=='/v2/directory':
+        if method=='POST' and u.path=='/v2/directory':
             if not self.limit('search:'+account,30,60,at): return 429,{'error':'search limit'}
-            q=parse_qs(u.query).get('q',[''])[0].strip().casefold()
+            q=data.get('query','')
+            if not isinstance(q,str): raise PolicyError('query')
+            q=q.strip().casefold()
             if len(q)>80: raise PolicyError('query')
             rows=self.db.execute('SELECT id,owner,alias,invite,policy,created,updated FROM p_facets ORDER BY updated DESC').fetchall()
             result=[]
@@ -227,6 +229,7 @@ class Purposes:
                     elif g[5]!='APPROVED': return 403,{'error':'approval required'}
                     # Intro submission is allowed any time; attention/display still follows hours.
                     if not intro and not is_open(p,at) and p['outside_hours_behavior']=='REJECT': return 403,{'error':'outside permitted hours'}
+                    if self.db.execute('SELECT count(*) FROM p_receipts').fetchone()[0]>=50000: return 429,{'error':'receipt capacity'}
                     if not self.limit('send:'+g[0]+':'+account,30,60,at): return 429,{'error':'message rate limit'}
                     if self.db.execute('SELECT count(*) FROM p_messages WHERE grant_id=?',(g[0],)).fetchone()[0]>=50 or self.db.execute('SELECT coalesce(sum(length(body)),0) FROM p_messages').fetchone()[0]+len(body)>64*1024*1024: return 429,{'error':'queue full'}
                     self.db.execute('INSERT INTO p_messages VALUES(?,?,?,?,?,?,?)',(g[0],mid,account,body,kind,expiry,at))

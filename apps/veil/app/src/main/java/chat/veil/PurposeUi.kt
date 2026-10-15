@@ -19,6 +19,16 @@ import androidx.compose.ui.unit.sp
 
 private val PurposeMint=Color(0xFFB5F4CF)
 private val PurposeMuted=Color(0xFF91A5AF)
+private fun contactStatus(s:String)=when(s) {
+    "RESERVED" -> "Preparing request"
+    "PENDING" -> "Awaiting approval"
+    "APPROVED" -> "Approved"
+    "REJECTED" -> "Request declined"
+    "BLOCKED" -> "Blocked"
+    "REVOKED" -> "Access revoked"
+    "EXPIRED" -> "Expired"
+    else -> "Unavailable"
+}
 
 @Composable fun ColumnScope.PurposeHome(a:MainActivity) {
     val s=a.purposeSnapshot
@@ -82,7 +92,8 @@ private val PurposeMuted=Color(0xFF91A5AF)
                 s.contacts.forEach { c ->
                     PurposePanel {
                         Text(c.policy.displayName,fontSize=20.sp,fontWeight=FontWeight.Medium)
-                        Text("${if(c.owner) "Your purpose" else "Contacted purpose"} · ${c.status.lowercase().replaceFirstChar { it.uppercase() }}",color=PurposeMint,fontSize=12.sp)
+                        Text("${if(c.owner) "Your purpose" else "Contacted purpose"} · ${contactStatus(c.status)}",color=PurposeMint,fontSize=12.sp)
+                        Text("Contact ${c.id.take(8)}",color=PurposeMuted,fontSize=11.sp)
                         Text(if(c.compared) "Safety number compared" else "Identity not compared",color=PurposeMuted,fontSize=12.sp)
                         Button({contactId=c.id},modifier=Modifier.fillMaxWidth()) { Text(if(c.owner && c.status=="PENDING") "Review request" else "Open conversation") }
                     }
@@ -110,6 +121,7 @@ private val PurposeMuted=Color(0xFF91A5AF)
             else -> {
                 Text("My purposes",fontSize=28.sp,fontWeight=FontWeight.SemiBold)
                 Text("Separate addresses. Different boundaries.",color=PurposeMuted)
+                Text("Early pilot · four first contacts per purpose. Invitation replenishment is not available yet.",color=PurposeMuted,fontSize=11.sp)
                 Button({editing=true;editFacet=null},enabled=!a.busy && s.facets.size<8,modifier=Modifier.fillMaxWidth()) { Text("Create contact purpose") }
                 s.facets.forEach { f -> PurposePanel {
                     Text(f.policy.displayName,fontSize=21.sp,fontWeight=FontWeight.Medium)
@@ -143,9 +155,10 @@ private val PurposeMuted=Color(0xFF91A5AF)
     var confirmRevoke by remember(c.id) { mutableStateOf(false) }
     TextButton(back) { Text("‹ Chats") }
     Text(c.policy.displayName,fontSize=26.sp,fontWeight=FontWeight.SemiBold)
-    Text("${c.status.lowercase()} · ${c.policy.timezone} · text only",color=PurposeMint,fontSize=12.sp)
+    Text("${contactStatus(c.status)} · ${c.policy.timezone} · text only",color=PurposeMint,fontSize=12.sp)
     Text("Messages expire seven days after sending, including queued time. Receiving requires Veil open and unlocked.",color=PurposeMuted,fontSize=11.sp)
-    TextButton({identity=!identity}) { Text(if(c.compared) "Safety number compared" else "Identity not compared · check number") }
+    TextButton({identity=!identity}) { Text("Contact ${c.id.take(8)}",color=PurposeMuted,fontSize=11.sp)
+                        Text(if(c.compared) "Safety number compared" else "Identity not compared · check number") }
     if(identity) {
         Text("Compare every group in person or on a trusted call. Both phones must show the same number.",fontSize=12.sp,color=PurposeMuted)
         Text(c.safetyNumber.chunked(5).chunked(3).joinToString("\n") { it.joinToString(" ") },fontFamily=FontFamily.Monospace,fontSize=18.sp)

@@ -39,7 +39,7 @@ class PurposeNetworkTest {
             for((id,p) in listOf(work to PurposePolicy.template("Professional").copy(discovery=DiscoveryMode.PUBLIC_SEARCHABLE),privateFacet to PurposePolicy.template("Personal"),sale to PurposePolicy.template("Temporary sale",Instant.parse("2026-10-19T06:00:00Z").epochSecond))) {
                 assertEquals(201,request("POST","/v2/facets",owner,JSONObject().put("id",id).put("invite",secret()).put("policy",p.json()).put("publish_confirmed",id==work)).first)
             }
-            val (searchCode,search)=request("GET","/v2/directory?q=Work",visitor)
+            val (searchCode,search)=request("POST","/v2/directory",visitor,JSONObject().put("query","Work"))
             assertEquals(200,searchCode);assertEquals(1,search.getJSONArray("listings").length())
             assertEquals(work,search.getJSONArray("listings").getJSONObject(0).getString("id"))
             assertFalse(search.toString().contains(privateFacet));assertFalse(search.toString().contains("account_id"))

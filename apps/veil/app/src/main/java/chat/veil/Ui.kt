@@ -64,7 +64,7 @@ private val Shape = RoundedCornerShape(22.dp)
                         }
                     }
                     if(activity.section==0) TextButton({activity.closeViewer();activity.legacyChat=!activity.legacyChat}) {
-                        Text(if(activity.legacyChat) "Show purpose conversations" else "Open original private chat",fontSize=11.sp)
+                        Text(if(activity.legacyChat) "Purpose chats · ${activity.purposeSnapshot?.contacts?.count { it.owner && it.status == "PENDING" } ?: 0} requests" else "Open personal chat",fontSize=11.sp)
                     }
                     when {
                         activity.section!=0 || !activity.legacyChat -> PurposeHome(activity)

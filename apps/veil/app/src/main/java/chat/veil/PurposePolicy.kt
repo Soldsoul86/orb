@@ -43,7 +43,7 @@ data class PurposePolicy(
         return "${displayName}\n${discoveryLabel(discovery)} · text only\n$days, ${hour(start)}–${hour(end)} · $timezone\n"+
             (when(requests) { RequestMode.DISABLED -> "New requests disabled"; RequestMode.REQUEST_APPROVAL -> "One introduction, then your approval"; RequestMode.AUTO_ACCEPT_WITH_LIMITS -> "Automatically approve introductions, with rate limits" })+
             "\n"+(if(outside==OutsideHours.ACCEPT_AND_QUEUE) "Outside hours: queue until open" else "Outside hours: reject new messages")+
-            "\nIntroductions may arrive any time; reveal only during hours.\nAccess expires after $inactivityDays inactive days. Silent in-app delivery."+
+            "\nIntroductions may arrive any time; reveal only during hours.\nAccess expires after $inactivityDays inactive days. Silent in-app delivery. Pilot grants last at most 90 days."+
             (if(expiresAt>0) "\nPurpose expires ${java.time.Instant.ofEpochSecond(expiresAt)}." else "")
     }
     companion object {

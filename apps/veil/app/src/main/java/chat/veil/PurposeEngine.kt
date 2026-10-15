@@ -66,8 +66,8 @@ class PurposeEngine(context: Context) {
         f.put("policy",result.getJSONObject("policy"));save(s)
     }
     fun search(query:String):List<PurposeListing> {
-        val s=load();val encoded=java.net.URLEncoder.encode(query,Charsets.UTF_8.name())
-        return api(s,"GET","/directory?q=$encoded").getJSONArray("listings").objects().map(::listing)
+        val s=load()
+        return api(s,"POST","/directory",JSONObject().put("query",query)).getJSONArray("listings").objects().map(::listing)
     }
     private fun listing(j:JSONObject)=PurposeListing(j.getString("id"),j.getString("alias"),PurposePolicy.from(j.getJSONObject("policy")))
     fun lookup(link:String):PurposeListing {

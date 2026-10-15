@@ -78,8 +78,8 @@ class PurposeTests(unittest.TestCase):
         p=policy(**kw);p['policy_version']=json.loads(self.r.purposes.facet(self.fid)[4])['policy_version']+1
         return self.call('PUT','/facets/'+self.fid,self.owner,dict(policy=p,publish_confirmed=True))
     def test_no_phone_and_no_public_account_identifier(self):
-        for path in ('/directory?q=consult','/facets'):
-            code,result=self.call('GET',path,self.owner);self.assertEqual(code,200)
+        for path in ('/directory','/facets'):
+            code,result=self.call('POST' if path=='/directory' else 'GET',path,self.owner);self.assertEqual(code,200)
             rendered=json.dumps(result)
             for name in ('account_id','owner','auth','email','phone','requester'):self.assertNotIn('"'+name+'"',rendered)
             self.assertNotIn(self.owner,rendered)
@@ -89,7 +89,7 @@ class PurposeTests(unittest.TestCase):
         for mode in ('UNLISTED','LINK_ONLY'):
             fid=secrets.token_hex(16);ids.append(fid)
             code,f=self.call('POST','/facets',self.owner,dict(id=fid,invite=self.invite,policy=policy(discovery_mode=mode)));self.assertEqual(code,201)
-            self.assertNotIn(fid,json.dumps(self.call('GET','/directory',self.visitor)[1]))
+            self.assertNotIn(fid,json.dumps(self.call('POST','/directory',self.visitor)[1]))
             code,_=self.call('POST','/lookup',self.visitor,dict(alias=f['alias']))
             self.assertEqual(code,404 if mode=='UNLISTED' else 200)
             self.assertEqual(self.call('POST','/lookup',self.visitor,dict(alias=f['alias'],invite=self.invite))[0],200)
@@ -100,7 +100,7 @@ class PurposeTests(unittest.TestCase):
         self.call('POST','/facets',self.owner,dict(id=other,invite=self.invite,policy=policy(discovery_mode='UNLISTED')))
         self.update(status='PAUSED')
         self.assertEqual(json.loads(self.r.purposes.facet(other)[4])['status'],'ACTIVE')
-        self.assertEqual(self.call('GET','/directory',self.visitor)[1]['listings'],[])
+        self.assertEqual(self.call('POST','/directory',self.visitor)[1]['listings'],[])
     def test_request_is_one_intro_not_unlimited_access_and_foreign_account_denied(self):
         gid,env=self.intro();path='/grants/'+gid+'/messages/'+secrets.token_hex(16)
         self.assertEqual(self.call('PUT',path,self.visitor,self.envelope())[0],403)
@@ -144,7 +144,7 @@ class PurposeTests(unittest.TestCase):
         self.assertEqual(self.call('PUT','/grants/'+gid+'/messages/'+secrets.token_hex(16),self.visitor,self.envelope())[0],403)
         self.assertEqual(self.r.purposes.grant(gid)[5],'EXPIRED')
         self.update(expires_at=self.at+60);self.at+=60
-        self.assertEqual(self.call('GET','/directory',self.visitor)[1]['listings'],[])
+        self.assertEqual(self.call('POST','/directory',self.visitor)[1]['listings'],[])
     def test_parallel_requests_cannot_exceed_single_introduction(self):
         with ThreadPoolExecutor(max_workers=8) as pool:
             codes=list(pool.map(lambda _:self.reserve()[1],range(8)))
@@ -155,8 +155,8 @@ class PurposeTests(unittest.TestCase):
         self.assertEqual(self.call('PUT','/grants/'+gid+'/messages/'+env['id'],self.visitor,env)[0],403)
         self.assertEqual(self.call('PUT','/facets/'+self.fid,self.owner,dict(policy=policy(),publish_confirmed=True))[0],409)
     def test_abuse_and_search_throttling(self):
-        for _ in range(30):self.assertEqual(self.call('GET','/directory',self.visitor)[0],200)
-        self.assertEqual(self.call('GET','/directory',self.visitor)[0],429)
+        for _ in range(30):self.assertEqual(self.call('POST','/directory',self.visitor)[0],200)
+        self.assertEqual(self.call('POST','/directory',self.visitor)[0],429)
         self.assertEqual(self.call('POST','/facets/'+self.fid+'/report',self.visitor,dict(reason='SPAM'))[0],202)
     def test_no_plaintext_or_raw_auth_in_storage(self):
         gid,env=self.intro()
