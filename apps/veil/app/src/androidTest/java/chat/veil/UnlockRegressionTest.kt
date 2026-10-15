@@ -30,7 +30,7 @@ class UnlockRegressionTest {
     }
 
     private fun awaitSetup() {
-        compose.waitUntil(10_000) { compose.activity.snapshot != null }
+        compose.waitUntil(10_000) { compose.activity.snapshot != null && compose.activity.purposeSnapshot != null }
         compose.onNodeWithText("Get started").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(compose.activity.unlocked)

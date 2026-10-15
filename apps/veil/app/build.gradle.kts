@@ -11,8 +11,8 @@ android {
         applicationId = "chat.veil"
         minSdk = 28
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2-dev"
+        versionCode = 4
+        versionName = "0.2.0-purpose-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {
@@ -54,6 +54,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.signal:libsignal-android:0.105.0")
     implementation("org.signal:libsignal-client:0.105.0")
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

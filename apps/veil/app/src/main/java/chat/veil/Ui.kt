@@ -58,7 +58,16 @@ private val Shape = RoundedCornerShape(22.dp)
                     if (activity.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (activity.notice.isNotEmpty()) Text(activity.notice, color = Color(0xFFFFD5A0), fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
                     val snap = activity.snapshot
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        listOf("Chats","Discover","My identity").forEachIndexed { i,label ->
+                            TextButton({activity.section=i}) { Text(label,color=if(activity.section==i)Mint else Muted,fontSize=12.sp) }
+                        }
+                    }
+                    if(activity.section==0) TextButton({activity.legacyChat=!activity.legacyChat}) {
+                        Text(if(activity.legacyChat) "Show purpose conversations" else "Open original private chat",fontSize=11.sp)
+                    }
                     when {
+                        activity.section!=0 || !activity.legacyChat -> PurposeHome(activity)
                         snap == null -> Text("Opening your private space…", color = Muted)
                         !snap.ready -> Setup(activity)
                         !snap.paired -> Pairing(activity)
@@ -220,7 +229,7 @@ private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
     }
     Text("JPEG / PNG / WebP / MP4 · up to 5 MiB · video up to 15s", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 8.dp))
 }
-@Composable private fun MessageBubble(m: ChatMessage, open: () -> Unit) {
+@Composable internal fun MessageBubble(m: ChatMessage, open: () -> Unit) {
     var held by remember(m.id) { mutableStateOf(false) }
     var clock by remember { mutableLongStateOf(now()) }
     LaunchedEffect(m.expires) { while (true) { delay(250); clock = now() } }

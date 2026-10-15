@@ -13,12 +13,15 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** One authenticated, atomically replaced snapshot: identity, ratchet, outbox and messages. */
-class Vault(context: Context) {
-    private val file = AtomicFile(File(context.noBackupFilesDir, "vault.v1"))
+class Vault(context: Context, fileName: String = "vault.v1") {
+    private val directory = context.noBackupFilesDir
+    private val file = AtomicFile(File(context.noBackupFilesDir, fileName.also {
+        require(it in setOf("vault.v1", "purposes.v1"))
+    }))
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey("veil-vault-v1", null) as? SecretKey)?.let { return it }
-        check(!file.baseFile.exists()) { "Vault key missing. Reset required." }
+        check(!File(directory, "vault.v1").exists() && !File(directory, "purposes.v1").exists()) { "Vault key missing. Recovery required." }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
             init(KeyGenParameterSpec.Builder("veil-vault-v1", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)

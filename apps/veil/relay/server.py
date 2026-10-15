@@ -111,7 +111,17 @@ def handler(relay):
     class Handler(BaseHTTPRequestHandler):
         server_version = 'VeilRelay'
         def log_message(self, *_): pass  # No request paths, capabilities, bodies, or IP logs.
-        def do_GET(self): self.run_request()
+        def do_GET(self):
+            if re.fullmatch(r'/p/p-[a-f0-9]{32}', self.path):
+                from purpose_landing import HTML, CSP
+                self.send_response(200)
+                for key, value in [('Content-Type','text/html; charset=utf-8'),('Cache-Control','no-store'),
+                                   ('Referrer-Policy','no-referrer'),('Content-Security-Policy',CSP),
+                                   ('X-Content-Type-Options','nosniff'),('X-Frame-Options','DENY'),('Content-Length',str(len(HTML)))]:
+                    self.send_header(key,value)
+                self.end_headers();self.wfile.write(HTML)
+                return
+            self.run_request()
         def do_POST(self): self.run_request()
         def do_PUT(self): self.run_request()
         def do_DELETE(self): self.run_request()

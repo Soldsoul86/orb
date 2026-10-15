@@ -31,6 +31,19 @@ class MainActivity : FragmentActivity() {
     var viewer by mutableStateOf<Pair<ChatMessage, ByteArray>?>(null); private set
     var attachment by mutableStateOf<Pair<String, ByteArray>?>(null); private set
     var invitation by mutableStateOf(""); private set
+    var section by mutableStateOf(0)
+    var legacyChat by mutableStateOf(true)
+    var purposeSnapshot by mutableStateOf<PurposeSnapshot?>(null); private set
+    var purposeListings by mutableStateOf<List<PurposeListing>>(emptyList()); private set
+    var purposeTarget by mutableStateOf<PurposeListing?>(null); private set
+    var purposeNotice by mutableStateOf(""); private set
+    var purposeLinkInput by mutableStateOf("")
+    private var pendingPurposeLink: String? = null
+    private var pendingQr: Uri? = null
+    private val qrPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        pendingQr = uri
+        if (unlocked) importPurposeEntry()
+    }
     private lateinit var curtain: View
     private val mutex = processMutex
     companion object { private val processMutex = Mutex() }
@@ -60,6 +73,17 @@ class MainActivity : FragmentActivity() {
             visibility = View.GONE
         }
         addContentView(curtain, FrameLayout.LayoutParams(-1, -1))
+        capturePurposeLink(intent)
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent); setIntent(intent); capturePurposeLink(intent)
+        if (unlocked) importPurposeEntry()
+    }
+    private fun capturePurposeLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (intent.action != Intent.ACTION_VIEW) return
+        val candidate = if (data.scheme == "veil-purpose" && data.host == "open") data.getQueryParameter("link") else data.toString()
+        if (candidate != null && candidate.length <= 500) pendingPurposeLink = candidate
     }
     fun contentCommitted(renderedUnlocked: Boolean) {
         // A queued commit from before a focus loss must never uncover locked content.
@@ -84,6 +108,7 @@ class MainActivity : FragmentActivity() {
         concealPlayer?.invoke(); closeViewer()
         attachment?.second?.fill(0); attachment = null
         invitation = ""; snapshot = null; notice = ""
+        purposeSnapshot = null; purposeListings = emptyList(); purposeTarget = null; purposeNotice = ""; purposeLinkInput = ""
         polling?.cancel(); polling = null
     }
     fun unlock() {
@@ -109,12 +134,16 @@ class MainActivity : FragmentActivity() {
     }
     private fun authenticationAccepted() {
         authShowing = false; unlocked = true
-        action({ snapshot() }) { snapshot = it; importPending(); startPolling() }
+        action({ snapshot() }) {
+            snapshot = it; if (!it.ready) legacyChat = false
+            importPending(); refreshPurposes(); startPolling()
+        }
     }
     private fun startPolling() {
         polling?.cancel()
         polling = lifecycleScope.launch {
             val engine = Messenger(this@MainActivity)
+            var purposeTick = 0
             while (unlocked) {
                 delay(2000)
                 val token = generation
@@ -127,6 +156,18 @@ class MainActivity : FragmentActivity() {
                     snapshot = it.first
                     if (it.second) notice = "Delivery paused. Check the relay connection and storage limits. Queued messages will retry."
                 }.onFailure { notice = "Vault could not be read. Your data has not been reset." }
+                purposeTick++
+                if (purposeTick % 5 == 0 && unlocked) {
+                    val purposes = withContext(Dispatchers.IO) { mutex.withLock { runCatching {
+                        val p = PurposeEngine(this@MainActivity)
+                        val error = runCatching { p.sync() }.isFailure
+                        p.snapshot() to error
+                    } } }
+                    if (unlocked && token == generation) purposes.onSuccess {
+                        purposeSnapshot = it.first
+                        if (it.second) purposeNotice = "Some purpose delivery is paused. Check hours, permissions or connection; queued messages will retry."
+                    }.onFailure { purposeNotice = "Purpose data could not be read. Nothing has been reset." }
+                }
             }
         }
     }
@@ -145,6 +186,54 @@ class MainActivity : FragmentActivity() {
         }
     }
     fun setup(url: String) = action({ setup(url); snapshot() }) { snapshot = it }
+    private fun <T> purposeAction(block: PurposeEngine.() -> T, done: (T) -> Unit = {}) {
+        if (!unlocked || busy) return
+        busy = true; purposeNotice = ""
+        val token = generation
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { mutex.withLock { runCatching { PurposeEngine(this@MainActivity).block() } } }
+            if (unlocked && token == generation) {
+                busy = false
+                result.onSuccess(done).onFailure { purposeNotice = "Could not complete this action. The server must support purposes; check connection, rules, quotas and approval. Nothing was reset." }
+            }
+        }
+    }
+    fun refreshPurposes() = purposeAction({ snapshot() }) { purposeSnapshot = it; importPurposeEntry() }
+    fun setupPurposes() = purposeAction({ setup(); snapshot() }) { purposeSnapshot = it }
+    fun createPurpose(p: PurposePolicy, consent: Boolean) = purposeAction({ create(p, consent); snapshot() }) { purposeSnapshot = it; section = 2 }
+    fun editPurpose(id: String, p: PurposePolicy, consent: Boolean) = purposeAction({ update(id,p,consent); snapshot() }) { purposeSnapshot = it }
+    fun searchPurposes(query: String) = purposeAction({ search(query) }) { purposeListings = it }
+    fun lookupPurpose(value: String) = purposeAction({ lookup(value) }) { purposeTarget = it }
+    fun choosePurpose(listing: PurposeListing) { purposeTarget = listing }
+    fun closePurposeTarget() { purposeTarget = null }
+    fun requestPurpose(listing: PurposeListing, text: String) = purposeAction({ request(listing,text); sync(); snapshot() }) {
+        purposeSnapshot = it; purposeTarget = null; section = 0; legacyChat = false
+    }
+    fun decidePurpose(id: String, status: String) = purposeAction({ decide(id,status); snapshot() }) { purposeSnapshot = it }
+    fun comparePurpose(id: String) = purposeAction({ compare(id); snapshot() }) { purposeSnapshot = it }
+    fun sendPurpose(id: String, text: String, done: () -> Unit) = purposeAction({ send(id,text); snapshot() }) { purposeSnapshot = it; done() }
+    fun reportPurpose(id: String) = purposeAction({ report(id) }) { purposeNotice = "Report recorded for operator review. This does not automatically block the listing." }
+    fun sharePurpose(link: String) {
+        if (!unlocked || link.isEmpty()) return
+        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type="text/plain";putExtra(Intent.EXTRA_TEXT,link) },"Share purpose link"))
+    }
+    fun copyPurpose(link: String) {
+        if (!unlocked || link.isEmpty()) return
+        val clip=android.content.ClipData.newPlainText("Veil purpose invitation",link)
+        if (Build.VERSION.SDK_INT>=33) clip.description.extras=android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE",true) }
+        getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)
+        purposeNotice="Link copied. A private invitation permits one contact request, not unrestricted chat. Clipboard apps may retain it."
+    }
+    fun pickPurposeQr() { if(unlocked && !busy)qrPicker.launch("image/*") }
+    private fun importPurposeEntry() {
+        pendingPurposeLink?.let { purposeLinkInput=it;pendingPurposeLink=null;section=1 }
+        val uri=pendingQr ?: return
+        if(busy || !unlocked)return
+        pendingQr=null
+        purposeAction({ contentResolver.openInputStream(uri)?.use(PurposeQr::read) ?: error("Image unavailable") }) {
+            purposeLinkInput=it;section=1
+        }
+    }
     fun prepareAndShareInvite() = action({ invitation() }) {
         invitation = it
         shareInvite()
