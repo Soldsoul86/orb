@@ -1,8 +1,20 @@
+## Portable identity beta (pi/1)
+
+The existing messenger is preserved. My identity now offers locally owned keys, signed purpose policies, encrypted recovery and explicit provider migration. This beta needs a compatible separate provider; the existing personal-chat relay is unchanged. It does not migrate earlier v1/v2 identities automatically.
+
+Start with [migration demo](PROVIDER_MIGRATION_DEMO.md), [executed tests](TEST_RESULTS.md), [open protocol](OPEN_PROTOCOL.md), [limits](LIMITATIONS.md), and [threat model](docs/portability/THREAT_MODEL.md). Identity core: Nimbus JOSE+JWT; message encryption remains libsignal. Provider examples are not live deployments.
+
 # Veil — private communication, under your touch
 
 An Android-first, one-to-one messenger with concealed media, hold-to-reveal interaction, and moving recipient watermarks. Kotlin / Jetpack Compose client; a small opaque-envelope Python relay.
 
 **Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy/native Signal tests and relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. The user reports a successful basic two-phone check; detailed A–J acceptance results and physical capture verification remain unrecorded. Do not use this development build for consequential secrets.
+
+## Programmable purposes preview
+
+A separate **Veil Purposes Preview** app now adds multiple purpose addresses, explicit publication, public discovery, encrypted text requests, approval, office hours, pause/revocation and invitation links/QR. It installs beside the existing app, preserving its identity and messages. [Download and two-phone walkthrough](docs/purposes/DEMO.md) · [22-case test matrix](docs/purposes/TESTING.md) · [architecture](docs/purposes/DESIGN.md) · [API](docs/purposes/API.md) · [threat model](docs/purposes/SECURITY.md).
+
+The text-only preview and live additive `/v2` relay are tested as described in those reports. Purpose media/documents, recovery, background notifications and broader English interpretation are not implemented. Existing `/v1` chat/media and the original-app signing guard remain intact. This is a debuggable pilot, not an audited production release.
 
 ## Setup update and download status
 

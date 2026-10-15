@@ -1,5 +1,7 @@
 # Architecture and decisions
 
+**2026-10-15 additive purpose extension:** see [purposes/DESIGN.md](purposes/DESIGN.md). The original implementation history below predates `/v2`. The relay now also stores necessary purpose directory/grant metadata and public Signal bundles; message plaintext/private keys remain on clients. `/v1` contracts and `SignalSession` are preserved.
+
 ## Repository audit / Phase 0
 
 The supplied `/workspace` contained only empty infrastructure/download directories. No application, repository history, AGENTS.md, tests or usable Android infrastructure existed. Files are created under `/workspace/veil` to avoid modifying managed hidden directories. Available locally: Python 3.12.14 and OpenJDK 21. Missing: Gradle, Kotlin compiler, Android SDK, adb, emulator, devices. The configured HTTP proxy refuses connections. Socket creation is also denied. Public upstream source was inspected through the connected GitHub reader; binaries and builds remain unavailable.

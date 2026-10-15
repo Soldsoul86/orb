@@ -1,7 +1,7 @@
 name: Veil Relay
 on:
   push:
-    branches: ['codex/veil-apk']
+    branches: ['codex/veil-apk', 'codex/veil-purposes']
     paths: ['apps/veil/relay/**', '.github/workflows/veil-relay.yml']
   workflow_dispatch:
 permissions:
