@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -97,7 +98,7 @@ private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
             Text("You and your friend need the same server.", color = Muted, fontSize = 12.sp)
         }
         PrivacyCard("01  Invite your person", "Share an invitation privately and paste the one they send back.")
-        PrivacyCard("02  Make sure it’s them", "Compare identity codes together, then start your conversation.")
+        PrivacyCard("02  Make sure it’s them", "Check that your shared safety number matches, then start your conversation.")
         Text("Early development build · one conversation per installation", fontSize = 12.sp, color = Muted)
     }
 }
@@ -118,17 +119,32 @@ private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
             modifier = Modifier.fillMaxWidth())
         Button({ a.pair(invite.trim()) }, enabled = !a.busy && invite.trim().startsWith("veil1:"),
             modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Connect with my person") }
-        Text("Next: compare identity codes together. Invitations expire after 24 hours.", color = Muted, fontSize = 12.sp)
+        Text("Next: compare your shared safety number. Invitations expire after 24 hours.", color = Muted, fontSize = 12.sp)
     }
 }
 @Composable private fun Identity(a: MainActivity, s: Snapshot) {
     Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Make sure it’s them.", fontSize = 30.sp, fontWeight = FontWeight.SemiBold)
-        Text("Compare these complete codes in person or on a trusted call. Your code must match “Their identity” on their phone, and vice versa.", color = Muted)
+        SafetyNumberDetails(s)
+        Button(a::verify, enabled = !a.busy && s.safetyNumber.matches(Regex("[0-9]{60}")), modifier = Modifier.fillMaxWidth()) { Text("We compared · the numbers match") }
+        Text("If the numbers differ, stop and check with your person through a trusted channel. Veil will not silently accept a changed identity.", color = Muted, fontSize = 12.sp)
+    }
+}
+@Composable private fun SafetyNumberDetails(s: Snapshot) {
+    var legacy by remember { mutableStateOf(false) }
+    Text("You should both see the same number. Compare every group in person or on a trusted call.", color = Muted)
+    Column(Modifier.fillMaxWidth().background(Panel, Shape).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Your shared safety number", color = Mint, fontWeight = FontWeight.Medium)
+        // All 60 digits, in reading order. No shortened check or automatic trust decision.
+        Text(s.safetyNumber.chunked(5).chunked(3).joinToString("\n") { it.joinToString("  ") },
+            fontFamily = FontFamily.Monospace, fontSize = 18.sp, lineHeight = 30.sp)
+        Text("Same on both phones · unique to you two", color = Muted, fontSize = 12.sp)
+    }
+    TextButton({ legacy = !legacy }) { Text(if (legacy) "Hide older-version codes" else "Comparing with an older version?", fontSize = 12.sp) }
+    if (legacy) {
+        Text("If their app shows two identity codes, compare both complete codes below instead. Your identity must match “Their identity” on their phone, and vice versa.", color = Muted, fontSize = 12.sp)
         PrivacyCard("Your identity", s.localFingerprint.chunked(4).joinToString(" "))
         PrivacyCard("Their identity", s.peerFingerprint.chunked(4).joinToString(" "))
-        Button(a::verify, enabled = !a.busy, modifier = Modifier.fillMaxWidth()) { Text("We compared both codes · they match") }
-        Text("If either code differs, stop. Reset app data and exchange new invitations. Veil will not silently accept a changed identity.", color = Muted, fontSize = 12.sp)
     }
 }
 @Composable private fun ColumnScope.Conversations(a: MainActivity, s: Snapshot) {
@@ -136,10 +152,10 @@ private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
     var identity by remember { mutableStateOf(false) }
     BackHandler(chat || identity) { chat = false; identity = false }
     if (identity) {
-        TextButton({ identity = false }) { Text("‹ Conversation") }
-        PrivacyCard("Your identity", s.localFingerprint.chunked(4).joinToString(" "))
-        Spacer(Modifier.height(16.dp))
-        PrivacyCard("Their identity", s.peerFingerprint.chunked(4).joinToString(" "))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton({ identity = false }) { Text("‹ Conversation") }
+            SafetyNumberDetails(s)
+        }
     } else if (!chat) {
         Spacer(Modifier.height(24.dp))
         Text("Your conversations", fontSize = 27.sp, fontWeight = FontWeight.SemiBold)

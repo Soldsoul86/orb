@@ -15,11 +15,24 @@ data class ChatMessage(val id: String, val mine: Boolean, val kind: String, val 
     val text: String, val mime: String, val expires: Long, val viewMs: Long, val deadline: Long,
     val watermark: String, val status: String)
 data class Snapshot(val ready: Boolean, val paired: Boolean, val verified: Boolean,
-    val localFingerprint: String, val peerFingerprint: String, val messages: List<ChatMessage>, val pending: Int)
+    val localFingerprint: String, val peerFingerprint: String, val messages: List<ChatMessage>, val pending: Int,
+    val safetyNumber: String = "")
 
 /** Calls must be serialized by the controller. Every operation reloads its committed snapshot. */
 class Messenger(context: Context) {
     private val vault = Vault(context)
+    // Public data only, scoped to this controller. Avoid repeating fingerprint work on every poll.
+    private var safetyKeys: Pair<String, String>? = null
+    private var cachedSafetyNumber = ""
+    private fun comparison(s: JSONObject): String {
+        val peer = s.optJSONObject("peer") ?: return ""
+        val keys = s.getString("publicIdentity") to peer.getString("identity")
+        if (keys != safetyKeys) {
+            cachedSafetyNumber = safetyNumber(keys.first, keys.second)
+            safetyKeys = keys
+        }
+        return cachedSafetyNumber
+    }
     private fun load(): JSONObject = vault.read()
     private fun secret(): String = ByteArray(32).also { SecureRandom().nextBytes(it) }.b64().trimEnd('=').replace('+', '-').replace('/', '_')
     fun setup(url: String) {
@@ -57,7 +70,11 @@ class Messenger(context: Context) {
         s.put("peer", peer).put("verified", false)
         vault.write(s)
     }
-    fun verify() { val s = load(); require(s.has("peer")); s.put("verified", true); vault.write(s) }
+    fun verify() {
+        val s = load(); require(s.has("peer"))
+        require(comparison(s).matches(Regex("[0-9]{60}")))
+        s.put("verified", true); vault.write(s)
+    }
     private fun prune(s: JSONObject): Boolean {
         val oldMessages = s.optJSONArray("messages")?.length() ?: 0
         val oldOutbox = s.optJSONArray("outbox")?.length() ?: 0
@@ -78,7 +95,7 @@ class Messenger(context: Context) {
             s.optJSONObject("peer")?.let { fingerprint(it.getString("identity")) } ?: "",
             s.getJSONArray("messages").objects().map { m -> ChatMessage(m.getString("id"), m.getBoolean("mine"), m.getString("kind"),
                 Mode.valueOf(m.getString("mode")), m.optString("text"), m.optString("mime"), m.getLong("expires"), m.optLong("viewMs"),
-                m.optLong("deadline"), m.getString("watermark"), if (m.getString("id") in pending) "Queued" else if (m.getBoolean("mine")) "Relayed" else "Received") }, pending.size)
+                m.optLong("deadline"), m.getString("watermark"), if (m.getString("id") in pending) "Queued" else if (m.getBoolean("mine")) "Relayed" else "Received") }, pending.size, comparison(s))
     }
     fun send(text: String, media: ByteArray?, mime: String, mode: Mode, ttl: Long, viewMs: Long) {
         val s = load(); require(s.optBoolean("verified")) { "Compare identities first" }; prune(s)
