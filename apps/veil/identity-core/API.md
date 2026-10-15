@@ -1,0 +1,1 @@
+IdentityCore key/publicKey/id, sign/verify, verifyState, proveControl/verifyControl, exportIdentity/importIdentity. Verifiers must consume nonces atomically. Recovery keys must be random 32-byte values, never user passwords.
