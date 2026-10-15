@@ -1,6 +1,6 @@
 package chat.veil
 
-import android.util.Base64
+import java.util.Base64
 import org.json.JSONObject
 import org.signal.libsignal.protocol.IdentityKey
 import org.signal.libsignal.protocol.IdentityKeyPair
@@ -24,8 +24,8 @@ import org.signal.libsignal.protocol.state.impl.InMemorySignalProtocolStore
 import java.security.MessageDigest
 import java.security.SecureRandom
 
-fun ByteArray.b64(): String = Base64.encodeToString(this, Base64.NO_WRAP)
-fun String.unb64(): ByteArray = Base64.decode(this, Base64.NO_WRAP)
+fun ByteArray.b64(): String = Base64.getEncoder().encodeToString(this)
+fun String.unb64(): ByteArray = Base64.getDecoder().decode(this)
 fun fingerprint(key: String): String = MessageDigest.getInstance("SHA-256").digest(key.unb64()).joinToString("") { "%02x".format(it) }
 
 /** Signal's PQXDH / ratcheting sessions, never a locally designed key exchange. One peer/device. */

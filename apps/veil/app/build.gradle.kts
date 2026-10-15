@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "chat.veil"
     compileSdk = 35
+    ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "chat.veil"
         minSdk = 28
@@ -14,6 +15,10 @@ android {
         versionName = "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+    sourceSets {
+        getByName("test").java.srcDir("src/cryptoTest/java")
+        getByName("androidTest").java.srcDir("src/cryptoTest/java")
+    }
     buildFeatures { compose = true }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -21,7 +26,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions { jvmTarget = "21" }
-    packaging { resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "libsignal_jni*.dylib", "signal_jni*.dll", "libsignal_jni*.so") }
+    packaging {
+        jniLibs.excludes += "**/libsignal_jni_testing.so"
+        resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "libsignal_jni*.dylib", "signal_jni*.dll", "libsignal_jni*.so") }
 }
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

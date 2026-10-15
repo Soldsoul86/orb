@@ -1,14 +1,11 @@
 package chat.veil
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
-import org.junit.runner.RunWith
 import java.security.SecureRandom
 
 /** Uses the real native libsignal implementation. No fake cipher or transport assertions. */
-@RunWith(AndroidJUnit4::class)
 class SignalIntegrationTest {
     private fun identities(): Pair<JSONObject, JSONObject> {
         val a = JSONObject(); val b = JSONObject()

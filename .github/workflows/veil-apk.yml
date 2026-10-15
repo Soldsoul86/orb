@@ -31,7 +31,7 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - name: Install Android platform
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.0.12077973'
       - name: Relay tests
         run: python3 -m unittest discover -s relay -v
       - name: Compile and test Android
@@ -41,6 +41,8 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
           cp app/build/outputs/apk/debug/app-debug.apk veil-debug.apk
           sha256sum veil-debug.apk > veil-debug.apk.sha256
+          cat veil-debug.apk.sha256
+          ls -lh veil-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: veil-debug-apk
