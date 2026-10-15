@@ -2,17 +2,19 @@
 
 An Android-first, one-to-one messenger with concealed media, hold-to-reveal interaction, and moving recipient watermarks. Kotlin / Jetpack Compose client; a small opaque-envelope Python relay.
 
-**Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy tests and all 10 relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. Two-device delivery and physical capture tests remain NOT TESTED. Do not use this development build for consequential secrets.
+**Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy/native Signal tests and relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. The user reports a successful basic two-phone check; detailed A–J acceptance results and physical capture verification remain unrecorded. Do not use this development build for consequential secrets.
 
-## Latest download / unlock fix
+## Setup update and download status
 
-[Download 0.1.1-dev APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411). Extract and install `veil-debug.apk`. This fixes the privacy cover remaining after successful unlock. Four Android 15 emulator tests now verify the unlock/native concealment transitions. The tests inject the accepted authentication callback; physical fingerprint/PIN behavior still needs a retest.
+0.1.2 adds **Get started** with the hosted relay, one-tap invitation sharing, and one shared 60-digit safety number on both phones. The build and automated tests passed. **An update over the installed 0.1.1 is blocked by a signing-key mismatch. Keep the current app installed; do not uninstall or clear its data.** The previous signing-key cache did not save its key. See [the signing diagnosis and recovery requirements](docs/ONBOARDING.md).
 
-The previous APK used a different temporary debug signing key. Uninstall the old **Veil** first, then install this version. Uninstalling clears Veil’s local identity and messages. [Details and checksum](docs/STATUS.md).
+[0.1.2 build and tests](https://github.com/Soldsoul86/orb/actions/runs/38723409751) · [0.1.2 APK ZIP for fresh disposable test installations only](https://github.com/Soldsoul86/orb/actions/runs/38723409751/artifacts/11967018962). This binary cannot update the delivered 0.1.1 APK. A newer CI guard blocks publishing incompatible replacements.
+
+[Existing 0.1.1 APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411) remains the version the user tested on two phones. It includes the unlock-cover fix and works with the live relay. Existing users do not need to reinstall it.
 
 ## Implemented in source
 
-- Two-way invitation exchange, pinned peer identity and explicit full-code comparison.
+- Two-way invitation exchange, pinned peer identity and explicit shared safety-number comparison.
 - Signal libsignal 0.105.0 PQXDH and ratcheting sessions; text, photos and short videos encrypted before upload.
 - Android Keystore encrypted atomic vault containing identity/session state, outbox and received messages.
 - Native biometric/device credential unlock; dark Compose onboarding, conversation list, chat, mode selection and attachment picker.
@@ -65,11 +67,13 @@ Mailbox lifetime is 30 days, envelope maximum lifetime is seven days, and the UI
 
 ## Install and pair two phones
 
+For 0.1.2, use fresh disposable test installations only. This build cannot update the existing 0.1.1 installation; keep that working installation intact.
+
 1. Use two Android **9 / API 28 or later** phones with PIN/password screen locks. Enable USB debugging only for development. Connect both to a network that reaches your HTTPS relay.
 2. Run `adb devices`, then install the APK on both with `adb -s SERIAL install -r app/build/outputs/apk/debug/app-debug.apk`.
-3. Unlock Veil using biometrics or device credential. Enter the same HTTPS relay origin on both phones.
-4. On **both** phones choose **Prepare my invitation → Share invitation**. Exchange the invitations privately. Sharing or using the system picker locks Veil; unlock again on return. Save each invitation in the trusted exchange channel before importing the other.
-5. Import the other phone's invitation. Compare both **complete** identity codes in person or through a trusted call. Each “Your identity” must match the other's “Their identity.” Confirm only when both match.
+3. Unlock Veil using biometrics or device credential. In 0.1.2, tap **Get started** on both phones to use the built-in relay. **Use another server** allows a shared custom HTTPS origin. In 0.1.1, enter the same relay origin manually.
+4. On **both** phones choose **Share my invitation** (0.1.1: **Prepare my invitation → Share invitation**). Exchange the invitations privately. Sharing or using the system picker locks Veil; unlock again on return. Save each invitation in the trusted exchange channel before importing the other.
+5. Import the other phone's invitation. Compare **every group** of your shared safety number in person or on a trusted call. Both phones must show the same number. If one phone still uses 0.1.1, expand **Comparing with an older version?** and cross-compare both complete identity codes instead. Confirm only after the comparison matches.
 6. Open **Your person**. Send text, then use **+** to choose a JPEG, PNG, WebP or MP4. Media limit: **5 MiB**; video: **15 seconds**. Veil does not transcode. Sender-owned gallery originals remain where they were.
 7. Pick **Eyes-Only**, send a photo, and keep the receiving app open/unlocked. Tap the media; hold to reveal; release to conceal. Test again with video. Choose a one-minute lifetime to check disappearance.
 8. Follow [the A–J test procedure](docs/TESTING.md) before declaring the product usable or capture-protected on those devices.

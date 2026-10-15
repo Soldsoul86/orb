@@ -20,8 +20,24 @@ Three shared JVM/Android native tests check symmetry, all 60 digits, stability a
 
 ## Installation and verification
 
-Version code 3 / 0.1.2-dev. Intended as an in-place update to 0.1.1; retain existing identity and conversations. The new APK certificate is compared with the delivered 0.1.1 certificate before delivery. Do not uninstall or clear app data to test this update on an existing paired installation. If Android rejects the update, retain the existing installation and investigate the certificate/version error first.
+Version code 3 / 0.1.2-dev. **In-place upgrade BLOCKED. Keep the working 0.1.1 installation; do not uninstall or clear app data.** The built 0.1.2 APK has a different signing certificate, so Android rejects it as an update. Although the storage format is unchanged, this is not sufficient for upgrade compatibility.
 
-The existing unlock regression checks now identify the Get started screen and still assert native cover removal, focus/background locking and repeated unlock. Exact CI, checksum and certificate results are recorded in STATUS.md after the build completes. Existing device data preservation is inferred from the unchanged storage paths/format and matching signing identity; an actual on-device upgrade test is still required.
+The 0.1.1 CI log explicitly reports `Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.` The intended `~/.android/debug.keystore` cache never saved the generated key. The 0.1.2 build also missed that cache. No original signing private key was found in the available workspace/artifacts; it cannot be reconstructed from the APK's public certificate. This corrects the earlier assumption that the signing identity was preserved.
+
+- Delivered 0.1.1 certificate SHA-256: `bfc5d191b2daff5eef95b531c4775a0c4f2d6564eaf2ab110922253b7f2e43da`.
+- Tested 0.1.2 certificate SHA-256: `b8846d4e3103d322b8bc4459bd85ca84aa016ff92e15141251bc84b50cbb37b5`.
+- The tested 0.1.2 binary is for a fresh disposable test installation only; it is not delivered as a compatible replacement. Replacing a working installation would lose its local identity/messages and require both people to pair again. No reset or migration has been performed.
+
+## Signing publication guard
+
+The follow-up build change removes the ineffective signing-key cache. An optional repository Actions secret `VEIL_DEBUG_KEYSTORE_B64` supplies a preserved original Android debug keystore (alias `androiddebugkey`, standard debug passwords) to an explicit temporary path; Gradle uses that path for the app and test APKs. The temporary file is removed at job end. Never put a signing private key in the source tree, logs, chat or APK artifacts.
+
+Without that secret, ordinary disposable debug builds/tests still run, but APK publication now checks the actual signer against the delivered 0.1.1 certificate and fails closed on mismatch. Supplying a newly generated key cannot solve the 0.1.1 update problem. If the original key exists in a separate operator backup, encode that keystore as base64 locally and add it privately under repository Settings → Secrets and variables → Actions → New repository secret. Re-run the workflow; the pinned certificate must match before an APK is uploaded. Do not weaken the pin to make CI green.
+
+If the original key cannot be recovered, an update preserving the current installation is unavailable. A future separately signed distribution needs an explicitly planned new installation/migration, private durable signing-key custody and user acknowledgement of any data loss. This task does not perform that migration.
+
+The existing unlock regression checks identify the Get started screen and still assert native cover removal, focus/background locking and repeated unlock. The tested app build passed 9 JVM tests, 7 Android 15 emulator tests, 13 relay tests (one Postgres-only test skipped), lint (0 errors, 27 warnings), v2 signature verification and downloaded checksums. Exact run links are in STATUS.md. Real on-device upgrade and the new identity UI on two physical phones remain NOT TESTED.
+
+The signing follow-up CI run 38724685503 passed compilation/JVM/relay/lint, but its Android suite finished 6 PASS / 1 FAIL: the native reveal test did not obtain actual window focus within its setup deadline. The same test passed in the delivered binary's build. This intermittent failure is unresolved and was not disabled or reported as PASS. The fingerprint and unlock tests passed again. The publication guard therefore was not reached in this run; its runtime validation remains NOT TESTED.
 
 The default relay remains a development service in Singapore; the free database expires November 14, 2026 and must be upgraded for continued use. See relay/HOSTING.md. Supplying a default address does not change those hosting limits.

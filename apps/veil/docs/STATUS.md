@@ -1,16 +1,38 @@
 # Delivery report — 2026-10-15
 
+## 0.1.2 setup and shared safety number — build PASS, upgrade BLOCKED
+
+[Source build](https://github.com/Soldsoul86/orb/actions/runs/38723409751) · [APK ZIP for fresh disposable test installations only](https://github.com/Soldsoul86/orb/actions/runs/38723409751/artifacts/11967018962) · [design, signing diagnosis and recovery requirements](ONBOARDING.md).
+
+The user reports testing the existing app on two phones and that it works, while setup and identity comparison feel cumbersome. This is user-reported basic two-phone use, not a measured A–J acceptance run. Device models, Android versions, individual media/capture/optical results were not provided. The 0.1.2 changes themselves have not been tried on those phones.
+
+Implemented: default hosted relay behind Get started, one-tap invitation sharing, and a shared 60-digit libsignal safety number in twelve five-digit groups. Both participants see the same full number; legacy complete identity codes remain available for older app versions. No identities, verified flags or message formats are reset or migrated.
+
+- Tested code: `df4708fe7b63f91015afd5d81704e2b2abf265c8`; package `chat.veil`, version code 3 / 0.1.2-dev.
+- **PASS:** 9 JVM tests (2 policy, 4 real native Signal, 3 native safety-number tests).
+- **PASS:** 7 Android 15/API 35 x86_64 emulator tests (2 unlock, 2 protection-view, 3 native safety-number tests), no failures/skips.
+- **PASS:** 13 SQLite relay tests; 1 Postgres-specific reconnect test skipped in this APK workflow. Prior dedicated PostgreSQL tests are recorded separately.
+- **PASS:** app/test compilation, lint (0 errors, 27 warnings), APK v2 signature verification and downloaded ZIP/APK checksums.
+- APK: 72,731,074 bytes; ZIP: 32,473,963 bytes.
+- APK SHA-256: `68e689d89dbedffb5b399ecd7a89849a555139c1f1ae60d99833dd6857574af9`.
+- ZIP SHA-256: `70f341066f4bffe40bb86cbe1dc722bd73a57aa0b62d468e2f874908b5489458`.
+- **FAIL / BLOCKED:** signer compatibility with delivered 0.1.1. The original key was not saved by CI (explicit missing-path warning in that run). The two public certificate hashes differ; no original private key was found in accessible artifacts/workspace. Android will reject an in-place update. **Do not uninstall the user's working app.**
+- Follow-up `41f1a771e8ef570a63ef5d1e6124357239201539` explicitly supports restoring the original keystore from a private Actions secret and blocks APK publication unless its signer matches the installed version. It does not recover a lost key. [Follow-up CI 38724685503](https://github.com/Soldsoul86/orb/actions/runs/38724685503) compiled the app/test APKs and passed JVM/relay/lint checks, then ran 6/7 Android tests successfully. `ProtectionTest.nativeRevealReleaseCancelAndFocusLoss` failed its real-window-focus precondition after 10 seconds (`Device must be awake and unlocked`). The three safety-number tests and both unlock tests passed again. No app-view production code changed between these runs. This intermittent focus/setup failure is unresolved, not waived. The subsequent publication guard was NOT EXECUTED because the emulator step failed; it has static review only. No replacement APK was uploaded by that run.
+- **NOT TESTED / DEVICE REQUIRED:** new UI on two physical phones, in-place upgrade, OS biometric matcher, screenshot/recording/casting paths and optical watermark visibility. Native emulator tests are not physical capture verification.
+
+The historical sections below describe earlier builds. Their old uninstall instruction applied only to the original 0.1.0 replacement and must not be reused for this update.
+
 ## Live relay — 2026-10-15
 
 `https://veil-relay-soldsoul86.onrender.com` is live in Singapore, with a separate persistent PostgreSQL database. The user configured the private database connection in Render. [Live HTTPS test run 38714151908](https://github.com/Soldsoul86/orb/actions/runs/38714151908) passed at 09:36:30 UTC: health, two disposable inboxes, 128-byte and 5-MiB opaque payloads, idempotent retry, reader/writer and cross-inbox access checks, acknowledgement and cleanup. No real conversations or private keys were used.
 
-The installed 0.1.1 APK is compatible. Both people enter this same HTTPS origin, create their own inbox, each share their own invitation **before importing the other's**, compare complete identity codes, and keep Veil open/unlocked to receive messages. No background push notifications are implemented.
+The installed 0.1.1 APK is compatible. Version 0.1.2 selects this relay by default; 0.1.1 users enter the same origin manually. Both create their own inbox, each share their own invitation **before importing the other's**, compare the complete safety number (or both full identity codes on 0.1.1), and keep Veil open/unlocked to receive messages. No background push notifications are implemented.
 
 The free server may take about a minute to wake after idle. The free database expires November 14, 2026; an upgrade is needed for continued use. [Hosting details](../relay/HOSTING.md). These live transport checks do not establish Android two-phone delivery, combined Signal-to-relay integration or physical capture protection.
 
-## Latest APK: 0.1.1-dev — unlock cover fix
+## Historical APK: 0.1.1-dev — unlock cover fix
 
-**Use this replacement:** [APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411) · [successful build](https://github.com/Soldsoul86/orb/actions/runs/38707141433).
+**Historical 0.1.0 → 0.1.1 replacement:** [APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411) · [successful build](https://github.com/Soldsoul86/orb/actions/runs/38707141433).
 
 The user installed 0.1.0 on a phone and reported that “Veil is locked / Tap to unlock” remained after authentication. Fixed the Compose state observation that left the native privacy cover on top. [Cause, test design and upgrade instructions](UNLOCK_FIX.md).
 
@@ -21,7 +43,7 @@ The user installed 0.1.0 on a phone and reported that “Veil is locked / Tap to
 - Lint: **0 errors, 27 warnings**, unchanged from the previous build.
 - APK: 72,714,690 bytes. ZIP: 32,470,903 bytes.
 - APK SHA-256: `465e294593ea868ed34bddfd8963d1b2a79c33b4b613f37b2550355af3cd4aba`.
-- The old and new APK signing certificates differ (confirmed from their v2 signing blocks). **Uninstall the old Veil before installing this replacement; uninstall deletes its local identity/messages.** Do not uninstall unrelated Orb applications. The new debug key is cached for future CI builds; cache eviction remains a limitation.
+- The old and new APK signing certificates differ (confirmed from their v2 signing blocks). **Only the original 0.1.0 → 0.1.1 transition required uninstalling; this deletes its local identity/messages. Do not apply that advice to the 0.1.2 update.** Do not uninstall unrelated Orb applications. The new debug key is cached for future CI builds; cache eviction remains a limitation.
 - Two-phone end-to-end delivery, Android-native Signal tests, OS capture/recording/casting and optical watermark tests remain **NOT TESTED / DEVICE REQUIRED**. Passing view tests on an emulator is not a physical capture guarantee.
 
 The sections below preserve the original 0.1.0 delivery record; the newer results above supersede its build/emulator status.

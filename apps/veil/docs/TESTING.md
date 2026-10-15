@@ -35,7 +35,7 @@ python3 -m unittest discover -s relay -v
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-`PolicyTest` checks reveal state, release, background transitions and exact expiry/budget boundaries. The production native viewer uses this policy plus synchronous opaque cover and monotonic expiry checks. `SignalIntegrationTest` uses actual native libsignal for bidirectional text, maximum media-size bytes, restart serialization, tamper rejection, replay rejection, out-of-order messages and simultaneous initiation. Synthetic media bytes here verify the cryptographic path; they do not verify codec rendering. `UnlockRegressionTest` checks the native cover is removed after an accepted callback, then reappears on focus/background loss and allows another unlock. See UNLOCK_FIX.md for the test-only reflection boundary. `ProtectionTest` checks the Activity secure flag and real native photo view down/up/cancel/focus callbacks; it does not claim to verify the OS compositor or optical results. `TwoPhoneHarness` is skipped by ordinary instrumentation runs unless explicitly configured.
+`PolicyTest` checks reveal state, release, background transitions and exact expiry/budget boundaries. The production native viewer uses this policy plus synchronous opaque cover and monotonic expiry checks. `SignalIntegrationTest` uses actual native libsignal for bidirectional text, maximum media-size bytes, restart serialization, tamper rejection, replay rejection, out-of-order messages and simultaneous initiation. Synthetic media bytes here verify the cryptographic path; they do not verify codec rendering. `UnlockRegressionTest` checks the native cover is removed after an accepted callback, then reappears on focus/background loss and allows another unlock. See UNLOCK_FIX.md for the test-only reflection boundary. `ProtectionTest` checks the Activity secure flag and real native photo view down/up/cancel/focus callbacks; it does not claim to verify the OS compositor or optical results. `SafetyNumberTest` runs actual libsignal JNI to check the full 60-digit comparison in both directions, reloaded identity bytes, changes to either identity, invalid input rejection and the upstream known-answer vector. It runs in both JVM tests and the selected Android emulator suite. `TwoPhoneHarness` is skipped by ordinary instrumentation runs unless explicitly configured.
 
 ### Real two-device automation
 
@@ -57,11 +57,15 @@ If the relay database is local to the harness host, add `--relay-db /path/to/vei
 
 The script runs text/photo delivery, optional exact-byte video delivery and a 65-second expiration wait. It reports device/emulator identity without presenting an emulator run as a physical-device test. Its test photo is a generated PNG; the video must be a real supplied fixture <=5 MiB and <=15s. The script does not test video duration validation in the picker or playback in the viewer. It cleans its local public invitations and fixture files after success; remove `files/harness` from failed disposable runs. No private keys or message bodies are printed. `adb run-as` is a debug capability, and is not available in release builds.
 
+## User-reported two-phone check
+
+On 2026-10-15 the user reported checking two phones and that the app was working, with setup cumbersome. Device models, OS versions and the specific text/photo/video/capture tests were not supplied. Record this as user-reported general success; it does not establish PASS for every A–J case below. The 0.1.2 update addresses the visible setup friction; see ONBOARDING.md.
+
 ## Required A–J acceptance sequence
 
 | Test | Procedure and pass criterion | Current result |
 |---|---|---|
-| A: text | Pair through UI; compare both full fingerprints. Send a unique dummy sentence A→B and reply B→A; restart both; retry an offline send. Exact text, no duplicates, correct state after reconnect | NOT TESTED |
+| A: text | Pair through UI; compare every group of the shared safety number (or cross-compare both full fingerprints with an older version). Send a unique dummy sentence A→B and reply B→A; restart both; retry an offline send. Exact text, no duplicates, correct state after reconnect | NOT TESTED |
 | B: photo | Send a known JPEG/PNG/WebP. Confirm it decodes on B, without a public-gallery file. Also test a short real MP4, pause/resume and malformed/oversized imports | NOT TESTED |
 | C: Eyes-Only | Open received photo; no media pixels visible until a deliberate hold. Marks must identify the intended recipient, not the sender | NOT TESTED |
 | D: screenshot | With media revealed, try hardware buttons, screenshot quick setting, `adb exec-out screencap -p`, and a supported accessibility screenshot path. No protected media/text pixels may be present. Record OS refusal or black pixels separately | DEVICE REQUIRED |
@@ -92,3 +96,9 @@ ADB/system screenrecord can differ from MediaProjection/conferencing capture; al
 - Inspect `files`, `cache`, `no_backup`, MediaStore, notifications, logs and backup/transfer output for synthetic plaintext canaries. Validate there are no exported providers or unrestricted media URIs.
 - Try trusted and untrusted keyboards, TalkBack, touch assistance, overlay windows, picture-in-picture from another app and accessibility semantic extraction. Document usability failures honestly.
 - Test 5 MiB attachments and near-capacity state on a low-memory device; failed writes must not create new identities. Verify key loss produces an error and never silently resets trust.
+
+## 0.1.2 delivery boundary
+
+[Build 38723409751](https://github.com/Soldsoul86/orb/actions/runs/38723409751) passed 9 JVM tests and 7 Android 15 emulator tests, including the three native safety-number tests on both runtimes. The new UI and an upgrade have not been tested on physical phones. Downloaded certificate comparison **FAILED** update compatibility with 0.1.1, so keep the working installation intact. The signing diagnosis and publication guard are documented in [ONBOARDING.md](ONBOARDING.md).
+
+Follow-up run [38724685503](https://github.com/Soldsoul86/orb/actions/runs/38724685503) passed compilation/JVM/relay/lint, but Android finished 6 PASS / 1 FAIL. `ProtectionTest.nativeRevealReleaseCancelAndFocusLoss` failed the actual window-focus precondition after 10 seconds. No production viewer change occurred between these runs; the intermittent test environment/focus issue remains unresolved. The assertion was not bypassed. The signing-publication guard was skipped after that failure and has not yet been exercised end to end.
