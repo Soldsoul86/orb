@@ -4,6 +4,12 @@ An Android-first, one-to-one messenger with concealed media, hold-to-reveal inte
 
 **Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy/native Signal tests and relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. The user reports a successful basic two-phone check; detailed A–J acceptance results and physical capture verification remain unrecorded. Do not use this development build for consequential secrets.
 
+## Programmable purposes preview
+
+A separate **Veil Purposes Preview** app now adds multiple purpose addresses, explicit publication, public discovery, encrypted text requests, approval, office hours, pause/revocation and invitation links/QR. It installs beside the existing app, preserving its identity and messages. [Download and two-phone walkthrough](docs/purposes/DEMO.md) · [22-case test matrix](docs/purposes/TESTING.md) · [architecture](docs/purposes/DESIGN.md) · [API](docs/purposes/API.md) · [threat model](docs/purposes/SECURITY.md).
+
+The text-only preview and live additive `/v2` relay are tested as described in those reports. Purpose media/documents, recovery, background notifications and broader English interpretation are not implemented. Existing `/v1` chat/media and the original-app signing guard remain intact. This is a debuggable pilot, not an audited production release.
+
 ## Setup update and download status
 
 0.1.2 adds **Get started** with the hosted relay, one-tap invitation sharing, and one shared 60-digit safety number on both phones. The build and automated tests passed. **An update over the installed 0.1.1 is blocked by a signing-key mismatch. Keep the current app installed; do not uninstall or clear its data.** The previous signing-key cache did not save its key. See [the signing diagnosis and recovery requirements](docs/ONBOARDING.md).
