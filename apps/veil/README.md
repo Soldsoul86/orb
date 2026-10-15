@@ -43,6 +43,10 @@ The wrapper JAR/scripts cannot be downloaded/generated in the provided environme
 
 Expected APK after a successful build: `app/build/outputs/apk/debug/app-debug.apk`. Debug builds permit `run-as` and instrumentation; they are for testing. A distributed release needs a private signing key, non-debuggable release APK, license notices, and independent review.
 
+## Hosted Render trial
+
+A dedicated Singapore web service and PostgreSQL database have been provisioned in the user's confirmed Render workspace. The service is **waiting for the operator to set DATABASE_URL**; it is not yet live or verified. [Dashboard links, setup steps and hosting limits](relay/HOSTING.md). The free database expires November 14, 2026. The installed 0.1.1 APK is compatible; no update is required for this relay.
+
 ## Run an HTTPS relay
 
 Python **3.12+** is sufficient; no pip packages or third-party service credentials are needed. The relay must run on a host reachable by both phones. Use a domain with valid public TLS; the app rejects HTTP and redirects and does not trust user-added certificate authorities by default.

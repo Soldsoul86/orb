@@ -24,3 +24,7 @@ Sources inspected:
 - https://github.com/signalapp/libsignal/blob/v0.105.0/java/build.gradle
 - https://developer.android.com/reference/android/view/WindowManager.LayoutParams#FLAG_SECURE
 - https://developer.android.com/privacy-and-security/risks/secure-display
+
+## Optional hosted storage
+
+The hosted Render relay adds `psycopg[binary]==3.3.6` (Psycopg, LGPL-3.0-only) and managed PostgreSQL 17. The SQLite self-hosted path still uses only the Python standard library. Production corresponding source is in relay/postgres_store.py and relay/server.py; credentials are environment-only and never committed. See relay/HOSTING.md for storage, expiry and provider metadata limits.
