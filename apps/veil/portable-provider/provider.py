@@ -221,6 +221,8 @@ class Provider:
         r,owner=self.contact(q['id'],actor,now)
         if op=='contact': return self.describe(r,actor)
         p=owner['policy'] if op=='decision' else self.active(owner,now)
+        if op=='decision' and actor==r[1] and r[6] and verify(q['grant'],r[1],'pi-grant+jws')==verify(r[6],r[1],'pi-grant+jws'):
+            return {}  # Safe retry after a successful terminal decision with a lost response.
         if r[3]!=owner['epoch'] or r[7] in ('REVOKED','REJECTED','BLOCKED','EXPIRED') or r[8]<=now: raise Denied()
         if op=='bind':
             c=verify(q['channel'],r[2],'pi-channel+jws')

@@ -16,6 +16,12 @@ class PurposePolicyTest {
             assertTrue(runCatching { PurposePolicy.interpret(it) }.isFailure)
         }
     }
+    @Test fun globalGrammarUsesDeviceZoneAndRejectsUnsupportedDocuments() {
+        val sentence="Weekdays, 9-6 local time; intro allowed, further messages require approval; text only."
+        assertEquals(java.time.ZoneId.systemDefault().id,PurposePolicy.interpretGlobal(sentence).timezone)
+        assertTrue(runCatching {PurposePolicy.interpretGlobal(sentence.replace("text only","text and documents only"))}.isFailure)
+        assertTrue(runCatching {PurposePolicy.interpretGlobal(sentence+" Except holidays.")}.isFailure)
+    }
     @Test fun invalidScheduleAndContentFailClosed() {
         val p=PurposePolicy.template("Professional")
         listOf(p.copy(timezone="India"),p.copy(start=1080,end=540),p.copy(weekdays=emptyList()),p.copy(inactivityDays=0)).forEach {

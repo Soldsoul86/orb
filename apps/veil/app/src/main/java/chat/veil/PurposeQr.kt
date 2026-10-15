@@ -12,8 +12,9 @@ import java.io.InputStream
 import java.io.ByteArrayOutputStream
 
 object PurposeQr {
-    fun render(link:String):Bitmap {
-        require(link.length<=500)
+    fun render(link:String):Bitmap { require(link.length<=500);return renderPortable(link) }
+    fun renderPortable(link:String):Bitmap {
+        require(link.toByteArray().size<=2500)
         val matrix=MultiFormatWriter().encode(link,BarcodeFormat.QR_CODE,640,640)
         val pixels=IntArray(640*640) { if(matrix[it%640,it/640]) android.graphics.Color.BLACK else android.graphics.Color.WHITE }
         return Bitmap.createBitmap(pixels,640,640,Bitmap.Config.ARGB_8888)

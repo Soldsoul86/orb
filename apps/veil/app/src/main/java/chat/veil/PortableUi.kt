@@ -117,15 +117,12 @@ private val PortableMuted=Color(0xFF91A5AF)
                     Text("Your signed purpose card",fontSize=26.sp)
                     Text("Share privately. It contains this purpose’s name, rules, key and route. It never includes your wallet key or other purposes.",color=PortableMuted)
                     Button({a.sharePurpose(value)}){Text("Share invitation / new route")}
-                    // Full signed state often exceeds comfortable single-QR capacity. QR carries an open address only;
-                    // the full signed card remains available for offline migration when the old provider is gone.
-                    val address="pi1:"+Core.encode(JSONObject().put("id",f.getString("id")).put("route",f.getString("route")).toString().toByteArray())
-                    val bitmap=remember(address){runCatching {PurposeQr.render(address)}.getOrNull()}
+                    val bitmap=remember(value){runCatching {PurposeQr.renderPortable(value)}.getOrNull()}
                     if(bitmap!=null) {
                         DisposableEffect(bitmap){onDispose {bitmap.recycle()}}
-                        Image(bitmap.asImageBitmap(),"Purpose address QR",Modifier.fillMaxWidth().aspectRatio(1f))
-                        Text("QR is a public address for compatible tools, not the private invitation. Send the signed card for private requests or migration.",fontSize=12.sp,color=PortableMuted)
-                    }
+                        Image(bitmap.asImageBitmap(),"Signed purpose invitation QR",Modifier.fillMaxWidth().aspectRatio(1f))
+                        Text("This QR contains the same signed card. Scan and paste its text, or share the card remotely.",fontSize=12.sp,color=PortableMuted)
+                    } else Text("This card is too large for a readable QR. Use Share to send the complete signed card.",fontSize=12.sp,color=PortableMuted)
                     Text(f.getString("id"),fontFamily=FontFamily.Monospace,fontSize=11.sp)
                 }
             }
