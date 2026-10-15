@@ -19,6 +19,16 @@ android {
         getByName("test").java.srcDir("src/cryptoTest/java")
         getByName("androidTest").java.srcDir("src/cryptoTest/java")
     }
+    // CI may supply the original development signing key from a repository secret.
+    // Local test builds retain Android's default debug signing configuration.
+    System.getenv("VEIL_DEBUG_KEYSTORE")?.let { keyPath ->
+        signingConfigs.getByName("debug") {
+            storeFile = file(keyPath)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     buildFeatures { compose = true }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

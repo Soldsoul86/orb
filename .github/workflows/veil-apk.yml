@@ -30,11 +30,15 @@ jobs:
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
-      - name: Preserve development signing identity
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: veil-debug-signing-v1
+      - name: Restore explicitly configured development signing identity
+        env:
+          VEIL_DEBUG_KEYSTORE_B64: ${{ secrets.VEIL_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$VEIL_DEBUG_KEYSTORE_B64" ]; then
+            umask 077
+            printf '%s' "$VEIL_DEBUG_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/veil-debug.keystore"
+            echo "VEIL_DEBUG_KEYSTORE=$RUNNER_TEMP/veil-debug.keystore" >> "$GITHUB_ENV"
+          fi
       - name: Install Android platform
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.0.12077973'
       - name: Relay tests
@@ -63,7 +67,15 @@ jobs:
             gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest --stacktrace
       - name: Verify signed APK
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > "$RUNNER_TEMP/veil-signature.txt"
+          cat "$RUNNER_TEMP/veil-signature.txt"
+          actual_cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/veil-signature.txt")
+          # Pin the certificate of the delivered 0.1.1 APK. Never silently publish
+          # a new signing identity and tell existing users to erase their data.
+          test "$actual_cert" = 'bfc5d191b2daff5eef95b531c4775a0c4f2d6564eaf2ab110922253b7f2e43da' || {
+            echo '::error::APK signing identity differs from installed 0.1.1. Publication blocked. Restore the original key through VEIL_DEBUG_KEYSTORE_B64; see docs/ONBOARDING.md.'
+            exit 1
+          }
           cp app/build/outputs/apk/debug/app-debug.apk veil-debug.apk
           sha256sum veil-debug.apk > veil-debug.apk.sha256
           cat veil-debug.apk.sha256
@@ -84,3 +96,6 @@ jobs:
             apps/veil/app/build/outputs/logs/
             apps/veil/app/build/outputs/androidTest-results/
           if-no-files-found: ignore
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/veil-debug.keystore"
