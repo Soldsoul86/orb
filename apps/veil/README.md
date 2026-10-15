@@ -2,7 +2,7 @@
 
 An Android-first, one-to-one messenger with concealed media, hold-to-reveal interaction, and moving recipient watermarks. Kotlin / Jetpack Compose client; a small opaque-envelope Python relay.
 
-**Status: development implementation, not a completed or verified v0.1 release.** Android compilation, native encryption execution, two-device delivery and physical capture tests are NOT TESTED in this workspace. There is no built APK. Do not use this build for consequential secrets until the tests below pass and the integration has been reviewed.
+**Status: signed debug APK built in Orb CI; not a completed or verified v0.1 release.** Android compilation, lint, policy tests and all 10 relay tests passed in GitHub Actions. See [the delivery report](docs/STATUS.md) for exact build and encryption results. Two-device delivery and physical capture tests remain NOT TESTED. Do not use this development build for consequential secrets.
 
 ## Implemented in source
 
@@ -20,10 +20,10 @@ Only one person can be paired with an installation. Both sides must exchange inv
 
 ## Build on a development machine
 
-Prerequisites: JDK **21**, trusted Gradle **8.13**, Android SDK Platform **35**, Build Tools **35.0.0**, Android platform-tools, and access to Google Maven, Maven Central, Gradle and Signal's Maven repository. Android Studio can install the SDK and set `local.properties` for you.
+Prerequisites: JDK **21**, trusted Gradle **8.13**, Android SDK Platform **35**, Build Tools **35.0.0**, Android platform-tools, NDK **27.0.12077973**, and access to Google Maven, Maven Central, Gradle and Signal's Maven repository. Android Studio can install the SDK and set `local.properties` for you.
 
 ```sh
-cd veil
+cd apps/veil
 # Set sdk.dir in local.properties or configure ANDROID_HOME for your SDK.
 gradle --version                 # must report Gradle 8.13, JVM 21
 ./scripts/bootstrap.sh          # generates standard Gradle wrapper, builds and runs JVM tests
@@ -31,7 +31,7 @@ gradle --version                 # must report Gradle 8.13, JVM 21
 ./gradlew :app:lintDebug
 ```
 
-A GitHub Actions build/relay workflow is included at `.github/workflows/verify.yml`; it has not run here. It creates debug test artifacts only after a successful build and does not certify physical protection.
+The Orb workflow at `../../.github/workflows/veil-apk.yml` builds this application independently on the `codex/veil-apk` branch. Download the `veil-debug-apk` artifact from the successful run linked in [the delivery report](docs/STATUS.md), extract its ZIP, and install `veil-debug.apk`. It includes a SHA-256 checksum. A successful build does not certify physical protection.
 
 The wrapper JAR/scripts cannot be downloaded/generated in the provided environment; `scripts/bootstrap.sh` generates them using the specified trusted Gradle installation. Commit the generated wrapper after successful build. Dependencies and plugin versions are pinned, but dependency verification checksums/lockfiles are not yet generated; do that after resolving trusted artifacts. Do not disable TLS verification to make dependency downloads work.
 
@@ -42,7 +42,7 @@ Expected APK after a successful build: `app/build/outputs/apk/debug/app-debug.ap
 Python **3.12+** is sufficient; no pip packages or third-party service credentials are needed. The relay must run on a host reachable by both phones. Use a domain with valid public TLS; the app rejects HTTP and redirects and does not trust user-added certificate authorities by default.
 
 ```sh
-cd veil
+cd apps/veil
 python3 -m unittest discover -s relay -v
 VEIL_DB=/path/to/private/veil.sqlite3 python3 relay/server.py
 # Separate process, after installing Caddy and pointing DNS at this host:
@@ -73,3 +73,7 @@ Mailbox lifetime is 30 days, envelope maximum lifetime is seven days, and the UI
 - [Third-party dependencies and licensing](docs/DEPENDENCIES.md)
 
 Private communication should feel natural. Copying it should be difficult, deliberate, and potentially attributable. Another camera, a modified recipient app, or a compromised phone can still copy what a recipient can see. Watermarks are a deterrent, never forensic proof.
+
+## License
+
+The standalone Veil code in this directory is licensed under AGPL-3.0-only; see [LICENSE](LICENSE). This is separate from the existing Orb runtime. Signal libsignal is also AGPL-3.0-only. Corresponding application source and build instructions are on the `codex/veil-apk` branch; retain dependency notices and consult [the dependency record](docs/DEPENDENCIES.md) before redistribution.

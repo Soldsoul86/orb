@@ -2,7 +2,7 @@
 
 Use exactly these labels: **PASS**, **FAIL**, **NOT TESTED**, **DEVICE REQUIRED**. A skipped test is not PASS. A flag inspection or emulator screenshot is not physical-device verification. Record build hash, phone model, Android version/security patch, app version, test inputs and observations without real private content.
 
-## Results in this workspace — 2026-10-15
+## Results from local checks and Orb CI — 2026-10-15
 
 | Check | Result | Evidence |
 |---|---|---|
@@ -13,16 +13,19 @@ Use exactly these labels: **PASS**, **FAIL**, **NOT TESTED**, **DEVICE REQUIRED*
 | Cross-mailbox isolation, box revocation, registration limits | PASS | Three additional relay tests |
 | Mailbox quota | PASS | `test_quota` |
 | Opaque storage, hashed capabilities | PASS | `test_storage_is_opaque_and_capabilities_hashed`; synthetic random bytes, not proof of client encryption |
-| Real HTTP, two network clients | NOT TESTED | Socket creation returns `PermissionError: [Errno 1] Operation not permitted`; test explicitly skipped |
+| Real HTTP, two network clients | PASS | All 10 relay tests pass on the GitHub runner; initial local socket restriction remains |
 | Python syntax and shell bootstrap syntax | PASS | `py_compile`; `bash -n` |
-| Android build / lint / JVM tests | NOT TESTED | Gradle, Kotlin compiler and Android SDK absent; downloads fail at configured proxy |
-| Native libsignal and secure-view instrumentation | NOT TESTED | Sources supplied; no Android runtime or adb |
+| Android build / lint / JVM tests | PASS | Orb CI: debug and test APK compiled; 6 JVM tests pass; lint 0 errors / 27 warnings |
+| Native libsignal on Linux/JVM | PASS | 4 actual native protocol tests; shared source also compiled into Android instrumentation |
+| Secure-view and Android-native instrumentation execution | NOT TESTED | Instrumentation APK compiled but no Android runtime used |
 | Two-phone harness | NOT TESTED | Sources supplied; no phones/emulators/HTTPS relay |
 | Physical screenshot / recorder / casting / watermark | DEVICE REQUIRED | No physical devices attached |
 
 The initial relay test run surfaced the socket restriction as an error; it is now an explicit skip with the blocker retained here. No code failure was hidden as a passing network test.
 
-## Automated checks to run elsewhere
+[Exact build, artifact, checksum and caveats](STATUS.md). CI is not physical-device verification.
+
+## Automated checks to reproduce
 
 ```sh
 python3 -m unittest discover -s relay -v

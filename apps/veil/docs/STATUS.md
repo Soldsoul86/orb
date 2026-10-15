@@ -4,7 +4,18 @@
 
 An Android Kotlin/Compose source project named **Veil**, with setup/pairing, an identity-comparison gate, one-conversation list, chat composer, media picker, Normal/Protected/Eyes-Only selection, a native protected media viewer, animated repeated watermark and sender expiration controls. Source includes real libsignal calls, Android Keystore vault encryption, HTTP relay transport, persistent ratchet/outbox/inbox handling and biometric/device-credential app entry. The Python/SQLite relay and local tests execute without external packages.
 
-This is **not a completed v0.1 release**. No Android binary has been built or launched. Runtime compatibility and security behavior are unverified. No mock screen or substitute encryption is presented as functioning delivery.
+This is **not a completed v0.1 release**. A signed universal debug APK has now been built in Orb CI. It has not been installed or launched on Android; runtime UX, device capture protection and two-phone delivery remain unverified.
+
+## Download and exact build
+
+- [Download APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38698579359/artifacts/11954194230): extract `veil-debug.apk` and its SHA-256 file.
+- [Successful workflow and logs](https://github.com/Soldsoul86/orb/actions/runs/38698579359).
+- Source: `Soldsoul86/orb`, branch `codex/veil-apk`, application at `apps/veil`; APK code commit `88ddb36a4d94b25fef3d576241c3364addcfb831`. Later documentation-only commits do not change this binary.
+- Package `chat.veil`; version `0.1.0-dev` (1); Android 9/API 28 minimum, target API 35. ARM64, ARMv7, x86 and x86_64 included.
+- APK: 72,714,690 bytes; compressed download: 32,470,836 bytes. Unused Signal testing JNI excluded and native debug symbols stripped; production Signal JNI retained on every ABI.
+- APK SHA-256: `f48c1c2a1234297f4b05badd9c4215723db952c906be86150f7a8fba55424349`.
+- APK Signature Scheme v2 verified by Android `apksigner`. This is a debug certificate, not a production identity. Future CI builds may use a different debug signing key; preserve test data before replacing an installation and do not uninstall unrelated Orb apps.
+- Artifact retention currently expires January 13, 2027. Download and retain the APK/checksum; rebuild from source afterward.
 
 ## 2. Architecture / dependencies
 
@@ -12,11 +23,11 @@ Kotlin 2.2.20, Compose Material 3, libsignal 0.105.0, Android Keystore AES-GCM, 
 
 ## 3. Features demonstrated end to end
 
-**None between Android devices.** No phones, emulator, adb or SDK are available. The relay database operations are exercised locally. A real HTTP test is provided but cannot bind a socket in this environment. The supplied two-phone harness is unexecuted and must not be counted as a passing demonstration.
+**None between Android devices.** GitHub Actions supplies the SDK and native Linux libraries, but no Android device/emulator has been used. Real HTTP relay tests pass on the CI runner. Four actual native libsignal integration tests pass on Linux/JVM: text/reply and serialized restart, 5 MiB media payload/out-of-order/duplicate rejection, tamper/wrong-identity rejection, and simultaneous initiation. These are cryptographic integration tests, not Android UI or two-phone demonstrations. The supplied two-phone harness remains unexecuted.
 
 ## 4. Security protections verified
 
-Locally executed tests verify relay capability separation, idempotent storage/ack, TTL pruning, quotas, malformed-envelope rejection and opaque storage of synthetic payloads. Static source review confirms the intended secure-window, no-export/no-notification and encrypted-vault paths. It does **not** verify Android screenshot prevention, native encryption correctness, biometric behavior, lifecycle races or watermark readability.
+Executed tests verify native Signal roundtrips and adversarial cases above, reveal/expiry policy boundaries, and relay capability separation, idempotent storage/ack, TTL pruning, quotas, malformed-envelope rejection, opaque storage of synthetic payloads and HTTP transport. Static source review confirms the intended secure-window, no-export/no-notification and encrypted-vault paths. These checks do **not** verify Android screenshot prevention, full client-to-relay canary test H, biometric behavior, lifecycle races or optical watermark readability.
 
 ## 5. Security limitations / unresolved risks
 
@@ -24,10 +35,16 @@ Full threat model in SECURITY.md. Key limits: recipient/root compromise and seco
 
 ## 6. Automated results
 
-- Python relay: **9 PASS**, **1 NOT TESTED / skipped** (network socket denied).
+- Python relay in CI: **10 PASS**, zero skipped, including real HTTP transport. The initial local run was 9 pass / 1 skipped because local sockets are prohibited.
+- Kotlin/JVM tests: **6 PASS**, zero failed/ignored: 2 policy tests and 4 real native libsignal tests.
+- Debug application and Android instrumentation APK compilation: **PASS**.
+- Android lint: **PASS**, 0 errors and 27 warnings. Warnings include dependency/target updates, missing launcher icon, drawing allocations, accessibility click semantics and untranslated strings; they remain release work.
+- APK signing verification and downloaded checksum: **PASS**.
 - Python and shell syntax checks: **PASS**.
-- Kotlin/JVM/native/instrumentation/two-phone tests: **NOT TESTED**. Test sources exist; no claim that they compile or pass.
-- No physical test passed or failed because none could be attempted.
+- Android instrumentation execution, emulator UI, two-phone delivery and full test H: **NOT TESTED**.
+- Capture/optical watermark/lifecycle timing: **DEVICE REQUIRED**. No physical results are fabricated.
+
+The separate pre-existing Orb `verify` workflow failed its trading hard-exit demonstration with `event.risk.measured.toFixed is not a function` at `scripts/simulate-hard-exit.mjs:201`. Its earlier lint/build/compile/tests passed. Veil does not modify that code; the Veil APK workflow is green. See [the separate workflow](https://github.com/Soldsoul86/orb/actions/runs/38697571941).
 
 ## 7. Physical tests required
 
@@ -37,7 +54,7 @@ A–J in TESTING.md, including screenshot buttons/ADB/accessibility, OS recordin
 
 README.md contains exact prerequisites, Gradle bootstrap, APK locations, Caddy relay setup, ADB installation and manual pairing flow. TESTING.md includes `scripts/two_phone.py` and the acceptance sequence. No hosted relay/domain or TLS certificate was provisioned. Existing credentials are unnecessary for a self-hosted relay, but the operator must supply hosting and a reachable HTTPS origin.
 
-Exact environmental blockers:
+Initial local environmental blockers (Android build and HTTP test now resolved through GitHub Actions; local restrictions remain):
 
 - No Gradle, Kotlin compiler, Android SDK, platform-tools/adb, emulator or physical Android device.
 - `curl` through configured `http://proxy:8080` fails with `Failed to connect to proxy port 8080 ... Could not connect to server`.
@@ -46,7 +63,7 @@ Exact environmental blockers:
 
 ## 9. Three highest-priority v0.2 improvements
 
-1. **Establish release confidence:** reproducible CI/build artifacts, dependency verification, independent protocol/storage/lifecycle review, and a repeatable multi-OEM physical capture + optical watermark test matrix. This is also a gate for calling v0.1 complete.
+1. **Establish release confidence:** production signing, dependency verification and build provenance, independent protocol/storage/lifecycle review, and a repeatable multi-OEM physical capture + optical watermark test matrix. This is also a gate for calling v0.1 complete.
 2. **Make sessions durable over months:** authenticated prekey rotation, mailbox renewal/revocation, safe device replacement/re-pair UX, malformed-envelope quarantine and independent send/receive retry scheduling.
 3. **Improve the signature experience:** accessible deliberate-reveal alternatives with explicit tradeoffs, measured watermark contrast/crop resilience, safer media normalization/metadata stripping, and streamed encrypted storage to bound memory use.
 
@@ -55,8 +72,8 @@ Exact environmental blockers:
 | Phase | Implementation | Verification |
 |---|---|---|
 | 0: audit / architecture | Complete source/design audit and documented choices | Environment and upstream source inspected |
-| 1: encrypted text | Pairing, pinned identity, native protocol adapter, vault and relay source | Relay tests pass; Android protocol/transport blocked |
-| 2: media | Encrypted inline photo/video import and playback source | Native and two-phone tests supplied, blocked |
+| 1: encrypted text | Pairing, pinned identity, native protocol adapter, vault and relay source | Native Signal and relay HTTP tests PASS; two-phone delivery NOT TESTED |
+| 2: media | Encrypted inline photo/video import and playback source | Native 5 MiB crypto payload test PASS; Android codecs/two-phone tests NOT TESTED |
 | 3: protected chat | Secure window, recents exclusion, native concealment, no export source | Source review only; device capture tests required |
-| 4: Eyes-Only / watermark | Hold/cancel/release, pause, deadlines, repeated animated overlay source | Policy and view tests supplied, blocked |
-| 5: adversarial testing / refinement | Relay tests, test harness, threat model, UX error/lock handling | Partial; physical acceptance and Android build remain open |
+| 4: Eyes-Only / watermark | Hold/cancel/release, pause, deadlines, repeated animated overlay source | Policy tests PASS; native view execution/optical verification NOT TESTED |
+| 5: adversarial testing / refinement | Relay tests, test harness, threat model, UX error/lock handling | Signed debug build and 16 automated tests PASS; physical acceptance remains open |

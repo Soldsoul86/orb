@@ -15,7 +15,7 @@
 
 The Signal version and Java/Kotlin signatures were inspected using upstream tagged source. Direct application dependencies are pinned for reviewability; the supplied CI actions currently use version tags and should be commit-pinned during supply-chain review. They have not been resolved or checksum-verified in this environment. Other Android dependencies also need current vulnerability/compatibility review during the first successful build. No analytics, trackers, remote image fetcher or hosted AI service is included.
 
-libsignal is **AGPL-3.0-only**, maintained for Signal's own use; its external API is not a stable supported third-party contract. Its licensing obligations affect distribution of this application. Retain upstream notices and provide compliant corresponding source when distributing; final project licensing/release packaging is not established by this development deliverable. AndroidX and OkHttp generally use Apache-2.0; generate a resolved transitive license inventory before shipping. No production signing key or release artifact exists here.
+libsignal is **AGPL-3.0-only**, maintained for Signal's own use; its external API is not a stable supported third-party contract. Its licensing obligations affect distribution of this application. Retain upstream notices and provide compliant corresponding source when distributing; the standalone Veil application source is AGPL-3.0-only with the license text included at ../LICENSE. Production release packaging is not established by this development deliverable. AndroidX and OkHttp generally use Apache-2.0; generate a resolved transitive license inventory before shipping. No production signing key or release artifact exists here.
 
 Sources inspected:
 
