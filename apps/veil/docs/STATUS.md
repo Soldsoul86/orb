@@ -1,5 +1,13 @@
 # Delivery report — 2026-10-15
 
+## Live relay — 2026-10-15
+
+`https://veil-relay-soldsoul86.onrender.com` is live in Singapore, with a separate persistent PostgreSQL database. The user configured the private database connection in Render. [Live HTTPS test run 38714151908](https://github.com/Soldsoul86/orb/actions/runs/38714151908) passed at 09:36:30 UTC: health, two disposable inboxes, 128-byte and 5-MiB opaque payloads, idempotent retry, reader/writer and cross-inbox access checks, acknowledgement and cleanup. No real conversations or private keys were used.
+
+The installed 0.1.1 APK is compatible. Both people enter this same HTTPS origin, create their own inbox, each share their own invitation **before importing the other's**, compare complete identity codes, and keep Veil open/unlocked to receive messages. No background push notifications are implemented.
+
+The free server may take about a minute to wake after idle. The free database expires November 14, 2026; an upgrade is needed for continued use. [Hosting details](../relay/HOSTING.md). These live transport checks do not establish Android two-phone delivery, combined Signal-to-relay integration or physical capture protection.
+
 ## Latest APK: 0.1.1-dev — unlock cover fix
 
 **Use this replacement:** [APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38707141433/artifacts/11959076411) · [successful build](https://github.com/Soldsoul86/orb/actions/runs/38707141433).

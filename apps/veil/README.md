@@ -45,7 +45,7 @@ Expected APK after a successful build: `app/build/outputs/apk/debug/app-debug.ap
 
 ## Hosted Render trial
 
-A dedicated Singapore web service and PostgreSQL database have been provisioned in the user's confirmed Render workspace. The service is **waiting for the operator to set DATABASE_URL**; it is not yet live or verified. [Dashboard links, setup steps and hosting limits](relay/HOSTING.md). The free database expires November 14, 2026. The installed 0.1.1 APK is compatible; no update is required for this relay.
+A dedicated Singapore web service and PostgreSQL database have been provisioned in the user's confirmed Render workspace. The service is **live** at `https://veil-relay-soldsoul86.onrender.com`. Public HTTPS checks passed for two disposable inboxes, 128-byte and 5-MiB opaque payloads, authorization separation, idempotent retry, acknowledgement and cleanup. This verifies relay transport, not Android two-phone delivery. [Dashboard links, setup steps and hosting limits](relay/HOSTING.md). The free database expires November 14, 2026. The installed 0.1.1 APK is compatible; no update is required for this relay.
 
 ## Run an HTTPS relay
 
@@ -59,7 +59,7 @@ VEIL_DB=/path/to/private/veil.sqlite3 python3 relay/server.py
 VEIL_DOMAIN=relay.example.com caddy run --config relay/Caddyfile
 ```
 
-Create the database directory writable only by the relay's dedicated OS account. The server binds to `127.0.0.1:8080` by default; Caddy exposes HTTPS on 443. Keep the Python port off the public network. Run both as supervised services for a persistent installation. Do not enable access/body/header logs. There is no deployment created or hosted URL supplied by this workspace.
+Create the database directory writable only by the relay's dedicated OS account. The server binds to `127.0.0.1:8080` by default; Caddy exposes HTTPS on 443. Keep the Python port off the public network. Run both as supervised services for a persistent installation. Do not enable access/body/header logs. For the provisioned Render alternative, use the hosted trial above; Caddy is only needed for your own separate self-hosted deployment.
 
 Mailbox lifetime is 30 days, envelope maximum lifetime is seven days, and the UI offers up to one day. In this minimal version inbox renewal and key rotation require resetting and pairing both test installations again. No reset is performed automatically.
 

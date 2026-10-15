@@ -28,16 +28,16 @@ Application request logging is disabled. Render and its TLS proxy still observe 
 
 Run `python -m unittest discover -s apps/veil/relay -v` from the Orb repository root. For the PostgreSQL suite, install relay/requirements.txt and point `TEST_DATABASE_URL` at a **disposable test database only**; the suite clears its tables between tests. GitHub Actions `.github/workflows/veil-relay.yml` provisions a disposable PostgreSQL 17 instance and tests both backends, including restart persistence, transaction rollback, capability separation, idempotency, quotas, expiry and real HTTP transport.
 
-Live verification results and the final public address are recorded separately after configuration/deployment. A server test is not evidence of two physical phones communicating.
+Live verification results and the public address are recorded below. A server test is not evidence of two physical phones communicating.
 
 ## Provisioned resources — 2026-10-15
 
-- Public origin (pending database binding): `https://veil-relay-soldsoul86.onrender.com`.
+- Public origin (live): `https://veil-relay-soldsoul86.onrender.com`.
 - [Web service](https://dashboard.render.com/web/srv-db89jmfavr4c73anffe0), free, Singapore, manual deploys.
 - [Database](https://dashboard.render.com/d/dpg-db89dt5g1s2s739hft8g-a), PostgreSQL 17, free; expires **2026-11-14 09:03 UTC**.
-- Source deployed: `3583d3cf1f02463e1916aa37cd0d4c4f4d313633`.
+- Live deploy `dep-db89s1navr4c73aod0t0` uses source `ac160b9c5cf19f22955bcc631fddcb9b045b2ed9` (same relay code as `3583d3cf1f02463e1916aa37cd0d4c4f4d313633`), marked live at 2026-10-15 09:34:50 UTC.
 - [Database/HTTP CI run](https://github.com/Soldsoul86/orb/actions/runs/38710815081): PostgreSQL **14 PASS**; SQLite **13 PASS / 1 skipped** (PostgreSQL-only reconnect). Both include real HTTP requests. Local sockets remain unavailable.
-- Initial web deployment built successfully, then refused startup with the documented missing `DATABASE_URL` error. This is an explicit configuration blocker, not a live relay. The user has been shown how to set the Internal Database URL privately in Render.
-- Live smoke test script: `python apps/veil/relay/smoke_https.py https://veil-relay-soldsoul86.onrender.com`. Uses disposable mailboxes and synthetic opaque bytes, deletes them afterward, and prints no capabilities or payloads. Not yet run against the hosted endpoint.
+- Initial web deployment built successfully, then refused startup with the documented missing `DATABASE_URL` error. The user subsequently configured DATABASE_URL privately in Render and deployed successfully. This blocker is resolved.
+- Live smoke test script: `python apps/veil/relay/smoke_https.py https://veil-relay-soldsoul86.onrender.com`. Uses disposable mailboxes and synthetic opaque bytes, deletes them afterward, and prints no capabilities or payloads. Executed successfully against the hosted endpoint at 2026-10-15 09:36:30 UTC in [GitHub Actions run 38714151908](https://github.com/Soldsoul86/orb/actions/runs/38714151908). Public HTTPS health, both payload sizes, authorization separation, idempotency, acknowledgement and disposable inbox cleanup PASS. Android two-phone communication, combined Signal-to-live-relay integration and physical capture protection remain NOT TESTED.
 
 The APK rebuild triggered by relay changes exposed a pre-existing test startup race: native-view assertions ran before the emulator window had focus. App compilation and both unlock tests passed. Instrumentation now waits for real focus, and the emulator is explicitly woken; the [repeat run](https://github.com/Soldsoul86/orb/actions/runs/38711967584) passed all four Android 15 emulator instrumentation tests, compilation, JVM tests and lint. No Android production behavior was changed for hosting. Existing 0.1.1 APK remains usable.
