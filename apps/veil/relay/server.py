@@ -35,6 +35,8 @@ class Relay:
             CREATE TABLE IF NOT EXISTS messages(box TEXT, id TEXT, body BLOB, expires INTEGER, PRIMARY KEY(box,id));
             CREATE TABLE IF NOT EXISTS receipts(box TEXT, id TEXT, expires INTEGER, PRIMARY KEY(box,id));
             ''')
+        from purposes import Purposes
+        self.purposes = Purposes(self.db)
     def clean(self):
         now = int(time.time())
         self.db.execute('DELETE FROM messages WHERE expires <= ? OR box IN (SELECT id FROM boxes WHERE expires <= ?)', (now, now))
@@ -43,6 +45,8 @@ class Relay:
     def handle(self, method, path, bearer, data):
         with self.lock, self.db:
             self.clean()
+            if path.startswith('/v2/'):
+                return self.purposes.handle(method, path, bearer, data)
             if method == 'GET' and path in ('/', '/healthz'):
                 return 200, {'status': 'ok', 'service': 'Veil encrypted relay'}
             if method == 'POST' and path == '/v1/boxes':
@@ -107,7 +111,17 @@ def handler(relay):
     class Handler(BaseHTTPRequestHandler):
         server_version = 'VeilRelay'
         def log_message(self, *_): pass  # No request paths, capabilities, bodies, or IP logs.
-        def do_GET(self): self.run_request()
+        def do_GET(self):
+            if re.fullmatch(r'/p/p-[a-f0-9]{32}', self.path):
+                from purpose_landing import HTML, CSP
+                self.send_response(200)
+                for key, value in [('Content-Type','text/html; charset=utf-8'),('Cache-Control','no-store'),
+                                   ('Referrer-Policy','no-referrer'),('Content-Security-Policy',CSP),
+                                   ('X-Content-Type-Options','nosniff'),('X-Frame-Options','DENY'),('Content-Length',str(len(HTML)))]:
+                    self.send_header(key,value)
+                self.end_headers();self.wfile.write(HTML)
+                return
+            self.run_request()
         def do_POST(self): self.run_request()
         def do_PUT(self): self.run_request()
         def do_DELETE(self): self.run_request()
@@ -115,7 +129,8 @@ def handler(relay):
             self.connection.settimeout(15)
             try:
                 length = int(self.headers.get('Content-Length', '0'))
-                if length < 0 or length > MAX_BODY:
+                limit = 128*1024 if self.path.startswith('/v2/') else MAX_BODY
+                if length < 0 or length > limit:
                     self.reply(413, {'error': 'too large'}); return
                 data = json.loads(self.rfile.read(length)) if length else {}
                 if not isinstance(data, dict): raise ValueError()
