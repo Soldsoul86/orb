@@ -72,7 +72,7 @@ object IdentityCore {
         verify(proof,expected,PROOF).also {
             require(it.getInt("v")==1 && it.getString("iss")==expected && it.getString("aud")==challenge.getString("aud"))
             require(it.getString("nonce")==challenge.getString("nonce") && it.getLong("iat") in (now-60)..(now+5))
-            require(it.getLong("exp")>now && it.getLong("exp")<=challenge.getLong("expires"))
+            require(it.getLong("exp")>now && it.getLong("exp")<=minOf(challenge.getLong("expires"),it.getLong("iat")+60))
         } // The verifier must atomically consume the nonce; see provider implementation.
     fun exportIdentity(material: JSONObject, recoveryKey: String): String {
         require(material.getInt("v")==1 && material.toString().length<=4*1024*1024)

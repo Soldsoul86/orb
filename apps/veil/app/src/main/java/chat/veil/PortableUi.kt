@@ -136,7 +136,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                     Text(c.getJSONObject("policy").getString("display_name"),fontSize=28.sp)
                     Text("${c.getString("status")} · encrypted text · 7-day messages",color=PortableMuted,fontSize=12.sp)
                     Text(c.getString("route"),fontSize=11.sp,color=PortableMuted)
-                    Button({val id=c.getString("local");a.portableAction {sync(id)}},enabled=!a.busy){Text("Refresh & retry delivery")}
+                    Button({val id=c.getString("id");a.portableAction {syncContact(id)}},enabled=!a.busy){Text("Refresh & retry delivery")}
                     if(c.optBoolean("pending"))Text("A delivery or permission update is pending. Refresh to retry.",fontSize=12.sp,color=Color(0xFFFFD5A0))
                     Text("Compare this entire safety number through a trusted channel. It changes after migration; the signed purpose key must also match the pinned contact.",fontSize=12.sp,color=PortableMuted)
                     Text(c.getString("safety").chunked(5).chunked(3).joinToString("\n"){it.joinToString(" ")},fontFamily=FontFamily.Monospace,fontSize=16.sp)
@@ -180,6 +180,14 @@ private val PortableMuted=Color(0xFF91A5AF)
                         if(f.optBoolean("needs_migration"))Text("Restored locally. Choose a new provider before using this purpose.",color=Color(0xFFFFD5A0),fontSize=12.sp)
                         if(!f.optBoolean("published") && !f.optBoolean("needs_migration"))Button({a.portableAction {publish(id)}},enabled=!a.busy && p.status==PurposeStatus.ACTIVE){Text("Activate with provider")}
                         if(f.optBoolean("published"))Row {TextButton({a.portableAction {sync(id)}},enabled=!a.busy){Text("Refresh inbox")};TextButton({selected=id;page="card"}){Text("Share card / QR")}}
+                        if(p.status==PurposeStatus.REVOKED) {
+                            var forget by remember(id){mutableStateOf(false)}
+                            TextButton({forget=!forget}){Text("Forget revoked purpose on this device")}
+                            if(forget) {
+                                Text("Deletes this purpose's local keys and conversations. Other purposes and your ownership key remain. Old encrypted backups can still contain it.",fontSize=12.sp,color=PortableMuted)
+                                OutlinedButton({a.portableAction {forgetRevokedFacet(id)}},enabled=!a.busy){Text("Confirm local deletion")}
+                            }
+                        }
                         if(p.status!=PurposeStatus.REVOKED) {
                             TextButton({editor=PurposeFacet(id,"",p,"",f.optBoolean("published"));origin=f.getString("route");page="edit"}){Text("Edit / pause / revoke purpose")}
                             TextButton({a.portableAction {rotateDevice(id)}},enabled=!a.busy && !f.optBoolean("needs_migration")){Text("Rotate operational device key")}

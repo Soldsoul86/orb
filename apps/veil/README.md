@@ -1,3 +1,9 @@
+## Portable identity beta (pi/1)
+
+The existing messenger is preserved. My identity now offers locally owned keys, signed purpose policies, encrypted recovery and explicit provider migration. This beta needs a compatible separate provider; the existing personal-chat relay is unchanged. It does not migrate earlier v1/v2 identities automatically.
+
+Start with [migration demo](PROVIDER_MIGRATION_DEMO.md), [executed tests](TEST_RESULTS.md), [open protocol](OPEN_PROTOCOL.md), [limits](LIMITATIONS.md), and [threat model](docs/portability/THREAT_MODEL.md). Identity core: Nimbus JOSE+JWT; message encryption remains libsignal. Provider examples are not live deployments.
+
 # Veil — private communication, under your touch
 
 An Android-first, one-to-one messenger with concealed media, hold-to-reveal interaction, and moving recipient watermarks. Kotlin / Jetpack Compose client; a small opaque-envelope Python relay.

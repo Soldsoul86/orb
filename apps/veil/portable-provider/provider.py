@@ -81,6 +81,7 @@ class Provider:
         if old:
             previous = state(old[1])
             if s['revision'] < old[0] or (s['revision'] == old[0] and s != previous): raise Denied(409)
+            if p['policy_version']<previous['policy']['policy_version'] or (p!=previous['policy'] and p['policy_version']<=previous['policy']['policy_version']): raise Denied(409)
             if previous['policy']['status'] == 'REVOKED' and s != previous: raise Denied()
             if s['revision'] > old[0]:
                 self.db.execute('UPDATE states SET revision=?,token=?,published=0 WHERE id=?', (s['revision'], token, s['id']))

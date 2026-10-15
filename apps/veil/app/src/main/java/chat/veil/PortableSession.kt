@@ -93,6 +93,13 @@ class PortableSession(
         val f=facet(id);val old=payload(f);require(PurposePolicy.from(old.getJSONObject("policy")).status!=PurposeStatus.REVOKED)
         f.put("device",Core.key()).put("state",signedState(f,PurposePolicy.from(old.getJSONObject("policy")),old.getString("route"),old.getString("epoch"),old.getLong("revision")+1));commit();publish(id)
     }
+    fun forgetRevokedFacet(id:String) {
+        val f=facet(id);require(PurposePolicy.from(payload(f).getJSONObject("policy")).status==PurposeStatus.REVOKED)
+        // Confirm terminal state reached the provider before dropping local control material.
+        publish(id)
+        values(contacts()).filter {it.getString("local")==id}.forEach {contacts().remove(it.getString("id"))}
+        facets().remove(id);commit()
+    }
     fun card(id:String)=JSONObject().put("v",1).put("state",facet(id).getString("state")).toString()
     fun inspectCard(card:String)=validateState(JSONObject(card).getString("state"))
     fun search(asFacet:String,origin:String,query:String):List<String> {
@@ -239,13 +246,17 @@ class PortableSession(
             }
             adopt(contact(cid),r)
         }
-        // Peer relationships can be hosted at a different origin from their own facet.
-        values(contacts()).filter {it.getString("local")==id}.forEach { c ->
-            if(!listed || c.getString("route")!=route)adopt(c,call(f,c.getString("route"),q("contact").put("id",c.getString("id"))))
+        values(contacts()).filter {it.getString("local")==id}.forEach { c -> syncContact(c.getString("id")) }
+    }
+    /** Refresh one pinned route without contacting any unrelated provider/directory. */
+    fun syncContact(id:String) {
+        val c=contact(id);val f=facet(c.getString("local"))
+        flushDecision(c)
+        adopt(c,call(f,c.getString("route"),q("contact").put("id",id)))
             val p=PurposePolicy.from(validateState(c.getString("owner_state")).getJSONObject("policy"));trim(c);commit()
-            if(c.getString("status") !in setOf("PENDING","APPROVED","RESERVED") || p.status!=PurposeStatus.ACTIVE || (p.expiresAt>0 && p.expiresAt<=clock()))return@forEach
+            if(c.getString("status") !in setOf("PENDING","APPROVED","RESERVED") || p.status!=PurposeStatus.ACTIVE || (p.expiresAt>0 && p.expiresAt<=clock()))return
             if(c.has("outbox"))flush(c)
-            if(!open(p) || !c.getJSONObject("signal").has("peer"))return@forEach
+            if(!open(p) || !c.getJSONObject("signal").has("peer"))return
             if(c.getString("status")=="APPROVED")allowed(c)
             val messages=call(f,c.getString("route"),q("messages").put("id",c.getString("id"))).getJSONArray("messages")
             for(n in 0 until messages.length()) {
@@ -260,7 +271,6 @@ class PortableSession(
                 }
                 call(f,c.getString("route"),q("ack").put("id",c.getString("id")).put("message",mid))
             }
-        }
     }
     fun exportIdentity(key:String):String {
         require(ready())
