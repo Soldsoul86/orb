@@ -167,3 +167,13 @@ class PurposeTests(unittest.TestCase):
         self.at+=601;self.call('GET','/grants',self.owner)
         self.assertEqual(self.r.purposes.grant(gid)[5],'EXPIRED')
         _,_,other=self.reserve(self.stranger);self.assertNotEqual(other['slot'],res['slot'])
+
+    def test_multi_connection_transactions_serialize_reservations(self):
+        other=Relay(self.path,database_url=self.database_url);other.purposes.clock=lambda:self.at
+        def reserve_on(i):
+            relay=self.r if i%2 else other
+            return relay.handle('POST','/v2/facets/'+self.fid+'/reserve',self.visitor,dict(id=secrets.token_hex(16),bundle=fixture_bundle()))[0]
+        try:
+            with ThreadPoolExecutor(max_workers=8) as pool: codes=list(pool.map(reserve_on,range(8)))
+            self.assertEqual(codes.count(201),1)
+        finally: other.db.close()

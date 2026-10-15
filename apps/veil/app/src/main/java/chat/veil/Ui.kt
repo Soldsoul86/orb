@@ -60,10 +60,10 @@ private val Shape = RoundedCornerShape(22.dp)
                     val snap = activity.snapshot
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         listOf("Chats","Discover","My identity").forEachIndexed { i,label ->
-                            TextButton({activity.section=i}) { Text(label,color=if(activity.section==i)Mint else Muted,fontSize=12.sp) }
+                            TextButton({activity.closeViewer();activity.section=i}) { Text(label,color=if(activity.section==i)Mint else Muted,fontSize=12.sp) }
                         }
                     }
-                    if(activity.section==0) TextButton({activity.legacyChat=!activity.legacyChat}) {
+                    if(activity.section==0) TextButton({activity.closeViewer();activity.legacyChat=!activity.legacyChat}) {
                         Text(if(activity.legacyChat) "Show purpose conversations" else "Open original private chat",fontSize=11.sp)
                     }
                     when {

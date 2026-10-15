@@ -113,7 +113,7 @@ private val PurposeMuted=Color(0xFF91A5AF)
                 Button({editing=true;editFacet=null},enabled=!a.busy && s.facets.size<8,modifier=Modifier.fillMaxWidth()) { Text("Create contact purpose") }
                 s.facets.forEach { f -> PurposePanel {
                     Text(f.policy.displayName,fontSize=21.sp,fontWeight=FontWeight.Medium)
-                    Text(PurposePolicy.discoveryLabel(f.policy.discovery)+" · "+f.policy.status.name.lowercase(),color=PurposeMint,fontSize=12.sp)
+                    Text(PurposePolicy.discoveryLabel(f.policy.discovery)+" · "+(if(f.policy.expiresAt>0 && f.policy.expiresAt<=now()/1000) "expired" else f.policy.status.name.lowercase()),color=PurposeMint,fontSize=12.sp)
                     Text("${f.policy.timezone} · ${s.contacts.count { it.facet==f.id && it.status=="PENDING" }} pending requests",color=PurposeMuted,fontSize=12.sp)
                     if(!f.published)Text("Activation pending. Open Veil while connected to retry.",color=Color(0xFFFFD5A0),fontSize=12.sp)
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -179,6 +179,7 @@ private val PurposeMuted=Color(0xFF91A5AF)
     var p by remember(existing?.id) { mutableStateOf(existing?.policy ?: PurposePolicy.template("Professional")) }
     var description by remember { mutableStateOf("") }
     var problem by remember { mutableStateOf("") }
+    var instructionPending by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
     var start by remember(p.start) { mutableStateOf("%02d:%02d".format(java.util.Locale.ROOT,p.start/60,p.start%60)) }
@@ -197,10 +198,11 @@ private val PurposeMuted=Color(0xFF91A5AF)
     }
     if(existing==null) {
         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            listOf("Professional","Personal","Temporary sale").forEach { name -> TextButton({p=PurposePolicy.template(name);problem=""},contentPadding=PaddingValues(4.dp)) { Text(name,fontSize=11.sp) } }
+            listOf("Professional","Personal","Temporary sale").forEach { name -> TextButton({p=PurposePolicy.template(name);problem="";description="";instructionPending=false},contentPadding=PaddingValues(4.dp)) { Text(name,fontSize=11.sp) } }
         }
-        OutlinedTextField(description,{if(it.length<=500)description=it},label={Text("Describe your rules (optional)")},modifier=Modifier.fillMaxWidth())
-        TextButton({runCatching { PurposePolicy.interpret(description) }.onSuccess { p=it;problem="" }.onFailure { problem=it.message.orEmpty() }}) { Text("Interpret supported wording") }
+        OutlinedTextField(description,{if(it.length<=500)description=it;instructionPending=it.isNotBlank()},label={Text("Describe your rules (optional)")},modifier=Modifier.fillMaxWidth())
+        TextButton({runCatching { PurposePolicy.interpret(description) }.onSuccess { p=it;problem="";instructionPending=false }.onFailure { instructionPending=true;problem=it.message.orEmpty() }}) { Text("Interpret supported wording") }
+        if(instructionPending)TextButton({description="";problem="";instructionPending=false}) { Text("Discard instruction and use the form") }
         Text("Supported example: Weekdays, 9-6 India time; intro allowed, further messages require approval; text only.",fontSize=11.sp,color=PurposeMuted)
     }
     if(problem.isNotEmpty())Text(problem,color=Color(0xFFFFD5A0),fontSize=12.sp)
@@ -235,7 +237,7 @@ private val PurposeMuted=Color(0xFF91A5AF)
             fun minutes(v:String):Int { require(v.matches(Regex("[0-9]{2}:[0-9]{2}")));val parts=v.split(':').map(String::toInt);require(parts[1] in 0..59);return parts[0]*60+parts[1] }
             p.copy(start=minutes(start),end=minutes(end),inactivityDays=inactivity.toInt(),version=if(existing==null)1 else existing.policy.version+1).validate()
         }.onSuccess { p=it;preview=true;consent=false;problem="" }.onFailure { problem="Check the name, timezone, hours and expiry. Nothing has been activated." }
-    },modifier=Modifier.fillMaxWidth()) { Text("Review rules") }
+    },enabled=!instructionPending,modifier=Modifier.fillMaxWidth()) { Text("Review rules") }
 }
 
 @Composable private fun PurposePanel(content:@Composable ColumnScope.()->Unit) {

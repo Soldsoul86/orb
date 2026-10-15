@@ -29,6 +29,7 @@ android {
             keyPassword = "android"
         }
     }
+    testOptions { unitTests.all { it.systemProperty("veil.relayDir", rootProject.file("relay").absolutePath) } }
     buildFeatures { compose = true }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

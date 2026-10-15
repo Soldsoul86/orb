@@ -77,11 +77,12 @@ class PurposeEngine(context: Context) {
     fun request(target:PurposeListing,text:String) {
         require(text.isNotBlank() && text.length<=4000)
         val s=load();val contacts=s.getJSONObject("contacts");require(contacts.length()<16)
+        require(contacts.keys().asSequence().none { val existing=contacts.getJSONObject(it); existing.getString("facet")==target.id && !existing.getBoolean("owner") }) { "A request already exists; open it in Chats" }
         val id=opaqueId();val c=JSONObject();SignalSession.initialize(c)
         c.put("id",id).put("facet",target.id).put("owner",false).put("policy",target.policy.json()).put("invite",target.invite)
             .put("status","RESERVED").put("intro",text).put("messages",JSONArray()).put("outbox",JSONArray()).put("seen",JSONObject())
         contacts.put(id,c);save(s)
-        finishRequest(s,c)
+        runCatching { finishRequest(s,c) } // Durable local request remains visible/retryable after an ambiguous connection failure.
     }
     private fun finishRequest(s:JSONObject,c:JSONObject) {
         val id=c.getString("id")
@@ -109,7 +110,7 @@ class PurposeEngine(context: Context) {
     fun send(id:String,text:String) {
         val s=load();val c=s.getJSONObject("contacts").getJSONObject(id)
         require(c.getString("status")=="APPROVED") { "Approval required" }
-        queue(s,c,text,false);flush(s,c)
+        queue(s,c,text,false) // Polling retries the committed ciphertext; clear composer after durable queueing.
     }
     private fun queue(s:JSONObject,c:JSONObject,text:String,intro:Boolean) {
         require(text.isNotBlank() && text.length<=4000 && c.getJSONArray("outbox").length()<10 && c.getJSONArray("messages").length()<80)
@@ -172,7 +173,11 @@ class PurposeEngine(context: Context) {
                 finishRequest(s,c)
             } else if(c.getString("status") in listOf("PENDING","APPROVED")) {
                 if(runCatching { flush(s,c) }.isFailure)failed=true
-            } else { c.put("outbox",JSONArray());save(s) }
+            } else {
+                val pending=c.getJSONArray("outbox").objects().map { it.getJSONObject("envelope").getString("id") }.toSet()
+                c.getJSONArray("messages").objects().filter { it.getString("id") in pending }.forEach { it.put("status","Not sent · access closed") }
+                c.put("outbox",JSONArray());save(s)
+            }
             if(c.getString("status") !in listOf("PENDING","APPROVED"))return@forEach
             // Reload on failure so speculative Signal mutations never become durable.
             try {

@@ -172,7 +172,9 @@ class Purposes:
                 validated=[(s['id'],bundle(s['bundle'])) for s in slots]
                 if any(not valid_id(s[0]) for s in validated): raise PolicyError('slot id')
                 # Bound lifetime key material, including consumed slots, for this pilot.
-                if self.db.execute('SELECT count(*) FROM p_slots WHERE facet=?',(f[0],)).fetchone()[0]+len(slots)>64: return 429,{'error':'slot capacity'}
+                if len({sid for sid,_ in validated})!=len(validated): raise PolicyError('duplicate slots')
+                additions=sum(self.db.execute('SELECT 1 FROM p_slots WHERE id=?',(sid,)).fetchone() is None for sid,_ in validated)
+                if self.db.execute('SELECT count(*) FROM p_slots WHERE facet=?',(f[0],)).fetchone()[0]+additions>64: return 429,{'error':'slot capacity'}
                 for sid,b in validated:
                     old=self.db.execute('SELECT facet,bundle FROM p_slots WHERE id=?',(sid,)).fetchone()
                     if old and (old[0]!=f[0] or old[1]!=b): return 409,{'error':'slot conflict'}

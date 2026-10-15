@@ -53,7 +53,7 @@ jobs:
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
             adb shell settings put system screen_off_timeout 1800000
-            gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest --stacktrace
+            gradle --no-daemon :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:

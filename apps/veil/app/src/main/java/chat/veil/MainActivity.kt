@@ -206,7 +206,7 @@ class MainActivity : FragmentActivity() {
     fun lookupPurpose(value: String) = purposeAction({ lookup(value) }) { purposeTarget = it }
     fun choosePurpose(listing: PurposeListing) { purposeTarget = listing }
     fun closePurposeTarget() { purposeTarget = null }
-    fun requestPurpose(listing: PurposeListing, text: String) = purposeAction({ request(listing,text); sync(); snapshot() }) {
+    fun requestPurpose(listing: PurposeListing, text: String) = purposeAction({ request(listing,text); snapshot() }) {
         purposeSnapshot = it; purposeTarget = null; section = 0; legacyChat = false
     }
     fun decidePurpose(id: String, status: String) = purposeAction({ decide(id,status); snapshot() }) { purposeSnapshot = it }
