@@ -2,7 +2,7 @@ name: Veil Live Relay Check
 on:
   push:
     branches: ['codex/veil-apk']
-    paths: ['.github/workflows/veil-live-relay.yml', 'apps/veil/relay/smoke_https.py']
+    paths: ['.github/workflows/veil-live-relay.yml', 'apps/veil/relay/smoke_https.py', 'apps/veil/relay/smoke_purposes_https.py']
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,3 +17,5 @@ jobs:
           python-version: '3.12'
       - name: Verify public HTTPS delivery with disposable opaque envelopes
         run: python apps/veil/relay/smoke_https.py https://veil-relay-soldsoul86.onrender.com
+      - name: Verify purpose capabilities and private browser handoff
+        run: python apps/veil/relay/smoke_purposes_https.py https://veil-relay-soldsoul86.onrender.com
