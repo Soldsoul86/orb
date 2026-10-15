@@ -114,11 +114,11 @@ class MainActivity : FragmentActivity() {
     private fun startPolling() {
         polling?.cancel()
         polling = lifecycleScope.launch {
+            val engine = Messenger(this@MainActivity)
             while (unlocked) {
                 delay(2000)
                 val token = generation
                 val result = withContext(Dispatchers.IO) { mutex.withLock { runCatching {
-                    val engine = Messenger(this@MainActivity)
                     var syncError = false
                     try { engine.sync() } catch (_: Exception) { syncError = true }
                     engine.snapshot() to syncError
