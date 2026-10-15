@@ -20,6 +20,10 @@ This report separates native cryptographic integration, API tests, emulator UI c
 
 The [side-by-side APK build](https://github.com/Soldsoul86/orb/actions/runs/38753791606) repeated all 17 JVM and 12 Android tests successfully, verified the separate application ID and APK signature, and saved the explicit preview signing-key cache. The downloaded APK checksum and signing certificate match the CI outputs. [Download/demo](DEMO.md). Authentication instrumentation calls the post-authentication code path; it does not prove an OS biometric matcher or physical fingerprint works. API 28–34 and other OEM devices were not executed here.
 
+## Follow-up signing continuity run
+
+[Run 38755022878](https://github.com/Soldsoul86/orb/actions/runs/38755022878) restored the cached preview key and passed the certificate pin, compilation and JVM suite. Instrumentation reported **FAIL: 1/12**, because the viewer fixture did not acquire window focus; APK publication correctly stopped. The original downloadable preview run passed all 12 tests. The fixture now wakes/dismisses an unsecured test-device keyguard and waits for actual Activity window focus before attaching the viewer, while preserving every reveal/conceal assertion and adding an attachment assertion. No production focus check was changed. The follow-up result must be recorded before calling this resolved.
+
 ## Uploaded prompt acceptance cases
 
 | # | Result | What was actually checked / remains |
