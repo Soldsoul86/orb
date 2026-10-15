@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import secrets
 import tempfile
 import threading
@@ -13,7 +14,13 @@ from server import Relay, handler, BoundedHTTPServer
 class RelayTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.relay = Relay(self.tmp.name + '/db')
+        self.database_url = os.environ.get('TEST_DATABASE_URL')
+        self.relay = Relay(self.tmp.name + '/db', database_url=self.database_url)
+        if self.database_url:
+            # TEST_DATABASE_URL must point to the disposable CI database, never production.
+            with self.relay.db:
+                for table in ('messages', 'receipts', 'boxes'):
+                    self.relay.db.execute('DELETE FROM ' + table)
         self.reader, self.writer = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         status, box = self.relay.handle('POST', '/v1/boxes', '', dict(reader=self.reader, writer=self.writer))
         self.assertEqual(status, 201)
@@ -75,6 +82,26 @@ class RelayTests(unittest.TestCase):
         for _ in range(59):
             self.assertEqual(self.relay.handle('POST', '/v1/boxes', '', dict(reader=secrets.token_urlsafe(32), writer=secrets.token_urlsafe(32)))[0], 201)
         self.assertEqual(self.relay.handle('POST', '/v1/boxes', '', dict(reader=self.reader, writer=self.writer))[0], 429)
+    def test_health_exposes_no_mailbox_metadata(self):
+        self.assertEqual(self.relay.handle('GET', '/healthz', '', {}),
+                         (200, {'status': 'ok', 'service': 'Veil encrypted relay'}))
+    def test_inboxes_survive_connection_restart(self):
+        self.assertEqual(self.call('PUT', self.writer, self.data, True)[0], 201)
+        self.relay.db.close()
+        self.relay = Relay(self.tmp.name + '/db', database_url=self.database_url)
+        self.assertEqual(self.call('GET', self.reader)[1]['messages'][0]['body'], self.data['body'])
+        self.assertEqual(self.call('PUT', self.writer, self.data, True)[0], 200)
+    def test_database_transaction_rolls_back(self):
+        with self.assertRaises(RuntimeError):
+            with self.relay.db:
+                self.relay.db.execute('UPDATE boxes SET expires=0')
+                raise RuntimeError('synthetic interrupted transaction')
+        self.assertEqual(self.call('GET', self.reader)[0], 200)
+    def test_postgres_reconnects_after_closed_connection(self):
+        if not self.database_url:
+            self.skipTest('Postgres-specific reconnect')
+        self.relay.db.close()
+        self.assertEqual(self.call('GET', self.reader)[0], 200)
     def test_real_http_two_clients(self):
         try:
             server = BoundedHTTPServer(('127.0.0.1', 0), handler(self.relay))
