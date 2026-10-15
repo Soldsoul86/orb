@@ -35,6 +35,8 @@ class Relay:
             CREATE TABLE IF NOT EXISTS messages(box TEXT, id TEXT, body BLOB, expires INTEGER, PRIMARY KEY(box,id));
             CREATE TABLE IF NOT EXISTS receipts(box TEXT, id TEXT, expires INTEGER, PRIMARY KEY(box,id));
             ''')
+        from purposes import Purposes
+        self.purposes = Purposes(self.db)
     def clean(self):
         now = int(time.time())
         self.db.execute('DELETE FROM messages WHERE expires <= ? OR box IN (SELECT id FROM boxes WHERE expires <= ?)', (now, now))
@@ -43,6 +45,8 @@ class Relay:
     def handle(self, method, path, bearer, data):
         with self.lock, self.db:
             self.clean()
+            if path.startswith('/v2/'):
+                return self.purposes.handle(method, path, bearer, data)
             if method == 'GET' and path in ('/', '/healthz'):
                 return 200, {'status': 'ok', 'service': 'Veil encrypted relay'}
             if method == 'POST' and path == '/v1/boxes':
