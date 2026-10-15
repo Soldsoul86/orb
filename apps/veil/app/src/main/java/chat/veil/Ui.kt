@@ -32,7 +32,10 @@ private val Muted = Color(0xFF91A5AF)
 private val Shape = RoundedCornerShape(22.dp)
 
 @Composable fun VeilApp(activity: MainActivity) {
-    SideEffect { activity.contentCommitted() }
+    // Read in this scope, not only inside Surface's child composition or SideEffect.
+    // Otherwise unlocking can recompose the screen without rerunning the curtain effect.
+    val unlocked = activity.unlocked
+    SideEffect { activity.contentCommitted(unlocked) }
     MaterialTheme(colorScheme = darkColorScheme(primary = Mint, background = Ink, surface = Panel, onSurface = Color(0xFFE8F0F2), secondary = Mint)) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 22.dp)) {
@@ -40,7 +43,7 @@ private val Shape = RoundedCornerShape(22.dp)
                     Text("veil", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)
                     Spacer(Modifier.weight(1f)); Text("A LITTLE MORE PRIVATE", color = Mint, fontSize = 9.sp, letterSpacing = 1.5.sp)
                 }
-                if (!activity.unlocked) {
+                if (!unlocked) {
                     Spacer(Modifier.weight(1f))
                     Text("Just between\nyou two.", fontSize = 43.sp, lineHeight = 48.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(20.dp))

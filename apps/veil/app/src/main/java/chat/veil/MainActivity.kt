@@ -61,7 +61,10 @@ class MainActivity : FragmentActivity() {
         }
         addContentView(curtain, FrameLayout.LayoutParams(-1, -1))
     }
-    fun contentCommitted() { if (unlocked && ::curtain.isInitialized) curtain.visibility = View.GONE }
+    fun contentCommitted(renderedUnlocked: Boolean) {
+        // A queued commit from before a focus loss must never uncover locked content.
+        if (renderedUnlocked && unlocked && ::curtain.isInitialized) curtain.visibility = View.GONE
+    }
     override fun onPause() {
         if (::curtain.isInitialized) curtain.visibility = View.VISIBLE
         lock()
@@ -94,8 +97,7 @@ class MainActivity : FragmentActivity() {
         authShowing = true
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                authShowing = false; unlocked = true
-                action({ snapshot() }) { snapshot = it; importPending(); startPolling() }
+                authenticationAccepted()
             }
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 authShowing = false; notice = "Unlock canceled or unavailable. Use your device credential to retry."
@@ -104,6 +106,10 @@ class MainActivity : FragmentActivity() {
         prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("Open Veil")
             .setSubtitle("Your conversations stay behind this lock")
             .setAllowedAuthenticators(authenticators).build())
+    }
+    private fun authenticationAccepted() {
+        authShowing = false; unlocked = true
+        action({ snapshot() }) { snapshot = it; importPending(); startPolling() }
     }
     private fun startPolling() {
         polling?.cancel()
