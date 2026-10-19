@@ -44,7 +44,7 @@ def check(origin, live=False):
         assert page.locator('#open').get_attribute('href') == href
         assert all(token not in r.url for r in requests)
         assert all(token not in r.headers.get('referer', '') for r in requests)
-        assert all(urlsplit(r.url).path in ['/i', '/releases/download/veil-contact-v7/veil-contact-preview.apk'] for r in requests)
+        assert all(r.url in [origin + '/i', APK_URL] for r in requests), [urlsplit(r.url).path for r in requests]
         page.screenshot(path='invitation-install.png', full_page=True)
         page.reload(wait_until='networkidle')
         assert page.locator('#open').get_attribute('href') == href
