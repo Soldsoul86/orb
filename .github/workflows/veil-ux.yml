@@ -62,6 +62,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 1536 -cores 2
           script: |
             bash apps/veil/scripts/start_second_emulator.sh
+            python apps/veil/scripts/live_contact_ui.py
+            adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
+            adb -s emulator-5556 shell pm clear chat.veil.purposes.preview
             python apps/veil/scripts/portable_two_devices.py
             adb -s emulator-5556 emu kill
             adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
