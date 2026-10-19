@@ -23,7 +23,7 @@ class ContactLiveUiTest {
     private fun dir()=File(ui.activity.filesDir,"contact-live-fixture").apply{mkdirs()}
     private fun write(name:String,value:String){File(dir(),name).writeText(value)}
     private fun read(name:String)=File(dir(),name).readText()
-    private fun focusedWindow():String = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("dumpsys window windows")).use { input ->
+    private fun focusedWindow():String = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("dumpsys window")).use { input ->
         input.readBytes().toString(Charsets.UTF_8).lineSequence().firstOrNull { it.contains("mCurrentFocus=") } ?: "No focused window"
     }
     private fun unlock() {
@@ -59,7 +59,7 @@ class ContactLiveUiTest {
                     chooser=focusedWindow().contains("ChooserActivity")
                     if(!chooser)Thread.sleep(100)
                 }
-                assertTrue("Real Android Sharesheet opened",chooser)
+                assertTrue("Real Android Sharesheet opened; ${focusedWindow()}; unlocked=${ui.activity.unlocked}, busy=${ui.activity.busy}, notice=${ui.activity.portableNotice}",chooser)
                 write("timing",(android.os.SystemClock.elapsedRealtime()-began).toString())
                 ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("input keyevent BACK")).use{it.readBytes()}
                 Thread.sleep(500);unlock()
