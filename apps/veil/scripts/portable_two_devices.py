@@ -57,6 +57,15 @@ def main():
                 adb(device,'install','-r',str(ROOT/'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'))
                 adb(device,'reverse','tcp:18443','tcp:18443');adb(device,'reverse','tcp:18444','tcp:18444')
                 put(device,'ca.pem',(tmp/'ca.pem').read_bytes())
+            stage(args.owner,'contact-owner');put(args.peer,'link',get(args.owner,'link'))
+            stage(args.peer,'contact-peer');stage(args.owner,'contact-approve')
+            stage(args.peer,'contact-send');stage(args.owner,'contact-reply');stage(args.peer,'contact-receive')
+            stage(args.owner,'contact-end');stage(args.peer,'contact-blocked')
+            # Real ciphertext reaches the relay; synthetic test text must not occur in database bytes.
+            for path in tmp.glob('a.sqlite*'):
+                for plaintext in (b'Contact invitation introduction',b'Real encrypted invitation chat',b'Real encrypted contact reply'):
+                    if plaintext in path.read_bytes():raise RuntimeError('Plaintext found in relay storage')
+            print('PASS contact invitation preview/request/approval/Signal message and reply/end-access on two emulators',flush=True)
             stage(args.owner,'owner');put(args.peer,'card',get(args.owner,'card'));stage(args.peer,'peer')
             stage(args.owner,'approve');stage(args.peer,'send-original');stage(args.owner,'export')
             processes[0].terminate();processes[0].wait(timeout=10)

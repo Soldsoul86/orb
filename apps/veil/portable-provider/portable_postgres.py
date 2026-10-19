@@ -29,5 +29,5 @@ class PortablePostgres:
                     s=s.replace('INSERT OR IGNORE','INSERT')+' ON CONFLICT DO NOTHING'
                 self.connection.execute(s)
     def execute(self,sql,parameters=()):
-        return self.connection.execute(sql.replace('?','%s').replace('ORDER BY rowid','ORDER BY seq'),parameters)
+        return self.connection.execute(sql.replace('INSERT INTO messages VALUES','INSERT INTO messages(grant_id,id,sender,body,expires) VALUES').replace('?','%s').replace('ORDER BY rowid','ORDER BY seq'),parameters)
     def close(self):self.connection.close()

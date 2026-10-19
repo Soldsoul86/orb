@@ -81,7 +81,7 @@ private val Shape = RoundedCornerShape(22.dp)
                                 }
                             }}
                         }
-                    } else ContactHome(activity)
+                    } else if(activity.contactPage=="pilot") PurposeHome(activity) else ContactHome(activity)
                 }
             }
         }

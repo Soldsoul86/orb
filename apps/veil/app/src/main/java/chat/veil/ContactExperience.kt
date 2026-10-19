@@ -41,6 +41,7 @@ object ContactExperience {
     }
     fun status(c:JSONObject,now:Long=System.currentTimeMillis()/1000):String = when {
         c.optLong("access_expires") in 1..now -> "Access ended"
+        c.optBoolean("access_change_pending") -> "Access change waiting to send"
         c.optBoolean("pending") -> "Waiting to send — not delivered"
         c.optString("status")=="PENDING" -> "Waiting for acceptance"
         c.optString("status")=="RESERVED" -> "Request not sent yet"

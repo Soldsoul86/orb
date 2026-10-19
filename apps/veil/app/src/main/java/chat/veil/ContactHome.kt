@@ -71,7 +71,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                 if(invite==null) {Text("Opening invitation…");Action("Refresh",!a.busy){a.contactAction({})}}
                 else {
                     val link=invite.optString("link")
-                    Text(if(invite.optBoolean("canceled"))"Invitation canceled" else "Invitation expires ${ContactExperience.date(invite.getLong("expires"))}")
+                    Text(if(invite.optBoolean("cancel_pending"))"Cancellation waiting to send" else if(invite.optBoolean("canceled"))"Invitation canceled" else "Invitation expires ${ContactExperience.date(invite.getLong("expires"))}")
                     Text("Accepted access lasts ${invite.getLong("access_seconds")/86400} days from approval. Canceling the invitation does not end already accepted access.",fontSize=14.sp)
                     if(link.isNotBlank()) {
                         Action("Share again",!a.busy,a::shareContactLink)
@@ -86,7 +86,10 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                         }
                         TextButton({val id=a.contactSelected;a.contactAction({cancelInvitation(id)})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Cancel invitation")}
                     } else Text("This link can no longer accept new requests. Create a new contact to invite again.")
-                    if(invite.optBoolean("cancel_pending"))Action("Retry cancellation",!a.busy){val id=a.contactSelected;a.contactAction({cancelInvitation(id)})}
+                    if(invite.optBoolean("cancel_pending")) {
+                        Text("The link may still accept requests until cancellation reaches the service.",fontSize=14.sp)
+                        Action("Retry cancellation",!a.busy){val id=a.contactSelected;a.contactAction({cancelInvitation(id)})}
+                    }
                 }
             }
             "open","receive" -> {
@@ -187,6 +190,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
     Heading(c.getJSONObject("policy").getString("display_name"),ContactExperience.status(c))
     if(c.optLong("access_expires")>0)Text("Access ends ${ContactExperience.date(c.getLong("access_expires"))}",fontSize=14.sp)
     Text("Encrypted text · messages expire after 7 days",fontSize=14.sp)
+    if(c.optBoolean("access_change_pending"))Text("This access change has not reached the service. Tap Refresh / retry to send it.",fontSize=14.sp)
     OutlinedButton({a.contactAction({syncContact(id)})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Refresh / retry")}
     contactEntries(c.optJSONArray("messages")).forEach {m->Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(16.dp)) {
         Text(if(m.optBoolean("mine"))"You" else "Contact",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)

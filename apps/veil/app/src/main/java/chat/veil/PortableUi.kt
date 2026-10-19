@@ -49,7 +49,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 if(page=="create") {
                     Text("Choose a compatible provider",fontSize=24.sp)
                     OutlinedTextField(origin,{origin=it.take(2000)},label={Text("Provider HTTPS origin")},modifier=Modifier.fillMaxWidth())
-                    Text("This portable beta needs a pi/1 provider. Your existing personal-chat server is unchanged and does not yet offer this service.",color=PortableMuted,fontSize=12.sp)
+                    Text("Advanced: choose a compatible identity service. For an ordinary invitation, return to Chats and choose New contact.",color=PortableMuted,fontSize=12.sp)
                 }
                 PurposeEditor(editor,onCancel={page="home"},portable=true) {p,consent ->
                     val route=runCatching {RelayClient(origin).base}
@@ -77,7 +77,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 Button(a::choosePortableFile,enabled=!a.busy){Text("Choose encrypted package")}
                 Text(a.portableFileName,color=PortableMuted)
                 OutlinedTextField(recovery,{recovery=it.take(100)},label={Text("Recovery key")},visualTransformation=PasswordVisualTransformation(),modifier=Modifier.fillMaxWidth())
-                Button({val encrypted=a.portableBackup;val key=recovery;a.portableAction {importIdentity(encrypted,key)};recovery="";page="home"},enabled=!a.busy && a.portableBackup.isNotEmpty() && recovery.length==43){Text("Restore my identity")}
+                Button({val encrypted=a.portableBackup;val key=recovery;a.contactAction({importIdentity(encrypted,key)}){page="home"};recovery=""},enabled=!a.busy && a.portableBackup.isNotEmpty() && recovery.length==43){Text("Restore my identity")}
                 Text("An old backup can omit later revocations. Review every grant before moving a purpose. Existing personal chats and earlier pilot data are not overwritten.",color=Color(0xFFFFD5A0),fontSize=12.sp)
             }
             "connect" -> {
@@ -108,7 +108,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                     OutlinedTextField(origin,{origin=it.take(2000)},label={Text("New provider HTTPS origin")},modifier=Modifier.fillMaxWidth())
                     Text(PurposePolicy.from(f.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=12.sp)
                     Row {Checkbox(consent,{consent=it});Text("I reviewed the restored grants and authorize these rules and any public listing at this provider.",fontSize=12.sp)}
-                    Button({val id=selected;val route=origin;a.portableAction {migrate(id,RelayClient(route).base,true)};page="home"},enabled=!a.busy && consent && origin.isNotBlank()){Text("Move this purpose")}
+                    Button({val id=selected;val route=origin;a.contactAction({migrate(id,RelayClient(route).base,true)}){page="card"}},enabled=!a.busy && consent && origin.isNotBlank()){Text("Move this purpose")}
                 }
             }
             "card" -> {
@@ -200,7 +200,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                     Button({recovery=Core.secret();keyAgain="";backedUp=false;page="backup"},enabled=!a.busy){Text("Create encrypted recovery backup")}
                     Text("Controller keys cannot rotate while keeping the same fingerprint. If compromised, create a new purpose and verify it with contacts independently. Rotate the device key only when the controller remains safe.",color=Color(0xFFFFD5A0),fontSize=12.sp)
                 }
-                TextButton({a.portableScreen=false}){Text("Open earlier purpose pilot")}
+                TextButton({a.portableScreen=false;a.contactPage="pilot";a.section=2}){Text("Open earlier purpose pilot")}
             }
         }
         Spacer(Modifier.height(20.dp))

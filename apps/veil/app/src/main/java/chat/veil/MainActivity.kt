@@ -203,7 +203,7 @@ class MainActivity : FragmentActivity() {
                         var failed=false
                         if(facets!=null)for(i in 0 until facets.length()) {
                             val f=facets.getJSONObject(i)
-                            if(f.optBoolean("published") && !f.optBoolean("needs_migration"))runCatching {p.sync(f.getString("id"))}.onFailure {failed=true}
+                            if(!f.optBoolean("needs_migration"))runCatching {p.sync(f.getString("id"))}.onFailure {failed=true}
                         }
                         p.snapshot() to failed
                     }}}

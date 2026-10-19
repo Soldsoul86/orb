@@ -42,8 +42,49 @@ class PortableTwoDeviceTest {
             // A fresh client without old Signal sessions, on a disposable emulator only.
             File(context.noBackupFilesDir,"identity.v1").delete()
         }
-        val vault=Vault(context,"identity.v1");val session=PortableSession(vault.read(),vault::write,transport)
+        val vault=Vault(context,if(stage.startsWith("contact-"))"contact-test.v1" else "identity.v1");val session=PortableSession(vault.read(),vault::write,transport)
         when(stage) {
+            "contact-owner" -> {
+                assertFalse(session.ready())
+                val draft="1".repeat(32)
+                val id=session.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=originA)
+                val link=session.invitationLink(id)
+                assertEquals(id,session.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=originA))
+                assertEquals(link,session.invitationLink(id));assertEquals(1,session.snapshot().getJSONArray("facets").length())
+                write("facet",id);write("link",link)
+            }
+            "contact-peer" -> {
+                val link=read("link")
+                repeat(3){session.previewInvitation(link)}
+                assertFalse(session.ready()) // preview does not create any local identity
+                val draft="2".repeat(32);val id=session.requestInvitation(link,"Contact invitation introduction",draft)
+                assertEquals(id,session.requestInvitation(link,"Contact invitation introduction",draft))
+                assertEquals(1,session.snapshot().getJSONArray("contacts").length())
+                write("grant",id)
+                assertTrue(runCatching{session.send(id,"Not yet accepted")}.isFailure)
+            }
+            "contact-approve" -> {
+                session.sync(read("facet"));val c=session.snapshot().getJSONArray("contacts").getJSONObject(0)
+                assertEquals("Contact invitation introduction",c.getJSONArray("messages").getJSONObject(0).getString("text"))
+                write("grant",c.getString("id"));session.decide(c.getString("id"),"APPROVED")
+                val expires=session.snapshot().getJSONArray("contacts").getJSONObject(0).getLong("access_expires")
+                assertTrue(expires-System.currentTimeMillis()/1000 in (ContactExperience.WEEK-10)..ContactExperience.WEEK)
+            }
+            "contact-send" -> {session.syncContact(read("grant"));session.send(read("grant"),"Real encrypted invitation chat")}
+            "contact-reply" -> {
+                session.syncContact(read("grant"));val messages=session.snapshot().getJSONArray("contacts").getJSONObject(0).getJSONArray("messages")
+                assertEquals("Real encrypted invitation chat",messages.getJSONObject(messages.length()-1).getString("text"))
+                session.send(read("grant"),"Real encrypted contact reply")
+            }
+            "contact-receive" -> {
+                session.syncContact(read("grant"));val messages=session.snapshot().getJSONArray("contacts").getJSONObject(0).getJSONArray("messages")
+                assertEquals("Real encrypted contact reply",messages.getJSONObject(messages.length()-1).getString("text"))
+            }
+            "contact-end" -> {session.cancelInvitation(read("facet"));session.decide(read("grant"),"REVOKED")}
+            "contact-blocked" -> {
+                assertTrue(runCatching{session.previewInvitation(read("link"))}.isFailure)
+                session.syncContact(read("grant"));assertTrue(runCatching{session.send(read("grant"),"After end access")}.isFailure)
+            }
             "owner" -> {
                 session.createIdentity()
                 val id=session.createFacet(PurposePolicy("Portable professional",timezone="Europe/London",discovery=DiscoveryMode.PUBLIC_SEARCHABLE),originA,true)
