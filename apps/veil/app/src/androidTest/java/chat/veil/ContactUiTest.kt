@@ -22,7 +22,7 @@ class ContactUiTest {
             val a=ui.activity;assertTrue(a.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE!=0)
             val v=a.window.decorView;val bitmap=Bitmap.createBitmap(v.width,v.height,Bitmap.Config.ARGB_8888)
             v.draw(Canvas(bitmap));val dir=File(a.filesDir,"ux-evidence").apply{mkdirs()}
-            File(dir,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
+            File(dir,"${androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("theme") ?: "default"}-$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
         }
     }
     @Test fun temporaryNeedsNoIdentityOrProviderForm() {
@@ -45,10 +45,11 @@ class ContactUiTest {
         ui.onNodeWithText("Discover").assertDoesNotExist()
     }
     @Test fun invalidLinkDoesNotCreateRequestOrIdentity() {
-        open();ui.onNodeWithText("Open an invitation").performScrollTo().performClick()
+        open();val before=ui.activity.portableSnapshot!!.optBoolean("ready");val count=ui.activity.portableSnapshot!!.optJSONArray("contacts")?.length() ?: 0
+        ui.onNodeWithText("Open an invitation").performScrollTo().performClick()
         ui.onNodeWithText("Paste invitation link").performTextInput("https://example.org/i#bad")
         ui.onNodeWithText("Preview invitation").performClick()
         ui.onNodeWithText("This invitation is incomplete. Ask your contact to share it again.").assertExists()
-        assertFalse(ui.activity.portableSnapshot!!.optBoolean("ready"))
+        assertEquals(before,ui.activity.portableSnapshot!!.optBoolean("ready"));assertEquals(count,ui.activity.portableSnapshot!!.optJSONArray("contacts")?.length() ?: 0)
     }
 }

@@ -64,6 +64,10 @@ jobs:
             bash apps/veil/scripts/start_second_emulator.sh
             python apps/veil/scripts/portable_two_devices.py
             adb -s emulator-5556 emu kill
+            adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
+            adb -s emulator-5554 shell input keyevent KEYCODE_WAKEUP
+            adb -s emulator-5554 shell wm dismiss-keyguard
+            adb -s emulator-5554 shell settings put system screen_off_timeout 1800000
             gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
             adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
             adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -80,48 +84,3 @@ jobs:
             apps/veil/identity-core/build/reports/
             apps/veil/app/build/reports/
             apps/veil/app/build/outputs/androidTest-results/
-
-  before:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: a606b85b933996aeb47003bd757d3a6b2ed656cb
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
-      - run: gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:assembleDebug :app:assembleDebugAndroidTest
-      - run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: |
-            adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
-            adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -r -e class chat.veil.UxBaselineTest -e baseline true chat.veil.purposes.preview.test/androidx.test.runner.AndroidJUnitRunner > /tmp/before-result.txt
-            cat /tmp/before-result.txt
-            grep -q 'OK (1 test)' /tmp/before-result.txt
-            mkdir -p apps/veil/ux-evidence
-            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/before.tar
-            tar -tf apps/veil/ux-evidence/before.tar
-      - uses: actions/upload-artifact@v4
-        with:
-          name: veil-before-screens
-          path: apps/veil/ux-evidence/before.tar
-          if-no-files-found: error
