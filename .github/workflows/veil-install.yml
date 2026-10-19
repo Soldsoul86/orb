@@ -1,0 +1,67 @@
+name: Veil QR install
+on:
+  push:
+    branches: ['codex/veil-apk']
+    paths: ['apps/veil/relay/contact_landing.py', 'tools/veil-install/**', '.github/workflows/veil-install.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r apps/veil/relay/requirements.txt playwright==1.56.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python tools/veil-install/browser_check.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: veil-install-page
+          path: invitation-install.png
+  publish-existing-apk:
+    needs: browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39200435127
+          name: veil-purposes-preview-apk
+          path: incoming
+      - name: Verify immutable v7 APK and publish direct public download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: Soldsoul86/orb
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp incoming/veil-purposes-preview.apk veil-contact-preview.apk
+          echo '143f7ee0371c9b9d1678f28cfcc6bcf10859bf4a8aed1c8ad54caac536029b07  veil-contact-preview.apk' > veil-contact-preview.apk.sha256
+          sha256sum -c veil-contact-preview.apk.sha256
+          cat > release-notes.txt <<'NOTES'
+          Veil contact preview v7 (0.3.2), Android 9+. The exact signed APK already tested in build 39200435127; no new signing key or rebuild.
+
+          Install as an update to Veil Purposes Preview. Do not uninstall or clear data. Package: chat.veil.purposes.preview. This is a debuggable development preview.
+
+          Scan an invitation QR with your phone camera, download this APK, install, then return to the invitation page and tap Continue in Veil. Automatic post-install invitation handoff is not implemented for this APK distribution method.
+
+          Portable contacts support text; personal media uses the existing separate pairing flow. Verify identities through a trusted channel. Full test report: https://github.com/Soldsoul86/orb/blob/f1d803b4e66a6cc66fed4904e9aa1dae2a98392c/VEIL_UX_REPORT.md
+          NOTES
+          if gh release view veil-contact-v7 --json tagName > /dev/null 2>&1; then
+            mkdir existing
+            gh release download veil-contact-v7 --pattern veil-contact-preview.apk --dir existing
+            (cd existing && sha256sum -c ../veil-contact-preview.apk.sha256)
+          else
+            gh release create veil-contact-v7 --target 62c5ce0a74b748c6a4ec1b20a6368da6119b861e --title 'Veil contact preview v7' --notes-file release-notes.txt --prerelease --latest=false veil-contact-preview.apk veil-contact-preview.apk.sha256
+          fi
