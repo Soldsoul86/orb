@@ -65,6 +65,7 @@ class ContactLiveUiTest {
                 // Exercise the same exported ACTION_VIEW handler used by Android App Links.
                 val link=read("link")
                 ui.runOnIdle{ui.activity.startActivity(Intent(ui.activity,MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP))}
+                instrumentation.waitForIdleSync();Thread.sleep(500);unlock()
                 try {ui.waitUntil(120000){ui.activity.contactPreview!=null && !ui.activity.busy}}
                 catch(e:Throwable){throw AssertionError("Preview did not appear: unlocked=${ui.activity.unlocked}, busy=${ui.activity.busy}, page=${ui.activity.contactPage}, notice=${ui.activity.portableNotice}",e)}
                 capture("preview")
