@@ -23,7 +23,12 @@ class ContactLiveUiTest {
     private fun dir()=File(ui.activity.filesDir,"contact-live-fixture").apply{mkdirs()}
     private fun write(name:String,value:String){File(dir(),name).writeText(value)}
     private fun read(name:String)=File(dir(),name).readText()
+    private fun focusedWindow():String = ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("dumpsys window windows")).use { input ->
+        input.readBytes().toString(Charsets.UTF_8).lineSequence().firstOrNull { it.contains("mCurrentFocus=") } ?: "No focused window"
+    }
     private fun unlock() {
+        try {ui.waitUntil(20000){ui.activity.window.decorView.hasWindowFocus()}}
+        catch (error:Throwable) {throw AssertionError("Real app window focus required before test authentication: "+focusedWindow(),error)}
         ui.runOnIdle {MainActivity::class.java.getDeclaredMethod("authenticationAccepted").apply{isAccessible=true}.invoke(ui.activity)}
         ui.waitUntil(120000){ui.activity.portableSnapshot!=null && !ui.activity.busy}
     }
@@ -51,8 +56,7 @@ class ContactLiveUiTest {
                 val deadline=android.os.SystemClock.elapsedRealtime()+120000
                 var chooser=false
                 while(!chooser && android.os.SystemClock.elapsedRealtime()<deadline) {
-                    val root=instrumentation.uiAutomation.rootInActiveWindow
-                    chooser=root?.packageName?.toString() in setOf("android","com.android.intentresolver")
+                    chooser=focusedWindow().contains("ChooserActivity")
                     if(!chooser)Thread.sleep(100)
                 }
                 assertTrue("Real Android Sharesheet opened",chooser)
