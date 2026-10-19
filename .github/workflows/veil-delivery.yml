@@ -1,0 +1,59 @@
+name: Veil contact delivery
+on:
+  push:
+    branches: ['codex/veil-purposes']
+    paths: ['tools/veil-delivery/**', 'VEIL_UX_REPORT.md', 'VEIL_UX_CHANGELOG.md', '.github/workflows/veil-delivery.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39200435127
+          name: veil-purposes-preview-apk
+          path: delivery-input/apk
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39191501896
+          name: veil-before-screens
+          path: delivery-input/before
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39197149425
+          name: veil-contact-ux-reports
+          path: delivery-input/screens
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39200431098
+          name: veil-live-contact-ui
+          path: delivery-input/live
+      - name: Validate APK, actual signer, screenshots and reopen the complete ZIP
+        run: python tools/veil-delivery/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veil-contact-preview-delivery
+          compression-level: 0
+          path: |
+            veil-contact-preview.zip
+            veil-contact-preview.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veil-contact-preview-manifest
+          path: |
+            veil-contact-preview/MANIFEST.json
+            veil-contact-preview/SHA256SUMS
+            veil-contact-preview.zip.sha256

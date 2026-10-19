@@ -1,4 +1,4 @@
-# Veil 0.3.1 contact preview
+# Veil 0.3.2 contact preview
 
 ## What changed
 
@@ -7,9 +7,11 @@
 - Temporary invitations expire after seven days. Accepted access lasts at most seven days from the owner's acceptance; the exact end date is visible. Work and Personal default to 30 days of approved access.
 - Link previews do not reserve access. Recipients send an introduction; owners Accept or Decline. End access takes a tap plus confirmation.
 - Share again, Copy invitation, matching QR code and Cancel invitation are available. Pending cancellation and permission changes are labelled until acknowledged by the service.
+- Interrupted invitation creation can resume safely. Opening an invitation while already unlocked now displays its preview; each page starts at the top.
 - Work uses the device timezone and explains contact hours, queued delivery and silent in-app notifications. Rules sit behind Change rules.
 - Back up my identity and Move my identity are in Settings. Moving preserves identity control and eligible relationships, not message history; contacts still need a new signed address through another channel.
 - Native light/dark theme, larger readable labels and preserved Android capture restrictions.
+- End access now confirms inside the protected screen, avoiding the lock caused by a separate dialog. Revoked chats no longer show a future access deadline. This v7 update supersedes the earlier v6 contact candidate.
 - Invitation QR decoding accepts QR format only, fixing occasional false barcode-format detection.
 
 ## Preserved
@@ -17,6 +19,8 @@
 Package `chat.veil.purposes.preview`; original preview signing certificate; Android Keystore alias and encrypted vault formats; Signal message/media encryption; identity JWS/JWE formats; user-held recovery secret; migration protocol. The existing personal media chat remains available for photos, videos and Eyes-Only.
 
 ## Installation
+
+Requires Android 9/API 28 or later. Automated device checks use Android 15/API 35 AOSP emulators.
 
 Use the APK inside this delivery as an **update to Veil Purposes Preview**. Do not uninstall or clear its data. Android will retain the installation's private data when the package and signer match. This is not a signing-compatible update to the separate original `chat.veil` application whose old signing key is unavailable.
 
@@ -28,7 +32,7 @@ If a browser opens the landing page, tap Open in Veil. If the app is not install
 
 Portable contacts support text only. Invitations are approval-gated but not single-recipient; four initial channel slots and existing wallet/service quotas apply. A name is chosen by its owner and is not proof of a person's real identity. Ending access stops future service-authorized contact, not copies already made. Disappearing messages cannot guarantee deletion from a modified recipient device. The service sees routing/timing and signed access metadata, not message plaintext.
 
-The hosted free relay can be slow to wake. No push notifications or background delivery guarantee. New contact addresses must be shared explicitly after moving services; old invitation capabilities are not part of portable backups. Capture protection cannot stop a second camera or a compromised device. This remains a development preview, not an independently audited production messenger.
+The hosted free relay can be slow to wake. No push notifications or background delivery guarantee. New contact addresses must be shared explicitly after moving services; old invitation capabilities are not part of portable backups. Capture protection cannot stop a second camera or a compromised device. This remains a signed, debuggable development preview, not an independently audited production messenger; authorized ADB/debugger access is an additional risk.
 
 Screenshots use synthetic data rendered by test code inside the actual app; FLAG_SECURE is never disabled. They illustrate UX, not proof of encryption. Physical-phone and five-person usability verification are recorded separately and must not be inferred from emulator tests.
 
