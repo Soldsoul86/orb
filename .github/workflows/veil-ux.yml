@@ -8,7 +8,7 @@ permissions:
   contents: read
 concurrency:
   group: veil-ux-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   core:
     runs-on: ubuntu-latest
