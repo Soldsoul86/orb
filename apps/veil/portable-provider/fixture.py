@@ -4,8 +4,8 @@ import ssl
 from provider import Provider, BoundedHTTPServer, handler
 
 p=argparse.ArgumentParser();p.add_argument('--db',required=True);p.add_argument('--port',type=int,required=True)
-p.add_argument('--cert');p.add_argument('--key');args=p.parse_args()
-origin=('https' if args.cert else 'http')+'://127.0.0.1:'+str(args.port)
+p.add_argument('--cert');p.add_argument('--key');p.add_argument('--logical-https',action='store_true');args=p.parse_args()
+origin=('https' if args.cert or args.logical_https else 'http')+'://127.0.0.1:'+str(args.port)
 service=Provider(args.db,origin,local=not args.cert)
 server=BoundedHTTPServer(('127.0.0.1',args.port),handler(service))
 if args.cert:

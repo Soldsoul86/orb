@@ -64,7 +64,7 @@ class ContactLiveUiTest {
             "request" -> {
                 // Exercise the same exported ACTION_VIEW handler used by Android App Links.
                 val link=read("link")
-                ui.runOnIdle{ui.activity.onNewIntent(Intent(Intent.ACTION_VIEW,Uri.parse(link)))}
+                ui.runOnIdle{instrumentation.callActivityOnNewIntent(ui.activity,Intent(Intent.ACTION_VIEW,Uri.parse(link)))}
                 ui.waitUntil(120000){ui.activity.contactPreview!=null && !ui.activity.busy}
                 capture("preview")
                 ui.onNodeWithText("Introduce yourself").performScrollTo().performTextInput("Hello from the live contact test")
