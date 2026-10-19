@@ -3,16 +3,18 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val purposePreview = providers.gradleProperty("veilPurposePreview").orNull == "true"
 android {
     namespace = "chat.veil"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
     defaultConfig {
-        applicationId = "chat.veil"
+        applicationId = if (purposePreview) "chat.veil.purposes.preview" else "chat.veil"
+        resValue("string", "app_name", if (purposePreview) "Veil Purposes Preview" else "Veil")
         minSdk = 28
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2-dev"
+        versionCode = 6
+        versionName = "0.3.1-contact-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {
@@ -29,6 +31,7 @@ android {
             keyPassword = "android"
         }
     }
+    testOptions { unitTests.all { it.systemProperty("veil.relayDir", rootProject.file("relay").absolutePath); it.systemProperty("veil.providerDir", rootProject.file("portable-provider").absolutePath) } }
     buildFeatures { compose = true }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -41,6 +44,7 @@ android {
         resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "libsignal_jni*.dylib", "signal_jni*.dll", "libsignal_jni*.so") }
 }
 dependencies {
+    implementation(project(":identity-core"))
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.material3:material3")
@@ -54,6 +58,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.signal:libsignal-android:0.105.0")
     implementation("org.signal:libsignal-client:0.105.0")
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

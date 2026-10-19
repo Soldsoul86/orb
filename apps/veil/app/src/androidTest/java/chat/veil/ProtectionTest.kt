@@ -2,6 +2,7 @@ package chat.veil
 
 import android.graphics.Bitmap
 import android.os.SystemClock
+import android.os.ParcelFileDescriptor
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -23,7 +24,23 @@ class ProtectionTest {
         } }
     }
     @Test fun nativeRevealReleaseCancelAndFocusLoss() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // These are test-device preparation commands, not app permissions or an
+        // authentication bypass. A credential-protected device still needs its owner.
+        for (command in listOf("input keyevent KEYCODE_WAKEUP", "wm dismiss-keyguard")) {
+            ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+        }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            instrumentation.waitForIdleSync()
+            // RESUMED may precede the first window traversal. Attach the test view
+            // only after the actual Activity window is ready, never force focus.
+            val windowReady = AtomicBoolean(false)
+            val windowDeadline = SystemClock.uptimeMillis() + 10_000
+            while (!windowReady.get() && SystemClock.uptimeMillis() < windowDeadline) {
+                scenario.onActivity { windowReady.set(it.window.decorView.hasWindowFocus()) }
+                if (!windowReady.get()) Thread.sleep(50)
+            }
+            assertTrue("Activity must have real window focus before attaching the viewer", windowReady.get())
             var view: SecureMediaView? = null
             scenario.onActivity { a ->
                 val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
@@ -33,7 +50,7 @@ class ProtectionTest {
                 view = SecureMediaView(a, m, bytes) {}
                 a.addContentView(view, android.view.ViewGroup.LayoutParams(300, 300))
             }
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            instrumentation.waitForIdleSync()
             // Activity RESUMED / main-loop idle can precede window focus on a cold emulator.
             // Wait for the actual precondition instead of mistaking that race for a reveal failure.
             val focused = AtomicBoolean(false)
@@ -44,6 +61,7 @@ class ProtectionTest {
             }
             scenario.onActivity {
                 val v = view!!
+                assertTrue("Viewer must remain attached", v.isAttachedToWindow)
                 assertTrue("Device must be awake and unlocked", v.hasWindowFocus())
                 fun event(action: Int) {
                     val t = SystemClock.uptimeMillis()

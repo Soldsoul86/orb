@@ -1,0 +1,43 @@
+# Veil Purposes Preview: install and two-account demo
+
+This is an additive **text-only development preview**, not a completed production identity platform. It uses the live HTTPS relay at `https://veil-relay-soldsoul86.onrender.com`. Both participants need the preview for purpose conversations; the original Veil app remains usable for its existing paired conversation and media.
+
+## Installation and signing
+
+Download the [preview APK ZIP](https://github.com/Soldsoul86/orb/actions/runs/38753791606/artifacts/11981824945) from the successful [preview build](https://github.com/Soldsoul86/orb/actions/runs/38753791606). GitHub may require sign-in. Extract the ZIP, then install `veil-purposes-preview.apk` on each phone (Android 9/API 28 or newer; automated runtime checks used Android 15/API 35 only).
+
+The preview's application ID is **`chat.veil.purposes.preview`**, label **Veil Purposes Preview**, version **0.2.0-purpose-dev (4)**. It installs alongside `chat.veil`; it creates a separate identity and does not migrate your existing conversations. **Keep your current Veil installed. Do not uninstall it or clear its data.** If Android offers to replace the original Veil instead of installing a separate preview, cancel and verify the downloaded package.
+
+The original 0.1.1 signing key was not preserved by the old build cache. The stable workflow pins its original certificate and blocks incompatible updates. This preview does not solve that missing-key problem; it provides an isolated test installation. The preview workflow uses an explicit separate keystore path and a certificate pin. A second CI run successfully restored that key and matched the pin; see TESTING.md for the separate emulator failure observed in that run. A missing cached key after pinning blocks publication instead of silently changing identity. GitHub cache is temporary development storage, not durable/private production signing custody. Do not use this debuggable build for consequential secrets. Private signing/recovery design is required before a production release.
+
+The artifact contains the APK SHA-256 and public signing-certificate SHA-256, never the private signing key. The first preview APK SHA-256 is `8d21eb2d0e80bdd77d8b52efedbfe7447c90bd6fb8b16c60c5597647fa02b47b`; its signing-certificate SHA-256 is `e241ad4e30de7812469e70f72065960eafd5ee3f2fab089ac40a89783647f6a4`. CI checked the isolated package ID and APK signature; the downloaded bytes/certificate were checked independently. A locally built APK has your local debug signer and generally cannot update the CI-built preview; use a separate disposable device/profile for local builds.
+
+## Two phones: real directory and scoped chat
+
+1. On both phones, open **Veil Purposes Preview**, unlock with the system prompt, select **My identity**, and tap **Get started**. No phone/email/OTP is requested. The hosted relay is the default. Keep the apps open and unlocked for polling; no push notifications are implemented.
+2. On the owner's phone, tap **Create contact purpose**, choose **Professional**, enter a display name such as `Work` and an intentionally public description such as `Consulting`. Do not publish real personal information for a test.
+3. Try the prompt's sentence ending in **“text and files only.”** It must report unsupported instructions and prevent review. This preview cannot transfer files through purpose grants. Explicitly correct it to **“Weekdays, 9-6 India time; intro allowed, further messages require approval; text only.”** and apply it, or explicitly discard it and use the typed form.
+4. Set the name to `Work` and description to `Consulting` after interpreting the instruction (interpretation replaces the form with its exact result). Choose **Public directory**, inspect the hours/timezone, approval, text-only and inactivity rules, then tap **Review rules**. Check publication consent and confirm. This is the only action that publishes the listing. Create a separate **Personal** purpose with **Private invite only** and optionally a **Temporary sale** purpose with link-only visibility/seven-day expiry. They have independent addresses.
+5. On the other phone, select **Discover**, search `Consulting`, open the Work listing, read its rules and send a short encrypted introduction. No phone number, email or pre-shared QR is needed. The directory supplies the first-contact key; identity is initially unverified.
+6. On the owner phone, open **Chats → Review request** for Work. Approve, reject or block. The introduction body is available only during Work's delivery hours; request metadata may appear earlier. Approval permits that Work conversation only. It does not expose the private purpose address/invite or permit sending to it.
+7. Exchange text while Work is open. Both users can display the shared safety number and compare the full number through an independent trusted channel before marking it compared. This verifies the peer key, not a legal name. Statuses distinguish **Queued on this phone**, **Queued until open**, **Accepted by relay**, and **Received**; none claims the other person read the message.
+8. Outside Work's hours, send a message with **Queue outside hours** selected. It may be accepted as ciphertext but must not appear to the recipient until the next opening. With **Reject**, server acceptance must fail and the app keeps a retryable local queued send. For an immediate demo, explicitly edit the test purpose to a current open window and confirm; do not change the server clock. The deterministic CI test exercises real boundaries without waiting overnight.
+9. Revoke the grant in the Work conversation. Subsequent sends from a stale/offline client must fail after reconnect; undelivered server ciphertext is removed. Old downloaded messages cannot be recalled. Pause a different purpose and confirm Work changes do not alter it.
+10. Copy/share a purpose link or display its QR. The recipient sees the same purpose and rules before requesting. **Read QR image** accepts a received QR image; live scanning uses the phone's system camera. Browser entry only opens the app or instructs the visitor to paste the full link. It never accepts plaintext introductory messages.
+11. Open the original Veil app on both phones and verify your existing conversation still works. Record the actual result; this physical regression has not been executed by Codex.
+
+With no reply from the owner, wait until their purpose is open and their app is unlocked. The free Render service may take time to wake. A creation/request failure should be retried by reopening the existing pending purpose/contact, not by publishing duplicate profiles. The pilot initially supports four new contacts per purpose and 16 contacts per installation; invitation replenishment is not implemented.
+
+## Demonstration status and limits
+
+The equivalent two-account native Signal/HTTP story passed in CI, including creation of three purposes, discovery, one encrypted introduction, approval, closed-hour queuing, opening, wrong-account/facet refusal, revocation and legacy `/v1` delivery. The exact original **text-and-files** story is **BLOCKED** because purpose files are unsupported. Physical two-phone/international/URL-opening tests and the under-60-second usability target are **DEVICE REQUIRED / NOT TESTED**. [Full 22-case matrix](TESTING.md).
+
+Lost device/data means lost keys. Recovery is visibly unavailable; no server-held master key exists. This pilot uses server-verified possession of a device-generated bearer capability, not hardware-backed asymmetric account attestation. The operator can link purposes and sees routing/policy/timing metadata. Public listings are public. First-contact directory key substitution remains possible until independently compared.
+
+The existing Render database is a free trial expiring **2026-11-14 09:03 UTC**. Continued service needs an operator-managed durable database/backup plan before that date. Do not paste database credentials into chats or the app. No new external credential is needed to try the currently deployed preview.
+
+## Highest-value next work
+
+1. Preserve production signing keys privately, restore/resolve the old-app update path, and design/test encrypted recovery or device transfer without a server decryption key.
+2. Review first-contact key authenticity and ratchet/crash behavior independently; add automatic single-use contact-key replenishment, account cleanup and stronger abuse controls.
+3. Complete two-phone/OEM usability/capture testing, then add policy-scoped documents/media, better timezone controls and validated broader policy interpretation.

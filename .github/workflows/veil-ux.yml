@@ -1,0 +1,96 @@
+name: Veil contact UX
+on:
+  push:
+    branches: ['codex/veil-ux']
+    paths: ['apps/veil/**', '.github/workflows/veil-ux.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: veil-ux-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: veil
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: veil_test
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U veil -d veil_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r apps/veil/portable-provider/requirements.txt -r apps/veil/relay/requirements.txt
+      - run: python -m unittest discover -s apps/veil/portable-provider -v
+      - name: PostgreSQL isolation and invitation enforcement
+        run: python -m unittest discover -s apps/veil/portable-provider -p test_postgres.py -v
+        env:
+          VEIL_TEST_POSTGRES_URL: postgresql://veil:disposable-ci-only@127.0.0.1:5432/veil_test
+      - run: python -m unittest discover -s apps/veil/relay -v
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+      - name: Provider-neutral identity core
+        run: gradle -p apps/veil --no-daemon :identity-core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug -PveilPurposePreview=true --stacktrace
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Security regressions and contact UI
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 1536 -cores 2
+          script: |
+            bash apps/veil/scripts/start_second_emulator.sh
+            python apps/veil/scripts/live_contact_ui.py
+            adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
+            adb -s emulator-5556 shell pm clear chat.veil.purposes.preview
+            python apps/veil/scripts/portable_two_devices.py
+            adb -s emulator-5556 emu kill
+            adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
+            adb -s emulator-5554 shell input keyevent KEYCODE_WAKEUP
+            adb -s emulator-5554 shell wm dismiss-keyguard
+            adb -s emulator-5554 shell settings put system screen_off_timeout 1800000
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss --stacktrace
+            mkdir -p apps/veil/app/build/privacy-regression/native
+            cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/native/
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#flagIsSetBeforeAuthentication --stacktrace
+            mkdir -p apps/veil/app/build/privacy-regression/flag
+            cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/flag/
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
+            adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            python apps/veil/scripts/capture_contact_ui.py
+            mkdir -p apps/veil/ux-evidence
+            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/after.tar
+            tar -tf apps/veil/ux-evidence/after.tar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: veil-contact-ux-reports
+          path: |
+            apps/veil/ux-evidence/
+            apps/veil/identity-core/build/reports/
+            apps/veil/app/build/reports/
+            apps/veil/app/build/outputs/androidTest-results/
+            apps/veil/app/build/privacy-regression/

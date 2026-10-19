@@ -1,0 +1,5 @@
+# On each independently administered host: substitute that operator's own domain.
+provider-a.your-domain.example {
+    reverse_proxy 127.0.0.1:8080
+    # Deliberately no access-log directive. Do not log request bodies or query identifiers.
+}

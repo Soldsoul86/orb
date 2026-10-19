@@ -5,3 +5,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Veil"
 include(":app")
+include(":identity-core")

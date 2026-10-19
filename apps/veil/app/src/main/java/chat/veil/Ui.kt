@@ -37,12 +37,14 @@ private val Shape = RoundedCornerShape(22.dp)
     // Otherwise unlocking can recompose the screen without rerunning the curtain effect.
     val unlocked = activity.unlocked
     SideEffect { activity.contentCommitted(unlocked) }
-    MaterialTheme(colorScheme = darkColorScheme(primary = Mint, background = Ink, surface = Panel, onSurface = Color(0xFFE8F0F2), secondary = Mint)) {
-        Surface(Modifier.fillMaxSize(), color = Ink) {
+    val dark=androidx.compose.foundation.isSystemInDarkTheme()
+    val colors=if(dark)darkColorScheme(primary=Mint,background=Ink,surface=Panel,onSurface=Color(0xFFE8F0F2),secondary=Mint) else lightColorScheme(primary=Color(0xFF235C46),background=Color(0xFFF5F7F4),surface=Color(0xFFFDFEFC),secondary=Color(0xFF235C46))
+    MaterialTheme(colorScheme=colors) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 22.dp)) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("veil", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)
-                    Spacer(Modifier.weight(1f)); Text("A LITTLE MORE PRIVATE", color = Mint, fontSize = 9.sp, letterSpacing = 1.5.sp)
+                    Spacer(Modifier.weight(1f)); Text("PRIVATE BY CHOICE", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
                 }
                 if (!unlocked) {
                     Spacer(Modifier.weight(1f))
@@ -57,15 +59,29 @@ private val Shape = RoundedCornerShape(22.dp)
                 } else {
                     if (activity.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (activity.notice.isNotEmpty()) Text(activity.notice, color = Color(0xFFFFD5A0), fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
-                    val snap = activity.snapshot
-                    when {
-                        snap == null -> Text("Opening your private space…", color = Muted)
-                        !snap.ready -> Setup(activity)
-                        !snap.paired -> Pairing(activity)
-                        !snap.verified -> Identity(activity, snap)
-                        activity.viewer != null -> Viewer(activity)
-                        else -> Conversations(activity, snap)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        listOf("Chats","Reach me","Settings").forEachIndexed {i,label ->
+                            TextButton({activity.closeViewer();activity.section=i;activity.contactPage="home"},modifier=Modifier.heightIn(min=48.dp)) {Text(label,fontSize=14.sp,fontWeight=if(activity.section==i)FontWeight.Bold else FontWeight.Normal)}
+                        }
                     }
+                    if(activity.contactPage=="personal") {
+                        BackHandler {activity.closeViewer();activity.contactPage="home"}
+                        TextButton({activity.closeViewer();activity.contactPage="home"}){Text("‹ Chats")}
+                        // Existing media experience and security lifecycle are preserved.
+                        MaterialTheme(colorScheme=darkColorScheme(primary=Mint,background=Ink,surface=Panel,onSurface=Color(0xFFE8F0F2))) {
+                            Surface(Modifier.weight(1f).fillMaxWidth(),color=Ink) { Column(Modifier.fillMaxSize().padding(8.dp)) {
+                                val snap=activity.snapshot
+                                when {
+                                    snap==null -> Text("Opening your private space…")
+                                    !snap.ready -> Setup(activity)
+                                    !snap.paired -> Pairing(activity)
+                                    !snap.verified -> Identity(activity,snap)
+                                    activity.viewer!=null -> Viewer(activity)
+                                    else -> Conversations(activity,snap)
+                                }
+                            }}
+                        }
+                    } else if(activity.contactPage=="pilot") PurposeHome(activity) else ContactHome(activity)
                 }
             }
         }
@@ -220,7 +236,7 @@ private const val DefaultRelay = "https://veil-relay-soldsoul86.onrender.com"
     }
     Text("JPEG / PNG / WebP / MP4 · up to 5 MiB · video up to 15s", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 8.dp))
 }
-@Composable private fun MessageBubble(m: ChatMessage, open: () -> Unit) {
+@Composable internal fun MessageBubble(m: ChatMessage, open: () -> Unit) {
     var held by remember(m.id) { mutableStateOf(false) }
     var clock by remember { mutableLongStateOf(now()) }
     LaunchedEffect(m.expires) { while (true) { delay(250); clock = now() } }

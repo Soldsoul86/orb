@@ -1,0 +1,3 @@
+# Tests
+
+`python -m unittest discover -s apps/veil/portable-provider -v`: real P-256 signatures, nonce replay, altered claims, wrong audience/controller, publication consent, private discovery, approvals, duplicate introductions, hours, DST, TTL, expiry, revocation, rotation, stale state and independent DB restore. Ciphertext fixtures are synthetic in this suite. `:app:testDebugUnitTest` adds real libsignal with two provider subprocesses and A offline. `scripts/portable_two_devices.py` exercises the same Android client engine on two disposable API 35 emulators with TLS. Results and run links belong in TEST_RESULTS.md, not inferred from the presence of tests.
