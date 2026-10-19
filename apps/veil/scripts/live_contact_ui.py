@@ -17,13 +17,29 @@ for attempt in range(6):
     except Exception:
         if attempt==5:raise
         time.sleep(5)
+def clear_launcher_anr(device):
+    # Disposable AOSP launcher occasionally ANRs under two-emulator CI load.
+    # Only clear that confirmed system-launcher dialog, never a Veil failure.
+    focus=adb(device,'shell','dumpsys','window').decode(errors='replace')
+    current=next((line for line in focus.splitlines() if 'mCurrentFocus=' in line),'')
+    if 'Application Not Responding: com.android.launcher3' in current:
+        print('Emulator preparation: close confirmed Launcher3 ANR on',device,flush=True)
+        adb(device,'shell','am','force-stop','com.android.launcher3')
+
 for device in ('emulator-5554','emulator-5556'):
+    # Reduce software-rendering load; security flags and focus assertions stay unchanged.
+    adb(device,'shell','wm','size','720x1280')
+    adb(device,'shell','wm','density','320')
+    for setting in ('window_animation_scale','transition_animation_scale','animator_duration_scale'):
+        adb(device,'shell','settings','put','global',setting,'0')
+    clear_launcher_anr(device)
     adb(device,'install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk'))
     adb(device,'install','-r',str(root/'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk'))
     adb(device,'shell','input','keyevent','KEYCODE_WAKEUP');adb(device,'shell','wm','dismiss-keyguard')
     adb(device,'shell','settings','put','system','screen_off_timeout','1800000')
     adb(device,'shell','run-as',pkg,'mkdir','-p','files/contact-live-fixture')
 def stage(device,name):
+    clear_launcher_anr(device)
     output=adb(device,'shell','am','instrument','-w','-r','-e','class','chat.veil.ContactLiveUiTest','-e','liveStage',name,'-e','disposableFixture','true',pkg+'.test/androidx.test.runner.AndroidJUnitRunner').decode()
     if 'OK (1 test)' not in output:raise RuntimeError('Live stage '+name+' failed:\n'+output)
     for line in output.splitlines():
