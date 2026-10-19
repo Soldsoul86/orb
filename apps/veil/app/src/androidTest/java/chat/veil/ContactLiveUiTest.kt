@@ -40,7 +40,7 @@ class ContactLiveUiTest {
     @Test fun stage() {
         val args=InstrumentationRegistry.getArguments();val stage=args.getString("liveStage") ?: return
         require(args.getString("disposableFixture")=="true");unlock()
-        when(stage) {
+        try { when(stage) {
             "share" -> {
                 val began=android.os.SystemClock.elapsedRealtime()
                 ui.onNodeWithText("New contact").performClick();ui.onNodeWithText("Temporary").performClick()
@@ -64,7 +64,7 @@ class ContactLiveUiTest {
             "request" -> {
                 // Exercise the same exported ACTION_VIEW handler used by Android App Links.
                 val link=read("link")
-                ui.runOnIdle{instrumentation.callActivityOnNewIntent(ui.activity,Intent(Intent.ACTION_VIEW,Uri.parse(link)))}
+                ui.runOnIdle{ui.activity.startActivity(Intent(ui.activity,MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP))}
                 try {ui.waitUntil(120000){ui.activity.contactPreview!=null && !ui.activity.busy}}
                 catch(e:Throwable){throw AssertionError("Preview did not appear: unlocked=${ui.activity.unlocked}, busy=${ui.activity.busy}, page=${ui.activity.contactPage}, notice=${ui.activity.portableNotice}",e)}
                 capture("preview")
@@ -93,6 +93,10 @@ class ContactLiveUiTest {
             }
             "blocked" -> {chat();assertEquals("REVOKED",contact().getString("status"));ui.onNodeWithText("Send").assertDoesNotExist()}
             else -> error("Unknown live stage")
+        }
+        } catch (error: Throwable) {
+            instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream", "LIVE BODY FAILURE: " + error.stackTraceToString())})
+            throw error
         }
         println("PASS live Android UI stage: $stage")
     }
