@@ -39,7 +39,9 @@ class ContactLiveUiTest {
     }
     @Test fun stage() {
         val args=InstrumentationRegistry.getArguments();val stage=args.getString("liveStage") ?: return
-        require(args.getString("disposableFixture")=="true");unlock()
+        require(args.getString("disposableFixture")=="true")
+        val launchIntent=Intent(ui.activity.intent)
+        unlock()
         try { when(stage) {
             "share" -> {
                 val began=android.os.SystemClock.elapsedRealtime()
@@ -98,6 +100,10 @@ class ContactLiveUiTest {
         } catch (error: Throwable) {
             instrumentation.sendStatus(0,android.os.Bundle().apply{putString("stream", "LIVE BODY FAILURE: " + error.stackTraceToString())})
             throw error
+        } finally {
+            // ActivityScenario matches lifecycle callbacks against its launch intent. Production
+            // correctly replaces/clears link data; restore only the harness intent after assertions.
+            ui.runOnIdle{ui.activity.intent=launchIntent}
         }
         println("PASS live Android UI stage: $stage")
     }

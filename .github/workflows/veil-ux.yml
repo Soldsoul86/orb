@@ -68,7 +68,7 @@ jobs:
             adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/after.tar
             tar -tf apps/veil/ux-evidence/after.tar
             bash apps/veil/scripts/start_second_emulator.sh
-            python apps/veil/scripts/live_contact_ui.py
+            python apps/veil/scripts/live_contact_ui.py || touch /tmp/veil-live-failed
             adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
             adb -s emulator-5556 shell pm clear chat.veil.purposes.preview
             python apps/veil/scripts/portable_two_devices.py
@@ -84,6 +84,7 @@ jobs:
             mkdir -p apps/veil/app/build/privacy-regression/flag
             cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/flag/
             gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
+            test ! -f /tmp/veil-live-failed
 
       - uses: actions/upload-artifact@v4
         if: always()
