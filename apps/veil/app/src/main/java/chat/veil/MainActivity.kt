@@ -327,6 +327,7 @@ class MainActivity : FragmentActivity() {
         val draft=contactDraft
         contactAction({prepareInvitation(draft,kind,p)}) {id -> contactSelected=id;contactPage="invitation";shareContactLink()}
     }
+    fun resumeContact(id:String) = contactAction({resumeInvitation(id)}) {contactSelected=it;contactPage="invitation";shareContactLink()}
     fun shareContactLink() {
         val fs=portableSnapshot?.optJSONArray("facets") ?: return
         val f=(0 until fs.length()).map(fs::getJSONObject).firstOrNull {it.getString("id")==contactSelected} ?: return

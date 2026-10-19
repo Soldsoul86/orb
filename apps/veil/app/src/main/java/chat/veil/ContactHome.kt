@@ -85,6 +85,9 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                             Text("Scan to preview. Sending a request still requires confirmation.",fontSize=14.sp)
                         }
                         TextButton({val id=a.contactSelected;a.contactAction({cancelInvitation(id)})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Cancel invitation")}
+                    } else if(!invite.optBoolean("ready") && !invite.optBoolean("canceled") && invite.getLong("expires")>System.currentTimeMillis()/1000) {
+                        Text("This invitation has not finished setting up. Retry with the same saved identity.",fontSize=14.sp)
+                        Action("Resume invitation",!a.busy){a.resumeContact(a.contactSelected)}
                     } else Text("This link can no longer accept new requests. Create a new contact to invite again.")
                     if(invite.optBoolean("cancel_pending")) {
                         Text("The link may still accept requests until cancellation reaches the service.",fontSize=14.sp)

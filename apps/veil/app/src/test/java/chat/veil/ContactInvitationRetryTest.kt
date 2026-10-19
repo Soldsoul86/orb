@@ -42,9 +42,10 @@ class ContactInvitationRetryTest {
             var b=PortableSession(savedB,{savedB=JSONObject(it.toString())},::post)
             val draft="3".repeat(32);lose="invite"
             assertTrue(runCatching{a.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=origin)}.isFailure)
-            val wallet=a.snapshot().getString("wallet_id")
+            val wallet=a.snapshot().getString("wallet_id");val savedOwner=a.snapshot().getJSONArray("facets").getJSONObject(0).getString("id")
             a=PortableSession(savedA,{savedA=JSONObject(it.toString())},::post)
-            val owner=a.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=origin);val link=a.invitationLink(owner)
+            val owner=a.resumeInvitation(savedOwner);val link=a.invitationLink(owner)
+            assertEquals(owner,a.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=origin))
             assertEquals(wallet,a.snapshot().getString("wallet_id"));assertEquals(1,a.snapshot().getJSONArray("facets").length())
             val requestId="4".repeat(32);lose="reserve"
             assertTrue(runCatching{b.requestInvitation(link,"A retry-safe introduction",requestId)}.isFailure)

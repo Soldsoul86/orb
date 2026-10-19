@@ -31,3 +31,5 @@ Portable contacts support text only. Invitations are approval-gated but not sing
 The hosted free relay can be slow to wake. No push notifications or background delivery guarantee. New contact addresses must be shared explicitly after moving services; old invitation capabilities are not part of portable backups. Capture protection cannot stop a second camera or a compromised device. This remains a development preview, not an independently audited production messenger.
 
 Screenshots use synthetic data rendered by test code inside the actual app; FLAG_SECURE is never disabled. They illustrate UX, not proof of encryption. Physical-phone and five-person usability verification are recorded separately and must not be inferred from emulator tests.
+
+Opaque invitation lookup still relies on the service to return the intended initial contact identity. A malicious resolver could substitute an unverified identity. Compare full safety numbers out-of-band; the app does not label an accepted request “verified.” The signing process is the preserved development-preview workflow, not a production key-management setup.

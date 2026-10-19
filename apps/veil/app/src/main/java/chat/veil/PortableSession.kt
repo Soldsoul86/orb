@@ -350,7 +350,12 @@ class PortableSession(
         val id=if(drafts.has(draft))drafts.getString(draft) else createFacet(p,origin,false).also {drafts.put(draft,it);commit()}
         val f=facet(id)
         if(!f.has("ux"))f.put("ux",JSONObject().put("kind",kind.name).put("token",Core.secret()).put("expires",clock()+ContactExperience.WEEK).put("access_seconds",ContactExperience.accessSeconds(kind)).put("ready",false)).also{commit()}
-        val x=f.getJSONObject("ux");require(!x.optBoolean("canceled") && x.getLong("expires")>clock()) {"Invitation expired. Create a new contact."}
+        return resumeInvitation(id)
+    }
+    /** Resume an interrupted publication using its already saved identity, token and expiry. */
+    fun resumeInvitation(id:String):String {
+        val f=facet(id);val x=f.getJSONObject("ux")
+        require(!x.optBoolean("canceled") && x.getLong("expires")>clock()) {"Invitation expired. Create a new contact."}
         publish(id)
         call(f,payload(f).getString("route"),q("invite").put("token",x.getString("token")).put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")))
         x.put("ready",true);commit();return id
