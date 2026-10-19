@@ -34,7 +34,7 @@ object PurposeQr {
             val bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.size,options) ?: error("Invalid QR image")
             try {
                 val pixels=IntArray(bitmap.width*bitmap.height);bitmap.getPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
-                return MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bitmap.width,bitmap.height,pixels)))).text.also { require(it.length<=limit) }
+                return MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bitmap.width,bitmap.height,pixels))), mapOf(com.google.zxing.DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),com.google.zxing.DecodeHintType.TRY_HARDER to true)).text.also { require(it.length<=limit) }
             } finally { bitmap.recycle() }
         } finally { bytes.fill(0) }
     }

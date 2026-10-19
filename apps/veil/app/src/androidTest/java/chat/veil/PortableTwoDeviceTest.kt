@@ -42,7 +42,11 @@ class PortableTwoDeviceTest {
             // A fresh client without old Signal sessions, on a disposable emulator only.
             File(context.noBackupFilesDir,"identity.v1").delete()
         }
-        val vault=Vault(context,if(stage.startsWith("contact-"))"contact-test.v1" else "identity.v1");val session=PortableSession(vault.read(),vault::write,transport)
+        val vault=Vault(context,"identity.v1")
+        // Separate disposable test fixture, removed by the host; never a production vault format.
+        val contactFile=File(dir,"contact-state.json")
+        val session=if(stage.startsWith("contact-"))PortableSession(if(contactFile.exists())JSONObject(contactFile.readText()) else JSONObject(),{contactFile.writeText(it.toString())},transport)
+            else PortableSession(vault.read(),vault::write,transport)
         when(stage) {
             "contact-owner" -> {
                 assertFalse(session.ready())
