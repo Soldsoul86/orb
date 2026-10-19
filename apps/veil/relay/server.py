@@ -17,7 +17,7 @@ TOKEN = re.compile(r'^[A-Za-z0-9_-]{43}$')
 ID = re.compile(r'^[a-f0-9]{32}$')
 
 class Relay:
-    def __init__(self, path, database_url=None):
+    def __init__(self, path, database_url=None, portable_origin=None):
         if database_url:
             from postgres_store import PostgresStore
             self.db = PostgresStore(database_url)
@@ -37,12 +37,25 @@ class Relay:
             ''')
         from purposes import Purposes
         self.purposes = Purposes(self.db)
+        self.portable = None
+        if portable_origin:
+            import sys
+            from pathlib import Path
+            sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'portable-provider'))
+            from provider import Provider
+            self.portable=Provider(str(path)+'.portable',portable_origin,database_url=database_url)
     def clean(self):
         now = int(time.time())
         self.db.execute('DELETE FROM messages WHERE expires <= ? OR box IN (SELECT id FROM boxes WHERE expires <= ?)', (now, now))
         self.db.execute('DELETE FROM receipts WHERE expires <= ?', (now,))
         self.db.execute('DELETE FROM boxes WHERE expires <= ?', (now,))
     def handle(self, method, path, bearer, data):
+        # Separate connection, schema, lock and transaction; old inbox tables are unchanged.
+        if path.startswith('/v3/'):
+            if self.portable is None:return 503,{'error':'contact invitations unavailable'}
+            if path=='/v3/capabilities' and method=='GET':return 200,{'profile':'pi/1','invitations':1}
+            if method!='POST':return 405,{'error':'method not allowed'}
+            return self.portable.handle(path,data)
         with self.lock, self.db:
             self.clean()
             if path.startswith('/v2/'):
@@ -112,6 +125,14 @@ def handler(relay):
         server_version = 'VeilRelay'
         def log_message(self, *_): pass  # No request paths, capabilities, bodies, or IP logs.
         def do_GET(self):
+            if self.path=='/.well-known/assetlinks.json':
+                from contact_landing import ASSETLINKS
+                self.reply(200,ASSETLINKS);return
+            if self.path=='/i':
+                from contact_landing import HTML,CSP
+                self.send_response(200)
+                for key,value in [('Content-Type','text/html; charset=utf-8'),('Cache-Control','no-store'),('Referrer-Policy','no-referrer'),('Content-Security-Policy',CSP),('X-Content-Type-Options','nosniff'),('X-Frame-Options','DENY'),('Content-Length',str(len(HTML)))]:self.send_header(key,value)
+                self.end_headers();self.wfile.write(HTML);return
             if re.fullmatch(r'/p/p-[a-f0-9]{32}', self.path):
                 from purpose_landing import HTML, CSP
                 self.send_response(200)
@@ -129,7 +150,7 @@ def handler(relay):
             self.connection.settimeout(15)
             try:
                 length = int(self.headers.get('Content-Length', '0'))
-                limit = 128*1024 if self.path.startswith('/v2/') else MAX_BODY
+                limit = 512*1024 if self.path.startswith('/v3/') else 128*1024 if self.path.startswith('/v2/') else MAX_BODY
                 if length < 0 or length > limit:
                     self.reply(413, {'error': 'too large'}); return
                 data = json.loads(self.rfile.read(length)) if length else {}
@@ -182,7 +203,7 @@ if __name__ == '__main__':
     if os.environ.get('RENDER') and not database_url:
         raise SystemExit('DATABASE_URL is required on Render; refusing ephemeral inbox storage')
     try:
-        relay = Relay(os.environ.get('VEIL_DB', 'veil.sqlite3'), database_url=database_url)
+        relay = Relay(os.environ.get('VEIL_DB', 'veil.sqlite3'), database_url=database_url, portable_origin=os.environ.get('VEIL_PUBLIC_ORIGIN') or os.environ.get('RENDER_EXTERNAL_URL'))
     except Exception:
         raise SystemExit('Database unavailable; check DATABASE_URL and database status') from None
     server = BoundedHTTPServer((os.environ.get('VEIL_BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), handler(relay))
@@ -191,6 +212,8 @@ if __name__ == '__main__':
             time.sleep(30)
             try:
                 with relay.lock, relay.db: relay.clean()
+                if relay.portable:
+                    with relay.portable.lock,relay.portable.db:relay.portable.clean(int(time.time()))
             except Exception:
                 # Keep the sweeper alive through transient DB outages; no credentials in logs.
                 print('Relay maintenance unavailable; retrying', flush=True)
