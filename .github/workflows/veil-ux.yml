@@ -61,6 +61,12 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 1536 -cores 2
           script: |
+            adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            python apps/veil/scripts/capture_contact_ui.py
+            mkdir -p apps/veil/ux-evidence
+            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/after.tar
+            tar -tf apps/veil/ux-evidence/after.tar
             bash apps/veil/scripts/start_second_emulator.sh
             python apps/veil/scripts/live_contact_ui.py
             adb -s emulator-5554 shell pm clear chat.veil.purposes.preview
@@ -78,12 +84,7 @@ jobs:
             mkdir -p apps/veil/app/build/privacy-regression/flag
             cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/flag/
             gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
-            adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
-            adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            python apps/veil/scripts/capture_contact_ui.py
-            mkdir -p apps/veil/ux-evidence
-            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/after.tar
-            tar -tf apps/veil/ux-evidence/after.tar
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
