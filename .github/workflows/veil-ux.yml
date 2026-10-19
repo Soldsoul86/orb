@@ -71,7 +71,13 @@ jobs:
             adb -s emulator-5554 shell input keyevent KEYCODE_WAKEUP
             adb -s emulator-5554 shell wm dismiss-keyguard
             adb -s emulator-5554 shell settings put system screen_off_timeout 1800000
-            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss --stacktrace
+            mkdir -p apps/veil/app/build/privacy-regression/native
+            cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/native/
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#flagIsSetBeforeAuthentication --stacktrace
+            mkdir -p apps/veil/app/build/privacy-regression/flag
+            cp -R apps/veil/app/build/outputs/androidTest-results/. apps/veil/app/build/privacy-regression/flag/
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
             adb install -r apps/veil/app/build/outputs/apk/debug/app-debug.apk
             adb install -r apps/veil/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             python apps/veil/scripts/capture_contact_ui.py
@@ -87,3 +93,4 @@ jobs:
             apps/veil/identity-core/build/reports/
             apps/veil/app/build/reports/
             apps/veil/app/build/outputs/androidTest-results/
+            apps/veil/app/build/privacy-regression/

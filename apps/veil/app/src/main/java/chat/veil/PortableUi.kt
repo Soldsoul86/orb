@@ -19,10 +19,10 @@ import org.json.JSONArray
 import org.portableidentity.core.IdentityCore as Core
 
 private fun entries(a:JSONArray?):List<JSONObject> = if(a==null)emptyList() else (0 until a.length()).map(a::getJSONObject)
-private val PortableMuted=Color(0xFF91A5AF)
 
 /** No private keys are supplied to this composition. Recovery secret exists only while unlocked. */
 @Composable fun ColumnScope.PortableHome(a:MainActivity, startPage:String="home", startSelected:String="", onExit:(()->Unit)?=null) {
+    val PortableMuted=MaterialTheme.colorScheme.onSurfaceVariant
     val s=a.portableSnapshot
     var page by remember {mutableStateOf(startPage)}
     var selected by remember {mutableStateOf(startSelected)}
@@ -36,12 +36,12 @@ private val PortableMuted=Color(0xFF91A5AF)
     var results by remember {mutableStateOf<List<String>>(emptyList())}
     var problem by remember {mutableStateOf("")}
     LaunchedEffect(Unit) {a.portableAction()}
-    BackHandler(page!="home") {page="home";recovery="";keyAgain="";problem=""}
+    BackHandler(page!="home" || onExit!=null) {if(onExit!=null)onExit() else page="home";recovery="";keyAgain="";problem=""}
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         if(onExit!=null)TextButton(onExit){Text("‹ Settings")}
-        if(page!="home")TextButton({page="home";recovery="";keyAgain="";problem=""}) {Text("‹ My identity")}
-        if(a.portableNotice.isNotBlank())Text(a.portableNotice,color=Color(0xFFFFD5A0),fontSize=12.sp)
-        if(problem.isNotEmpty())Text(problem,color=Color(0xFFFFD5A0),fontSize=12.sp)
+        if(page!="home" && onExit==null)TextButton({page="home";recovery="";keyAgain="";problem=""}) {Text("‹ My identity")}
+        if(a.portableNotice.isNotBlank())Text(a.portableNotice,color=MaterialTheme.colorScheme.error,fontSize=14.sp)
+        if(problem.isNotEmpty())Text(problem,color=MaterialTheme.colorScheme.error,fontSize=14.sp)
         if(s==null) {Text("Opening your identity…");TextButton({a.portableAction()},enabled=!a.busy){Text("Retry")};return@Column}
         val facets=entries(s.optJSONArray("facets"));val contacts=entries(s.optJSONArray("contacts"))
         when(page) {
@@ -49,7 +49,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 if(page=="create") {
                     Text("Choose a compatible provider",fontSize=24.sp)
                     OutlinedTextField(origin,{origin=it.take(2000)},label={Text("Provider HTTPS origin")},modifier=Modifier.fillMaxWidth())
-                    Text("Advanced: choose a compatible identity service. For an ordinary invitation, return to Chats and choose New contact.",color=PortableMuted,fontSize=12.sp)
+                    Text("Advanced: choose a compatible identity service. For an ordinary invitation, return to Chats and choose New contact.",color=PortableMuted,fontSize=14.sp)
                 }
                 PurposeEditor(editor,onCancel={page="home"},portable=true) {p,consent ->
                     val route=runCatching {RelayClient(origin).base}
@@ -64,12 +64,12 @@ private val PortableMuted=Color(0xFF91A5AF)
             "backup" -> {
                 Text("Back up my identity",fontSize=28.sp)
                 Text("This backup preserves identity control and signed relationships. It does not contain chat history, live Signal sessions or old pending messages.",color=PortableMuted)
-                Text("Write this recovery key somewhere safe, separately from the backup. Anyone with both can control these identities. We cannot reset it.",color=Color(0xFFFFD5A0))
+                Text("Write this recovery key somewhere safe, separately from the backup. Anyone with both can control these identities. We cannot reset it.",color=MaterialTheme.colorScheme.error)
                 Text(recovery,fontFamily=FontFamily.Monospace,fontSize=16.sp)
                 OutlinedTextField(keyAgain,{keyAgain=it.take(100)},label={Text("Retype the complete recovery key")},visualTransformation=PasswordVisualTransformation(),modifier=Modifier.fillMaxWidth())
-                Row {Checkbox(backedUp,{backedUp=it});Text("I saved the key separately. Losing it loses this backup.",fontSize=12.sp)}
+                Row {Checkbox(backedUp,{backedUp=it});Text("I saved the key separately. Losing it loses this backup.",fontSize=14.sp)}
                 Button({a.savePortableBackup(recovery)},enabled=!a.busy && backedUp && keyAgain==recovery){Text("Save encrypted backup")}
-                Text("Returning from the file picker locks the app. The recovery key will be cleared from this screen.",color=PortableMuted,fontSize=12.sp)
+                Text("Returning from the file picker locks the app. The recovery key will be cleared from this screen.",color=PortableMuted,fontSize=14.sp)
             }
             "import" -> {
                 Text("Restore your identity",fontSize=28.sp)
@@ -78,7 +78,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 Text(a.portableFileName,color=PortableMuted)
                 OutlinedTextField(recovery,{recovery=it.take(100)},label={Text("Recovery key")},visualTransformation=PasswordVisualTransformation(),modifier=Modifier.fillMaxWidth())
                 Button({val encrypted=a.portableBackup;val key=recovery;a.contactAction({importIdentity(encrypted,key)}){page="home"};recovery=""},enabled=!a.busy && a.portableBackup.isNotEmpty() && recovery.length==43){Text("Restore my identity")}
-                Text("An old backup can omit later revocations. Review every grant before moving a purpose. Existing personal chats and earlier pilot data are not overwritten.",color=Color(0xFFFFD5A0),fontSize=12.sp)
+                Text("An old backup can omit later revocations. Review every grant before moving a purpose. Existing personal chats and earlier pilot data are not overwritten.",color=MaterialTheme.colorScheme.error,fontSize=14.sp)
             }
             "connect" -> {
                 var query by remember {mutableStateOf("")}
@@ -92,8 +92,8 @@ private val PortableMuted=Color(0xFF91A5AF)
                 OutlinedTextField(card,{if(it.length<=16000)card=it},label={Text("Or paste a signed invitation / route card")},maxLines=5,modifier=Modifier.fillMaxWidth())
                 val state=remember(card) {runCatching {Core.verifyState(JSONObject(card).getString("state"))}.getOrNull()}
                 if(state!=null) {
-                    Text(PurposePolicy.from(state.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=13.sp)
-                    Text("Controller: ${state.getString("id")}",fontFamily=FontFamily.Monospace,fontSize=10.sp)
+                    Text(PurposePolicy.from(state.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=14.sp)
+                    Text("Controller: ${state.getString("id")}",fontFamily=FontFamily.Monospace,fontSize=14.sp)
                     OutlinedTextField(introduction,{introduction=it.take(4000)},label={Text("One introduction")},modifier=Modifier.fillMaxWidth())
                     Button({val actor=selected;val invite=card;val text=introduction;a.portableAction {request(actor,invite,text)};page="home"},enabled=!a.busy && selected.isNotBlank() && introduction.isNotBlank()){Text("Request contact with these rules")}
                 }
@@ -104,10 +104,10 @@ private val PortableMuted=Color(0xFF91A5AF)
                     var consent by remember {mutableStateOf(false)}
                     Text("Move my identity",fontSize=28.sp)
                     Text("Your identity stays yours. Old messages do not move. After moving, send your new contact address to each person through another trusted channel. They must accept it to reconnect; this is not automatic.",color=PortableMuted)
-                    Text("Current provider: ${f.getString("route")}",fontSize=12.sp)
+                    Text("Current provider: ${f.getString("route")}",fontSize=14.sp)
                     OutlinedTextField(origin,{origin=it.take(2000)},label={Text("New provider HTTPS origin")},modifier=Modifier.fillMaxWidth())
-                    Text(PurposePolicy.from(f.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=12.sp)
-                    Row {Checkbox(consent,{consent=it});Text("I reviewed the restored grants and authorize these rules and any public listing at this provider.",fontSize=12.sp)}
+                    Text(PurposePolicy.from(f.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=14.sp)
+                    Row {Checkbox(consent,{consent=it});Text("I reviewed the restored grants and authorize these rules and any public listing at this provider.",fontSize=14.sp)}
                     Button({val id=selected;val route=origin;a.contactAction({migrate(id,RelayClient(route).base,true)}){page="card"}},enabled=!a.busy && consent && origin.isNotBlank()){Text("Move this purpose")}
                 }
             }
@@ -122,9 +122,9 @@ private val PortableMuted=Color(0xFF91A5AF)
                     if(bitmap!=null) {
                         DisposableEffect(bitmap){onDispose {bitmap.recycle()}}
                         Image(bitmap.asImageBitmap(),"Signed purpose invitation QR",Modifier.fillMaxWidth().aspectRatio(1f))
-                        Text("This QR contains the same signed card. Scan and paste its text, or share the card remotely.",fontSize=12.sp,color=PortableMuted)
-                    } else Text("This card is too large for a readable QR. Use Share to send the complete signed card.",fontSize=12.sp,color=PortableMuted)
-                    Text(f.getString("id"),fontFamily=FontFamily.Monospace,fontSize=11.sp)
+                        Text("This QR contains the same signed card. Scan and paste its text, or share the card remotely.",fontSize=14.sp,color=PortableMuted)
+                    } else Text("This card is too large for a readable QR. Use Share to send the complete signed card.",fontSize=14.sp,color=PortableMuted)
+                    Text(f.getString("id"),fontFamily=FontFamily.Monospace,fontSize=14.sp)
                 }
             }
             "chat" -> {
@@ -135,13 +135,13 @@ private val PortableMuted=Color(0xFF91A5AF)
                     var revoke by remember(selected){mutableStateOf(false)}
                     val owner=c.getString("local")==c.getString("owner")
                     Text(c.getJSONObject("policy").getString("display_name"),fontSize=28.sp)
-                    Text("${c.getString("status")} · encrypted text · 7-day messages",color=PortableMuted,fontSize=12.sp)
-                    Text(c.getString("route"),fontSize=11.sp,color=PortableMuted)
+                    Text("${c.getString("status")} · encrypted text · 7-day messages",color=PortableMuted,fontSize=14.sp)
+                    Text(c.getString("route"),fontSize=14.sp,color=PortableMuted)
                     Button({val id=c.getString("id");a.portableAction {syncContact(id)}},enabled=!a.busy){Text("Refresh & retry delivery")}
-                    if(c.optBoolean("pending"))Text("A delivery or permission update is pending. Refresh to retry.",fontSize=12.sp,color=Color(0xFFFFD5A0))
-                    Text("Compare this entire safety number through a trusted channel. It changes after migration; the signed purpose key must also match the pinned contact.",fontSize=12.sp,color=PortableMuted)
+                    if(c.optBoolean("pending"))Text("A delivery or permission update is pending. Refresh to retry.",fontSize=14.sp,color=MaterialTheme.colorScheme.error)
+                    Text("Compare this entire safety number through a trusted channel. It changes after migration; the signed purpose key must also match the pinned contact.",fontSize=14.sp,color=PortableMuted)
                     Text(c.getString("safety").chunked(5).chunked(3).joinToString("\n"){it.joinToString(" ")},fontFamily=FontFamily.Monospace,fontSize=16.sp)
-                    entries(c.getJSONArray("messages")).forEach {m -> Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(12.dp)){Text(if(m.optBoolean("mine"))"You" else "Contact",fontSize=11.sp,color=PortableMuted);Text(m.getString("text"))}}}
+                    entries(c.getJSONArray("messages")).forEach {m -> Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(12.dp)){Text(if(m.optBoolean("mine"))"You" else "Contact",fontSize=14.sp,color=PortableMuted);Text(m.getString("text"))}}}
                     if(owner && c.getString("status")=="PENDING") {
                         Row {Button({val id=selected;a.portableAction {decide(id,"APPROVED")}},enabled=!a.busy){Text("Approve")};TextButton({val id=selected;a.portableAction {decide(id,"REJECTED")}},enabled=!a.busy){Text("Reject")}}
                     }
@@ -157,7 +157,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                         HorizontalDivider()
                         Text("Contact moved providers?",fontSize=20.sp)
                         OutlinedTextField(newRoute,{if(it.length<=16000)newRoute=it},label={Text("Their new signed route card")},maxLines=4,modifier=Modifier.fillMaxWidth())
-                        Text("Accepting replaces this conversation’s old session and local messages. Only a newer card signed by the same pinned controller is accepted.",fontSize=12.sp,color=PortableMuted)
+                        Text("Accepting replaces this conversation’s old session and local messages. Only a newer card signed by the same pinned controller is accepted.",fontSize=14.sp,color=PortableMuted)
                         Button({val id=selected;val value=newRoute;a.portableAction {acceptRoute(id,value)};newRoute=""},enabled=!a.busy && newRoute.isNotBlank()){Text("Verify identity & accept new session")}
                         TextButton({val id=selected;a.portableAction {reconnect(id)}},enabled=!a.busy){Text("Retry accepted route")}
                     }
@@ -166,26 +166,26 @@ private val PortableMuted=Color(0xFF91A5AF)
             else -> {
                 Text("Identity is yours.",fontSize=30.sp)
                 Text("Access is programmable.\nServices are replaceable.",color=PortableMuted,fontSize=18.sp)
-                Text("Portable beta · no phone number, email or company account. Compatible provider required for messaging.",color=PortableMuted,fontSize=12.sp)
+                Text("Portable beta · no phone number, email or company account. Compatible provider required for messaging.",color=PortableMuted,fontSize=14.sp)
                 if(!s.optBoolean("ready")) {
                     Button({a.portableAction {createIdentity()}},enabled=!a.busy,modifier=Modifier.fillMaxWidth()){Text("Create identity on this device")}
                     OutlinedButton({page="import"},enabled=!a.busy){Text("Restore encrypted identity")}
                 } else {
-                    Text("Private ownership key created locally. Each purpose has an independent public key.",color=PortableMuted,fontSize=12.sp)
+                    Text("Private ownership key created locally. Each purpose has an independent public key.",color=PortableMuted,fontSize=14.sp)
                     Button({editor=null;page="create"},enabled=!a.busy && facets.size<8){Text("Create a purpose")}
                     OutlinedButton({page="connect"},enabled=facets.isNotEmpty()){Text("Find a purpose / open invitation")}
                     facets.forEach {f -> Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         val p=PurposePolicy.from(f.getJSONObject("policy"));val id=f.getString("id")
-                        Text(p.displayName,fontSize=22.sp);Text("${PurposePolicy.discoveryLabel(p.discovery)} · ${p.status.name.lowercase()}",color=PortableMuted,fontSize=12.sp)
-                        Text("${p.timezone} · revision ${f.getLong("revision")}",fontSize=12.sp,color=PortableMuted)
-                        if(f.optBoolean("needs_migration"))Text("Restored locally. Choose a new provider before using this purpose.",color=Color(0xFFFFD5A0),fontSize=12.sp)
+                        Text(p.displayName,fontSize=22.sp);Text("${PurposePolicy.discoveryLabel(p.discovery)} · ${p.status.name.lowercase()}",color=PortableMuted,fontSize=14.sp)
+                        Text("${p.timezone} · revision ${f.getLong("revision")}",fontSize=14.sp,color=PortableMuted)
+                        if(f.optBoolean("needs_migration"))Text("Restored locally. Choose a new provider before using this purpose.",color=MaterialTheme.colorScheme.error,fontSize=14.sp)
                         if(!f.optBoolean("published") && !f.optBoolean("needs_migration"))Button({a.portableAction {publish(id)}},enabled=!a.busy && p.status==PurposeStatus.ACTIVE){Text("Activate with provider")}
                         if(f.optBoolean("published"))Row {TextButton({a.portableAction {sync(id)}},enabled=!a.busy){Text("Refresh inbox")};TextButton({selected=id;page="card"}){Text("Share card / QR")}}
                         if(p.status==PurposeStatus.REVOKED) {
                             var forget by remember(id){mutableStateOf(false)}
                             TextButton({forget=!forget}){Text("Forget revoked purpose on this device")}
                             if(forget) {
-                                Text("Deletes this purpose's local keys and conversations. Other purposes and your ownership key remain. Old encrypted backups can still contain it.",fontSize=12.sp,color=PortableMuted)
+                                Text("Deletes this purpose's local keys and conversations. Other purposes and your ownership key remain. Old encrypted backups can still contain it.",fontSize=14.sp,color=PortableMuted)
                                 OutlinedButton({a.portableAction {forgetRevokedFacet(id)}},enabled=!a.busy){Text("Confirm local deletion")}
                             }
                         }
@@ -198,7 +198,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                     Text("Requests & conversations",fontSize=22.sp)
                     contacts.forEach {c -> OutlinedButton({selected=c.getString("id");page="chat"},modifier=Modifier.fillMaxWidth()){Text("${c.getJSONObject("policy").getString("display_name")} · ${c.getString("status")}")}}
                     Button({recovery=Core.secret();keyAgain="";backedUp=false;page="backup"},enabled=!a.busy){Text("Create encrypted recovery backup")}
-                    Text("Controller keys cannot rotate while keeping the same fingerprint. If compromised, create a new purpose and verify it with contacts independently. Rotate the device key only when the controller remains safe.",color=Color(0xFFFFD5A0),fontSize=12.sp)
+                    Text("Controller keys cannot rotate while keeping the same fingerprint. If compromised, create a new purpose and verify it with contacts independently. Rotate the device key only when the controller remains safe.",color=MaterialTheme.colorScheme.error,fontSize=14.sp)
                 }
                 TextButton({a.portableScreen=false;a.contactPage="pilot";a.section=2}){Text("Open earlier purpose pilot")}
             }

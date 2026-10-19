@@ -90,7 +90,13 @@ jobs:
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
             adb shell settings put system screen_off_timeout 1800000
-            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss --stacktrace
+            mkdir -p app/build/privacy-regression/native
+            cp -R app/build/outputs/androidTest-results/. app/build/privacy-regression/native/
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#flagIsSetBeforeAuthentication --stacktrace
+            mkdir -p app/build/privacy-regression/flag
+            cp -R app/build/outputs/androidTest-results/. app/build/privacy-regression/flag/
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
             python scripts/upgrade_preview.py
       - name: Verify preview APK and signing identity
         run: |
@@ -117,4 +123,5 @@ jobs:
           path: |
             apps/veil/app/build/reports/
             apps/veil/app/build/outputs/androidTest-results/
+            apps/veil/app/build/privacy-regression/
           if-no-files-found: ignore

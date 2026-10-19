@@ -32,7 +32,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
     Text("Text messages only. You approve each person. Sharing does not reserve the link for one recipient.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
     if(kind==ContactExperience.Kind.WORK) {
         Text("${if(p.weekdays==(1..5).toList())"Monday–Friday" else "Selected days"} · %02d:%02d–%02d:%02d".format(p.start/60,p.start%60,p.end/60,p.end%60),fontSize=16.sp)
-        Text("Times use ${p.timezone}. Introductions can be submitted any time. ${if(p.outside==OutsideHours.ACCEPT_AND_QUEUE)"Outside hours, messages wait for delivery." else "Outside hours, new messages are rejected."} You see them during contact hours. Notifications are silent and in-app only.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Times use ${p.timezone}, following local daylight-saving changes. Introductions can be submitted any time. ${if(p.outside==OutsideHours.ACCEPT_AND_QUEUE)"Outside hours, messages wait for delivery." else "Outside hours, new messages are rejected."} You see them during contact hours. Notifications are silent and in-app only.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -131,7 +131,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                 val kind=ContactExperience.Kind.valueOf(page.substringAfter(':'))
                 var p by remember(page){mutableStateOf(ContactExperience.policy(kind))}
                 var rules by remember {mutableStateOf(false)}
-                Heading(kind.title,"Share a private invitation. You decide who gets in.")
+                Heading(if(kind==ContactExperience.Kind.TEMPORARY)"Temporary contact" else kind.title,"Talk privately without sharing your phone number or email.")
                 InvitationSummary(kind,p)
                 if(rules) ContactRules(p,{p=it;rules=false},{rules=false})
                 else {
