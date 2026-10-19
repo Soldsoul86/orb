@@ -94,7 +94,10 @@ class ContactLiveUiTest {
             "receive" -> {chat();ui.onNodeWithText("Live encrypted reply").assertExists();capture("received")}
             "end" -> {
                 chat();ui.onNodeWithText("End access").performScrollTo().performClick()
-                ui.onAllNodesWithText("End access").onLast().performClick();idle()
+                ui.onNodeWithText("End access?").performScrollTo().assertExists()
+                assertTrue("Confirmation stays in the focused protected app",ui.activity.unlocked && ui.activity.window.decorView.hasWindowFocus())
+                capture("end-confirmation")
+                ui.onNodeWithText("End access").performScrollTo().performClick();idle()
                 assertEquals("REVOKED",contact().getString("status"));assertFalse(contact().optBoolean("pending"));capture("ended")
                 val id=read("facet");ui.runOnIdle{ui.activity.contactAction({cancelInvitation(id)})};idle()
             }

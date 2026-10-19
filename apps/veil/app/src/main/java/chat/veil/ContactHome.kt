@@ -193,7 +193,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
     val id=c.getString("id");val owner=c.getString("local")==c.getString("owner")
     var text by remember(id){mutableStateOf("")};var details by remember(id){mutableStateOf(false)};var end by remember(id){mutableStateOf(false)}
     Heading(c.getJSONObject("policy").getString("display_name"),ContactExperience.status(c))
-    if(c.optLong("access_expires")>0)Text("Access ends ${ContactExperience.date(c.getLong("access_expires"))}",fontSize=14.sp)
+    if(c.getString("status")=="APPROVED" && c.optLong("access_expires")>0)Text("Access ends ${ContactExperience.date(c.getLong("access_expires"))}",fontSize=14.sp)
     Text("Encrypted text · messages expire after 7 days",fontSize=14.sp)
     if(c.optBoolean("access_change_pending"))Text("This access change has not reached the service. Tap Refresh / retry to send it.",fontSize=14.sp)
     OutlinedButton({a.contactAction({syncContact(id)})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Refresh / retry")}
@@ -207,11 +207,21 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
         OutlinedButton({a.contactAction({decide(id,"REJECTED")})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Decline")}
     }
     if(c.getString("status")=="APPROVED" && c.optLong("access_expires")>System.currentTimeMillis()/1000) {
-        OutlinedTextField(text,{text=it.take(4000)},label={Text("Message")},modifier=Modifier.fillMaxWidth(),maxLines=5)
-        Action("Send",!a.busy && text.isNotBlank() && !c.optBoolean("pending")){val body=text;a.contactAction({send(id,body)}){text=""}}
-        if(owner)TextButton({end=true},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("End access")}
+        if(end) {
+            // Keep confirmation inside the secured Activity. A separate Dialog window
+            // would correctly trigger the app's conceal-on-focus-loss protection.
+            Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text("End access?",fontSize=21.sp,fontWeight=FontWeight.Medium)
+                Text("This person will no longer be able to send or fetch messages through this relationship. Copies they already made cannot be removed.",fontSize=15.sp)
+                Action("End access",!a.busy){end=false;a.contactAction({decide(id,"REVOKED")})}
+                TextButton({end=false},modifier=Modifier.heightIn(min=48.dp)){Text("Keep access")}
+            }}
+        } else {
+            OutlinedTextField(text,{text=it.take(4000)},label={Text("Message")},modifier=Modifier.fillMaxWidth(),maxLines=5)
+            Action("Send",!a.busy && text.isNotBlank() && !c.optBoolean("pending")){val body=text;a.contactAction({send(id,body)}){text=""}}
+            if(owner)TextButton({end=true},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("End access")}
+        }
     }
-    if(end)AlertDialog(onDismissRequest={end=false},title={Text("End access?")},text={Text("This person will no longer be able to send or fetch messages through this relationship. Copies they already made cannot be removed.")},confirmButton={TextButton({end=false;a.contactAction({decide(id,"REVOKED")})}){Text("End access")}},dismissButton={TextButton({end=false}){Text("Keep access")}})
     TextButton({details=!details},modifier=Modifier.heightIn(min=48.dp)){Text(if(details)"Hide details" else "Contact details")}
     if(details) {
         Text("Compare every group with your contact through a trusted channel. A name or shared link alone does not verify a person.",fontSize=14.sp)

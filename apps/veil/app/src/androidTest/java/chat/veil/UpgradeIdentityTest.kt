@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.File
 import java.security.MessageDigest
 
-/** Run this test APK against v5, install v6 -r, run again; never uninstall between stages. */
+/** Run against v5, install actual v6 -r, then v7 -r, verifying each transition; never uninstall between stages. */
 class UpgradeIdentityTest {
     @Test fun stage() {
         val args=InstrumentationRegistry.getArguments();val stage=args.getString("upgradeStage") ?: return
@@ -37,6 +37,10 @@ class UpgradeIdentityTest {
             assertEquals("preserve-existing-purpose-vault",Vault(context,"purposes.v1").read().getString("upgrade_fixture"))
             val pair=Vault(context).read();val sealed=SignalSession(pair.getJSONObject("sender")).encrypt("After update".toByteArray())
             assertEquals("After update",String(SignalSession(pair.getJSONObject("receiver")).decrypt(sealed)))
+            // Persist ratchet progression and the next upgrade's expected encrypted bytes.
+            Vault(context).write(pair)
+            listOf("vault.v1","purposes.v1","identity.v1").forEach{before.put(it,vaultHash(it))}
+            proof.writeText(before.toString())
         }
         println("PASS upgrade $stage: encrypted vaults, ownership/controller keys and established Signal session; no private values printed")
     }

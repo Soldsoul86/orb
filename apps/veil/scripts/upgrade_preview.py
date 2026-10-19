@@ -12,6 +12,8 @@ def stage(name):
     if 'OK (1 test)' not in output:raise RuntimeError(output)
     print('PASS preview upgrade:',name,flush=True)
 stage('seed')
-run('adb','install','-r',str(root/'app/build/outputs/apk/debug/app-debug.apk'))
-stage('check')
-print('PASS v5 -> v6 update without uninstall; keys, three encrypted vaults and existing Signal session preserved')
+for apk,label in [(root/'previous-v6/veil-purposes-preview.apk','actual distributed v6'),(root/'app/build/outputs/apk/debug/app-debug.apk','v7')]:
+    run('adb','install','-r',str(apk))
+    stage('check')
+    print('PASS upgrade to',label,flush=True)
+print('PASS v5 -> v6 -> v7 updates without uninstall; keys, three encrypted vaults and continuing Signal ratchet preserved')
