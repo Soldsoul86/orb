@@ -349,6 +349,7 @@ class PortableSession(
         val drafts=db.optJSONObject("ux_drafts") ?: JSONObject().also{db.put("ux_drafts",it)}
         val id=if(drafts.has(draft))drafts.getString(draft) else createFacet(p,origin,false).also {drafts.put(draft,it);commit()}
         val f=facet(id)
+        if(!same(payload(f).getJSONObject("policy"),p.json()))throw InvitationRulesChanged()
         if(!f.has("ux"))f.put("ux",JSONObject().put("kind",kind.name).put("token",Core.secret()).put("expires",clock()+ContactExperience.WEEK).put("access_seconds",ContactExperience.accessSeconds(kind)).put("ready",false)).also{commit()}
         return resumeInvitation(id)
     }

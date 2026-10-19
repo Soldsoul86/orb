@@ -41,7 +41,7 @@ class ContactUiTest {
         ui.onNodeWithText("Timezone, for example Asia/Kolkata").assertExists()
         ui.onNodeWithText("Cancel changes").performScrollTo().performClick()
         ui.onNodeWithText("Settings").performClick();capture("after-settings")
-        ui.onNodeWithText("Back up my identity").assertExists();ui.onNodeWithText("Move my identity").assertExists()
+        ui.onNodeWithText("Back up my identity").assertIsDisplayed();ui.onNodeWithText("Move my identity").assertExists()
         ui.onNodeWithText("Discover").assertDoesNotExist()
     }
     @Test fun invalidLinkDoesNotCreateRequestOrIdentity() {

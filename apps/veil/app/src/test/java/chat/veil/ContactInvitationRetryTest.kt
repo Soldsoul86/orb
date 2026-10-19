@@ -47,6 +47,8 @@ class ContactInvitationRetryTest {
             val owner=a.resumeInvitation(savedOwner);val link=a.invitationLink(owner)
             assertEquals(owner,a.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,origin=origin))
             assertEquals(wallet,a.snapshot().getString("wallet_id"));assertEquals(1,a.snapshot().getJSONArray("facets").length())
+            assertTrue(runCatching{a.prepareInvitation(draft,ContactExperience.Kind.TEMPORARY,ContactExperience.policy(ContactExperience.Kind.TEMPORARY).copy(start=600,end=900),origin)}.exceptionOrNull() is InvitationRulesChanged)
+            assertEquals(link,a.invitationLink(owner));assertEquals(1,a.snapshot().getJSONArray("facets").length())
             val requestId="4".repeat(32);lose="reserve"
             assertTrue(runCatching{b.requestInvitation(link,"A retry-safe introduction",requestId)}.isFailure)
             b=PortableSession(savedB,{savedB=JSONObject(it.toString())},::post);lose="intro"

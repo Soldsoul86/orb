@@ -54,7 +54,7 @@ class ContactLiveUiTest {
                     if(!chooser)Thread.sleep(100)
                 }
                 assertTrue("Real Android Sharesheet opened",chooser)
-                println("MEASURED: three taps from unlocked Chats to real Android Sharesheet; elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-began)+" including HTTPS publication")
+                write("timing",(android.os.SystemClock.elapsedRealtime()-began).toString())
                 ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("input keyevent BACK")).use{it.readBytes()}
                 Thread.sleep(500);unlock()
                 val f=ui.activity.portableSnapshot!!.getJSONArray("facets").getJSONObject(0)
@@ -65,7 +65,8 @@ class ContactLiveUiTest {
                 // Exercise the same exported ACTION_VIEW handler used by Android App Links.
                 val link=read("link")
                 ui.runOnIdle{instrumentation.callActivityOnNewIntent(ui.activity,Intent(Intent.ACTION_VIEW,Uri.parse(link)))}
-                ui.waitUntil(120000){ui.activity.contactPreview!=null && !ui.activity.busy}
+                try {ui.waitUntil(120000){ui.activity.contactPreview!=null && !ui.activity.busy}}
+                catch(e:Throwable){throw AssertionError("Preview did not appear: unlocked=${ui.activity.unlocked}, busy=${ui.activity.busy}, page=${ui.activity.contactPage}, notice=${ui.activity.portableNotice}",e)}
                 capture("preview")
                 ui.onNodeWithText("Introduce yourself").performScrollTo().performTextInput("Hello from the live contact test")
                 ui.onNodeWithText("Request contact").performScrollTo().performClick();idle()

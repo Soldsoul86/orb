@@ -41,6 +41,8 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
     val s=a.portableSnapshot
     val facets=contactEntries(s?.optJSONArray("facets"));val contacts=contactEntries(s?.optJSONArray("contacts"))
     val page=a.contactPage
+    val scroll=rememberScrollState()
+    LaunchedEffect(page,a.section){scroll.scrollTo(0)}
     BackHandler(page!="home") {a.dismissContactLink()}
     if(page in setOf("backup","import","advanced","migrate","address","oldchat")) {
         val advancedPage=when(page){"advanced"->"home";"address"->"card";"oldchat"->"chat";else->page}
@@ -48,7 +50,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
         return
     }
     LaunchedEffect(Unit) {if(s==null && !a.busy)a.contactAction({})}
-    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         if(page!="home")TextButton({a.dismissContactLink()},modifier=Modifier.heightIn(min=48.dp)){Text("‹ Back",fontSize=16.sp)}
         if(a.portableNotice.isNotBlank())Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.medium) {
             Text(a.portableNotice,Modifier.padding(14.dp),fontSize=14.sp,color=MaterialTheme.colorScheme.onSecondaryContainer)

@@ -66,7 +66,7 @@ class MainActivity : FragmentActivity() {
     private var pendingQr: Uri? = null
     private val qrPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         pendingQr = uri
-        if (unlocked) { importPurposeEntry(); importContactEntry() }
+        if (unlocked) importPurposeEntry()
     }
     private lateinit var curtain: View
     private val mutex = processMutex
@@ -111,7 +111,7 @@ class MainActivity : FragmentActivity() {
     }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent); capturePurposeLink(intent)
-        if (unlocked) importPurposeEntry()
+        if (unlocked) {importPurposeEntry();importContactEntry()}
     }
     private fun capturePurposeLink(intent: Intent?) {
         val data = intent?.data ?: return
@@ -316,7 +316,7 @@ class MainActivity : FragmentActivity() {
                 busy=false
                 result.onSuccess { (operation,snap,_) ->
                     portableSnapshot=snap
-                    operation.onSuccess(done).onFailure {portableNotice="Could not finish. Check your connection, invitation expiry or contact hours, then retry. Your identity is safe."}
+                    operation.onSuccess(done).onFailure {portableNotice=if(it is InvitationRulesChanged)"This invitation already has saved rules. Resume it from Reach me, or start a new contact to choose different rules." else "Could not finish. Check your connection, invitation expiry or contact hours, then retry. Your identity is safe."}
                     readPortableFile()
                 }.onFailure {portableNotice="Your saved identity could not be opened. Nothing has been reset."}
             }

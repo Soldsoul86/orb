@@ -6,6 +6,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+class InvitationRulesChanged : IllegalStateException()
+
 /** Presentation defaults; authorization remains in the existing signed policy/provider. */
 object ContactExperience {
     const val DEFAULT_PROVIDER="https://veil-relay-soldsoul86.onrender.com"
