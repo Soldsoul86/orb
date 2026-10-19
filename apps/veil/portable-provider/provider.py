@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'relay'))
 from purpose_policy import validate as validate_policy, is_open
 from server import BoundedHTTPServer
+import invitations
 from open_verifier import PREFIX, encode, decode, state, verify, public_id, strict_json
 
 HEX = re.compile(r'^[a-f0-9]{32}$')
@@ -36,9 +37,12 @@ class Denied(Exception):
 
 
 class Provider:
-    def __init__(self, database, service_origin, local=False, clock=time.time):
+    def __init__(self, database, service_origin, local=False, clock=time.time, database_url=None):
         self.origin = origin(service_origin, local); self.local = local; self.clock = clock
-        self.db = sqlite3.connect(database, check_same_thread=False)
+        if database_url:
+            from portable_postgres import PortablePostgres
+            self.db=PortablePostgres(database_url)
+        else: self.db = sqlite3.connect(database, check_same_thread=False)
         self.lock = threading.RLock()
         self.db.executescript('''PRAGMA journal_mode=WAL; PRAGMA secure_delete=ON;
           CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY);
@@ -52,6 +56,7 @@ class Provider:
           CREATE TABLE IF NOT EXISTS messages(grant_id TEXT,id TEXT,sender TEXT,body TEXT,expires INTEGER,PRIMARY KEY(grant_id,id));
           CREATE TABLE IF NOT EXISTS receipts(grant_id TEXT,id TEXT,digest TEXT,expires INTEGER,PRIMARY KEY(grant_id,id));
         ''')
+        self.db.executescript(invitations.SCHEMA)
 
     def limit(self, bucket, n, seconds, now):
         key = bucket + ':' + str(now//seconds)
@@ -61,6 +66,7 @@ class Provider:
         else: self.db.execute('INSERT INTO limits VALUES(?,1,?)', (key, (now//seconds+1)*seconds))
 
     def clean(self, now):
+        self.db.execute("UPDATE contacts SET status='EXPIRED' WHERE status IN ('RESERVED','PENDING') AND id IN (SELECT c.contact_id FROM invitation_contacts c JOIN invitations i ON c.digest=i.digest WHERE i.expires<=? OR i.canceled=1)",(now,))
         self.db.execute('DELETE FROM nonces WHERE expires<=?', (now,))
         self.db.execute('DELETE FROM limits WHERE expires<=?', (now,))
         for table in ('messages', 'receipts'): self.db.execute(f'DELETE FROM {table} WHERE expires<=?', (now,))
@@ -98,6 +104,11 @@ class Provider:
         with self.lock, self.db:
             now = int(self.clock()); self.clean(now)
             try:
+                if path == '/v3/invite-preview':
+                    self.limit('preview',600,60,now)
+                    result=invitations.preview(self,data['token'],now)
+                    if result is None:raise Denied(410)
+                    return 200,result
                 if path == '/v3/nonce':
                     self.limit('nonce', 600, 60, now)
                     if self.db.execute('SELECT count(*) FROM nonces').fetchone()[0] >= 2048: raise Denied(429)
@@ -148,11 +159,19 @@ class Provider:
     def describe(self, r, actor):
         owner,owner_token=self.get_state(r[1]);_,peer_token=self.get_state(r[2])
         slot=self.db.execute('SELECT token FROM slots WHERE owner=? AND id=?',(r[1],r[4])).fetchone()
-        return {'id':r[0],'owner':r[1],'peer':r[2],'epoch':r[3],'slot':slot[0], 'channel':r[5],
+        result={'id':r[0],'owner':r[1],'peer':r[2],'epoch':r[3],'slot':slot[0], 'channel':r[5],
                 'grant':r[6],'status':r[7], 'owner_state':owner_token,'peer_state':peer_token}
+        invite=invitations.access(self,r[0],int(self.clock()))
+        if invite:result.update(invitation_expires=invite[0],access_seconds=invite[1],invitation_canceled=bool(invite[2]))
+        return result
 
     def command(self,s,q,now):
         actor=s['id'];op=q['op']
+        if op=='invite':
+            self.active(s,now)
+            if s['route']!=self.origin:raise Denied()
+            return invitations.create(self,actor,q,now)
+        if op=='cancel_invite':return invitations.cancel(self,actor,q['token'])
         if op=='publish':
             if s['route']!=self.origin: raise Denied()
             public=s['policy']['discovery_mode']=='PUBLIC_SEARCHABLE'
@@ -191,7 +210,13 @@ class Provider:
         if op=='reserve':
             target,target_token=self.get_state(q['target']);p=self.active(target,now)
             if target['route']!=self.origin or target['id']==actor or p['contact_request_mode']=='DISABLED': raise Denied()
-            if p['discovery_mode']=='UNLISTED' and q.get('invitation')!=target_token: raise Denied(404)
+            invite=None
+            if self.db.execute('SELECT 1 FROM invitations WHERE owner=?',(target['id'],)).fetchone() and not q.get('invitation_token'):raise Denied(410)
+            if q.get('invitation_token'):
+                invite=invitations.preview(self,q['invitation_token'],now)
+                if invite is None:raise Denied(410)
+                if state(invite['state'])['id']!=target['id']:raise Denied()
+            if p['discovery_mode']=='UNLISTED' and not invite and q.get('invitation')!=target_token: raise Denied(404)
             gid=q['id']
             if not HEX.fullmatch(gid): raise ValueError()
             existing=self.db.execute('SELECT peer,owner FROM contacts WHERE id=?',(gid,)).fetchone()
@@ -203,6 +228,11 @@ class Provider:
                 if self.db.execute('SELECT count(*) FROM contacts').fetchone()[0]>=10000: raise Denied(503)
                 slot,_=self.allocate(target['id'],target['epoch'])
                 self.db.execute('INSERT INTO contacts VALUES(?,?,?,?,?,NULL,NULL,?,?,?)',(gid,target['id'],actor,target['epoch'],slot,'RESERVED',now+600,now))
+            if invite:
+                previous=self.db.execute('SELECT digest FROM invitation_contacts WHERE contact_id=?',(gid,)).fetchone()
+                d=invitations.digest(q['invitation_token'])
+                if previous and previous[0]!=d:raise Denied(409)
+                if not previous:self.db.execute('INSERT INTO invitation_contacts VALUES(?,?)',(gid,d))
             r,_=self.contact(gid,actor,now);return self.describe(r,actor)
         if op=='restore':
             # Only the unchanged controller can reintroduce its signed grants.
@@ -221,6 +251,8 @@ class Provider:
             return {'contacts':[self.describe(r,actor) for r in rows]}
         r,owner=self.contact(q['id'],actor,now)
         if op=='contact': return self.describe(r,actor)
+        invite_access=invitations.access(self,r[0],now)
+        if invite_access and r[7] in ('RESERVED','PENDING') and (invite_access[0]<=now or invite_access[2]):raise Denied(410)
         p=owner['policy'] if op=='decision' else self.active(owner,now)
         if op=='decision' and actor==r[1] and r[6] and verify(q['grant'],r[1],'pi-grant+jws')==verify(r[6],r[1],'pi-grant+jws'):
             return {}  # Safe retry after a successful terminal decision with a lost response.
@@ -234,6 +266,7 @@ class Provider:
             g=verify(q['grant'],r[1],'pi-grant+jws')
             if actor!=r[1] or g.get('iss')!=actor or g.get('aud')!=r[2] or g.get('id')!=r[0] or g.get('status') not in ('APPROVED','REVOKED','REJECTED','BLOCKED'): raise Denied()
             if type(g.get('expires')) is not int or not now<g['expires']<=now+90*86400 or type(g.get('revision')) is not int: raise ValueError()
+            if invite_access and g['status']=='APPROVED' and g['expires']>now+invite_access[1]:raise Denied()
             previous=verify(r[6],r[1],'pi-grant+jws') if r[6] else None
             if previous and (g['revision']<previous['revision'] or (g['revision']==previous['revision'] and g!=previous)): raise Denied(409)
             self.db.execute('UPDATE contacts SET grant_token=?,status=?,expires=?,activity=? WHERE id=?',(q['grant'],g['status'],g['expires'],now,r[0]))

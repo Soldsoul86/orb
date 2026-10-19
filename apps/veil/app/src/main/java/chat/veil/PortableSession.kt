@@ -106,9 +106,10 @@ class PortableSession(
         val result=call(facet(asFacet),origin,q("search").put("query",query)).getJSONArray("states")
         return (0 until result.length()).map {result.getString(it)}.onEach {validateState(it)}.map {JSONObject().put("v",1).put("state",it).toString()}
     }
-    fun request(asFacet:String,card:String,text:String):String {
-        val token=JSONObject(card).getString("state");val owner=validateState(token);val f=facet(asFacet);val id=fresh()
-        val result=call(f,owner.getString("route"),q("reserve").put("id",id).put("target",owner.getString("id")).put("invitation",token))
+    fun request(asFacet:String,card:String,text:String,invitationToken:String?=null,requestId:String?=null):String {
+        val token=JSONObject(card).getString("state");val owner=validateState(token);val f=facet(asFacet);val id=requestId ?: fresh()
+        if(contacts().has(id)){val existing=contact(id);require(existing.getString("local")==asFacet);adopt(existing,call(f,existing.getString("route"),q("contact").put("id",id)));bind(existing);if(existing.has("outbox"))flush(existing) else if(existing.getString("status")=="RESERVED")send(id,text,true);return id}
+        val result=call(f,owner.getString("route"),q("reserve").put("id",id).put("target",owner.getString("id")).put("invitation",token).apply {if(invitationToken!=null)put("invitation_token",invitationToken)})
         val c=JSONObject().put("id",id).put("local",asFacet).put("owner",owner.getString("id")).put("peer",asFacet)
             .put("owner_state",token).put("route",owner.getString("route")).put("messages",JSONArray()).put("seen",JSONArray()).put("status","RESERVED")
         contacts().put(id,c);commit();adopt(c,result);bind(c);send(id,text,true);return id
@@ -150,6 +151,7 @@ class PortableSession(
             }
             c.put("grant",r.getString("grant"))
         } else require(!c.has("grant"))
+        if(r.has("invitation_expires"))c.put("invitation_expires",r.getLong("invitation_expires")).put("access_seconds",r.getLong("access_seconds"))
         c.put("owner_state",r.getString("owner_state")).put("peer_state",r.getString("peer_state")).put("slot",slot.getString("slot")).put("slot_token",r.getString("slot")).put("status",r.getString("status"))
         if(c.getString("local")==c.getString("owner")) {
             require(values(contacts()).none {it.getString("id")!=c.getString("id") && it.getString("owner")==c.getString("owner") && it.optString("slot")==slot.getString("slot")}) {"Prekey slot reuse"}
@@ -180,11 +182,11 @@ class PortableSession(
         }
         call(f,c.getString("route"),q("bind").put("id",c.getString("id")).put("channel",c.getString("channel")))
     }
-    fun decide(id:String,status:String) {
+    fun decide(id:String,status:String,accessSeconds:Long?=null) {
         val c=contact(id);val f=facet(c.getString("local"));require(f.getString("id")==c.getString("owner"))
         val rev=if(c.has("grant"))grant(c.getString("grant"),c.getString("owner"),c.getString("peer"),id).getLong("revision")+1 else 1
         val g=JSONObject().put("v",1).put("iss",c.getString("owner")).put("aud",c.getString("peer")).put("id",id)
-            .put("status",status).put("revision",rev).put("expires",clock()+90*86400)
+            .put("status",status).put("revision",rev).put("expires",clock()+minOf(accessSeconds ?: 90*86400L,c.optLong("access_seconds",90*86400L),f.optJSONObject("ux")?.optLong("access_seconds",90*86400L) ?: 90*86400L))
         require(status in setOf("APPROVED","REVOKED","REJECTED","BLOCKED"))
         val token=Core.sign(g,f.getJSONObject("controller"),Core.GRANT)
         // Revocation is locally effective before any network request. A failed publication is visible.
@@ -340,13 +342,50 @@ class PortableSession(
         adopt(c,call(f,c.getString("route"),q("contact").put("id",id)));bind(c);c.remove("needs_migration");commit()
     }
     /** Public/display-only snapshot. Never return controller/device keys or Signal state to UI. */
+    fun prepareInvitation(draft:String,kind:ContactExperience.Kind,p:PurposePolicy=ContactExperience.policy(kind),origin:String=ContactExperience.DEFAULT_PROVIDER):String {
+        require(draft.matches(Regex("[a-f0-9]{32}")))
+        require(p.discovery==DiscoveryMode.UNLISTED && p.requests==RequestMode.REQUEST_APPROVAL && p.expiresAt==0L)
+        if(!ready())createIdentity()
+        val drafts=db.optJSONObject("ux_drafts") ?: JSONObject().also{db.put("ux_drafts",it)}
+        val id=if(drafts.has(draft))drafts.getString(draft) else createFacet(p,origin,false).also {drafts.put(draft,it);commit()}
+        val f=facet(id)
+        if(!f.has("ux"))f.put("ux",JSONObject().put("kind",kind.name).put("token",Core.secret()).put("expires",clock()+ContactExperience.WEEK).put("access_seconds",ContactExperience.accessSeconds(kind)).put("ready",false)).also{commit()}
+        val x=f.getJSONObject("ux");require(!x.optBoolean("canceled") && x.getLong("expires")>clock()) {"Invitation expired. Create a new contact."}
+        publish(id)
+        call(f,payload(f).getString("route"),q("invite").put("token",x.getString("token")).put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")))
+        x.put("ready",true);commit();return id
+    }
+    fun invitationLink(id:String):String {
+        val f=facet(id);val x=f.getJSONObject("ux");require(x.getBoolean("ready") && !x.optBoolean("canceled") && x.getLong("expires")>clock())
+        return ContactExperience.link(payload(f).getString("route"),x.getString("token"))
+    }
+    fun cancelInvitation(id:String) {
+        val f=facet(id);val x=f.getJSONObject("ux")
+        x.put("canceled",true).put("cancel_pending",true);commit()
+        call(f,payload(f).getString("route"),q("cancel_invite").put("token",x.getString("token")))
+        x.put("cancel_pending",false);commit()
+    }
+    fun previewInvitation(link:String):JSONObject {
+        val (route,token)=ContactExperience.parse(link)
+        val result=transport(route,"/v3/invite-preview",JSONObject().put("token",token))
+        val s=validateState(result.getString("state"));require(s.getString("route")==route && result.getLong("expires")>clock())
+        require(result.getLong("access_seconds") in 3600..90*86400L)
+        return result.put("policy",s.getJSONObject("policy"))
+    }
+    fun requestInvitation(link:String,text:String,draft:String):String {
+        val result=previewInvitation(link);val (route,token)=ContactExperience.parse(link)
+        if(!ready())createIdentity()
+        val requests=db.optJSONObject("ux_requests") ?: JSONObject().also{db.put("ux_requests",it)}
+        val local=if(requests.has(draft))requests.getString(draft) else createFacet(PurposePolicy("Private contact",timezone=ZoneId.systemDefault().id),route,false).also{requests.put(draft,it);commit()}
+        return request(local,JSONObject().put("v",1).put("state",result.getString("state")).toString(),text,token,draft)
+    }
     fun snapshot():JSONObject {
         if(!ready())return JSONObject().put("ready",false)
         values(contacts()).forEach(::trim);commit()
         return JSONObject().put("ready",true).put("wallet_id",Core.id(db.getJSONObject("wallet")))
-            .put("facets",JSONArray(values(facets()).map {f -> payload(f).put("published",f.optBoolean("published")).put("needs_migration",f.optBoolean("needs_migration")).put("card",card(f.getString("id")))}))
+            .put("facets",JSONArray(values(facets()).map {f -> payload(f).put("published",f.optBoolean("published")).put("needs_migration",f.optBoolean("needs_migration")).put("card",card(f.getString("id"))).apply {f.optJSONObject("ux")?.let {x -> put("invitation",JSONObject().put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")).put("ready",x.optBoolean("ready")).put("canceled",x.optBoolean("canceled")).put("cancel_pending",x.optBoolean("cancel_pending")).put("link",if(x.optBoolean("ready") && !x.optBoolean("canceled") && x.getLong("expires")>clock())invitationLink(f.getString("id")) else ""))}}}))
             .put("contacts",JSONArray(values(contacts()).map {c -> JSONObject().put("id",c.getString("id")).put("local",c.getString("local")).put("owner",c.getString("owner")).put("peer",c.getString("peer"))
-                .put("status",c.getString("status")).put("route",c.getString("route")).put("policy",validateState(c.getString("owner_state")).getJSONObject("policy"))
+                .put("status",c.getString("status")).put("access_expires",if(c.has("grant"))grant(c.getString("grant"),c.getString("owner"),c.getString("peer"),c.getString("id")).getLong("expires") else 0).put("invitation_expires",c.optLong("invitation_expires")).put("access_seconds",c.optLong("access_seconds",90*86400L)).put("route",c.getString("route")).put("policy",validateState(c.getString("owner_state")).getJSONObject("policy"))
                 .put("messages",c.getJSONArray("messages")).put("pending",c.has("outbox") || c.optBoolean("decision_pending")).put("needs_migration",c.optBoolean("needs_migration"))
                 .put("safety",if(c.optJSONObject("signal")?.has("peer")==true) safetyNumber(c.getJSONObject("signal").getString("publicIdentity"),c.getJSONObject("signal").getJSONObject("peer").getString("identity")) else "")
             }))

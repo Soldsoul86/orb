@@ -22,15 +22,15 @@ private fun entries(a:JSONArray?):List<JSONObject> = if(a==null)emptyList() else
 private val PortableMuted=Color(0xFF91A5AF)
 
 /** No private keys are supplied to this composition. Recovery secret exists only while unlocked. */
-@Composable fun ColumnScope.PortableHome(a:MainActivity) {
+@Composable fun ColumnScope.PortableHome(a:MainActivity, startPage:String="home", startSelected:String="", onExit:(()->Unit)?=null) {
     val s=a.portableSnapshot
-    var page by remember {mutableStateOf("home")}
-    var selected by remember {mutableStateOf("")}
+    var page by remember {mutableStateOf(startPage)}
+    var selected by remember {mutableStateOf(startSelected)}
     var editor by remember {mutableStateOf<PurposeFacet?>(null)}
     var origin by remember {mutableStateOf("")}
     var card by remember {mutableStateOf("")}
     var introduction by remember {mutableStateOf("")}
-    var recovery by remember {mutableStateOf("")}
+    var recovery by remember {mutableStateOf(if(startPage=="backup")Core.secret() else "")}
     var keyAgain by remember {mutableStateOf("")}
     var backedUp by remember {mutableStateOf(false)}
     var results by remember {mutableStateOf<List<String>>(emptyList())}
@@ -38,6 +38,7 @@ private val PortableMuted=Color(0xFF91A5AF)
     LaunchedEffect(Unit) {a.portableAction()}
     BackHandler(page!="home") {page="home";recovery="";keyAgain="";problem=""}
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        if(onExit!=null)TextButton(onExit){Text("‹ Settings")}
         if(page!="home")TextButton({page="home";recovery="";keyAgain="";problem=""}) {Text("‹ My identity")}
         if(a.portableNotice.isNotBlank())Text(a.portableNotice,color=Color(0xFFFFD5A0),fontSize=12.sp)
         if(problem.isNotEmpty())Text(problem,color=Color(0xFFFFD5A0),fontSize=12.sp)
@@ -61,7 +62,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 }
             }
             "backup" -> {
-                Text("Keep your identity",fontSize=28.sp)
+                Text("Back up my identity",fontSize=28.sp)
                 Text("This backup preserves identity control and signed relationships. It does not contain chat history, live Signal sessions or old pending messages.",color=PortableMuted)
                 Text("Write this recovery key somewhere safe, separately from the backup. Anyone with both can control these identities. We cannot reset it.",color=Color(0xFFFFD5A0))
                 Text(recovery,fontFamily=FontFamily.Monospace,fontSize=16.sp)
@@ -76,7 +77,7 @@ private val PortableMuted=Color(0xFF91A5AF)
                 Button(a::choosePortableFile,enabled=!a.busy){Text("Choose encrypted package")}
                 Text(a.portableFileName,color=PortableMuted)
                 OutlinedTextField(recovery,{recovery=it.take(100)},label={Text("Recovery key")},visualTransformation=PasswordVisualTransformation(),modifier=Modifier.fillMaxWidth())
-                Button({val encrypted=a.portableBackup;val key=recovery;a.portableAction {importIdentity(encrypted,key)};recovery="";page="home"},enabled=!a.busy && a.portableBackup.isNotEmpty() && recovery.length==43){Text("Restore control")}
+                Button({val encrypted=a.portableBackup;val key=recovery;a.portableAction {importIdentity(encrypted,key)};recovery="";page="home"},enabled=!a.busy && a.portableBackup.isNotEmpty() && recovery.length==43){Text("Restore my identity")}
                 Text("An old backup can omit later revocations. Review every grant before moving a purpose. Existing personal chats and earlier pilot data are not overwritten.",color=Color(0xFFFFD5A0),fontSize=12.sp)
             }
             "connect" -> {
@@ -101,8 +102,8 @@ private val PortableMuted=Color(0xFF91A5AF)
                 val f=facets.firstOrNull {it.getString("id")==selected}
                 if(f!=null) {
                     var consent by remember {mutableStateOf(false)}
-                    Text("Replace this provider",fontSize=28.sp)
-                    Text("Your purpose key stays the same. Approved, unexpired grants move; old messages do not. Contacts need your new signed route card through another trusted channel, then must explicitly accept fresh Signal sessions.",color=PortableMuted)
+                    Text("Move my identity",fontSize=28.sp)
+                    Text("Your identity stays yours. Old messages do not move. After moving, send your new contact address to each person through another trusted channel. They must accept it to reconnect; this is not automatic.",color=PortableMuted)
                     Text("Current provider: ${f.getString("route")}",fontSize=12.sp)
                     OutlinedTextField(origin,{origin=it.take(2000)},label={Text("New provider HTTPS origin")},modifier=Modifier.fillMaxWidth())
                     Text(PurposePolicy.from(f.getJSONObject("policy")).summary(),color=PortableMuted,fontSize=12.sp)
@@ -114,9 +115,9 @@ private val PortableMuted=Color(0xFF91A5AF)
                 val f=facets.firstOrNull {it.getString("id")==selected}
                 if(f!=null) {
                     val value=f.getString("card")
-                    Text("Your signed purpose card",fontSize=26.sp)
+                    Text("Your new contact address",fontSize=26.sp)
                     Text("Share privately. It contains this purpose’s name, rules, key and route. It never includes your wallet key or other purposes.",color=PortableMuted)
-                    Button({a.sharePurpose(value)}){Text("Share invitation / new route")}
+                    Button({a.sharePurpose(value)}){Text("Send new contact address")}
                     val bitmap=remember(value){runCatching {PurposeQr.renderPortable(value)}.getOrNull()}
                     if(bitmap!=null) {
                         DisposableEffect(bitmap){onDispose {bitmap.recycle()}}

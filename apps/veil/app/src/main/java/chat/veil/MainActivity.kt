@@ -32,6 +32,12 @@ class MainActivity : FragmentActivity() {
     var attachment by mutableStateOf<Pair<String, ByteArray>?>(null); private set
     var invitation by mutableStateOf(""); private set
     var section by mutableStateOf(0)
+    var contactPage by mutableStateOf("home")
+    var contactSelected by mutableStateOf("")
+    var contactDraft by mutableStateOf(java.util.UUID.randomUUID().toString().replace("-",""))
+    var contactPreview by mutableStateOf<org.json.JSONObject?>(null); private set
+    var contactIncoming by mutableStateOf(""); private set
+    private var pendingContactLink: String? = null
     var portableScreen by mutableStateOf(true)
     var portableSnapshot by mutableStateOf<org.json.JSONObject?>(null); private set
     var portableNotice by mutableStateOf(""); private set
@@ -60,7 +66,7 @@ class MainActivity : FragmentActivity() {
     private var pendingQr: Uri? = null
     private val qrPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         pendingQr = uri
-        if (unlocked) importPurposeEntry()
+        if (unlocked) { importPurposeEntry(); importContactEntry() }
     }
     private lateinit var curtain: View
     private val mutex = processMutex
@@ -79,6 +85,10 @@ class MainActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         if (Build.VERSION.SDK_INT >= 31) window.setHideOverlayWindows(true)
         if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
+        contactPage=savedInstanceState?.getString("contactPage") ?: "home"
+        contactSelected=savedInstanceState?.getString("contactSelected") ?: ""
+        contactDraft=savedInstanceState?.getString("contactDraft") ?: contactDraft
+        section=savedInstanceState?.getInt("section") ?: 0
         setContent { VeilApp(this) }
         curtain = android.widget.TextView(this).apply {
             text = "Veil is locked\n\nTap to unlock"
@@ -93,6 +103,12 @@ class MainActivity : FragmentActivity() {
         addContentView(curtain, FrameLayout.LayoutParams(-1, -1))
         capturePurposeLink(intent)
     }
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Navigation and random operation IDs only; no links, text or recovery secrets.
+        outState.putString("contactPage",contactPage);outState.putString("contactSelected",contactSelected)
+        outState.putString("contactDraft",contactDraft);outState.putInt("section",section)
+        super.onSaveInstanceState(outState)
+    }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent); capturePurposeLink(intent)
         if (unlocked) importPurposeEntry()
@@ -100,6 +116,8 @@ class MainActivity : FragmentActivity() {
     private fun capturePurposeLink(intent: Intent?) {
         val data = intent?.data ?: return
         if (intent.action != Intent.ACTION_VIEW) return
+        val contact = if(data.scheme=="veil-contact" && data.host=="open")data.getQueryParameter("link") else data.toString()
+        if(contact!=null && runCatching {ContactExperience.parse(contact)}.isSuccess) {pendingContactLink=contact;return}
         val candidate = if (data.scheme == "veil-purpose" && data.host == "open") data.getQueryParameter("link") else data.toString()
         if (candidate != null && candidate.length <= 500) pendingPurposeLink = candidate
     }
@@ -128,6 +146,7 @@ class MainActivity : FragmentActivity() {
         invitation = ""; snapshot = null; notice = ""
         purposeSnapshot = null; purposeListings = emptyList(); purposeTarget = null; purposeNotice = ""; purposeLinkInput = ""
         portableSnapshot=null;portableNotice="";portableBackup="";portableFileName=""
+        contactPreview=null;contactIncoming=""
         polling?.cancel(); polling = null
     }
     fun unlock() {
@@ -176,6 +195,20 @@ class MainActivity : FragmentActivity() {
                     if (it.second) notice = "Delivery paused. Check the relay connection and storage limits. Queued messages will retry."
                 }.onFailure { notice = "Vault could not be read. Your data has not been reset." }
                 purposeTick++
+                if(purposeTick % 5 == 0 && unlocked && !busy && portableSnapshot?.optBoolean("ready")==true) {
+                    val updated=withContext(Dispatchers.IO) {mutex.withLock {runCatching {
+                        val vault=Vault(this@MainActivity,"identity.v1")
+                        val p=PortableSession(vault.read(),vault::write,{origin,path,data -> RelayClient(origin).request("POST",path,data=data)})
+                        val before=p.snapshot();val facets=before.optJSONArray("facets")
+                        var failed=false
+                        if(facets!=null)for(i in 0 until facets.length()) {
+                            val f=facets.getJSONObject(i)
+                            if(f.optBoolean("published") && !f.optBoolean("needs_migration"))runCatching {p.sync(f.getString("id"))}.onFailure {failed=true}
+                        }
+                        p.snapshot() to failed
+                    }}}
+                    if(unlocked && token==generation)updated.onSuccess {portableSnapshot=it.first;if(it.second)portableNotice="Some conversations could not refresh. Check your connection or contact hours, then retry."}
+                }
                 if (purposeTick % 5 == 0 && unlocked) {
                     val purposes = withContext(Dispatchers.IO) { mutex.withLock { runCatching {
                         val p = PurposeEngine(this@MainActivity)
@@ -217,7 +250,7 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
-    fun refreshPurposes() = purposeAction({ snapshot() }) { purposeSnapshot = it; importPurposeEntry() }
+    fun refreshPurposes() = purposeAction({ snapshot() }) { purposeSnapshot = it; importPurposeEntry(); contactAction({}) {importContactEntry()} }
     fun setupPurposes() = purposeAction({ setup(); snapshot() }) { purposeSnapshot = it }
     fun createPurpose(p: PurposePolicy, consent: Boolean) = purposeAction({ create(p, consent); snapshot() }) { purposeSnapshot = it; section = 2 }
     fun editPurpose(id: String, p: PurposePolicy, consent: Boolean) = purposeAction({ update(id,p,consent); snapshot() }) { purposeSnapshot = it }
@@ -267,6 +300,68 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+    fun <T> contactAction(block: PortableSession.()->T, done: (T)->Unit = {}) {
+        if(!unlocked || busy)return
+        busy=true;portableNotice="";val token=generation
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) {mutex.withLock {
+                runCatching {
+                    val vault=Vault(this@MainActivity,"identity.v1")
+                    val session=PortableSession(vault.read(),vault::write,{origin,path,data -> RelayClient(origin).request("POST",path,data=data)})
+                    val operation=runCatching {session.block()}
+                    Triple(operation,session.snapshot(),Unit)
+                }
+            }}
+            if(unlocked && token==generation) {
+                busy=false
+                result.onSuccess { (operation,snap,_) ->
+                    portableSnapshot=snap
+                    operation.onSuccess(done).onFailure {portableNotice="Could not finish. Check your connection, invitation expiry or contact hours, then retry. Your identity is safe."}
+                    readPortableFile()
+                }.onFailure {portableNotice="Your saved identity could not be opened. Nothing has been reset."}
+            }
+        }
+    }
+    fun newContact() {contactDraft=java.util.UUID.randomUUID().toString().replace("-","");contactPage="new";contactSelected="";portableNotice=""}
+    fun prepareContact(kind:ContactExperience.Kind,p:PurposePolicy) {
+        val draft=contactDraft
+        contactAction({prepareInvitation(draft,kind,p)}) {id -> contactSelected=id;contactPage="invitation";shareContactLink()}
+    }
+    fun shareContactLink() {
+        val fs=portableSnapshot?.optJSONArray("facets") ?: return
+        val f=(0 until fs.length()).map(fs::getJSONObject).firstOrNull {it.getString("id")==contactSelected} ?: return
+        val link=f.optJSONObject("invitation")?.optString("link") ?: return
+        if(!unlocked || link.isBlank())return
+        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {type="text/plain";putExtra(Intent.EXTRA_TEXT,link)},"Share invitation"))
+    }
+    fun copyContactLink(link:String) {
+        if(!unlocked || runCatching{ContactExperience.parse(link)}.isFailure)return
+        val manager=getSystemService(android.content.ClipboardManager::class.java)
+        val clip=android.content.ClipData.newPlainText("Veil invitation",link)
+        if(Build.VERSION.SDK_INT>=33)clip.description.extras=android.os.PersistableBundle().apply {putBoolean("android.content.extra.IS_SENSITIVE",true)}
+        manager.setPrimaryClip(clip);portableNotice="Invitation copied. Only send it to people you choose."
+        android.os.Handler(mainLooper).postDelayed({
+            if(manager.primaryClip?.getItemAt(0)?.text?.toString()==link)manager.clearPrimaryClip()
+        },60_000)
+    }
+    private fun importContactEntry() {
+        val link=pendingContactLink ?: return
+        if(!unlocked || busy)return
+        contactIncoming=link;contactPage="receive";section=0
+        contactAction({previewInvitation(link)}) {contactPreview=it}
+    }
+    fun openContactLink(value:String) {
+        if(runCatching{ContactExperience.parse(value)}.isFailure){portableNotice="This invitation is incomplete. Ask your contact to share it again.";return}
+        pendingContactLink=value.trim();contactDraft=java.util.UUID.randomUUID().toString().replace("-","");importContactEntry()
+    }
+    fun requestContact(text:String) {
+        val link=contactIncoming;val draft=contactDraft
+        contactAction({requestInvitation(link,text,draft)}) {id ->
+            pendingContactLink=null;contactIncoming="";contactPreview=null;contactSelected=id;contactPage="chat";section=0
+            intent.data=null
+        }
+    }
+    fun dismissContactLink() {pendingContactLink=null;contactIncoming="";contactPreview=null;intent.data=null;contactPage="home"}
     fun choosePortableFile() {if(unlocked && !busy)portableOpen.launch(arrayOf("*/*"))}
     private fun readPortableFile() {
         val uri=pendingPortableFile ?: return

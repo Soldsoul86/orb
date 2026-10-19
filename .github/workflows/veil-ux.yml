@@ -1,4 +1,4 @@
-name: Veil UX baseline
+name: Veil contact UX
 on:
   push:
     branches: ['codex/veil-ux']
@@ -37,7 +37,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Unchanged baseline and actual screen evidence
+      - name: Security regressions and contact UI
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -47,14 +47,13 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -memory 1536 -cores 2
           script: |
-            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest --stacktrace
-            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UxBaselineTest -Pandroid.testInstrumentationRunnerArguments.baseline=true --stacktrace
+            gradle -p apps/veil --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.ProtectionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
             mkdir -p apps/veil/ux-evidence
-            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/before.tar
+            adb exec-out run-as chat.veil.purposes.preview tar -C files/ux-evidence -cf - . > apps/veil/ux-evidence/after.tar
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: veil-ux-baseline-reports
+          name: veil-contact-ux-reports
           path: |
             apps/veil/ux-evidence/
             apps/veil/identity-core/build/reports/
