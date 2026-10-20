@@ -29,11 +29,11 @@ class ContactUiTest {
         open();capture("after-chats")
         ui.onNodeWithText("New contact").performClick();capture("after-new-contact")
         ui.onNodeWithText("Temporary").performClick();capture("after-temporary")
-        ui.onNodeWithText("Share invitation").performScrollTo().assertIsEnabled()
+        ui.onNodeWithText("Create QR invitation").performScrollTo().assertIsEnabled()
         ui.onNodeWithText("Invitation expires 7 days after creation.").assertExists()
         ui.onNodeWithText("After you accept a request, access lasts 7 days.").assertExists()
         ui.onNodeWithText("Provider HTTPS origin").assertDoesNotExist()
-        println("UX TAP MAP: Chats -> New contact (1) -> Temporary (2) -> Share invitation CTA (3). Network/share completion measured separately.")
+        println("UX TAP MAP: Chats -> New contact (1) -> Temporary (2) -> Create QR invitation CTA (3). Network/share completion measured separately.")
     }
     @Test fun workAndSettingsHavePlainLabels() {
         open();ui.onNodeWithText("New contact").performClick();ui.onNodeWithText("Work").performClick();capture("after-work")

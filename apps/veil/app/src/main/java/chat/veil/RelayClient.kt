@@ -15,14 +15,19 @@ class RelayClient(url: String) {
         require(parsed.isHttps && parsed.username.isEmpty() && parsed.password.isEmpty() && parsed.query == null && parsed.fragment == null && parsed.encodedPath == "/") { "Use an HTTPS origin, without a path" }
         base = parsed.toString().trimEnd('/')
     }
-    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()
+    companion object {
+        // Reuse TLS connections and allow the hosted relay to wake from idle.
+        // Keep a finite deadline and never follow a capability-bearing redirect.
+        private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS).callTimeout(90, TimeUnit.SECONDS)
+            .followRedirects(false).followSslRedirects(false).build()
+    }
     fun request(method: String, path: String, token: String = "", data: JSONObject? = null): JSONObject {
         val body = if (method == "PUT" || method == "POST") (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null
         val req = Request.Builder().url(base + path).method(method, body)
         if (token.isNotEmpty()) req.header("Authorization", "Bearer $token")
         client.newCall(req.build()).execute().use { response ->
-            check(response.isSuccessful) { "Relay rejected request (${response.code})" }
+            if (!response.isSuccessful) throw RelayRejected(response.code)
             val source = response.body?.source() ?: error("Empty relay response")
             // Reject hostile responses before buffering an unlimited body.
             source.request(12L * 1024 * 1024 + 1)

@@ -316,7 +316,7 @@ class MainActivity : FragmentActivity() {
                 busy=false
                 result.onSuccess { (operation,snap,_) ->
                     portableSnapshot=snap
-                    operation.onSuccess(done).onFailure {portableNotice=if(it is InvitationRulesChanged)"This invitation already has saved rules. Resume it from Reach me, or start a new contact to choose different rules." else "Could not finish. Check your connection, invitation expiry or contact hours, then retry. Your identity is safe."}
+                    operation.onSuccess(done).onFailure {portableNotice=ContactErrors.message(it)}
                     readPortableFile()
                 }.onFailure {portableNotice="Your saved identity could not be opened. Nothing has been reset."}
             }
@@ -325,9 +325,9 @@ class MainActivity : FragmentActivity() {
     fun newContact() {contactDraft=java.util.UUID.randomUUID().toString().replace("-","");contactPage="new";contactSelected="";portableNotice=""}
     fun prepareContact(kind:ContactExperience.Kind,p:PurposePolicy) {
         val draft=contactDraft
-        contactAction({prepareInvitation(draft,kind,p)}) {id -> contactSelected=id;contactPage="invitation";shareContactLink()}
+        contactAction({prepareInvitation(draft,kind,p)}) {id -> contactSelected=id;contactPage="invitation"}
     }
-    fun resumeContact(id:String) = contactAction({resumeInvitation(id)}) {contactSelected=it;contactPage="invitation";shareContactLink()}
+    fun resumeContact(id:String) = contactAction({resumeInvitation(id)}) {contactSelected=it;contactPage="invitation"}
     fun shareContactLink() {
         val fs=portableSnapshot?.optJSONArray("facets") ?: return
         val f=(0 until fs.length()).map(fs::getJSONObject).firstOrNull {it.getString("id")==contactSelected} ?: return

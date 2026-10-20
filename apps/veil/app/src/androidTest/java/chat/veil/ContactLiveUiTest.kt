@@ -14,7 +14,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
-/** Explicit CI opt-in, disposable emulators, real production HTTPS and native Android Sharesheet.
+/** Explicit CI opt-in, disposable emulators, real production HTTPS and the rendered invitation QR.
  * Test-only accepted-auth callback does not exercise the OS biometric matcher.
  */
 class ContactLiveUiTest {
@@ -51,20 +51,27 @@ class ContactLiveUiTest {
             "share" -> {
                 val began=android.os.SystemClock.elapsedRealtime()
                 ui.onNodeWithText("New contact").performClick();ui.onNodeWithText("Temporary").performClick()
-                ui.onNodeWithText("Share invitation").performScrollTo().performClick()
-                // Native chooser takes focus and locks the app; do not synthesize a successful share.
-                val deadline=android.os.SystemClock.elapsedRealtime()+120000
-                var chooser=false
-                while(!chooser && android.os.SystemClock.elapsedRealtime()<deadline) {
-                    chooser=focusedWindow().contains("ChooserActivity")
-                    if(!chooser)Thread.sleep(100)
-                }
-                assertTrue("Real Android Sharesheet opened; ${focusedWindow()}; unlocked=${ui.activity.unlocked}, busy=${ui.activity.busy}, notice=${ui.activity.portableNotice}",chooser)
+                ui.onNodeWithText("Create QR invitation").performScrollTo().performClick();idle()
+                assertEquals("invitation",ui.activity.contactPage)
+                assertTrue("Creating a QR stays in the focused secure app",ui.activity.unlocked && ui.activity.window.decorView.hasWindowFocus())
+                ui.onNodeWithContentDescription("Invitation QR code").performScrollTo().assertIsDisplayed()
+                assertFalse("No share chooser on creation",focusedWindow().contains("ChooserActivity"))
                 write("timing",(android.os.SystemClock.elapsedRealtime()-began).toString())
-                ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("input keyevent BACK")).use{it.readBytes()}
-                Thread.sleep(500);unlock()
                 val f=ui.activity.portableSnapshot!!.getJSONArray("facets").getJSONObject(0)
-                write("link",f.getJSONObject("invitation").getString("link"));write("facet",f.getString("id"))
+                val expected=f.getJSONObject("invitation").getString("link")
+                val bounds=ui.onNodeWithContentDescription("Invitation QR code").fetchSemanticsNode().boundsInWindow
+                var decoded=""
+                ui.runOnIdle {
+                    val view=ui.activity.window.decorView
+                    val screen=Bitmap.createBitmap(view.width,view.height,Bitmap.Config.ARGB_8888)
+                    view.draw(Canvas(screen))
+                    val qr=Bitmap.createBitmap(screen,bounds.left.toInt(),bounds.top.toInt(),bounds.width.toInt(),bounds.height.toInt())
+                    val bytes=java.io.ByteArrayOutputStream();qr.compress(Bitmap.CompressFormat.PNG,100,bytes)
+                    decoded=PurposeQr.readPortable(java.io.ByteArrayInputStream(bytes.toByteArray()))
+                    qr.recycle();screen.recycle()
+                }
+                assertEquals("Rendered QR encodes the real invitation",expected,decoded)
+                write("link",decoded);write("facet",f.getString("id"))
                 capture("invitation")
             }
             "request" -> {

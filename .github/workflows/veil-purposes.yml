@@ -79,6 +79,14 @@ jobs:
           run-id: 39195451218
           name: veil-purposes-preview-apk
           path: apps/veil/previous-v6
+      - name: Download the distributed v7 QR-compatible preview
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: Soldsoul86/orb
+          run-id: 39200435127
+          name: veil-purposes-preview-apk
+          path: apps/veil/previous-v7
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

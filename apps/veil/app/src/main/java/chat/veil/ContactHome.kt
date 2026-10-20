@@ -65,27 +65,24 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                         }
                     }
                 }
-                Text("No phone number or email needed. Your identity is created on this device when you share.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No phone number or email needed. Your identity is created on this device when you make a QR code.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
             "invitation" -> {
                 val f=facets.firstOrNull {it.getString("id")==a.contactSelected};val invite=f?.optJSONObject("invitation")
-                Heading("Your invitation","Send it privately to someone you choose.")
+                Heading("Your invitation QR","Let your friend scan this with their phone camera.")
                 if(invite==null) {Text("Opening invitation…");Action("Refresh",!a.busy){a.contactAction({})}}
                 else {
                     val link=invite.optString("link")
                     Text(if(invite.optBoolean("cancel_pending"))"Cancellation waiting to send" else if(invite.optBoolean("canceled"))"Invitation canceled" else "Invitation expires ${ContactExperience.date(invite.getLong("expires"))}")
                     Text("Accepted access lasts ${invite.getLong("access_seconds")/86400} days from approval. Canceling the invitation does not end already accepted access.",fontSize=14.sp)
                     if(link.isNotBlank()) {
-                        Action("Share again",!a.busy,a::shareContactLink)
-                        OutlinedButton({a.copyContactLink(link)},modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Copy invitation")}
-                        var qr by remember {mutableStateOf(false)}
-                        TextButton({qr=!qr},modifier=Modifier.heightIn(min=48.dp)){Text(if(qr)"Hide QR code" else "Show QR code")}
-                        if(qr) {
-                            val bitmap=remember(link){PurposeQr.renderPortable(link)}
-                            DisposableEffect(bitmap){onDispose{bitmap.recycle()}}
-                            Image(bitmap.asImageBitmap(),"Invitation QR code, same link as Share",Modifier.fillMaxWidth().aspectRatio(1f))
-                            Text("Scan to preview. Sending a request still requires confirmation.",fontSize=14.sp)
-                        }
+                        val bitmap=remember(link){PurposeQr.renderPortable(link)}
+                        DisposableEffect(bitmap){onDispose{bitmap.recycle()}}
+                        Image(bitmap.asImageBitmap(),"Invitation QR code",Modifier.fillMaxWidth().aspectRatio(1f))
+                        Text("No Veil yet? The QR opens a download page. After installing, return to that page and tap Continue in Veil.",fontSize=15.sp)
+                        Text("Already installed? Scan to review the invitation and request contact. You approve before chatting.",fontSize=14.sp)
+                        OutlinedButton(a::shareContactLink,enabled=!a.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Share link instead")}
+                        TextButton({a.copyContactLink(link)},modifier=Modifier.heightIn(min=48.dp)){Text("Copy link")}
                         TextButton({val id=a.contactSelected;a.contactAction({cancelInvitation(id)})},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Cancel invitation")}
                     } else if(!invite.optBoolean("ready") && !invite.optBoolean("canceled") && invite.getLong("expires")>System.currentTimeMillis()/1000) {
                         Text("This invitation has not finished setting up. Retry with the same saved identity.",fontSize=14.sp)
@@ -140,15 +137,15 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                 InvitationSummary(kind,p)
                 if(rules) ContactRules(p,{p=it;rules=false},{rules=false})
                 else {
-                    Action(if(a.busy)"Preparing invitation…" else "Share invitation",!a.busy){a.prepareContact(kind,p)}
+                    Action(if(a.busy)"Preparing invitation…" else "Create QR invitation",!a.busy){a.prepareContact(kind,p)}
                     TextButton({rules=true},enabled=!a.busy,modifier=Modifier.heightIn(min=48.dp)){Text("Change rules")}
-                    Text("If sharing fails, retry here. Veil reuses this invitation instead of creating another identity.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if(a.busy)"Connecting securely. The service can take up to a minute to wake up." else "If setup fails, retry here. Veil keeps the same saved invitation.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else when(a.section) {
                 0 -> {
                     Heading("Chats","A small circle. On your terms.")
                     Action("New contact",!a.busy,a::newContact)
-                    if(contacts.isEmpty())Text("Your conversations will appear here. Start by sharing an invitation.",fontSize=16.sp)
+                    if(contacts.isEmpty())Text("Your conversations will appear here. Start by creating an invitation QR.",fontSize=16.sp)
                     contacts.sortedBy {if(it.getString("status")=="PENDING")0 else 1}.forEach {c ->
                         Card(onClick={a.contactSelected=c.getString("id");a.contactPage="chat"},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp)) {
                             Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -170,7 +167,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                             Text(f.getJSONObject("policy").getString("display_name"))
                         }
                     }
-                    if(facets.none {it.has("invitation")})Text("Share your first invitation to choose who can reach you.")
+                    if(facets.none {it.has("invitation")})Text("Create your first invitation QR to choose who can reach you.")
                     Text("Each invitation has its own identity. Your contacts do not receive a universal profile or ownership key.",fontSize=14.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else -> {

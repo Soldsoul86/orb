@@ -13,8 +13,8 @@ android {
         resValue("string", "app_name", if (purposePreview) "Veil Purposes Preview" else "Veil")
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.3.2-contact-preview"
+        versionCode = 8
+        versionName = "0.3.3-qr-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {

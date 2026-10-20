@@ -49,7 +49,8 @@ class PortableSession(
         Core.sign(JSONObject().put("v",1).put("id",f.getString("id")).put("device",Core.publicKey(f.getJSONObject("device")))
             .put("revision",revision).put("issued",clock()).put("epoch",epoch).put("route",route).put("policy",policy.json()),f.getJSONObject("controller"),Core.STATE)
     fun createFacet(policy:PurposePolicy,route:String,consent:Boolean):String {
-        require(ready() && facets().length()<8 && policy.requests!=RequestMode.AUTO_ACCEPT_WITH_LIMITS)
+        require(ready() && policy.requests!=RequestMode.AUTO_ACCEPT_WITH_LIMITS)
+        if(facets().length()>=8)throw ContactIdentityLimit()
         require(policy.discovery!=DiscoveryMode.PUBLIC_SEARCHABLE || consent)
         val controller=Core.key();val id=Core.id(controller)
         val f=JSONObject().put("id",id).put("controller",controller).put("device",Core.key()).put("slots",JSONObject()).put("consent",consent)
@@ -356,7 +357,7 @@ class PortableSession(
     /** Resume an interrupted publication using its already saved identity, token and expiry. */
     fun resumeInvitation(id:String):String {
         val f=facet(id);val x=f.getJSONObject("ux")
-        require(!x.optBoolean("canceled") && x.getLong("expires")>clock()) {"Invitation expired. Create a new contact."}
+        if(x.optBoolean("canceled") || x.getLong("expires")<=clock())throw InvitationUnavailable()
         publish(id)
         call(f,payload(f).getString("route"),q("invite").put("token",x.getString("token")).put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")))
         x.put("ready",true);commit();return id

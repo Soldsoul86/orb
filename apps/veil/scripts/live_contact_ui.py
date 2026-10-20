@@ -49,7 +49,7 @@ owner='emulator-5554';peer='emulator-5556'
 try:
     stage(owner,'share')
     timing=adb(owner,'exec-out','run-as',pkg,'cat','files/contact-live-fixture/timing').decode()
-    print('MEASURED: 3 taps from unlocked Chats to native Sharesheet; elapsed_ms='+timing+' including HTTPS publication',flush=True)
+    print('MEASURED: 3 taps from unlocked Chats to visible invitation QR; elapsed_ms='+timing+' including HTTPS publication',flush=True)
     link=adb(owner,'exec-out','run-as',pkg,'cat','files/contact-live-fixture/link')
     adb(peer,'shell','run-as',pkg,'sh','-c','"cat > files/contact-live-fixture/link"',data=link)
     stage(peer,'request');stage(owner,'accept');stage(peer,'send');stage(owner,'reply');stage(peer,'receive');stage(owner,'end');stage(peer,'blocked')
