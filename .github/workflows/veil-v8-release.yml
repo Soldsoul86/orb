@@ -1,0 +1,55 @@
+name: Veil v8 QR release
+on:
+  push:
+    branches: ['codex/veil-purposes']
+    paths: ['.github/workflows/veil-v8-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require both exact-source validation runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: Soldsoul86/orb
+        run: |
+          set -euo pipefail
+          for run in 39467021620 39467023676; do
+            test "$(gh api repos/Soldsoul86/orb/actions/runs/$run --jq .conclusion)" = success
+            test "$(gh api repos/Soldsoul86/orb/actions/runs/$run --jq .head_sha)" = 134e0c2b243a293512e4e3263c49ce79227553c5
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39467021620
+          name: veil-purposes-preview-apk
+          path: incoming
+      - name: Publish the tested signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: Soldsoul86/orb
+        run: |
+          set -euo pipefail
+          (cd incoming && sha256sum -c veil-purposes-preview.apk.sha256)
+          test "$(cat incoming/veil-purposes-preview.certificate.sha256)" = e241ad4e30de7812469e70f72065960eafd5ee3f2fab089ac40a89783647f6a4
+          cp incoming/veil-purposes-preview.apk veil-qr-preview.apk
+          sha256sum veil-qr-preview.apk > veil-qr-preview.apk.sha256
+          cat > notes.txt <<'NOTES'
+          Veil v8 (0.3.3-qr-preview), Android 9+. Create QR invitation opens the QR directly; sharing a link is optional. Improved service-startup timeouts and specific retry error codes.
+
+          Install over Veil Purposes Preview. Do not uninstall or clear data. Package chat.veil.purposes.preview and preview signer preserved. v5 → v6 → v7 → v8 upgrade checks and two-emulator QR-decoded invitation/approval/text/revocation tests passed.
+
+          The exact previously reported generic retry error was not conclusively reproduced. Report the new error code if it persists. This is a debuggable development preview. Physical camera/installer tests remain required. After APK installation, return to the invitation tab and tap Continue in Veil; automatic post-install continuation remains unimplemented.
+          NOTES
+          if gh release view veil-qr-v8 --json tagName >/dev/null 2>&1; then
+            mkdir existing
+            gh release download veil-qr-v8 --pattern veil-qr-preview.apk --dir existing
+            (cd existing && sha256sum -c ../veil-qr-preview.apk.sha256)
+          else
+            gh release create veil-qr-v8 --target 134e0c2b243a293512e4e3263c49ce79227553c5 --title 'Veil v8 — QR invitations' --notes-file notes.txt --prerelease --latest=false veil-qr-preview.apk veil-qr-preview.apk.sha256
+          fi
