@@ -35,10 +35,10 @@ def check(origin, live=False):
         # Controlled download response exercises a real browser download without Android installation.
         context.route(APK_URL, lambda route: route.fulfill(status=200, headers={
             'Content-Type': 'application/vnd.android.package-archive',
-            'Content-Disposition': 'attachment; filename=veil-contact-preview.apk'}, body=b'browser-download-test-only'))
+            'Content-Disposition': 'attachment; filename=veil-qr-preview.apk'}, body=b'browser-download-test-only'))
         with page.expect_download() as download:
             page.locator('#download').click()
-        assert download.value.suggested_filename == 'veil-contact-preview.apk'
+        assert download.value.suggested_filename == 'veil-qr-preview.apk'
         assert page.url == destination
         assert page.locator('#install-help').is_visible()
         assert page.locator('#open').get_attribute('href') == href
@@ -61,8 +61,8 @@ def check(origin, live=False):
         import urllib.request
         with urllib.request.urlopen(APK_URL, timeout=120) as response:
             digest = hashlib.sha256(response.read()).hexdigest()
-        assert digest == '143f7ee0371c9b9d1678f28cfcc6bcf10859bf4a8aed1c8ad54caac536029b07'
-        print('PASS public APK download without authentication; SHA256 matches signed v7')
+        assert digest == '258e366bd00d9c3b88cf7618c7857e581bc5fa9a1c31d80c79aa78192f05d206'
+        print('PASS public APK download without authentication; SHA256 matches signed v8')
     print('PASS browser: QR destination, download, retained invitation, reload, invalid link, no token/referrer leakage')
     print('NOT TESTED: physical camera scan, Android installer and browser-to-app resolution; automatic post-install continuation is not implemented')
 

@@ -2,7 +2,7 @@
 import base64
 import hashlib
 
-APK_URL = 'https://github.com/Soldsoul86/orb/releases/download/veil-contact-v7/veil-contact-preview.apk'
+APK_URL = 'https://github.com/Soldsoul86/orb/releases/download/veil-qr-v8/veil-qr-preview.apk'
 _SCRIPT = """const open = document.getElementById('open');
 const status = document.getElementById('status');
 function invitation() {
@@ -32,7 +32,7 @@ HTML = ('''<!doctype html>
 <p id="status" role="status">Install Veil, then return to this page to open your invitation.</p>
 <section class="step" aria-labelledby="install"><h2 id="install">1. Get Veil</h2><p>Download the Android app. No account or phone number needed.</p>
 <a id="download" class="action" href="''' + APK_URL + '''" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Download Veil</a>
-<p class="fine">Android 9 or later · Development preview v7</p>
+<p class="fine">Android 9 or later · Development preview v8</p>
 <div id="install-help" hidden role="status"><p>Open the downloaded APK and tap Install. If Android asks, allow installation from your browser.</p><p><strong>Keep this invitation tab open.</strong> After installing, come back here for step 2. If the download did not start, tap Download Veil again.</p></div></section>
 <section class="step" aria-labelledby="continue"><h2 id="continue">2. Open your invitation</h2><p>Already installed? You can continue now.</p>
 <a id="open" class="action secondary" hidden>Continue in Veil</a>
