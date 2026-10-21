@@ -52,7 +52,7 @@ async function pinPeer(value, pin) {
   peer = { ...value, endpoint: e };
   return true;
 }
-async function init(account) {
+async function init(account, purposeOverrides = {}) {
   const login = await fetch(base + '/_matrix/client/v3/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: account.username }, password: account.password, device_id: account.device }) }).then(r => r.json());
   assert(login.access_token, 'login: ' + String(login.errcode) + ' ' + String(login.error));
   accessToken = login.access_token;
@@ -77,12 +77,13 @@ async function init(account) {
     const timer = setTimeout(() => reject(new Error('initial browser sync timed out')), 60000);
     client.on(ClientEvent.Sync, state => { if (state === 'PREPARED' || state === 'SYNCING') { clearTimeout(timer); resolve(); } });
   });
-  const pair = await generateKeyPair('ES256', { extractable: true });
+  const pair = await generateKeyPair('ES256');
   signing = pair.privateKey;
   const jwk = await exportJWK(pair.publicKey);
   publicKey = { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y };
   const id = await calculateJwkThumbprintUri(publicKey);
   const purposePolicy = { display_name: 'Home Repairs', description: '', discovery_mode: 'UNLISTED', contact_request_mode: 'REQUEST_APPROVAL', allowed_content_types: ['text'], schedule: { timezone: 'UTC', weekdays: [1, 2, 3, 4, 5, 6, 7], start: 0, end: 1440 }, outside_hours_behavior: 'REJECT', first_contact_message_limit: 1, inactivity_days: 7, expires_at: now() + 3600, notification_behavior: 'SILENT_IN_APP', status: 'ACTIVE', policy_version: 1 };
+  Object.assign(purposePolicy, purposeOverrides);
   const state = await sign({ v: 1, id, device: publicKey, revision: 1, issued: now(), epoch: hex(16), route: 'https://veil.test', policy: purposePolicy }, 'pi-state+jws');
   const keys = await client.getCrypto().getOwnDeviceKeys();
   const endpoint = { user_id: login.user_id, device_id: login.device_id, ...keys };
@@ -127,4 +128,8 @@ async function raw(body, path = '/_matrix/client/v3/sendToDevice/m.room.encrypte
 window.interop = { init, pinPeer, setPolicy, loadPolicy, send, encrypted, raw,
   received: text => received.includes(text), rejected: () => rejected.length,
   wrongPin: async value => { try { await pinPeer(value, self.id); return false; } catch { return true; } },
+  substitutedDevice: async () => {
+    const endpoint = { ...(await verifyCard(self, self.id)), curve25519: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/=/g, '') };
+    return { ...self, binding: await sign({ v: 1, iss: self.id, state_hash: await hash(self.state), endpoint }, 'pi-matrix-binding+jws') };
+  },
   stop: () => client.stopClient() };

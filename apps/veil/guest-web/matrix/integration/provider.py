@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import aiohttp
+from jwt.exceptions import InvalidTokenError
 from aiohttp import web
 
 VEIL = Path(__file__).resolve().parents[3]
@@ -183,7 +184,7 @@ class Boundary:
             assert allowed
             status, raw = await self.upstream(req.method, req.path_qs, await req.read(), req.headers['Authorization'])
             return web.Response(status=status, body=raw, content_type='application/json')
-        except (AssertionError, ValueError, KeyError, TypeError, StopIteration):
+        except (AssertionError, ValueError, KeyError, TypeError, StopIteration, InvalidTokenError):
             self.stats['denied'] += 1
             return web.json_response({'errcode': 'M_FORBIDDEN', 'error': 'Veil boundary denied'}, status=403)
 

@@ -23,28 +23,29 @@ await copyWasm('node_modules/@matrix-org/matrix-sdk-crypto-wasm');
 const server = createServer(async (req, res) => {
   if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><meta charset="utf-8"><script type="module" src="/browser.js"></script>'); return; }
   try {
-    assert(/^\/[a-zA-Z0-9_.-]+$/.test(req.url));
-    res.setHeader('Content-Type', req.url.endsWith('.wasm') ? 'application/wasm' : 'text/javascript');
-    res.end(await readFile('web' + req.url));
+    const name = basename(new URL(req.url, 'http://127.0.0.1:8766').pathname);
+    assert(/^[a-zA-Z0-9_-]+\.(js|wasm)$/.test(name));
+    res.setHeader('Content-Type', name.endsWith('.wasm') ? 'application/wasm' : 'text/javascript');
+    res.end(await readFile('web/' + name));
   } catch { res.statusCode = 404; res.end(); }
 });
 await new Promise(r => server.listen(8766, '127.0.0.1', r));
 const browser = await chromium.launch({ headless: true });
 const accounts = JSON.parse(await readFile('runtime/accounts.json', 'utf8'));
 const call = (page, name, ...args) => page.evaluate(async ({ name, args }) => window.interop[name](...args), { name, args });
-async function make(index) {
+async function make(index, purposeOverrides = {}) {
   const context = await browser.newContext();
   const page = await context.newPage();
   // No console, screenshots, trace, HAR or browser profile artifacts: these contain secrets.
   page.on('pageerror', error => console.error('browser runtime error:', error.name, error.message.slice(0, 220)));
   await page.goto('http://127.0.0.1:8766');
   await page.waitForFunction(() => window.interop);
-  const card = await call(page, 'init', accounts[index]);
+  const card = await call(page, 'init', accounts[index], purposeOverrides);
   return { page, card };
 }
-async function pair(i) {
+async function pair(i, ownerOverrides = {}) {
   const guest = await make(i);
-  const owner = await make(i + 1);
+  const owner = await make(i + 1, ownerOverrides);
   await call(guest.page, 'pinPeer', owner.card, owner.card.id);
   await call(owner.page, 'pinPeer', guest.card, guest.card.id);
   return { guest, owner };
@@ -70,6 +71,9 @@ async function browserTest() {
   pass('two isolated Chromium contexts initialized Rust-backed Matrix SDK encryption');
   assert(await call(guest.page, 'wrongPin', owner.card));
   pass('independent purpose identity pin rejects substitution');
+  const substituted = await call(owner.page, 'substitutedDevice');
+  await assert.rejects(call(guest.page, 'pinPeer', substituted, owner.card.id), /device key mismatch/);
+  pass('valid purpose signature cannot substitute mismatched SDK device keys');
   const pending = await call(owner.page, 'setPolicy', 'pending');
   await call(guest.page, 'loadPolicy', pending.invitation, owner.card.id);
   const premature = await call(owner.page, 'encrypted', 'not delivered');
@@ -108,6 +112,13 @@ async function browserTest() {
   await new Promise(r => setTimeout(r, 4500));
   assert.equal(await call(exp.guest.page, 'raw', body), 403);
   pass('server-time invitation expiration denies direct SDK ciphertext submission');
+  const closedWeekday = (new Date().getUTCDay() + 2) % 7 + 1;
+  const closed = await pair(4, { schedule: { timezone: 'UTC', weekdays: [closedWeekday], start: 0, end: 1440 } });
+  const closedPolicy = await call(closed.owner.page, 'setPolicy', 'pending');
+  await call(closed.guest.page, 'loadPolicy', closedPolicy.invitation, closed.owner.card.id);
+  const closedMessage = await call(closed.guest.page, 'encrypted', 'closed hours');
+  assert.equal(await call(closed.guest.page, 'raw', closedMessage), 403);
+  pass('signed purpose schedule enforced at direct Matrix API boundary');
   await absence();
 }
 async function androidTest() {
