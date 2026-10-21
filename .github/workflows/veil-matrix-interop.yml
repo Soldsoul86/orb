@@ -1,0 +1,142 @@
+name: Veil isolated Matrix interoperability
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/veil-programmable-reachability-matrix, feat/veil-discovery-guest-integration]
+    paths:
+      - '.github/workflows/veil-matrix-interop.yml'
+      - 'apps/veil/guest-web/matrix/integration/**'
+permissions:
+  contents: read
+concurrency:
+  group: veil-matrix-interop-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    working-directory: apps/veil/guest-web/matrix/integration
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned SDK and private homeserver
+        run: |
+          python -m pip install -r requirements.txt
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start disposable private provider
+        run: |
+          python -m unittest test_boundary -v
+          python start.py
+      - name: Browser crypto and hostile direct API tests
+        run: node run.mjs browser
+      - name: Publish sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-browser-results
+          path: apps/veil/guest-web/matrix/integration/evidence/*.json
+          if-no-files-found: ignore
+      - name: Destroy disposable accounts, keys and stores
+        if: always()
+        run: |
+          python -c "import json,os,pathlib,signal; p=pathlib.Path('runtime/pids.json'); [os.kill(pid,signal.SIGTERM) for pid in json.loads(p.read_text())] if p.exists() else None"
+          rm -rf runtime web
+  android:
+    needs: browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+      MATRIX_RUST_REV: 56bc59112822e7eb25943a95e02502855cdeef2d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;28.2.13676358
+          log-accepted-android-sdk-licenses: false
+      - name: Cache official SDK build (no runtime keys)
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/veil/guest-web/matrix/integration/android/app/src/main/sdk
+          key: matrix-crypto-android-x86_64-56bc59112822e7eb25943a95e02502855cdeef2d-v1
+      - name: Build maintained upstream SDK Kotlin/JNI bindings
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          rustup target add x86_64-linux-android
+          cargo install cargo-ndk --version 4.1.2 --locked
+          git init sdk-source
+          git -C sdk-source remote add origin https://github.com/matrix-org/matrix-rust-sdk.git
+          git -C sdk-source fetch --depth=1 origin "$MATRIX_RUST_REV"
+          git -C sdk-source checkout --detach FETCH_HEAD
+          test "$(git -C sdk-source rev-parse HEAD)" = "$MATRIX_RUST_REV"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+          test_dir="$PWD"
+          cd sdk-source
+          cargo xtask kotlin build-android-library --package crypto-sdk --profile dev --only-target x86_64-linux-android --src-dir "$test_dir/android/app/src/main/sdk"
+      - name: Save compiled SDK before instrumentation
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/veil/guest-web/matrix/integration/android/app/src/main/sdk
+          key: matrix-crypto-android-x86_64-56bc59112822e7eb25943a95e02502855cdeef2d-v1
+      - name: Compile native bindings and instrumentation before emulator startup
+        run: gradle -p android :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --console=plain
+      - name: Install pinned browser SDK and homeserver
+        run: |
+          python -m pip install -r requirements.txt
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Enable runner KVM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Start disposable private provider
+        run: python start.py
+      - name: Real browser to Android native crypto exchange
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 2048
+          script: cd apps/veil/guest-web/matrix/integration && node run.mjs android
+      - name: Publish sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-android-results
+          path: apps/veil/guest-web/matrix/integration/evidence/*.json
+          if-no-files-found: ignore
+      - name: Destroy disposable accounts, APKs, keys and stores
+        if: always()
+        run: |
+          python -c "import json,os,pathlib,signal; p=pathlib.Path('runtime/pids.json'); [os.kill(pid,signal.SIGTERM) for pid in json.loads(p.read_text())] if p.exists() else None"
+          rm -rf runtime web android/app/src/androidTest/assets android/app/build

@@ -1,0 +1,104 @@
+Local baseline at 53eee234b03fb731b434662f2bd041d3755ca843
+2026-10-21. These are existing foundation/provider tests, NOT Matrix E2EE.
+
+$ node apps/veil/guest-web/tests/core.test.mjs
+exit=0
+✔ strict public controller address distinguishes reusable and unlisted; reference grants nothing (1.919454ms)
+✔ malformed, normalized, cross-origin and legacy invitations cannot become pinned guest addresses (0.694016ms)
+✔ duplicate JSON members, pollution, excessive nesting and invalid numeric forms rejected (1.536046ms)
+✔ ES256 state authenticates only the independently pinned controller (41.245888ms)
+✔ wrong JOSE type, algorithm, external key URL and duplicate payload claims fail closed (14.891993ms)
+✔ state route substitution, known rollback, private keys and reusable unlisted scope rejected (100.874866ms)
+✔ release remains disabled; no send fallback even when callers request enabling (0.844594ms)
+✔ pending cannot send twice; unverified acceptance and reply cannot expose install offer (0.498682ms)
+✔ lost session is terminal and never inferred recoverable from a URL (0.223958ms)
+✔ Unicode text normalization, bounded input and literal HTML treatment (0.850963ms)
+﹣ Nimbus Android identity-core signed fixture verifies in Web Crypto (0.145399ms) # SKIP
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 175.651459
+
+$ python3 -m unittest discover -s apps/veil/guest-web/tests -v
+exit=0
+test_capability_and_network_policy_cannot_pretend_crypto (test_server.GuestGateTests.test_capability_and_network_policy_cannot_pretend_crypto) ... ok
+test_exact_allowlist_no_traversal_query_or_other_origins (test_server.GuestGateTests.test_exact_allowlist_no_traversal_query_or_other_origins) ... ok
+test_mutations_never_reach_message_body_processing (test_server.GuestGateTests.test_mutations_never_reach_message_body_processing) ... ok
+test_release_gate_cannot_be_enabled_by_environment (test_server.GuestGateTests.test_release_gate_cannot_be_enabled_by_environment) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.048s
+
+OK
+
+$ python3 -m unittest discover -s apps/veil/portable-provider -v
+exit=0
+test_cancel_closes_pending_access (test_invitations.InvitationTests.test_cancel_closes_pending_access) ... ok
+test_cancel_does_not_end_accepted_access (test_invitations.InvitationTests.test_cancel_does_not_end_accepted_access) ... ok
+test_foreign_owner_cannot_cancel_or_reuse_token (test_invitations.InvitationTests.test_foreign_owner_cannot_cancel_or_reuse_token) ... ok
+test_invitation_expiry_does_not_shorten_approved_access (test_invitations.InvitationTests.test_invitation_expiry_does_not_shorten_approved_access) ... ok
+test_preview_never_claims_and_retry_creates_only_one_invitation (test_invitations.InvitationTests.test_preview_never_claims_and_retry_creates_only_one_invitation) ... ok
+test_cancel_closes_pending_access (test_postgres.PostgresInvitations.test_cancel_closes_pending_access) ... skipped 'Disposable PostgreSQL required'
+test_cancel_does_not_end_accepted_access (test_postgres.PostgresInvitations.test_cancel_does_not_end_accepted_access) ... skipped 'Disposable PostgreSQL required'
+test_foreign_owner_cannot_cancel_or_reuse_token (test_postgres.PostgresInvitations.test_foreign_owner_cannot_cancel_or_reuse_token) ... skipped 'Disposable PostgreSQL required'
+test_invitation_expiry_does_not_shorten_approved_access (test_postgres.PostgresInvitations.test_invitation_expiry_does_not_shorten_approved_access) ... skipped 'Disposable PostgreSQL required'
+test_preview_never_claims_and_retry_creates_only_one_invitation (test_postgres.PostgresInvitations.test_preview_never_claims_and_retry_creates_only_one_invitation) ... skipped 'Disposable PostgreSQL required'
+test_v1_and_v3_schema_isolation_and_restart (test_postgres.PostgresInvitations.test_v1_and_v3_schema_isolation_and_restart) ... skipped 'Disposable PostgreSQL required'
+test_approval_queue_reject_and_revocation (test_provider.ProviderTests.test_approval_queue_reject_and_revocation) ... ok
+test_device_rotation_rejects_old_authority_and_state_rollback (test_provider.ProviderTests.test_device_rotation_rejects_old_authority_and_state_rollback) ... ok
+test_dst_and_bounded_queue (test_provider.ProviderTests.test_dst_and_bounded_queue) ... ok
+test_expiry_duplicate_intro_and_terminal_decision_retry (test_provider.ProviderTests.test_expiry_duplicate_intro_and_terminal_decision_retry) ... ok
+test_independent_provider_restores_signed_grant_without_old_database (test_provider.ProviderTests.test_independent_provider_restores_signed_grant_without_old_database) ... ok
+test_nonce_replay_tamper_wrong_controller_and_expiry (test_provider.ProviderTests.test_nonce_replay_tamper_wrong_controller_and_expiry) ... ok
+test_private_keys_and_raw_recovery_never_sent_to_service (test_provider.ProviderTests.test_private_keys_and_raw_recovery_never_sent_to_service) ... ok
+test_public_consent_private_separation_and_no_owner_identifier (test_provider.ProviderTests.test_public_consent_private_separation_and_no_owner_identifier) ... ok
+test_wrong_audience_tampered_signature_grant_and_state (test_provider.ProviderTests.test_wrong_audience_tampered_signature_grant_and_state) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.385s
+
+OK (skipped=6)
+
+$ python3 -m unittest discover -s apps/veil/relay -v
+exit=0
+test_abuse_and_search_throttling (test_purposes.PurposeTests.test_abuse_and_search_throttling) ... ok
+test_declared_content_and_stale_policy_rejected (test_purposes.PurposeTests.test_declared_content_and_stale_policy_rejected) ... ok
+test_grant_cannot_target_other_facet (test_purposes.PurposeTests.test_grant_cannot_target_other_facet) ... ok
+test_inactivity_and_purpose_expiration (test_purposes.PurposeTests.test_inactivity_and_purpose_expiration) ... ok
+test_multi_connection_transactions_serialize_reservations (test_purposes.PurposeTests.test_multi_connection_transactions_serialize_reservations) ... ok
+test_no_phone_and_no_public_account_identifier (test_purposes.PurposeTests.test_no_phone_and_no_public_account_identifier) ... ok
+test_no_plaintext_or_raw_auth_in_storage (test_purposes.PurposeTests.test_no_plaintext_or_raw_auth_in_storage) ... ok
+test_parallel_requests_cannot_exceed_single_introduction (test_purposes.PurposeTests.test_parallel_requests_cannot_exceed_single_introduction) ... ok
+test_private_and_link_only_discovery (test_purposes.PurposeTests.test_private_and_link_only_discovery) ... ok
+test_publication_requires_consent_and_edit_is_scoped (test_purposes.PurposeTests.test_publication_requires_consent_and_edit_is_scoped) ... ok
+test_queued_ciphertext_uses_current_hours_and_survives_restart (test_purposes.PurposeTests.test_queued_ciphertext_uses_current_hours_and_survives_restart) ... ok
+test_reject_never_stores_outside_hours (test_purposes.PurposeTests.test_reject_never_stores_outside_hours) ... ok
+test_request_is_one_intro_not_unlimited_access_and_foreign_account_denied (test_purposes.PurposeTests.test_request_is_one_intro_not_unlimited_access_and_foreign_account_denied) ... ok
+test_reservation_expiry_does_not_reissue_prekey (test_purposes.PurposeTests.test_reservation_expiry_does_not_reissue_prekey) ... ok
+test_revoke_block_expire_and_pause_stop_old_clients (test_purposes.PurposeTests.test_revoke_block_expire_and_pause_stop_old_clients) ... ok
+test_auckland_dst_gap_and_repeat (test_purposes.ScheduleTests.test_auckland_dst_gap_and_repeat) ... ok
+test_invalid_rules_fail_closed (test_purposes.ScheduleTests.test_invalid_rules_fail_closed) ... ok
+test_kolkata_half_open_boundaries_and_weekend (test_purposes.ScheduleTests.test_kolkata_half_open_boundaries_and_weekend) ... ok
+test_capability_separation (test_relay.RelayTests.test_capability_separation) ... ok
+test_cross_mailbox_isolation (test_relay.RelayTests.test_cross_mailbox_isolation) ... ok
+test_database_transaction_rolls_back (test_relay.RelayTests.test_database_transaction_rolls_back) ... ok
+test_delete_box_revokes_access_and_removes_queue (test_relay.RelayTests.test_delete_box_revokes_access_and_removes_queue) ... ok
+test_delivery_ack_and_idempotent_retry (test_relay.RelayTests.test_delivery_ack_and_idempotent_retry) ... ok
+test_expiration (test_relay.RelayTests.test_expiration) ... ok
+test_health_exposes_no_mailbox_metadata (test_relay.RelayTests.test_health_exposes_no_mailbox_metadata) ... ok
+test_inboxes_survive_connection_restart (test_relay.RelayTests.test_inboxes_survive_connection_restart) ... ok
+test_invalid_payload_and_ttl (test_relay.RelayTests.test_invalid_payload_and_ttl) ... ok
+test_postgres_reconnects_after_closed_connection (test_relay.RelayTests.test_postgres_reconnects_after_closed_connection) ... skipped 'Postgres-specific reconnect'
+test_quota (test_relay.RelayTests.test_quota) ... ok
+test_real_http_two_clients (test_relay.RelayTests.test_real_http_two_clients) ... skipped 'NOT TESTED: environment denies socket creation'
+test_registration_limits_and_distinct_capabilities (test_relay.RelayTests.test_registration_limits_and_distinct_capabilities) ... ok
+test_storage_is_opaque_and_capabilities_hashed (test_relay.RelayTests.test_storage_is_opaque_and_capabilities_hashed) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 0.211s
+
+OK (skipped=2)

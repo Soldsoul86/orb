@@ -1,0 +1,74 @@
+Post-change checks, 2026-10-21. NOT Matrix message E2EE evidence.
+
+$ node apps/veil/guest-web/tests/core.test.mjs
+exit=0
+✔ strict public controller address distinguishes reusable and unlisted; reference grants nothing (1.270005ms)
+✔ malformed, normalized, cross-origin and legacy invitations cannot become pinned guest addresses (0.47064ms)
+✔ duplicate JSON members, pollution, excessive nesting and invalid numeric forms rejected (1.586182ms)
+✔ ES256 state authenticates only the independently pinned controller (12.429065ms)
+✔ wrong JOSE type, algorithm, external key URL and duplicate payload claims fail closed (3.914178ms)
+✔ state route substitution, known rollback, private keys and reusable unlisted scope rejected (9.939941ms)
+✔ release remains disabled; no send fallback even when callers request enabling (0.402457ms)
+✔ pending cannot send twice; unverified acceptance and reply cannot expose install offer (0.406072ms)
+✔ lost session is terminal and never inferred recoverable from a URL (0.295095ms)
+✔ Unicode text normalization, bounded input and literal HTML treatment (0.530811ms)
+﹣ Nimbus Android identity-core signed fixture verifies in Web Crypto (0.203837ms) # SKIP
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 42.266896
+
+
+$ python3 -m unittest discover -s apps/veil/guest-web/tests -v
+exit=0
+
+test_capability_and_network_policy_cannot_pretend_crypto (test_server.GuestGateTests.test_capability_and_network_policy_cannot_pretend_crypto) ... ok
+test_exact_allowlist_no_traversal_query_or_other_origins (test_server.GuestGateTests.test_exact_allowlist_no_traversal_query_or_other_origins) ... ok
+test_mutations_never_reach_message_body_processing (test_server.GuestGateTests.test_mutations_never_reach_message_body_processing) ... ok
+test_release_gate_cannot_be_enabled_by_environment (test_server.GuestGateTests.test_release_gate_cannot_be_enabled_by_environment) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.012s
+
+OK
+
+$ python3 apps/veil/guest-web/release_gate.py
+exit=2
+BLOCKED: public guest release requires reviewed Matrix-native guest adapters with verified purpose/device binding, browser/Android encrypted request and reply proof plus provider permission enforcement, independent integration and web-delivery security review plus physical-device verification
+
+
+$ npm run verify
+exit=127
+
+> orb@0.0.0 verify
+> npm run lint && npm run build && npm run test
+
+
+> orb@0.0.0 lint
+> node scripts/lint.mjs
+
+lint: 112 files, no problems
+
+> orb@0.0.0 build
+> tsc -b
+
+
+sh: 1: tsc: not found
+
+$ python3 apps/veil/guest-web/tests/browser.py
+exit=1
+
+Traceback (most recent call last):
+  File "/workspace/orb/apps/veil/guest-web/tests/browser.py", line 11, in <module>
+    server=HTTPServer(('127.0.0.1',0),Handler)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socketserver.py", line 453, in __init__
+    self.socket = socket.socket(self.address_family,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py", line 233, in __init__
+    _socket.socket.__init__(self, family, type, proto, fileno)
+PermissionError: [Errno 1] Operation not permitted

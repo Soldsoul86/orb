@@ -41,6 +41,7 @@ All responses: `no-store`, `no-referrer`, `nosniff`, same-origin resource policy
 | `GET /api/config` | Public taxonomy/synonyms and `guestMessaging:false`; no listings |
 | `POST /api/search` | `{query, category?}` → parsed intent/unknowns, up to five verified public active results with signed publication and match reasons |
 | `POST /api/publish` | `{controller, publication}` → authenticated revision/visibility receipt; applies signed removal too |
+| `POST /api/current` | `{controller}` → same signed public view as profile GET, or `publication:null`; never exposes private/deleted/blocked counters |
 | `GET /api/profile/<thumbprint>` | One current, public, nonexpired, nonblocked signed publication; otherwise generic 404 |
 | `GET /api/qr/<thumbprint>` | QR for the contact address reconstructed only from the verified current public route |
 | `POST /api/report` | `{controller, reason: misleading|abuse|privacy}`; bounded aggregate count, 30-day retention, no free-text or message content |
@@ -50,6 +51,25 @@ All responses: `no-store`, `no-referrer`, `nosniff`, same-origin resource policy
 No enumeration, offset pagination, autocomplete, private-profile fetch or search-history API exists. Candidate work is capped at 200 public full-text matches per category; a response flags the cap. SQL is parameterized, and only controlled tag lexemes enter `to_tsquery`. Endpoint-free offline verification uses `python profile.py exported.json '<independently pinned controller>'`.
 
 ## Import, export and removal
+
+Native publication may add `expected_revision` to `/api/publish`. This integer
+must match the stored revision (zero for a new listing), under the existing
+PostgreSQL transaction lock. A byte-equivalent canonical signed payload may
+repeat after a lost response. Changed content, competing edits and stale
+revisions return 409. Blocked identities cannot receive a publication receipt.
+Legacy clients still obey all original monotonic revision and policy checks.
+
+Android saves the exact signed command in its encrypted vault before sending.
+Retry uses that command and its original directory. A matching HTTP receipt is
+needed before showing a confirmed profile link. Recovery requires an explicit
+owner action and verifies the current public signature, creation time, policy
+and revision against the local identity. It does not trust an unsigned counter
+or silently adopt a different transport device. New devices still need explicit
+authenticated migration. Removed/expired/blocked public content cannot supply a
+recovery baseline: these cases fail closed; private/tombstone recovery remains
+an open integration gate. A server can withhold or replay old signed public
+content; monotonic checks at the accepting directory prevent a stale write but
+do not prove global freshness across independent providers.
 
 Export envelope: `{"publication":"<compact JWS>"}`. Any operator can verify it offline and import the exact signed public content through the same publication contract. No Veil authorization, private key, company identity lookup or fixed directory domain is needed. The signed route origin remains necessary for that provider. Migration/rotation and updating each directory are manual; global freshness consensus is not claimed.
 

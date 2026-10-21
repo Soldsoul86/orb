@@ -1,0 +1,19 @@
+Run: https://github.com/Soldsoul86/orb/actions/runs/39573339196
+Commit: f338bb16f758b7584536a7cab987a7c71ae59c5d
+Job: browser (119132686251), conclusion: success
+Source: completed GitHub Actions job log; selected output only
+2026-10-21T08:59:33.8454550Z PASS disposable private homeserver: Unix upstream, loopback boundary, registration/federation disabled
+2026-10-21T08:59:37.0644876Z PASS two isolated Chromium contexts initialized Rust-backed Matrix SDK encryption
+2026-10-21T08:59:37.0729916Z PASS independent purpose identity pin rejects substitution
+2026-10-21T08:59:37.0940207Z PASS valid purpose signature cannot substitute mismatched SDK device keys
+2026-10-21T08:59:37.1150788Z PASS modified policy signature refused at provider boundary
+2026-10-21T08:59:37.1716117Z PASS direct API owner reply denied before approval
+2026-10-21T08:59:37.2517674Z PASS browser to browser encrypted introduction decrypted and purpose signature verified in recipient browser
+2026-10-21T08:59:37.2929135Z PASS direct API concurrent second introductions denied before approval
+2026-10-21T08:59:37.3243311Z PASS direct API room/plaintext/legacy/wildcard and guest approval bypasses denied
+2026-10-21T08:59:37.4010220Z PASS signed approval permits genuine encrypted browser reply
+2026-10-21T08:59:37.4408668Z PASS revocation denies both directions and signed policy rollback at direct API
+2026-10-21T08:59:39.4183275Z PASS atomic first-introduction race and exact transaction retry; changed-body replay denied
+2026-10-21T08:59:51.9372887Z PASS server-time invitation expiration denies direct SDK ciphertext submission
+2026-10-21T08:59:53.9014491Z PASS signed purpose schedule enforced at direct Matrix API boundary
+2026-10-21T08:59:53.9053023Z PASS wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only

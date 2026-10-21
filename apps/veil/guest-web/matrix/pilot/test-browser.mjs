@@ -1,0 +1,69 @@
+import {chromium} from '../integration/node_modules/playwright/index.mjs';
+import {readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const root=new URL('./',import.meta.url), runtime=new URL('../integration/runtime/',import.meta.url);
+const browser=await chromium.launch({headless:true,...(process.env.VEIL_TEST_CHROMIUM?{executablePath:process.env.VEIL_TEST_CHROMIUM}:{})});
+const results=[];const pass=name=>{results.push({name,status:'PASS'});console.log('PASS '+name);};
+const call=(p,name,...args)=>p.evaluate(({name,args})=>window.fixture[name](...args),{name,args});
+const contexts=[];
+try {
+ const ownerContext=await browser.newContext();contexts.push(ownerContext);const owner=await ownerContext.newPage();await owner.goto('http://127.0.0.1:8766/fixture');await owner.waitForFunction(()=>window.fixture);
+ const accounts=JSON.parse(await readFile(new URL('accounts.json',runtime),'utf8'));
+ const link='http://127.0.0.1:8766'+await call(owner,'init',accounts[0]);
+ const context=await browser.newContext({viewport:{width:390,height:844}});contexts.push(context);const page=await context.newPage();
+ page.on('pageerror',()=>console.error('Browser script error (content suppressed)'));
+ const started=performance.now();await page.goto(link);await page.locator('#send').waitFor();await page.waitForFunction(()=>!document.getElementById('send').disabled);const usableMs=performance.now()-started;
+ assert.equal(await page.locator('#name').textContent(),'TEST Alex');assert.equal(await page.locator('#install').isVisible(),false);pass('pinned invitation opens mobile page without registration or install prompt');
+ await page.locator('#message').fill('PILOT_REQUEST_CANARY_91f7');
+ let disrupted=false;await page.route('**/_matrix/client/v3/sendToDevice/**',async route=>{if(!disrupted){disrupted=true;await route.fetch();await route.abort();}else await route.continue();});
+ await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('send').textContent==='Retry saved message'&&!document.getElementById('send').disabled);
+ // Direct API attempts deliberately bypass all UI checks.
+ const denied=await page.evaluate(async()=>{
+   const localId=new URLSearchParams(location.hash.slice(1)).get('conversation');
+   const db=await new Promise(r=>{const q=indexedDB.open('veil-pilot-v1');q.onsuccess=()=>r(q.result);});
+   const record=await new Promise(r=>{const q=db.transaction('conversations').objectStore('conversations').get(localId);q.onsuccess=()=>r(q.result);});db.close();
+   const call=async(path,method,body)=>fetch(path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+record.login.access_token},body:JSON.stringify(body)}).then(r=>r.status);
+   const statuses=[];
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.encrypted/new-txn','PUT',record.outbox.body));
+   const changed=structuredClone(record.outbox.body);const message=Object.values(Object.values(changed.messages)[0])[0];Object.values(message.ciphertext)[0].body='A'.repeat(80);
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.encrypted/'+record.outbox.id,'PUT',changed));
+   statuses.push(await call('/_matrix/client/v3/createRoom','POST',{}));
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.message/plain','PUT',{messages:{}}));
+   return statuses;
+ });
+ assert.deepEqual(denied,[403,403,403,403]);pass('direct APIs deny extra introduction, altered exact retry, rooms and plaintext');
+ const saved=page.url();assert(saved.includes('conversation='));
+ const conversations=await call(owner,'sync');assert.equal(conversations.length,1);const id=conversations[0].id;
+ await owner.waitForFunction(()=>window.fixture.messages.length===1,{},{timeout:45000});
+ await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('status').textContent.includes('Received by service'));
+ assert.equal(await page.locator('#send').isDisabled(),true);assert.equal(await owner.evaluate(()=>window.fixture.messages.length),1);pass('response lost after acceptance retries exact ciphertext without a second introduction');
+ const other=await context.newPage();await other.goto(saved);await other.waitForFunction(()=>document.getElementById('status').textContent.includes('another tab'));assert(await other.locator('#send').isDisabled());await other.close();pass('second tab cannot open the same crypto store');
+ const suffix=new URLSearchParams(new URL(link).hash.slice(1)).get('owner').split(':').pop();
+ await page.goto('http://127.0.0.1:8766/g/'+suffix);await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REQUEST_CANARY_91f7'));pass('Discovery purpose address and QR recover the same saved conversation and crypto identity');
+ await page.reload();await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REQUEST_CANARY_91f7'));pass('refresh retains identity, encrypted SDK store and conversation');
+ await call(owner,'decide',id,'approved');await call(owner,'reply',id,'PILOT_REPLY_CANARY_39a2');
+ await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'),{},{timeout:45000});assert(await page.locator('#install').isVisible());pass('approved encrypted reply arrives; optional install explanation appears after interaction');
+ await page.close();const reopened=await context.newPage();await reopened.goto(saved);await reopened.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'));await reopened.waitForFunction(()=>!document.getElementById('send').disabled);
+ await reopened.locator('#message').fill('PILOT_CONTINUE_CANARY_c3bf');await reopened.locator('#send').click();await owner.waitForFunction(()=>window.fixture.messages.length===2,{},{timeout:45000});pass('reopen same browser resumes private conversation and sends continuation');
+ await call(owner,'decide',id,'blocked');await reopened.locator('#refresh').click();await reopened.waitForFunction(()=>document.getElementById('status').textContent.includes('blocked'));assert(await reopened.locator('#send').isDisabled());pass('signed block disables continued messaging');
+ await reopened.close();const storagePage=await context.newPage();await storagePage.goto('http://127.0.0.1:8766/fixture');
+ const removed=await storagePage.evaluate(async()=>{let n=0;for(const db of await indexedDB.databases()){if(db.name.includes('veil-crypto-')){await new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase(db.name);r.onsuccess=resolve;r.onerror=reject;});n++;}}return n;});assert(removed>0);
+ await storagePage.goto(saved);await storagePage.waitForFunction(()=>document.getElementById('status').textContent.includes('Encryption storage was lost'));assert(await storagePage.locator('#send').isDisabled());pass('lost SDK storage refuses to replace the saved encryption identity');
+ const deniedContext=await browser.newContext();contexts.push(deniedContext);await deniedContext.addInitScript(()=>Object.defineProperty(globalThis,'indexedDB',{get(){throw new DOMException('denied','SecurityError');}}));const deniedPage=await deniedContext.newPage();await deniedPage.goto(link);await deniedPage.waitForFunction(()=>document.getElementById('status').textContent.includes('Browser storage is unavailable'));assert(await deniedPage.locator('#send').isDisabled());pass('storage permission denial gives an actionable failure without sending');
+ const emptyContext=await browser.newContext();contexts.push(emptyContext);const empty=await emptyContext.newPage();await empty.goto(saved);await empty.waitForFunction(()=>document.getElementById('status').textContent.includes('Browser data was lost'));assert(await empty.locator('#send').isDisabled());pass('lost browser storage fails without creating a replacement identity');
+ const wrong=await emptyContext.newPage();await wrong.goto(link.replace(/owner=[^&]+/,'owner=urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%3Asha-256%3Ainvalid'));await wrong.waitForFunction(()=>document.getElementById('status').textContent.includes('could not be verified'));assert(await wrong.locator('#send').isDisabled());pass('controller substitution rejected against link pin');
+ const crashOwnerContext=await browser.newContext();contexts.push(crashOwnerContext);const crashOwner=await crashOwnerContext.newPage();await crashOwner.goto('http://127.0.0.1:8766/fixture');await crashOwner.waitForFunction(()=>window.fixture);
+ const crashLink='http://127.0.0.1:8766'+await call(crashOwner,'init',accounts[1]);
+ const crashContext=await browser.newContext();contexts.push(crashContext);const crashPage=await crashContext.newPage();await crashPage.goto(crashLink);await crashPage.waitForFunction(()=>!document.getElementById('send').disabled);
+ await crashPage.locator('#message').fill('Disposable crash test request');await crashPage.locator('#send').click();await crashPage.waitForFunction(()=>document.getElementById('status').textContent.includes('Received by service'));const crashSaved=crashPage.url();
+ const crashId=(await call(crashOwner,'sync'))[0].id;await crashOwner.waitForFunction(()=>window.fixture.messages.length===1,{},{timeout:45000});await call(crashOwner,'decide',crashId,'approved');
+ // Interrupt APP persistence after a real SDK decryption, not a mocked crypto result.
+ await crashPage.evaluate(()=>{const put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(value,...args){if(this.name==='conversations' && value?.messages?.some(m=>m.text==='PILOT_CRASH_CANARY_8f31'))throw new DOMException('TEST interrupted storage','QuotaExceededError');return put.call(this,value,...args);};});
+ await call(crashOwner,'reply',crashId,'PILOT_CRASH_CANARY_8f31');await crashPage.waitForFunction(()=>document.getElementById('status').textContent.includes('Could not save'),{},{timeout:45000});await crashPage.close();
+ const interrupted=await crashContext.newPage();await interrupted.goto(crashSaved);await interrupted.waitForFunction(()=>document.getElementById('status').textContent.includes('Saving an encrypted message was interrupted'));assert(await interrupted.locator('#send').isDisabled());pass('interrupted app commit after real SDK decryption locks recovery explicitly; no identity reset or silent loss');
+ const paths=(await readdir(runtime)).filter(n=>/\.(db|sqlite)(-wal|-shm)?$|\.(log|jsonl)$/.test(n));
+ for(const name of paths){const bytes=await readFile(new URL(name,runtime));for(const sentinel of ['PILOT_REQUEST_CANARY_91f7','PILOT_REPLY_CANARY_39a2','PILOT_CONTINUE_CANARY_c3bf','PILOT_CRASH_CANARY_8f31'])assert(!bytes.includes(Buffer.from(sentinel)),name+' contains plaintext');}
+ pass('server wire, databases, WAL and logs contain no request/reply/continuation plaintext canaries');
+ await mkdir(new URL('evidence/',root),{recursive:true});await writeFile(new URL('evidence/browser.json',root),JSON.stringify({commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),worktreeDirty:execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).length>0,browser:browser.version(),usableMs,measurement:'Automated cold page on local loopback. Not camera scan, mobile data, or human comprehension.',results},null,2));
+}finally{for(const c of contexts)await c.close();await browser.close();}

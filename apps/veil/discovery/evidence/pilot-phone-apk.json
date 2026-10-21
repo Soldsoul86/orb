@@ -1,0 +1,17 @@
+{
+  "commit": "0c3a7a2f0e564dc2d1f4e47abdddd432a5160732",
+  "run": 39620149498,
+  "artifact": 12355960948,
+  "artifactZipSha256": "b661886a8d5519ee6e7dc9880a61d8abe371c1e8950ec0aa341f7a33f204c941",
+  "apkSha256": "067292ebc0aaa30d10f0da761e82f856f7aed0f94ef2a15acb3b9fbefa72d81a",
+  "certificateSha256": "67af6ed0130981c8812de55369c3ba9641a825a43390e826b2cd65505f424098",
+  "package": "chat.veil.guest.pilot",
+  "signing": "Disposable Android debug certificate; not an upgrade of existing preview",
+  "arm64Libraries16KiBAligned": [
+    "libandroidx.graphics.path.so",
+    "libjnidispatch.so",
+    "libmatrix_sdk_crypto_ffi.so",
+    "libsignal_jni.so"
+  ],
+  "physicalPixelInstall": "NOT TESTED"
+}

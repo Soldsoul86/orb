@@ -1,0 +1,77 @@
+{
+  "mode": "browser",
+  "revision": "local",
+  "versions": {
+    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0",
+    "playwright": "1.56.0",
+    "chromium": "154.0.8037.57",
+    "adapter": "standalone-public-crypto-api"
+  },
+  "results": [
+    {
+      "name": "two isolated Chromium contexts initialized Rust-backed Matrix SDK encryption",
+      "status": "PASS"
+    },
+    {
+      "name": "independent purpose identity pin rejects substitution",
+      "status": "PASS"
+    },
+    {
+      "name": "valid purpose signature cannot substitute mismatched SDK device keys",
+      "status": "PASS"
+    },
+    {
+      "name": "modified policy signature refused at provider boundary",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API owner reply denied before approval",
+      "status": "PASS"
+    },
+    {
+      "name": "browser to browser encrypted introduction decrypted and purpose signature verified in recipient browser",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API concurrent second introductions denied before approval",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API room/plaintext/legacy/wildcard and guest approval bypasses denied",
+      "status": "PASS"
+    },
+    {
+      "name": "signed approval permits genuine encrypted browser reply",
+      "status": "PASS"
+    },
+    {
+      "name": "revocation denies both directions and signed policy rollback at direct API",
+      "status": "PASS"
+    },
+    {
+      "name": "atomic first-introduction race and exact transaction retry; changed-body replay denied",
+      "status": "PASS"
+    },
+    {
+      "name": "server-time invitation expiration denies direct SDK ciphertext submission",
+      "status": "PASS"
+    },
+    {
+      "name": "signed purpose schedule enforced at direct Matrix API boundary",
+      "status": "PASS"
+    },
+    {
+      "name": "wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only",
+      "status": "PASS"
+    }
+  ],
+  "execution": "Local disposable Synapse, Chromium 154, separate browser contexts; not production Android integration",
+  "source_revision": "eacad99839b8df97a5868b10ab66a0ffa37e5f06",
+  "source_sha256": {
+    "crypto-endpoint.mjs": "e749406d6cf55985e3a7f68350434d87109fa54f6a2ef1a3c6f9b17f022e291a",
+    "browser.mjs": "e44351246a09cd8d482f668471b3c8e329ce9afb23cb37fcf6a4b5cd4bf0d362",
+    "provider.py": "feef5b66ca77184f95ec943221006d2ad7807530f010f3fa5fcc7c864ee087a0",
+    "run.mjs": "858f0b1f2dfd59965c67a928ce964ec9a0f0e572bbe156eb0270ef8039de78a7",
+    "package-lock.json": "5b876a189f958c98c5bcced87739a6af46b02f9a7ff7f0b9eef0c01b7e3fe60e"
+  }
+}

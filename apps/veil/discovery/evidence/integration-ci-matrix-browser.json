@@ -1,0 +1,68 @@
+{
+  "mode": "browser",
+  "revision": "eacad99839b8df97a5868b10ab66a0ffa37e5f06",
+  "versions": {
+    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0",
+    "playwright": "1.56.0",
+    "chromium": "141.0.7390.37",
+    "adapter": "standalone-public-crypto-api"
+  },
+  "results": [
+    {
+      "name": "two isolated Chromium contexts initialized Rust-backed Matrix SDK encryption",
+      "status": "PASS"
+    },
+    {
+      "name": "independent purpose identity pin rejects substitution",
+      "status": "PASS"
+    },
+    {
+      "name": "valid purpose signature cannot substitute mismatched SDK device keys",
+      "status": "PASS"
+    },
+    {
+      "name": "modified policy signature refused at provider boundary",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API owner reply denied before approval",
+      "status": "PASS"
+    },
+    {
+      "name": "browser to browser encrypted introduction decrypted and purpose signature verified in recipient browser",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API concurrent second introductions denied before approval",
+      "status": "PASS"
+    },
+    {
+      "name": "direct API room/plaintext/legacy/wildcard and guest approval bypasses denied",
+      "status": "PASS"
+    },
+    {
+      "name": "signed approval permits genuine encrypted browser reply",
+      "status": "PASS"
+    },
+    {
+      "name": "revocation denies both directions and signed policy rollback at direct API",
+      "status": "PASS"
+    },
+    {
+      "name": "atomic first-introduction race and exact transaction retry; changed-body replay denied",
+      "status": "PASS"
+    },
+    {
+      "name": "server-time invitation expiration denies direct SDK ciphertext submission",
+      "status": "PASS"
+    },
+    {
+      "name": "signed purpose schedule enforced at direct Matrix API boundary",
+      "status": "PASS"
+    },
+    {
+      "name": "wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only",
+      "status": "PASS"
+    }
+  ]
+}

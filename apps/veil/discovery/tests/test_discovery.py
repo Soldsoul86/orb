@@ -105,9 +105,61 @@ class PostgreSQL(unittest.TestCase):
         a=self.d.search('website')['results'];self.assertEqual(a,self.d.search('website')['results'])
         self.assertLessEqual(len(a),5)
         self.assertEqual(len(self.d.search('website under $500')['results']),1)
+    def test_frozen_parser_on_additional_holdout_queries(self):
+        from pathlib import Path
+        from open_verifier import public_id,strict_json
+        seed(self.d,self.now)
+        names={make(name,self.now)[0]:name for name in PEOPLE}
+        original={case['query'] for case in json.loads((Path(__file__).parent/'gold.json').read_text())}
+        cases=json.loads((Path(__file__).parent/'holdout.json').read_text())
+        exact=0;misses=[]
+        for case in cases:
+            with self.subTest(query=case['query']):
+                self.assertNotIn(case['query'],original)
+                result=self.d.search(case['query'])
+                actual={names[public_id(strict_json(decode(row['publication'].split('.')[0]))['jwk'])] for row in result['results']}
+                relevant=set(case['relevant'])
+                # No irrelevant/hard-constraint-breaking result is acceptable.
+                # False negatives remain visible evaluation results, not patched
+                # golden answers or a claim of perfect recall.
+                self.assertLessEqual(actual,relevant)
+                exact+=actual==relevant
+                if actual!=relevant:misses.append(case['query'])
+        print(json.dumps({'holdout_cases':len(cases),'exact_sets':exact,'missing_results':misses}))
     def test_deletion_terminal(self):
         i,_,_,_=self.publish();self.publish(revision=2,visibility='DELETED')
         with self.assertRaises(Conflict):self.publish(revision=3)
+        self.assertIsNone(self.d.get(i))
+    def test_native_compare_and_set_and_ambiguous_retry(self):
+        i,t,d,s=make('web',self.now)
+        self.d.publish(i,t,0)
+        self.d.publish(i,t,0)  # Lost first response; identical signed command.
+        newer=make('web',self.now,revision=2)[1]
+        with self.assertRaises(Conflict):self.d.publish(i,newer,0)
+        self.d.publish(i,newer,1)
+        with self.assertRaises(Conflict):self.d.publish(i,t,0)
+        for invalid in [True,-1,1000001,'1']:
+            with self.assertRaises(ValueError):self.d.publish(i,newer,invalid)
+    def test_concurrent_native_publishers_have_one_winner(self):
+        i,t,d,s=self.publish()
+        left=make('web',self.now,revision=2)[1]
+        right=make('web',self.now,revision=2,changes={'expires':self.now+2000})[1]
+        barrier=threading.Barrier(2);results=[]
+        def submit(token):
+            other=Directory(__import__('fixtures').test_database_url(),clock=lambda:self.now)
+            try:
+                barrier.wait()
+                try:other.publish(i,token,1);results.append('accepted')
+                except Conflict:results.append('conflict')
+            finally:other.close()
+        workers=[threading.Thread(target=submit,args=(t,)) for t in (left,right)]
+        for w in workers:w.start()
+        for w in workers:w.join(timeout=10)
+        self.assertEqual(sorted(results),['accepted','conflict'])
+    def test_blocked_owner_cannot_republish_or_receive_success_receipt(self):
+        i,t,d,s=self.publish();self.d.block(i,'abuse')
+        with self.assertRaises(Conflict):self.d.publish(i,t,0)
+        with self.assertRaises(Conflict):self.publish(revision=2)
         self.assertIsNone(self.d.get(i))
     def test_http_visibility_gate_headers_and_origin(self):
         i,t,_,_=self.publish();private,_,_,_=self.publish('mobile',visibility='LINK_ONLY')
@@ -119,6 +171,8 @@ class PostgreSQL(unittest.TestCase):
         try:
             r=request('/api/profile/'+i[len(PREFIX):]);self.assertEqual(r.status,200);self.assertEqual(r.headers['Cache-Control'],'no-store');self.assertIn('noindex',r.headers['X-Robots-Tag'])
             self.assertEqual(request('/api/profile/'+private[len(PREFIX):]).status,404)
+            self.assertEqual(json.loads(request('/api/current',{'controller':private}).read()),{'publication':None})
+            self.assertEqual(json.loads(request('/api/current',{'controller':i}).read()),{'publication':t})
             self.assertNotIn(private.encode(),request('/sitemap.xml').read())
             self.assertEqual(request('/api/publish',{'controller':i,'publication':t},{'Origin':'https://evil.example'}).status,403)
             for path in ['/guest/send','/api/send','/v3/command']:

@@ -1,0 +1,11 @@
+{
+  admin off
+  default_sni {$VEIL_LAN_IP}
+  auto_https disable_redirects
+}
+https://{$VEIL_LAN_IP}:8443 {
+  tls internal
+  reverse_proxy 127.0.0.1:8766 {
+    header_up Host 127.0.0.1:8766
+  }
+}

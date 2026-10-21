@@ -25,12 +25,22 @@ class DiscoveryOwnerUiTest {
         ui.onNodeWithText("Be found · discovery preview").performScrollTo().performClick()
         ui.waitUntil(20000){ui.activity.contactPage=="discovery"}
         ui.onNodeWithText("TEST discovery UI").performScrollTo().performClick()
-        ui.onNodeWithText("Profile draft from discovery").performScrollTo().performTextInput("""{"v":1,"visibility":"PUBLIC","profile":{"alias":"TEST designer","purpose":"Android interface redesign","category":"DESIGN & CREATE","tags":["ui"]}}""")
-        ui.onNodeWithText("Review exact disclosure").performScrollTo().performClick()
-        ui.onNodeWithText("Advanced identity details").assertExists()
-        ui.onNodeWithText("Authorize signed export").performScrollTo().assertIsNotEnabled()
-        ui.onAllNodes(isToggleable()).onLast().performScrollTo().performClick()
-        ui.onNodeWithText("Authorize signed export").assertIsEnabled()
+        ui.onNodeWithTag("discovery-public").assertIsOff()
+        ui.onNodeWithText("Public name").performScrollTo().performTextInput("TEST designer")
+        ui.onNodeWithText("How can you help?").performScrollTo().performTextInput("Android interface redesign")
+        ui.onNodeWithText("Design & create").performScrollTo().performClick()
+        ui.onNodeWithText("ui").performScrollTo().performClick()
+        ui.onNodeWithTag("discovery-public").performScrollTo().performClick()
+        ui.onNodeWithText("Preview directory HTTPS address").performScrollTo().performTextInput("https://test-directory.example")
+        ui.onNodeWithText("Review profile").performScrollTo().performClick()
+        ui.onNodeWithText("Publish").performScrollTo().assertIsNotEnabled()
+        ui.onNodeWithTag("discovery-consent").performScrollTo().performClick()
+        ui.onNodeWithText("Publish").assertIsEnabled()
+        // Changing disclosure invalidates consent and requires a fresh review.
+        ui.onNodeWithText("How can you help?").performScrollTo().performTextInput(" for remote projects")
+        ui.onNodeWithText("Publish").assertDoesNotExist()
+        ui.onNodeWithText("Review profile").performScrollTo().performClick()
+        ui.onNodeWithText("Publish").performScrollTo().assertIsNotEnabled()
         // Deliberately do not authorize: TEST provider is not a working remote service.
         ui.runOnIdle {
             val a=ui.activity;assertTrue(a.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE!=0)

@@ -1,0 +1,42 @@
+Run: https://github.com/Soldsoul86/orb/actions/runs/39576585395
+Tested commit: e3790cb585a536edf07d66430448398513b4ea4f
+Workflow conclusion: success (completed)
+Source: completed GitHub Actions job logs; selected actual output only.
+
+Browser job 119143492698: success
+2026-10-21T09:24:37.4558536Z PASS disposable private homeserver: Unix upstream, loopback boundary, registration/federation disabled
+2026-10-21T09:24:40.5568520Z PASS two isolated Chromium contexts initialized Rust-backed Matrix SDK encryption
+2026-10-21T09:24:40.5658989Z PASS independent purpose identity pin rejects substitution
+2026-10-21T09:24:40.5826310Z PASS valid purpose signature cannot substitute mismatched SDK device keys
+2026-10-21T09:24:40.5998650Z PASS modified policy signature refused at provider boundary
+2026-10-21T09:24:40.6469883Z PASS direct API owner reply denied before approval
+2026-10-21T09:24:40.7245686Z PASS browser to browser encrypted introduction decrypted and purpose signature verified in recipient browser
+2026-10-21T09:24:40.7496368Z PASS direct API concurrent second introductions denied before approval
+2026-10-21T09:24:40.7756609Z PASS direct API room/plaintext/legacy/wildcard and guest approval bypasses denied
+2026-10-21T09:24:40.8394537Z PASS signed approval permits genuine encrypted browser reply
+2026-10-21T09:24:40.8732242Z PASS revocation denies both directions and signed policy rollback at direct API
+2026-10-21T09:24:42.5863669Z PASS atomic first-introduction race and exact transaction retry; changed-body replay denied
+2026-10-21T09:24:55.1030001Z PASS server-time invitation expiration denies direct SDK ciphertext submission
+2026-10-21T09:24:58.4387547Z PASS signed purpose schedule enforced at direct Matrix API boundary
+2026-10-21T09:24:58.4435460Z PASS wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only
+2026-10-21T09:24:59.1517952Z SHA256 digest of uploaded artifact zip is 637131c7a93df5bfd569baa773160f2ab15a28efa44a588d75f8cb3c54f3f9bc
+2026-10-21T09:24:59.4045555Z Artifact download URL: https://github.com/Soldsoul86/orb/actions/runs/39576585395/artifacts/12334492787
+
+Android job 119144149082: success
+2026-10-21T09:27:27.0514823Z BUILD SUCCESSFUL in 1m 29s
+2026-10-21T09:28:20.1250228Z PASS disposable private homeserver: Unix upstream, loopback boundary, registration/federation disabled
+2026-10-21T09:30:53.8082226Z PASS Chromium received and authenticated native Android SDK encrypted reply
+2026-10-21T09:30:56.2785844Z Finished 1 tests on emulator-5554 - 15
+2026-10-21T09:30:57.7728112Z BUILD SUCCESSFUL in 1m 11s
+2026-10-21T09:30:57.7985693Z PASS Android instrumentation passed real SDK request decryption, identity signature, approval, reply encryption and revocation
+2026-10-21T09:30:57.8481222Z PASS browser direct API cannot bypass Android owner revocation
+2026-10-21T09:30:57.8561570Z PASS wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only
+2026-10-21T09:31:03.6032341Z SHA256 digest of uploaded artifact zip is 406487a928d10b1bb8e3e78787d7b71d569ef05b613dde6310bf26961e06441d
+2026-10-21T09:31:03.8581423Z Artifact download URL: https://github.com/Soldsoul86/orb/actions/runs/39576585395/artifacts/12334029174
+
+Separate root verify run 39576585644, job 119143492815: failure
+2026-10-21T09:23:44.6371980Z ℹ tests 666
+2026-10-21T09:23:44.6372636Z ℹ pass 666
+2026-10-21T09:23:44.6372890Z ℹ fail 0
+2026-10-21T09:23:44.7529970Z TypeError: event.risk.measured.toFixed is not a function
+2026-10-21T09:23:44.7530733Z     at main (file:///home/runner/work/orb/orb/scripts/simulate-hard-exit.mjs:201:45)

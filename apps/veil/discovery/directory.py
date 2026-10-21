@@ -21,7 +21,7 @@ class Directory:
 
     def close(self): self.db.close()
 
-    def publish(self, controller, token):
+    def publish(self, controller, token, expected_revision=None):
         now = int(self.clock())
         d, s = verify_profile(token, controller, now, allow_removed=True)
         digest = hashlib.sha256(canonical(d)).hexdigest()
@@ -29,6 +29,16 @@ class Directory:
             # Cross-process serialization protects first-insert and monotonic revisions.
             self.db.execute('SELECT pg_advisory_xact_lock(901715463)')
             old = self.db.execute('SELECT revision,digest,created,state_revision,state_digest,policy_version,policy_digest,visibility FROM veil_discovery.profiles WHERE controller=%s FOR UPDATE', (controller,)).fetchone()
+            if self.db.execute('SELECT 1 FROM veil_discovery.blocks WHERE controller=%s', (controller,)).fetchone():
+                raise Conflict('hosting refused')
+            # Optional compare-and-set for native publishers. Exact retries remain
+            # idempotent after an ambiguous response, but changed content cannot win.
+            if expected_revision is not None:
+                if type(expected_revision) is not int or not 0 <= expected_revision <= 1000000:
+                    raise ValueError('invalid expected revision')
+                identical = old and d['revision'] == old[0] and digest == old[1]
+                if not identical and expected_revision != (old[0] if old else 0):
+                    raise Conflict('publication changed since review')
             sd = hashlib.sha256(canonical(s)).hexdigest() if s else None
             pd = hashlib.sha256(canonical(s['policy'])).hexdigest() if s else None
             if old:
@@ -119,5 +129,6 @@ class Directory:
     def block(self, controller, reason):
         # Local operator command only: refuses hosting, never revokes the identity.
         if reason not in ('misleading', 'abuse', 'privacy'): raise ValueError('reason')
-        with self.lock:
+        with self.lock, self.db.transaction():
+            self.db.execute('SELECT pg_advisory_xact_lock(901715463)')
             self.db.execute('INSERT INTO veil_discovery.blocks VALUES(%s,%s) ON CONFLICT(controller) DO UPDATE SET reason=excluded.reason', (controller,reason))

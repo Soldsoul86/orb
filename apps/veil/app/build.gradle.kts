@@ -4,13 +4,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 val purposePreview = providers.gradleProperty("veilPurposePreview").orNull == "true"
+val guestPilot = providers.gradleProperty("veilGuestPilot").orNull == "true"
 android {
     namespace = "chat.veil"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
     defaultConfig {
-        applicationId = if (purposePreview) "chat.veil.purposes.preview" else "chat.veil"
-        resValue("string", "app_name", if (purposePreview) "Veil Purposes Preview" else "Veil")
+        applicationId = if (guestPilot) "chat.veil.guest.pilot" else if (purposePreview) "chat.veil.purposes.preview" else "chat.veil"
+        resValue("string", "app_name", if (guestPilot) "Veil Guest Pilot" else if (purposePreview) "Veil Purposes Preview" else "Veil")
         minSdk = 28
         targetSdk = 35
         versionCode = 9
@@ -18,6 +19,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {
+        getByName("main").java.srcDir(if (guestPilot) "src/guest/java" else "src/noGuest/java")
+        if (guestPilot) {
+            getByName("main").java.srcDir("../guest-web/matrix/integration/android/app/src/main/sdk/kotlin")
+            getByName("main").jniLibs.srcDir("../guest-web/matrix/integration/android/app/src/main/sdk/jniLibs")
+            getByName("main").manifest.srcFile("src/guest/AndroidManifest.xml")
+            getByName("main").res.srcDir("src/guest/res")
+            getByName("androidTest").java.srcDir("src/guestAndroidTest/java")
+            getByName("androidTest").assets.srcDir("src/guestAndroidTest/assets")
+        }
         getByName("test").java.srcDir("src/cryptoTest/java")
         getByName("androidTest").java.srcDir("src/cryptoTest/java")
     }
@@ -44,6 +54,11 @@ android {
         resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1", "libsignal_jni*.dylib", "signal_jni*.dll", "libsignal_jni*.so") }
 }
 dependencies {
+    if (guestPilot) {
+        implementation("androidx.annotation:annotation:1.9.1")
+        implementation("net.java.dev.jna:jna:5.18.1@aar")
+        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    }
     implementation(project(":identity-core"))
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
