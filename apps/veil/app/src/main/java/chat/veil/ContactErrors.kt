@@ -7,10 +7,14 @@ import javax.net.ssl.SSLException
 class RelayRejected(val status:Int):IOException("Relay status $status")
 class ContactIdentityLimit:IllegalStateException()
 class InvitationUnavailable:IllegalStateException()
+class DiscoveryChanged:IllegalStateException()
+class DiscoveryPending:IllegalStateException()
 
 /** Only fixed messages and HTTP status codes reach the UI; never server text or request URLs. */
 object ContactErrors {
     fun message(error:Throwable):String = when(error) {
+        is DiscoveryChanged -> "A newer signed profile exists. Recover and review the latest profile before publishing. Nothing was overwritten."
+        is DiscoveryPending -> "A publication is awaiting confirmation. Retry the saved publication before making another change."
         is InvitationRulesChanged -> "This invitation already has saved rules. Resume it from Reach me, or start a new contact to choose different rules."
         is ContactIdentityLimit -> "This preview has reached its limit of 8 contact identities. Open Reach me to use an existing invitation. Nothing has been deleted. (CONTACT-LIMIT)"
         is InvitationUnavailable -> "This invitation has expired or was canceled. Create a new QR invitation. (INVITE-ENDED)"

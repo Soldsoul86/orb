@@ -1,7 +1,7 @@
 name: Veil discovery preview gates
 on:
   push:
-    branches: ['feat/veil-discovery-v01*']
+    branches: ['feat/veil-discovery-v01*', 'feat/veil-discovery-guest-integration']
     paths: ['apps/veil/**', '.github/workflows/veil-discovery.yml']
   pull_request:
     paths: ['apps/veil/discovery/**', 'apps/veil/identity-core/**', 'apps/veil/app/src/**', '.github/workflows/veil-discovery.yml']

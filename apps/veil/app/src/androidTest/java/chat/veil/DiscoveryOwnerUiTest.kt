@@ -25,6 +25,7 @@ class DiscoveryOwnerUiTest {
         ui.onNodeWithText("Be found · discovery preview").performScrollTo().performClick()
         ui.waitUntil(20000){ui.activity.contactPage=="discovery"}
         ui.onNodeWithText("TEST discovery UI").performScrollTo().performClick()
+        ui.onNodeWithText("Advanced identity details").performScrollTo().performClick()
         ui.onNodeWithText("Profile draft from discovery").performScrollTo().performTextInput("""{"v":1,"visibility":"PUBLIC","profile":{"alias":"TEST designer","purpose":"Android interface redesign","category":"DESIGN & CREATE","tags":["ui"]}}""")
         ui.onNodeWithText("Review exact disclosure").performScrollTo().performClick()
         ui.onNodeWithText("Advanced identity details").assertExists()

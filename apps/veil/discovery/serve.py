@@ -64,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
         # This route does not read the body. No UI/environment flag can enable it.
         if path.startswith(('/guest/send','/v3/command','/api/send')):
             return self.reply(503, {'error':'guest_messaging_disabled'})
-        kind = 'read' if self.command in ('GET','HEAD') or path=='/api/search' else 'write'
+        kind = 'read' if self.command in ('GET','HEAD') or path in ('/api/search','/api/current') else 'write'
         if not self.server.limits.allow(self.client_address[0],kind): return self.reply(429, {'error':'rate_limited'})
         try:
             if self.command in ('GET','HEAD'):
@@ -94,7 +94,7 @@ class Handler(BaseHTTPRequestHandler):
                     result=self.server.directory.get(PREFIX+suffix)
                     return self.reply(200 if result else 404,result or {'error':'not_found'})
                 return self.reply(404, {'error':'not_found'})
-            if self.command!='POST' or path not in ('/api/search','/api/publish','/api/report'):
+            if self.command!='POST' or path not in ('/api/search','/api/publish','/api/report','/api/current'):
                 return self.reply(404, {'error':'not_found'})
             origin=self.headers.get('Origin')
             if origin and origin not in {'http://'+v for v in expected}: return self.reply(403, {'error':'wrong_origin'})
@@ -106,8 +106,14 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(d,dict): raise ValueError()
             if path=='/api/search' and set(d)<= {'query','category'} and 'query' in d:
                 return self.reply(200,self.server.directory.search(d['query'],d.get('category')))
-            if path=='/api/publish' and set(d)=={'controller','publication'}:
-                return self.reply(200,self.server.directory.publish(d['controller'],d['publication']))
+            if path=='/api/current' and set(d)=={'controller'}:
+                identifier=d['controller']
+                if not isinstance(identifier,str) or not identifier.startswith(PREFIX) or len(decode(identifier[len(PREFIX):]))!=32: raise ValueError()
+                # Exactly the public GET view, never private revision metadata.
+                return self.reply(200,self.server.directory.get(identifier) or {'publication':None})
+            if path=='/api/publish' and set(d) in ({'controller','publication'},{'controller','publication','expected_revision'}):
+                if 'expected_revision' in d and type(d['expected_revision']) is not int: raise ValueError()
+                return self.reply(200,self.server.directory.publish(d['controller'],d['publication'],d.get('expected_revision')))
             if path=='/api/report' and set(d)=={'controller','reason'}:
                 self.server.directory.report(d['controller'],d['reason']);return self.reply(202,{'recorded':True})
             raise ValueError()

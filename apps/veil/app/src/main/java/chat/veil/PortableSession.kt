@@ -129,6 +129,74 @@ class PortableSession(
         commit();return export
     }
     fun discoveryExport(id:String):String = facet(id).optString("discovery_export")
+
+    /** Explicit owner recovery. Public server metadata alone never advances counters. */
+    fun reconcileDiscovery(id:String,token:String) {
+        val d=org.portableidentity.core.DiscoveryPublication.verifyPublic(token,id,clock())
+        val f=facet(id);val revision=d.getLong("revision");val local=f.optLong("discovery_revision",0)
+        require(!f.optBoolean("discovery_deleted") && revision>=local)
+        require(!f.has("discovery_created") || f.getLong("discovery_created")==d.getLong("created"))
+        if(revision==local && f.has("discovery_export")) {
+            val prior=Core.verify(JSONObject(f.getString("discovery_export")).getString("publication"),id,org.portableidentity.core.DiscoveryPublication.TYPE)
+            require(same(prior,d)) {"Conflicting publication at the same revision"}
+        }
+        val current=payload(f);val remote=validateState(d.getString("state"),id)
+        val oldPolicy=PurposePolicy.from(current.getJSONObject("policy"));val remotePolicy=PurposePolicy.from(remote.getJSONObject("policy"))
+        require(oldPolicy.status!=PurposeStatus.REVOKED)
+        if(remote.getLong("revision")==current.getLong("revision"))require(same(remote,current))
+        if(remote.getLong("revision")>current.getLong("revision")) {
+            require(remotePolicy.version>=oldPolicy.version)
+            if(remotePolicy.version==oldPolicy.version)require(same(remote.getJSONObject("policy"),current.getJSONObject("policy")))
+            // A recovered device may read the signed baseline but must explicitly
+            // migrate before publishing; never impersonate the former device.
+            if(!same(remote.getJSONObject("device"),Core.publicKey(f.getJSONObject("device"))) || remote.getString("route")!=current.getString("route") || remote.getString("epoch")!=current.getString("epoch"))
+                f.put("needs_migration",true)
+            f.put("state",d.getString("state")).put("consent",true)
+        }
+        f.put("discovery_revision",revision).put("discovery_created",d.getLong("created"))
+            .put("discovery_export",JSONObject().put("publication",token).toString())
+        f.remove("discovery_pending");commit()
+    }
+
+    fun recoverDiscovery(id:String,directory:String):String {
+        RelayClient(directory) // Validate an HTTPS origin, never follow an unsigned redirect.
+        val current=transport(directory,"/api/current",JSONObject().put("controller",id))
+        if(current.isNull("publication"))throw DiscoveryChanged()
+        val token=current.getString("publication");reconcileDiscovery(id,token)
+        return discoveryExport(id)
+    }
+
+    fun publishDiscovery(id:String,raw:String,directory:String):String {
+        RelayClient(directory)
+        val f=facet(id)
+        if(f.has("discovery_pending"))throw DiscoveryPending()
+        val current=transport(directory,"/api/current",JSONObject().put("controller",id))
+        if(!current.isNull("publication")) {
+            val d=org.portableidentity.core.DiscoveryPublication.verifyPublic(current.getString("publication"),id,clock())
+            if(d.getLong("revision")>f.optLong("discovery_revision",0))throw DiscoveryChanged()
+            if(d.getLong("revision")==f.optLong("discovery_revision",0)) {
+                val local=Core.verify(JSONObject(discoveryExport(id)).getString("publication"),id,org.portableidentity.core.DiscoveryPublication.TYPE)
+                require(same(d,local))
+            }
+        }
+        val expected=if(current.isNull("publication"))f.optLong("discovery_revision",0) else
+            org.portableidentity.core.DiscoveryPublication.verifyPublic(current.getString("publication"),id,clock()).getLong("revision")
+        val export=signDiscovery(id,raw)
+        val pending=JSONObject(export).put("controller",id).put("expected_revision",expected)
+        f.put("discovery_pending",JSONObject().put("directory",directory).put("body",pending));commit()
+        return retryDiscovery(id)
+    }
+
+    fun retryDiscovery(id:String):String {
+        val f=facet(id);val pending=f.getJSONObject("discovery_pending");val directory=pending.getString("directory")
+        val body=pending.getJSONObject("body")
+        val d=Core.verify(body.getString("publication"),id,org.portableidentity.core.DiscoveryPublication.TYPE)
+        val receipt=transport(directory,"/api/publish",body)
+        require(receipt.getLong("revision")==d.getLong("revision") && receipt.getString("visibility")==d.getString("visibility"))
+        require(receipt.getBoolean("hosted")== (d.getString("visibility")=="PUBLIC"))
+        f.remove("discovery_pending");f.put("discovery_directory",directory);commit()
+        return if(d.getString("visibility")=="PUBLIC")directory+"/#profile/"+id.substringAfterLast(':') else ""
+    }
     fun card(id:String)=JSONObject().put("v",1).put("state",facet(id).getString("state")).toString()
     fun inspectCard(card:String)=validateState(JSONObject(card).getString("state"))
     fun search(asFacet:String,origin:String,query:String):List<String> {
@@ -418,7 +486,7 @@ class PortableSession(
         if(!ready())return JSONObject().put("ready",false)
         values(contacts()).forEach(::trim);commit()
         return JSONObject().put("ready",true).put("wallet_id",Core.id(db.getJSONObject("wallet")))
-            .put("facets",JSONArray(values(facets()).map {f -> payload(f).put("published",f.optBoolean("published")).put("needs_migration",f.optBoolean("needs_migration")).put("card",card(f.getString("id"))).apply {f.optJSONObject("ux")?.let {x -> put("invitation",JSONObject().put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")).put("ready",x.optBoolean("ready")).put("canceled",x.optBoolean("canceled")).put("cancel_pending",x.optBoolean("cancel_pending")).put("link",if(x.optBoolean("ready") && !x.optBoolean("canceled") && x.getLong("expires")>clock())invitationLink(f.getString("id")) else ""))}}}))
+            .put("facets",JSONArray(values(facets()).map {f -> payload(f).put("published",f.optBoolean("published")).put("needs_migration",f.optBoolean("needs_migration")).put("card",card(f.getString("id"))).put("discovery",JSONObject().put("directory",f.optString("discovery_directory")).put("pending",f.has("discovery_pending")).put("deleted",f.optBoolean("discovery_deleted"))).apply {f.optJSONObject("ux")?.let {x -> put("invitation",JSONObject().put("expires",x.getLong("expires")).put("access_seconds",x.getLong("access_seconds")).put("ready",x.optBoolean("ready")).put("canceled",x.optBoolean("canceled")).put("cancel_pending",x.optBoolean("cancel_pending")).put("link",if(x.optBoolean("ready") && !x.optBoolean("canceled") && x.getLong("expires")>clock())invitationLink(f.getString("id")) else ""))}}}))
             .put("contacts",JSONArray(values(contacts()).map {c -> JSONObject().put("id",c.getString("id")).put("local",c.getString("local")).put("owner",c.getString("owner")).put("peer",c.getString("peer"))
                 .put("status",c.getString("status")).put("access_expires",if(c.has("grant"))grant(c.getString("grant"),c.getString("owner"),c.getString("peer"),c.getString("id")).getLong("expires") else 0).put("invitation_expires",c.optLong("invitation_expires")).put("access_seconds",c.optLong("access_seconds",90*86400L)).put("route",c.getString("route")).put("policy",validateState(c.getString("owner_state")).getJSONObject("policy"))
                 .put("messages",c.getJSONArray("messages")).put("access_change_pending",c.optBoolean("decision_pending")).put("pending",c.has("outbox") || c.optBoolean("decision_pending")).put("needs_migration",c.optBoolean("needs_migration"))

@@ -65,4 +65,28 @@ object DiscoveryPublication {
         val key=ECKey.parse(privateKey.toString())
         return JWSObject(JWSHeader.Builder(JWSAlgorithm.ES256).type(JOSEObjectType(TYPE)).jwk(key.toPublicJWK()).build(),Payload(bytes)).also {it.sign(ECDSASigner(key))}.serialize()
     }
+
+    /** Recovery accepts authenticated public content, never a server revision counter. */
+    fun verifyPublic(token:String,controller:String,now:Long):JSONObject {
+        require(token.length<=32000)
+        val d=IdentityCore.verify(token,controller,TYPE)
+        require(keys(d)==setOf("v","controller","revision","created","issued","expires","visibility","consent","profile","state"))
+        // Comparing exact payload bytes also rejects duplicate fields, coercions,
+        // alternate encodings and noncanonical numeric representations.
+        require(IdentityCore.decode(token.split('.')[1]).contentEquals(canonical(d).toByteArray(Charsets.UTF_8)))
+        require(d.get("v")==1 && d.getString("controller")==controller && d.getString("visibility")=="PUBLIC" && d.get("consent")==true)
+        number(d.get("revision"),1,1000000)
+        val created=number(d.get("created"),1,now+60)
+        val issued=number(d.get("issued"),created,now+60)
+        number(d.get("expires"),maxOf(now+1,issued+1),issued+30*86400)
+        request(JSONObject().put("v",1).put("visibility","PUBLIC").put("profile",d.getJSONObject("profile")).toString())
+        val state=IdentityCore.verifyState(d.getString("state"),controller)
+        require(state.getString("id")==controller && state.getLong("issued") in 1..now+60)
+        val p=state.getJSONObject("policy")
+        require(p.getString("discovery_mode")=="PUBLIC_SEARCHABLE" && p.getString("status") in setOf("ACTIVE","PAUSED"))
+        require(p.getString("contact_request_mode") in setOf("REQUEST_APPROVAL","DISABLED"))
+        require(p.getLong("expires_at")==0L || d.getLong("expires")<=p.getLong("expires_at"))
+        if(d.getJSONObject("profile").optBoolean("accepting"))require(p.getString("status")=="ACTIVE" && p.getString("contact_request_mode")=="REQUEST_APPROVAL")
+        return d
+    }
 }

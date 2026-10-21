@@ -1,55 +1,106 @@
 package chat.veil
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
 import org.json.JSONObject
 import org.portableidentity.core.DiscoveryPublication
+import org.portableidentity.core.IdentityCore
 
-/** Additive signing handoff; no web private-key import and no guest transport. */
+/** Native disclosure review and direct publication. Keys remain in the vault. */
 @Composable fun ColumnScope.DiscoveryOwner(a:MainActivity,facets:List<JSONObject>) {
-    var selected by remember {mutableStateOf("")};var raw by remember {mutableStateOf("")}
-    var preview by remember {mutableStateOf<JSONObject?>(null)};var error by remember {mutableStateOf("")}
+    var selected by remember {mutableStateOf("")}
+    var alias by remember(selected) {mutableStateOf("")}
+    var purpose by remember(selected) {mutableStateOf("")}
+    var category by remember(selected) {mutableStateOf(DiscoveryPublication.tags.keys.first())}
+    var tags by remember(selected) {mutableStateOf(setOf<String>())}
+    var public by remember(selected) {mutableStateOf(false)}
+    var remote by remember(selected) {mutableStateOf(true)}
+    var directory by remember(selected) {mutableStateOf(facets.firstOrNull{it.getString("id")==selected}?.optJSONObject("discovery")?.optString("directory") ?: "")}
+    var preview by remember(selected) {mutableStateOf<JSONObject?>(null)}
+    var consent by remember(selected) {mutableStateOf(false)}
     var advanced by remember(selected) {mutableStateOf(false)}
-    var consent by remember {mutableStateOf(false)};var exported by remember {mutableStateOf("")}
+    var raw by remember(selected) {mutableStateOf("")}
+    var exported by remember(selected) {mutableStateOf("")}
+    var notice by remember(selected) {mutableStateOf("")}
+    var link by remember(selected) {mutableStateOf("")}
+    fun changed(){preview=null;consent=false;notice="";link=""}
+    fun review(request:JSONObject) {
+        runCatching {DiscoveryPublication.request(request.toString())}.onSuccess {preview=it;consent=false;notice=""}
+            .onFailure {notice="Check your name, description and selected services."}
+    }
+    val facet=facets.firstOrNull{it.getString("id")==selected}
     BackHandler {a.contactPage="home"}
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         TextButton({a.contactPage="home"}){Text("‹ Reach me")}
         Text("Be found",style=MaterialTheme.typography.headlineLarge)
-        Text("Prepare your profile in the discovery web preview. Paste its draft here, choose a purpose, and review exactly what you will disclose. Your private keys stay in Veil.")
-        Text("Secure messaging is not available yet in the browser. Signing this profile does not enable it.")
-        facets.forEach {f -> FilterChip(selected==f.getString("id"),{selected=f.getString("id");preview=null;consent=false;exported=""},label={Text(f.getJSONObject("policy").getString("display_name"))})}
-        if(facets.isEmpty())Text("Create a purpose using the existing identity controls first.")
-        OutlinedTextField(raw,{if(it.length<=12000){raw=it;preview=null;consent=false}},label={Text("Profile draft from discovery")},modifier=Modifier.fillMaxWidth(),maxLines=6)
-        Button({runCatching {DiscoveryPublication.request(raw)}.onSuccess {preview=it;error="";consent=false}.onFailure {error="This draft is invalid. Return to discovery and prepare it again."}},enabled=selected.isNotEmpty()&&!a.busy){Text("Review exact disclosure")}
-        if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error)
-        if(a.portableNotice.isNotBlank())Text(a.portableNotice,color=MaterialTheme.colorScheme.error)
-        val p=preview;val facet=facets.firstOrNull {it.getString("id")==selected}
-        if(p!=null&&facet!=null) {
-            Text("Visibility: ${p.getString("visibility")}")
-            val profile=p.getJSONObject("profile")
-            profile.keys().asSequence().sorted().forEach {k -> Text("$k: ${profile.get(k)}")}
-            Text("Existing contact rules (also public in the signed route):")
-            Text(PurposePolicy.from(facet.getJSONObject("policy")).summary())
-            Text("Route: ${facet.getString("route")}")
-            Text("Purpose contact link: ${facet.getString("route")}/g/${facet.getString("id").substringAfterLast(':')}")
+        Text("Describe how you can help. Review your profile and contact rules before publishing. Nothing is public until you confirm.")
+        Text("Experimental discovery preview. Browser messaging is not available yet.")
+        facets.forEach {f -> FilterChip(selected==f.getString("id"),{selected=f.getString("id")},label={Text(f.getJSONObject("policy").getString("display_name"))})}
+        if(facets.isEmpty())Text("Create a purpose in Reach me first, then return here.")
+        if(facet!=null) {
+            OutlinedTextField(alias,{if(it.length<=60){alias=it;changed()}},label={Text("Public name")},modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(purpose,{if(it.length<=240){purpose=it;changed()}},label={Text("How can you help?")},modifier=Modifier.fillMaxWidth(),minLines=3)
+            Text("Category")
+            DiscoveryPublication.tags.keys.forEach {c -> FilterChip(category==c,{category=c;tags=emptySet();changed()},label={Text(c.lowercase().replaceFirstChar{it.uppercase()})})}
+            Text("Services you offer")
+            DiscoveryPublication.tags.getValue(category).forEach {t -> FilterChip(t in tags,{tags=if(t in tags)tags-t else tags+t;changed()},label={Text(t.replace('-',' '))})}
+            Row {Checkbox(remote,{remote=it;changed()});Text("Available for remote work")}
+            Row {Checkbox(public,{public=it;changed()});Text("Make this profile searchable")}
+            Text(if(public)"People can find your public profile. Your statements are self-declared." else "Private by default. Applying this choice removes an existing public listing.")
+            OutlinedTextField(directory,{directory=it.trim();changed()},label={Text("Preview directory HTTPS address")},modifier=Modifier.fillMaxWidth())
+            Button({review(JSONObject().put("v",1).put("visibility",if(public)"PUBLIC" else "PRIVATE").put("profile",if(public)JSONObject()
+                .put("alias",alias.trim()).put("purpose",purpose.trim()).put("category",category).put("tags",JSONArray(tags.sorted()))
+                .put("remote",remote).put("accepting",PurposePolicy.from(facet.getJSONObject("policy")).status==PurposeStatus.ACTIVE) else JSONObject()))},enabled=!a.busy){Text("Review profile")}
+            val p=preview
+            if(p!=null) {
+                Text("Review before publishing",style=MaterialTheme.typography.titleLarge)
+                Text(if(p.getString("visibility")=="PUBLIC")"Searchable public profile" else "Remove from public discovery")
+                val profile=p.getJSONObject("profile")
+                if(profile.length()>0) {
+                    Text(profile.getString("alias"));Text(profile.getString("purpose"));Text(profile.getString("category"))
+                    Text((0 until profile.getJSONArray("tags").length()).joinToString {profile.getJSONArray("tags").getString(it)})
+                    if(profile.optBoolean("remote"))Text("Remote projects")
+                }
+                Text(PurposePolicy.from(facet.getJSONObject("policy")).summary())
+                if(p.optBoolean("pause"))Text("This change also pauses purpose access at your provider.")
+                if(advanced)Text(DiscoveryPublication.canonical(profile))
+                Text("Publishing changes discovery visibility as shown. Public profiles expire within 30 days or when your purpose expires, whichever is sooner. Copied profiles cannot be recalled.")
+                Row {Checkbox(consent,{consent=it});Text("I approve this profile, contact rules and visibility.")}
+                Button({val draft=DiscoveryPublication.canonical(p);a.contactAction({publishDiscovery(selected,draft,directory)}){link=it;notice=if(it.isEmpty())"Public listing removed." else "Published. Your profile is searchable.";consent=false}},enabled=consent&&directory.isNotBlank()&&!a.busy){Text(if(p.getString("visibility")=="PUBLIC")"Publish" else "Unpublish")}
+            }
+            if(facet.optJSONObject("discovery")?.optBoolean("pending")==true) {
+                Text("Publication awaiting confirmation. Retrying sends the same signed change.")
+                OutlinedButton({a.contactAction({retryDiscovery(selected)}){link=it;notice="Publication confirmed."}},enabled=!a.busy){Text("Retry saved publication")}
+            }
+            OutlinedButton({a.contactAction({recoverDiscovery(selected,directory)}){exported=it;val d=IdentityCore.verify(JSONObject(it).getString("publication"),selected,DiscoveryPublication.TYPE);val profile=d.getJSONObject("profile");alias=profile.getString("alias");purpose=profile.getString("purpose");category=profile.getString("category");tags=(0 until profile.getJSONArray("tags").length()).map{profile.getJSONArray("tags").getString(it)}.toSet();remote=profile.optBoolean("remote");public=true;changed();notice="Latest signed profile recovered. Review before publishing. Restored devices may need an authenticated provider move first."}},enabled=directory.isNotBlank()&&!a.busy){Text("Recover latest signed profile")}
+            if(exported.isNotBlank() && runCatching{IdentityCore.verify(JSONObject(exported).getString("publication"),selected,DiscoveryPublication.TYPE).getString("visibility")=="PUBLIC"}.getOrDefault(false))OutlinedButton({val d=IdentityCore.verify(JSONObject(exported).getString("publication"),selected,DiscoveryPublication.TYPE);val profile=JSONObject(d.getJSONObject("profile").toString()).put("accepting",false);review(JSONObject().put("v",1).put("visibility","PUBLIC").put("profile",profile).put("pause",true))},enabled=!a.busy){Text("Review pause")}
             TextButton({advanced=!advanced}){Text("Advanced identity details")}
-            if(advanced)Text("Purpose controller: ${facet.getString("id")}")
-            Text("Visibility will change to the selected option. ${if(p.optBoolean("pause"))"This also pauses purpose access at your provider." else "Other contact permissions stay as shown."}")
-            Text("Public content may be cached elsewhere. Unpublishing cannot erase copied content. The export must be submitted to each directory you used. Removing a listing does not revoke existing contact approvals.")
-            Row {Checkbox(consent,{consent=it});Text("I approve these fields, existing rules, route and visibility change.")}
-            Button({val id=selected;val draft=DiscoveryPublication.canonical(p);a.contactAction({signDiscovery(id,draft)}){exported=it;consent=false}},enabled=consent&&!a.busy){Text("Authorize signed export")}
+            if(advanced) {
+                Text("Purpose controller: $selected");Text("Signed contact route: ${facet.getString("route")}")
+                OutlinedTextField(raw,{raw=it.take(12000)},label={Text("Profile draft from discovery")},modifier=Modifier.fillMaxWidth(),maxLines=4)
+                TextButton({runCatching{DiscoveryPublication.request(raw)}.onSuccess{preview=it;consent=false}.onFailure{notice="Invalid publication draft."}}){Text("Review exact disclosure")}
+                if(preview!=null)OutlinedButton({a.contactAction({signDiscovery(selected,DiscoveryPublication.canonical(preview!!))}){exported=it;notice="Signed export prepared. This does not confirm directory publication."}},enabled=consent&&!a.busy){Text("Authorize signed export")}
+                TextButton({a.contactAction({discoveryExport(selected)}){exported=it}}){Text("Recover last signed export")}
+                if(exported.isNotBlank())Button({a.sharePurpose(exported)}){Text("Share signed export")}
+            }
         }
-        if(selected.isNotEmpty())OutlinedButton({a.contactAction({discoveryExport(selected)}){exported=it}},enabled=!a.busy){Text("Recover last signed export")}
-        if(exported.isNotBlank()) {
-            Text("Signed locally. Return this export to discovery, review its authenticated preview, and explicitly publish. Directory publication is not yet confirmed.")
-            OutlinedTextField(exported,{},readOnly=true,label={Text("Signed profile export")},modifier=Modifier.fillMaxWidth(),maxLines=4)
-            Button({a.sharePurpose(exported)}){Text("Share signed export")}
+        if(notice.isNotBlank())Text(notice)
+        if(a.portableNotice.isNotBlank())Text(a.portableNotice,color=MaterialTheme.colorScheme.error)
+        if(link.isNotBlank()) {
+            val bitmap=remember(link){PurposeQr.renderPortable(link)}
+            DisposableEffect(bitmap){onDispose{bitmap.recycle()}}
+            Image(bitmap.asImageBitmap(),"Profile QR code",Modifier.size(240.dp),filterQuality=FilterQuality.None)
+            Text(link);Button({a.sharePurpose(link)}){Text("Share profile link")}
         }
     }
 }
