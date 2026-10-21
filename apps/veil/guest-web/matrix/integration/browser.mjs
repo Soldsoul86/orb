@@ -1,12 +1,9 @@
 // Executed inside Chromium. Private purpose/Matrix keys stay in this context.
-import { createClient, ClientEvent } from 'matrix-js-sdk';
-import { logger } from 'matrix-js-sdk/lib/logger';
-import { UserId } from '@matrix-org/matrix-sdk-crypto-wasm';
+import { CryptoEndpoint } from './crypto-endpoint.mjs';
 import { generateKeyPair, exportJWK, importJWK, CompactSign, compactVerify, calculateJwkThumbprintUri } from 'jose';
 import { strictJson } from '../../src/strict-json.mjs';
 import { publicId } from '../../src/identity.mjs';
 
-logger.setLevel('silent');
 const base = 'http://127.0.0.1:8765';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -48,17 +45,7 @@ async function api(path, method = 'GET', body) {
 }
 async function pinPeer(value, pin) {
   const e = await verifyCard(value, pin);
-  // Version-pinned spike adapter: Matrix JS's public getUserDeviceInfo(...,true)
-  // does NOT populate the crypto store for a user outside an encrypted room.
-  // Use the same genuine SDK request/response path as its room-key bundle code.
-  // These two JS internals are an explicit product-release integration gate.
-  const rust = client.getCrypto();
-  const request = rust.olmMachine.queryKeysForUsers([new UserId(e.user_id)]);
-  await rust.outgoingRequestProcessor.makeOutgoingRequest(request);
-  const devices = await client.getCrypto().getUserDeviceInfo([e.user_id], true);
-  const device = devices.get(e.user_id)?.get(e.device_id);
-  assert(device && device.getFingerprint() === e.ed25519 && device.getIdentityKey() === e.curve25519, 'signed Matrix device key mismatch');
-  await client.getCrypto().setDeviceVerified(e.user_id, e.device_id, true);
+  await client.pin(e);
   peer = { ...value, endpoint: e };
   return true;
 }
@@ -66,27 +53,19 @@ async function init(account, purposeOverrides = {}) {
   const login = await fetch(base + '/_matrix/client/v3/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: account.username }, password: account.password, device_id: account.device }) }).then(r => r.json());
   assert(login.access_token, 'login: ' + String(login.errcode) + ' ' + String(login.error));
   accessToken = login.access_token;
-  client = createClient({ baseUrl: base, userId: login.user_id, deviceId: login.device_id, accessToken, timelineSupport: false });
-  await client.initRustCrypto();
-  client.getCrypto().setTrustCrossSignedDevices(false);
-  client.on(ClientEvent.ReceivedToDeviceMessage, async payload => {
+  client = await CryptoEndpoint.open({ userId: login.user_id, deviceId: login.device_id, request: api, onMessage: async payload => {
     try {
       const event = payload.message;
       if (event?.type !== typ) return;
-      assert(peer && payload.encryptionInfo && payload.encryptionInfo.senderCurve25519KeyBase64 === peer.endpoint.curve25519 && payload.encryptionInfo.senderVerified, 'authenticated SDK ciphertext required');
+      assert(peer && payload.encryptionInfo && payload.encryptionInfo.senderCurve25519KeyBase64 === peer.endpoint.curve25519 && payload.encryptionInfo.senderVerified && payload.encryptionInfo.senderDevice === peer.endpoint.device_id, 'authenticated SDK ciphertext required');
       assert(event.sender === peer.endpoint.user_id, 'sender binding');
       const m = await verify(event.content.jws, peer.id, 'pi-matrix-message+jws');
       assert(m.iss === peer.id && m.recipient === self.id && m.invitation === policy.invitation && m.expires > now() && !seen.has(m.id), 'message context/replay');
       seen.add(m.id);
       received.push(m.text);
     } catch { rejected.push('message refused'); }
-  });
-  await client.startClient({ initialSyncLimit: 0, lazyLoadMembers: false, pollTimeout: 1000 });
-  await new Promise((resolve, reject) => {
-    if (client.getSyncState() === 'PREPARED' || client.getSyncState() === 'SYNCING') return resolve();
-    const timer = setTimeout(() => reject(new Error('initial browser sync timed out')), 60000);
-    client.on(ClientEvent.Sync, state => { if (state === 'PREPARED' || state === 'SYNCING') { clearTimeout(timer); resolve(); } });
-  });
+  } });
+  await client.start();
   const pair = await generateKeyPair('ES256');
   signing = pair.privateKey;
   const jwk = await exportJWK(pair.publicKey);
@@ -95,9 +74,8 @@ async function init(account, purposeOverrides = {}) {
   const purposePolicy = { display_name: 'Home Repairs', description: '', discovery_mode: 'UNLISTED', contact_request_mode: 'REQUEST_APPROVAL', allowed_content_types: ['text'], schedule: { timezone: 'UTC', weekdays: [1, 2, 3, 4, 5, 6, 7], start: 0, end: 1440 }, outside_hours_behavior: 'REJECT', first_contact_message_limit: 1, inactivity_days: 7, expires_at: now() + 3600, notification_behavior: 'SILENT_IN_APP', status: 'ACTIVE', policy_version: 1 };
   Object.assign(purposePolicy, purposeOverrides);
   const state = await sign({ v: 1, id, device: publicKey, revision: 1, issued: now(), epoch: hex(16), route: 'https://veil.test', policy: purposePolicy }, 'pi-state+jws');
-  const keys = await client.getCrypto().getOwnDeviceKeys();
-  // PREPARED sync does not imply that the SDK's asynchronous initial key
-  // upload has finished. Wait for observed publication, never assume it.
+  const keys = client.keys;
+  // Observe server publication of the actual SDK keys before enrollment.
   let published = false;
   for (let attempt = 0; attempt < 120; attempt++) {
     const response = await api('/_matrix/client/v3/keys/query', 'POST', { device_keys: { [login.user_id]: [login.device_id] } });
@@ -130,14 +108,11 @@ async function loadPolicy(invitation, ownerPin) {
 async function encrypted(text) {
   await pinPeer(peer, peer.id); // Recheck SDK device keys at every outbound boundary.
   const jws = await sign({ v: 1, iss: self.id, recipient: peer.id, invitation: policy.invitation, id: hex(16), expires: now() + 120, text }, 'pi-matrix-message+jws');
-  const batch = await client.getCrypto().encryptToDeviceMessages(typ, [{ userId: peer.endpoint.user_id, deviceId: peer.endpoint.device_id }], { jws });
-  assert(batch.eventType === 'm.room.encrypted' && batch.batch.length === 1, 'SDK encryption output');
-  const item = batch.batch[0];
-  return { messages: { [item.userId]: { [item.deviceId]: item.payload } } };
+  return client.encrypt(peer.endpoint, typ, { jws });
 }
 async function send(text) {
   const body = await encrypted(text);
-  await client.sendToDevice('m.room.encrypted', new Map(Object.entries(body.messages).map(([u, d]) => [u, new Map(Object.entries(d))])), hex(16));
+  await api('/_matrix/client/v3/sendToDevice/m.room.encrypted/' + hex(16), 'PUT', body);
   return true;
 }
 // Negative calls intentionally bypass all application admission logic.
@@ -152,4 +127,4 @@ window.interop = { init, pinPeer, setPolicy, loadPolicy, send, encrypted, raw,
     const endpoint = { ...(await verifyCard(self, self.id)), curve25519: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/=/g, '') };
     return { ...self, binding: await sign({ v: 1, iss: self.id, state_hash: await hash(self.state), endpoint }, 'pi-matrix-binding+jws') };
   },
-  stop: () => client.stopClient() };
+  stop: () => client.close() };

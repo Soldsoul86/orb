@@ -8,8 +8,8 @@ the presence of this harness is not itself a successful test result.
 
 ## What runs
 
-1. Two separate Chromium browser contexts initialize `matrix-js-sdk` 44.0.0 with
-   Rust/WASM crypto 18.9.0, publish device keys and establish an Olm session.
+1. Two separate Chromium browser contexts initialize the official standalone
+   Rust/WASM crypto SDK 18.9.0, publish device keys and establish an Olm session.
 2. Each endpoint signs its actual SDK Ed25519/Curve25519 device keys using its
    locally generated Veil purpose controller. The other endpoint independently
    pins the purpose identifier, verifies the binding, queries SDK device keys,
@@ -35,13 +35,16 @@ Megolm room history. There is no custom encryption implementation. ES256/JWS
 bindings and application signatures use existing Veil identity-core, JOSE and
 WebCrypto; they provide identity/context authentication, not encryption.
 
-Matrix JS 44's public lookup downloads untracked users' keys without inserting
-them into its crypto store. This roomless spike calls its pinned internal
-`olmMachine.queryKeysForUsers` and `outgoingRequestProcessor.makeOutgoingRequest`
-path before public device verification/encryption. This is the SDK's actual
-cryptographic processing, not a mock. Depending on these JS internals is a
-specific production integration gate: obtain a supported upstream API or use
-the public standalone crypto SDK before shipping this adapter.
+The integration branch replaces the two Matrix JS private-interface calls with
+`crypto-endpoint.mjs`, using the standalone crypto WASM SDK 18.9.0's documented
+public `OlmMachine.queryKeysForUsers`, `markRequestAsSent`, device verification,
+`Device.encryptToDeviceEvent` and `DecryptedToDeviceEvent.encryptionInfo` APIs.
+The existing identity/policy tests are retained. Local Chromium 154 completed all
+14 browser checks; Android interop on this adapter still requires its CI result.
+This removes the specific private-JS-interface dependency, not the independent
+review, durable application-state or product-enrollment gates. The adapter
+serializes SDK operations, fails closed on unexpected requests and exposes only
+SDK-authenticated decryption provenance to the application.
 
 ## Provider boundary
 
@@ -60,6 +63,10 @@ SQLite durable reservation serialize policy transitions and introductions.
 An unknown upstream result consumes the introduction reservation; only the same
 sender/transaction/body hash may retry. Revocation/expiry also deny retries.
 This experiment does not claim multi-worker or distributed enforcement.
+
+An OS file lock now refuses a second worker against the staging database.
+Optimized Python is refused at import because it removes assertion-based
+admission checks. Both startup protections have executable negative tests.
 
 An endpoint controller signs `pi-matrix-binding+jws` over its `pi-state+jws`
 hash and SDK endpoint. The owner signs `pi-matrix-policy+jws` over both complete
@@ -88,7 +95,7 @@ For the browser stage on an equivalent disposable Linux host:
 ```sh
 cd apps/veil/guest-web/matrix/integration
 python -m pip install -r requirements.txt
-npm install --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 npx playwright install --with-deps chromium
 python start.py
 node run.mjs browser
@@ -112,8 +119,8 @@ browser reload/lost storage/outbox recovery; production enrollment and UI;
 multi-device recovery, room history, attachments, push notifications, federation,
 two-provider migration; distributed quota enforcement and denial-of-service
 resistance; independent security review. Direct dependency versions and the Rust
-source are pinned; full npm/Python transitive supply-chain locking remains a
-release gate. The gateway cannot inspect encrypted content type and cannot stop
+source are pinned and npm transitives have an integrity-bearing lockfile;
+Python transitive locking and supply-chain review remain release gates. The gateway cannot inspect encrypted content type and cannot stop
 a compromised sender from encrypting arbitrary bytes. Endpoints enforce the
 application message format. The server still sees transport metadata and timing.
 

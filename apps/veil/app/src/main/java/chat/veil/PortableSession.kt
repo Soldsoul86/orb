@@ -105,6 +105,7 @@ class PortableSession(
     fun signDiscovery(id:String,raw:String):String {
         val r=org.portableidentity.core.DiscoveryPublication.request(raw)
         val f=facet(id);val previous=payload(f);val p=PurposePolicy.from(previous.getJSONObject("policy"))
+        if(f.has("discovery_pending"))throw DiscoveryPending()
         require(!f.optBoolean("needs_migration"))
         require(!f.optBoolean("discovery_deleted")) {"Deleted listings cannot be reopened; choose another purpose"}
         val visibility=r.getString("visibility");val removed=visibility in setOf("PRIVATE","DELETED")

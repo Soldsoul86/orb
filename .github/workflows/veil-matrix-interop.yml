@@ -32,7 +32,9 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Start disposable private provider
-        run: python start.py
+        run: |
+          python -m unittest test_boundary -v
+          python start.py
       - name: Browser crypto and hostile direct API tests
         run: node run.mjs browser
       - name: Publish sanitized evidence only

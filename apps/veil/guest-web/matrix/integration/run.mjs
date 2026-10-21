@@ -30,7 +30,7 @@ const server = createServer(async (req, res) => {
   } catch { res.statusCode = 404; res.end(); }
 });
 await new Promise(r => server.listen(8766, '127.0.0.1', r));
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.VEIL_TEST_CHROMIUM ? { executablePath: process.env.VEIL_TEST_CHROMIUM } : {}) });
 const accounts = JSON.parse(await readFile('runtime/accounts.json', 'utf8'));
 const call = (page, name, ...args) => page.evaluate(async ({ name, args }) => window.interop[name](...args), { name, args });
 async function make(index, purposeOverrides = {}) {

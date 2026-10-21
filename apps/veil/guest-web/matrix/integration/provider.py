@@ -4,6 +4,7 @@ Synapse has ONLY a Unix listener. This is its only client network ingress.
 This narrow experiment deliberately does not implement a general Matrix proxy.
 """
 import asyncio
+import fcntl
 import hashlib
 import json
 import re
@@ -21,6 +22,11 @@ VEIL = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(VEIL / 'portable-provider'), str(VEIL / 'relay')]
 from open_verifier import verify, state, strict_json, encode  # noqa: E402
 from purpose_policy import validate, active, is_open  # noqa: E402
+
+# This experimental boundary uses assertions for admission. Optimized Python
+# removes them, so refuse startup rather than accidentally opening the proxy.
+if not __debug__:
+    raise RuntimeError('Veil policy boundary requires validation-enabled Python')
 
 
 def card(value):
@@ -41,6 +47,12 @@ def card(value):
 class Boundary:
     def __init__(self, runtime):
         self.runtime = Path(runtime)
+        self.worker_lock = (self.runtime / 'boundary.lock').open('a')
+        try:
+            fcntl.flock(self.worker_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            self.worker_lock.close()
+            raise RuntimeError('Only one staging boundary worker is supported') from None
         self.lock = asyncio.Lock()
         self.db = sqlite3.connect(self.runtime / 'policy.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS policies (id TEXT PRIMARY KEY, value TEXT, token TEXT, used INTEGER)')
@@ -51,8 +63,10 @@ class Boundary:
         self.http = aiohttp.ClientSession(connector=aiohttp.UnixConnector(path=str(self.runtime / 'synapse.sock')))
 
     async def stop(self, app):
-        await self.http.close()
+        if hasattr(self, 'http'):
+            await self.http.close()
         self.db.close()
+        self.worker_lock.close()
 
     async def upstream(self, method, path, body=None, auth=None):
         # Unix sockets have no remote IP. Supply our own fixed loopback address,

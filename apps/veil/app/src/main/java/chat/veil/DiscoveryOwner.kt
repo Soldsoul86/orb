@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.unit.dp
@@ -55,12 +56,12 @@ import org.portableidentity.core.IdentityCore
             Text("Services you offer")
             DiscoveryPublication.tags.getValue(category).forEach {t -> FilterChip(t in tags,{tags=if(t in tags)tags-t else tags+t;changed()},label={Text(t.replace('-',' '))})}
             Row {Checkbox(remote,{remote=it;changed()});Text("Available for remote work")}
-            Row {Checkbox(public,{public=it;changed()});Text("Make this profile searchable")}
+            Row {Checkbox(public,{public=it;changed()},modifier=Modifier.testTag("discovery-public"));Text("Make this profile searchable")}
             Text(if(public)"People can find your public profile. Your statements are self-declared." else "Private by default. Applying this choice removes an existing public listing.")
             OutlinedTextField(directory,{directory=it.trim();changed()},label={Text("Preview directory HTTPS address")},modifier=Modifier.fillMaxWidth())
             Button({review(JSONObject().put("v",1).put("visibility",if(public)"PUBLIC" else "PRIVATE").put("profile",if(public)JSONObject()
                 .put("alias",alias.trim()).put("purpose",purpose.trim()).put("category",category).put("tags",JSONArray(tags.sorted()))
-                .put("remote",remote).put("accepting",PurposePolicy.from(facet.getJSONObject("policy")).status==PurposeStatus.ACTIVE) else JSONObject()))},enabled=!a.busy){Text("Review profile")}
+                .put("remote",remote).put("accepting",PurposePolicy.from(facet.getJSONObject("policy")).let{it.status==PurposeStatus.ACTIVE && it.requests==RequestMode.REQUEST_APPROVAL}) else JSONObject()))},enabled=!a.busy){Text("Review profile")}
             val p=preview
             if(p!=null) {
                 Text("Review before publishing",style=MaterialTheme.typography.titleLarge)
@@ -75,7 +76,7 @@ import org.portableidentity.core.IdentityCore
                 if(p.optBoolean("pause"))Text("This change also pauses purpose access at your provider.")
                 if(advanced)Text(DiscoveryPublication.canonical(profile))
                 Text("Publishing changes discovery visibility as shown. Public profiles expire within 30 days or when your purpose expires, whichever is sooner. Copied profiles cannot be recalled.")
-                Row {Checkbox(consent,{consent=it});Text("I approve this profile, contact rules and visibility.")}
+                Row {Checkbox(consent,{consent=it},modifier=Modifier.testTag("discovery-consent"));Text("I approve this profile, contact rules and visibility.")}
                 Button({val draft=DiscoveryPublication.canonical(p);a.contactAction({publishDiscovery(selected,draft,directory)}){link=it;notice=if(it.isEmpty())"Public listing removed." else "Published. Your profile is searchable.";consent=false}},enabled=consent&&directory.isNotBlank()&&!a.busy){Text(if(p.getString("visibility")=="PUBLIC")"Publish" else "Unpublish")}
             }
             if(facet.optJSONObject("discovery")?.optBoolean("pending")==true) {
