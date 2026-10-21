@@ -170,3 +170,74 @@ jobs:
         run: |
           python -c "import json,os,pathlib,signal; p=pathlib.Path('runtime/pids.json'); [os.kill(pid,signal.SIGTERM) for pid in json.loads(p.read_text())] if p.exists() else None"
           rm -rf runtime web ../../../app/src/guestAndroidTest/assets ../../../app/build
+
+  phone-apk:
+    needs: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+      MATRIX_RUST_REV: 56bc59112822e7eb25943a95e02502855cdeef2d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;28.2.13676358
+          log-accepted-android-sdk-licenses: false
+      - name: Cache official SDK build (no runtime keys)
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: apps/veil/guest-web/matrix/integration/android/app/src/main/sdk
+          key: matrix-crypto-android-aarch64-56bc59112822e7eb25943a95e02502855cdeef2d-v1
+      - name: Build maintained upstream SDK Kotlin/JNI bindings
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          rustup target add aarch64-linux-android
+          cargo install cargo-ndk --version 4.1.2 --locked
+          git init sdk-source
+          git -C sdk-source remote add origin https://github.com/matrix-org/matrix-rust-sdk.git
+          git -C sdk-source fetch --depth=1 origin "$MATRIX_RUST_REV"
+          git -C sdk-source checkout --detach FETCH_HEAD
+          test "$(git -C sdk-source rev-parse HEAD)" = "$MATRIX_RUST_REV"
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+          test_dir="$PWD"
+          cd sdk-source
+          cargo xtask kotlin build-android-library --package crypto-sdk --profile dev --only-target aarch64-linux-android --src-dir "$test_dir/android/app/src/main/sdk"
+      - name: Save compiled SDK before instrumentation
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/veil/guest-web/matrix/integration/android/app/src/main/sdk
+          key: matrix-crypto-android-aarch64-56bc59112822e7eb25943a95e02502855cdeef2d-v1
+      - name: Build side-by-side Pixel test APK
+        run: |
+          gradle -p ../../.. -PveilPurposePreview=true -PveilGuestPilot=true :app:assembleDebug --console=plain
+          mkdir -p ../pilot/evidence
+          sha256sum ../../../app/build/outputs/apk/debug/app-debug.apk > ../pilot/evidence/phone-apk-sha256.txt
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs ../../../app/build/outputs/apk/debug/app-debug.apk > ../pilot/evidence/phone-apk-signing.txt
+          git rev-parse HEAD > ../pilot/evidence/phone-apk-commit.txt
+      - name: Installable arm64 test APK (not an upgrade of production Veil)
+        uses: actions/upload-artifact@v4
+        with:
+          name: veil-guest-pilot-pixel-arm64-apk
+          path: |
+            apps/veil/app/build/outputs/apk/debug/app-debug.apk
+            apps/veil/guest-web/matrix/pilot/evidence/phone-apk-*.txt

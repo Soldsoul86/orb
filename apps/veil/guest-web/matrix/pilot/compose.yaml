@@ -1,0 +1,36 @@
+name: veil-private-pilot
+services:
+  pilot:
+    build:
+      context: ../../..
+      dockerfile: guest-web/matrix/pilot/Dockerfile
+    ports:
+      - '${VEIL_LAN_IP:?Run mac-start.sh with your Mac private Wi-Fi IP}:8443:8443'
+    volumes:
+      - pilot-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8766/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '2' }
+  tls:
+    image: caddy:2.10.2-alpine
+    network_mode: service:pilot
+    depends_on:
+      pilot: { condition: service_healthy }
+    environment:
+      VEIL_LAN_IP: '${VEIL_LAN_IP}'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - pilot-tls:/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '5m', max-file: '2' }
+volumes:
+  pilot-data:
+  pilot-tls:

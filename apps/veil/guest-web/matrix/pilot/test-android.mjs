@@ -2,7 +2,7 @@ import {chromium} from '../integration/node_modules/playwright/index.mjs';
 import {readFile,writeFile,mkdir,readdir} from 'node:fs/promises';
 import {spawn,execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
-const pkg='chat.veil.purposes.preview',component=pkg+'.test/androidx.test.runner.AndroidJUnitRunner';
+const pkg='chat.veil.guest.pilot',component=pkg+'.test/androidx.test.runner.AndroidJUnitRunner';
 const adb=(...args)=>execFileSync('adb',args,{encoding:'utf8',stdio:['pipe','pipe','pipe']});
 async function readPublic(file){const deadline=Date.now()+180000;while(Date.now()<deadline){try{return JSON.parse(adb('shell','run-as',pkg,'cat','files/'+file));}catch{}await new Promise(r=>setTimeout(r,500));}throw Error('Timed out waiting for '+file);}
 function instrument(method){const child=spawn('adb',['shell','am','instrument','-w','-r','-e','class','chat.veil.GuestJourneyTest#'+method,component],{stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',()=>{});return new Promise((resolve,reject)=>child.on('exit',code=>code===0 && /OK \(1 test\)/.test(output)?resolve():reject(Error('Native instrumentation failed: '+output.slice(-4500)))));}

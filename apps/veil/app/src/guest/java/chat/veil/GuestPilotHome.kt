@@ -18,9 +18,10 @@ internal const val guestPilotEnabled=true
     var snapshot by remember{mutableStateOf<JSONObject?>(null)}
     var owner by remember{mutableStateOf("")};var origin by remember{mutableStateOf("")};var web by remember{mutableStateOf("")}
     var user by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
+    var name by remember{mutableStateOf("")};var purpose by remember{mutableStateOf("")}
     var selected by remember{mutableStateOf("")};var text by remember(selected){mutableStateOf("")};var qr by remember{mutableStateOf(false)}
     fun action(block:GuestOwner.()->Unit={}) {
-        a.contactAction({val guest=GuestOwner(this,a.filesDir);guest.block();guest.snapshot()}){snapshot=it}
+        a.contactAction({val guest=GuestOwner(this,a.filesDir);val outcome=runCatching{guest.block()};guest.snapshot().put("action_failed",outcome.isFailure)}){snapshot=it}
     }
     LaunchedEffect(Unit){action()}
     LaunchedEffect(snapshot?.optBoolean("configured")) {
@@ -32,8 +33,17 @@ internal const val guestPilotEnabled=true
         Text("Private pilot · encrypted guest channel")
         Text("Requests arrive while this inbox is open and unlocked. No background notifications or message previews.")
         if(a.portableNotice.isNotEmpty())Text(a.portableNotice)
+        if(snapshot?.optBoolean("action_failed")==true)Text("Action incomplete. Check the connection and permissions. Refresh retries the saved operation.")
         if(snapshot?.optBoolean("configured")!=true) {
-            Text("Choose an existing purpose. Your pilot operator supplies the private service and technical account.")
+            Text("Choose a purpose or create a disposable pilot identity. Your existing Veil installation is separate.")
+            if(contactEntries(a.portableSnapshot?.optJSONArray("facets")).isEmpty()) {
+                OutlinedTextField(name,{name=it.take(60)},label={Text("Your chosen name")})
+                OutlinedTextField(purpose,{purpose=it.take(240)},label={Text("What can people contact you about?")})
+                Button({a.contactAction({
+                    if(!ready())createIdentity()
+                    createFacet(PurposePolicy(name,description=purpose,timezone="UTC",discovery=DiscoveryMode.LINK_ONLY),web,false)
+                }){owner=it}},enabled=!a.busy && name.isNotBlank() && web.startsWith("https://")){Text("Create pilot purpose")}
+            }
             contactEntries(a.portableSnapshot?.optJSONArray("facets")).forEach {f->
                 OutlinedButton({owner=f.getString("id")},enabled=!a.busy){Text((if(owner==f.getString("id"))"✓ " else "")+f.getJSONObject("policy").getString("display_name"))}
             }
@@ -72,7 +82,7 @@ internal const val guestPilotEnabled=true
                     OutlinedButton({action{decide(selected,"blocked")}},enabled=!a.busy,modifier=Modifier.testTag("guest-block")){Text("Block this browser identity")}
                     if(status=="approved") {
                         OutlinedTextField(text,{text=it.take(4000)},label={Text("Reply")},modifier=Modifier.testTag("guest-reply"))
-                        Button({val body=text;text="";action{reply(selected,body)}},enabled=!a.busy && text.isNotBlank() && !c.optBoolean("pending"),modifier=Modifier.testTag("guest-send")){Text("Send reply")}
+                        Button({val body=text;action{reply(selected,body)}},enabled=!a.busy && text.isNotBlank() && !c.optBoolean("pending"),modifier=Modifier.testTag("guest-send")){Text("Send reply")}
                         OutlinedButton({action{decide(selected,"revoked")}},enabled=!a.busy,modifier=Modifier.testTag("guest-revoke")){Text("End access")}
                     }
                 }

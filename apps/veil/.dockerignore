@@ -1,0 +1,13 @@
+**/node_modules
+**/.gradle
+**/build
+**/runtime
+**/sdk-source
+**/sdk
+**/.venv
+**/__pycache__
+**/evidence
+**/guestAndroidTest/assets
+**/androidTest/assets
+**/*.jks
+**/*.keystore

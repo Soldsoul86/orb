@@ -10,8 +10,8 @@ android {
     compileSdk = 35
     ndkVersion = "27.0.12077973"
     defaultConfig {
-        applicationId = if (purposePreview) "chat.veil.purposes.preview" else "chat.veil"
-        resValue("string", "app_name", if (purposePreview) "Veil Purposes Preview" else "Veil")
+        applicationId = if (guestPilot) "chat.veil.guest.pilot" else if (purposePreview) "chat.veil.purposes.preview" else "chat.veil"
+        resValue("string", "app_name", if (guestPilot) "Veil Guest Pilot" else if (purposePreview) "Veil Purposes Preview" else "Veil")
         minSdk = 28
         targetSdk = 35
         versionCode = 9

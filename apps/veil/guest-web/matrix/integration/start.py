@@ -13,7 +13,7 @@ import aiohttp
 import yaml
 
 ROOT = Path(__file__).resolve().parent
-RUNTIME = ROOT / 'runtime'
+RUNTIME = Path(os.environ.get('VEIL_PILOT_RUNTIME', str(ROOT / 'runtime')))
 
 
 async def main():
