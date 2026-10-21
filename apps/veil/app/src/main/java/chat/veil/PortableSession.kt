@@ -444,6 +444,15 @@ class PortableSession(
         val c=contact(id);val f=facet(c.getString("local"))
         adopt(c,call(f,c.getString("route"),q("contact").put("id",id)));bind(c);c.remove("needs_migration");commit()
     }
+    // Matrix guest state is separate from Signal contacts; it remains inside the existing encrypted vault.
+    internal fun guestLoad():JSONObject = JSONObject((db.optJSONObject("matrix_guest") ?: JSONObject()).toString())
+    internal fun guestSave(value:JSONObject) {db.put("matrix_guest",JSONObject(value.toString()));commit()}
+    internal fun guestState(id:String):String {val f=facet(id);require(!f.optBoolean("needs_migration"));return f.getString("state")}
+    internal fun guestSign(id:String,payload:JSONObject,type:String):String {
+        require(type in setOf("pi-matrix-binding+jws","pi-matrix-enrollment+jws","pi-matrix-policy+jws","pi-matrix-message+jws"))
+        require(payload.getString("iss")==id)
+        val f=facet(id);require(!f.optBoolean("needs_migration"));return Core.sign(payload,f.getJSONObject("controller"),type)
+    }
     /** Public/display-only snapshot. Never return controller/device keys or Signal state to UI. */
     fun prepareInvitation(draft:String,kind:ContactExperience.Kind,p:PurposePolicy=ContactExperience.policy(kind),origin:String=ContactExperience.DEFAULT_PROVIDER):String {
         require(draft.matches(Regex("[a-f0-9]{32}")))

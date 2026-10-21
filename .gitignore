@@ -36,3 +36,5 @@ coverage/
 
 # Probe signing keys: throwaway test identities, never committed
 apps/pixel/*/keys/
+# Disposable private guest pilot instrumentation inputs (credentials).
+apps/veil/app/src/guestAndroidTest/assets/

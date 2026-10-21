@@ -125,6 +125,9 @@ class Boundary:
         self.db.commit()
         return web.json_response({'accepted': True})
 
+    def current(self, identifier, policy):
+        pass
+
     async def send(self, req, who):
         assert req.method == 'PUT' and re.fullmatch(r'/_matrix/client/v3/sendToDevice/m\.room\.encrypted/[A-Za-z0-9_-]{1,100}', req.path)
         raw = await req.read()
@@ -142,7 +145,8 @@ class Boundary:
                     found.append((identifier, p, used, os, sender, target, intro))
         assert len(found) == 1
         identifier, p, used, os, sender, target, intro = found[0]
-        assert p['status'] != 'revoked' and time.time() < p['expires']
+        self.current(identifier, p)
+        assert p['status'] in ('pending', 'approved') and time.time() < p['expires']
         assert active(os['policy'], time.time()) and is_open(os['policy'], time.time())
         assert {'algorithm', 'sender_key', 'ciphertext'} <= set(content) <= {'algorithm', 'sender_key', 'ciphertext', 'org.matrix.msgid'}
         if 'org.matrix.msgid' in content:

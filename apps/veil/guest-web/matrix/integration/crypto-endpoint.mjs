@@ -11,14 +11,18 @@ const quiet = { debug() {}, info() {}, warn() {}, error() {} };
 
 export class CryptoEndpoint {
   #machine; #request; #queue = Promise.resolve(); #stopped = false;
-  #since = ''; #poll; #failure; #onMessage;
+  #since = ''; #poll; #failure; #onMessage; #checkpoint; #onError;
 
-  static async open({ userId, deviceId, request, onMessage, storeName, storePassphrase }) {
+  static async open({ userId, deviceId, request, onMessage, storeName, storePassphrase, expectedKeys, since = '', checkpoint = async () => {}, onError }) {
     await initAsync();
     const endpoint = new CryptoEndpoint();
     endpoint.#request = request;
     endpoint.#onMessage = onMessage;
+    endpoint.#since = since; endpoint.#checkpoint = checkpoint; endpoint.#onError = onError;
     endpoint.#machine = await OlmMachine.initialize(new UserId(userId), new DeviceId(deviceId), storeName, storePassphrase, quiet);
+    if (expectedKeys && (endpoint.keys.ed25519 !== expectedKeys.ed25519 || endpoint.keys.curve25519 !== expectedKeys.curve25519)) {
+      endpoint.#machine.close(); throw Error('Encryption storage was lost. This conversation cannot be resumed.');
+    }
     await endpoint.#drain();
     return endpoint;
   }
@@ -92,7 +96,12 @@ export class CryptoEndpoint {
     this.#poll = (async () => {
       while (!this.#stopped) {
         try { await this.#sync(); }
-        catch (error) { if (!this.#stopped) this.#failure = error; break; }
+        catch (error) {
+          if (this.#stopped) break;
+          if (!this.#onError) { this.#failure = error; break; }
+          this.#onError(error);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     })();
   }
@@ -120,6 +129,7 @@ export class CryptoEndpoint {
         } finally { event.free(); }
       }
       await this.#drain();
+      await this.#checkpoint(result.next_batch);
       this.#since = result.next_batch;
     });
   }
