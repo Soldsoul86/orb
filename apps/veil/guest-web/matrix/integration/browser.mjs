@@ -54,7 +54,7 @@ async function pinPeer(value, pin) {
 }
 async function init(account) {
   const login = await fetch(base + '/_matrix/client/v3/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'm.login.password', identifier: { type: 'm.id.user', user: account.username }, password: account.password, device_id: account.device }) }).then(r => r.json());
-  assert(login.access_token, 'login');
+  assert(login.access_token, 'login: ' + String(login.errcode) + ' ' + String(login.error));
   accessToken = login.access_token;
   client = createClient({ baseUrl: base, userId: login.user_id, deviceId: login.device_id, accessToken, timelineSupport: false });
   await client.initRustCrypto();
