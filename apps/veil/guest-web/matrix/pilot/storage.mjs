@@ -8,10 +8,10 @@ export async function storage() {
     r.onblocked=()=>reject(Error('Close other Veil tabs before continuing.'));
   }); } catch { throw Error("Browser storage is unavailable. Enable storage and reload to message here."); }
   async function transaction(mode, op) {
-    return new Promise((resolve,reject)=> {
+    try { return await new Promise((resolve,reject)=> {
       const t=db.transaction('conversations',mode,{durability:'strict'}), r=op(t.objectStore('conversations'));
       t.oncomplete=()=>resolve(r?.result); t.onerror=t.onabort=()=>reject(Error('Could not save this conversation. Do not clear browser data; close other tabs and retry.'));
-    });
+    }); } catch { throw Error('Could not save this conversation. Do not clear browser data; close other tabs and retry.'); }
   }
   return { get:id=>transaction('readonly',s=>s.get(id)), put:(id,value,index)=>transaction('readwrite',s=>{s.put(value,id);if(index)s.put(id,index);}), close:()=>db.close() };
 }

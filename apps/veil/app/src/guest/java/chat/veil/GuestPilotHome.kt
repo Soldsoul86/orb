@@ -21,7 +21,7 @@ internal const val guestPilotEnabled=true
     var name by remember{mutableStateOf("")};var purpose by remember{mutableStateOf("")}
     var selected by remember{mutableStateOf("")};var text by remember(selected){mutableStateOf("")};var qr by remember{mutableStateOf(false)}
     fun action(block:GuestOwner.()->Unit={}) {
-        a.contactAction({val guest=GuestOwner(this,a.filesDir);val outcome=runCatching{guest.block()};guest.snapshot().put("action_failed",outcome.isFailure)}){snapshot=it}
+        a.contactAction({val guest=GuestOwner(this,a.filesDir);val outcome=runCatching{guest.block()};outcome.exceptionOrNull()?.let{e->android.util.Log.w("VeilGuest","Operation incomplete at GuestOwner line "+(e.stackTrace.firstOrNull{it.className=="chat.veil.GuestOwner"}?.lineNumber ?: 0)+" ("+e.javaClass.simpleName+")")};guest.snapshot().put("action_failed",outcome.isFailure)}){snapshot=it}
     }
     LaunchedEffect(Unit){action()}
     LaunchedEffect(snapshot?.optBoolean("configured")) {

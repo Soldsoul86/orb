@@ -33,4 +33,7 @@ try {
  await mkdir(new URL('evidence/',import.meta.url),{recursive:true});
  await writeFile(new URL('evidence/android.json',import.meta.url),JSON.stringify({commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browser:browser.version(),androidApi:adb('shell','getprop','ro.build.version.sdk').trim(),...first,...second,plaintextAbsent:true,usableMs,requestMs,requestArrivalObservedMs,requestThroughReplyMs:replyMs,measurement:'Loopback/emulator automated interaction. Human comprehension, camera and mobile data NOT TESTED.'},null,2));
  console.log('PASS actual Veil Android inbox, UI approval/reply, browser process restart, Android process restart, continuation, revocation, plaintext absence');
+}catch(error){
+ try{console.error(adb('logcat','-d','-s','VeilGuest:W','*:S'));}catch{}
+ throw error;
 }finally{await context?.close();await browser.close();}
