@@ -32,12 +32,20 @@ class GuestJourneyTest {
         waitText("Browser visitor 1")
         ui.onNodeWithTag("guest-conversation-0").performScrollTo().performClick()
         waitText("PILOT_REQUEST_CANARY_91f7")
+        public("pilot-arrival.json",JSONObject().put("requestInInbox",true))
         ui.onNodeWithTag("guest-approve").performScrollTo().performClick()
         waitText("Approved")
         ui.onNodeWithTag("guest-reply").performScrollTo().performTextInput("PILOT_REPLY_CANARY_39a2")
         ui.waitUntil(30000){!ui.activity.busy}
         ui.onNodeWithTag("guest-send").performScrollTo().performClick()
         waitText("Received by service")
+        ui.runOnIdle {
+            val v=ui.activity.window.decorView
+            val image=android.graphics.Bitmap.createBitmap(v.width,v.height,android.graphics.Bitmap.Config.ARGB_8888)
+            v.draw(android.graphics.Canvas(image))
+            File(files,"pilot-reply.png").outputStream().use{image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
+            image.recycle()
+        }
         public("pilot-replied.json",JSONObject().put("actualVeilInbox",true).put("uiApproval",true).put("uiReply",true))
     }
     @Test fun processRestartContinuationAndRevoke() {

@@ -1,11 +1,12 @@
 // Private staging only. No wildcard listener or public-send switch.
 import {build} from '../integration/node_modules/esbuild/lib/main.js';
 import {createServer} from 'node:http';
-import {readFile, mkdir, readdir, copyFile} from 'node:fs/promises';
+import {readFile, mkdir, readdir, copyFile, rm} from 'node:fs/promises';
 import {resolve,basename,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const test=process.argv.includes('--test');
 const root=dirname(fileURLToPath(import.meta.url)), out=resolve(root,'web');
+await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
 await build({entryPoints:[resolve(root,'app.mjs'),...(test?[resolve(root,'fixture.mjs')]:[])],bundle:true,format:'esm',splitting:true,outdir:out,nodePaths:[resolve(root,'../integration/node_modules')],loader:{'.wasm':'file'},logLevel:'warning'});
 async function wasm(dir){for(const e of await readdir(dir,{withFileTypes:true})){const f=resolve(dir,e.name);if(e.isDirectory())await wasm(f);else if(e.name.endsWith('.wasm'))await copyFile(f,resolve(out,e.name));}}
@@ -23,7 +24,7 @@ const server=createServer(async(req,res)=>{
     let file,type;
     if(req.url==='/' || req.url==='/contact' || /^\/g\/[A-Za-z0-9_-]{43}$/.test(req.url)){file=resolve(root,'index.html');type='text/html';}
     else if(req.url==='/style.css'){file=resolve(root,'style.css');type='text/css';}
-    else {const name=basename(req.url);if(!/^[A-Za-z0-9_-]+\.(js|wasm)$/.test(name))throw Error();file=resolve(out,name);type=name.endsWith('.wasm')?'application/wasm':'text/javascript';}
+    else {const name=basename(req.url);if(!test && name.startsWith('fixture'))throw Error();if(!/^[A-Za-z0-9_-]+\.(js|wasm)$/.test(name))throw Error();file=resolve(out,name);type=name.endsWith('.wasm')?'application/wasm':'text/javascript';}
     res.setHeader('Content-Type',type);res.end(await readFile(file));
   }catch{res.statusCode=404;res.end('Unavailable');}
 });

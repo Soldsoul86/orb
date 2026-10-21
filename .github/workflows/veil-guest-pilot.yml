@@ -48,7 +48,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: guest-pilot-browser-results
-          path: apps/veil/guest-web/matrix/pilot/evidence/*.json
+          path: |
+            apps/veil/guest-web/matrix/pilot/evidence/*.json
+            apps/veil/guest-web/matrix/pilot/evidence/*.png
           if-no-files-found: ignore
       - name: Destroy disposable accounts, keys and stores
         if: always()
@@ -134,7 +136,7 @@ jobs:
       - name: Actual Veil browser request and Android inbox UI reply
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 36
           arch: x86_64
           target: google_apis
           profile: pixel_2
@@ -149,7 +151,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: guest-pilot-android-results
-          path: apps/veil/guest-web/matrix/pilot/evidence/*.json
+          path: |
+            apps/veil/guest-web/matrix/pilot/evidence/*.json
+            apps/veil/guest-web/matrix/pilot/evidence/*.png
           if-no-files-found: ignore
       - name: Record test APK provenance
         if: success()

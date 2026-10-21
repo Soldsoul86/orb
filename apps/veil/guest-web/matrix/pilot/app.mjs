@@ -61,7 +61,7 @@ async function connect() {
   if(!endpoint)endpoint=await CryptoEndpoint.open({userId:data.login.user_id,deviceId:data.login.device_id,request:api,
     storeName:'veil-crypto-'+data.localId,storePassphrase:data.passphrase,expectedKeys:data.keys,since:data.since,
     checkpoint:async since=>{data.since=since;await save();},
-    onError:()=>{status='Connection interrupted. Keep this page open or return here later.';render();},
+    onError:error=>{status=fatal?error.message:'Connection interrupted. Keep this page open or return here later.';render();},
     onMessage:async payload=>{
       try {
       const event=payload.message;
@@ -134,7 +134,7 @@ function render() {
   $('name').textContent=owner?.state.policy.display_name || 'Private message';
   $('purpose').textContent=owner?.state.policy.description || '';
   let ended=false;
-  try {if(enrollmentValue)permission();}catch(error){status=error.message;ended=true;}
+  try {if(enrollmentValue && !fatal)permission();}catch(error){status=error.message;ended=true;}
   $('status').textContent=status;
   $('send').textContent=data?.outbox?'Retry saved message':data?.sent?'Send message':'Send request';
   $('send').disabled=!active || busy || fatal || ended || (data?.sent && data.permission!=='approved' && !data.outbox);

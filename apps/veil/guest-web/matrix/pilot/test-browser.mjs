@@ -18,6 +18,21 @@ try {
  await page.locator('#message').fill('PILOT_REQUEST_CANARY_91f7');
  let disrupted=false;await page.route('**/_matrix/client/v3/sendToDevice/**',async route=>{if(!disrupted){disrupted=true;await route.fetch();await route.abort();}else await route.continue();});
  await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('send').textContent==='Retry saved message'&&!document.getElementById('send').disabled);
+ // Direct API attempts deliberately bypass all UI checks.
+ const denied=await page.evaluate(async()=>{
+   const localId=new URLSearchParams(location.hash.slice(1)).get('conversation');
+   const db=await new Promise(r=>{const q=indexedDB.open('veil-pilot-v1');q.onsuccess=()=>r(q.result);});
+   const record=await new Promise(r=>{const q=db.transaction('conversations').objectStore('conversations').get(localId);q.onsuccess=()=>r(q.result);});db.close();
+   const call=async(path,method,body)=>fetch(path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+record.login.access_token},body:JSON.stringify(body)}).then(r=>r.status);
+   const statuses=[];
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.encrypted/new-txn','PUT',record.outbox.body));
+   const changed=structuredClone(record.outbox.body);const message=Object.values(Object.values(changed.messages)[0])[0];Object.values(message.ciphertext)[0].body='A'.repeat(80);
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.encrypted/'+record.outbox.id,'PUT',changed));
+   statuses.push(await call('/_matrix/client/v3/createRoom','POST',{}));
+   statuses.push(await call('/_matrix/client/v3/sendToDevice/m.room.message/plain','PUT',{messages:{}}));
+   return statuses;
+ });
+ assert.deepEqual(denied,[403,403,403,403]);pass('direct APIs deny extra introduction, altered exact retry, rooms and plaintext');
  const saved=page.url();assert(saved.includes('conversation='));
  const conversations=await call(owner,'sync');assert.equal(conversations.length,1);const id=conversations[0].id;
  await owner.waitForFunction(()=>window.fixture.messages.length===1,{},{timeout:45000});
@@ -32,6 +47,10 @@ try {
  await page.close();const reopened=await context.newPage();await reopened.goto(saved);await reopened.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'));await reopened.waitForFunction(()=>!document.getElementById('send').disabled);
  await reopened.locator('#message').fill('PILOT_CONTINUE_CANARY_c3bf');await reopened.locator('#send').click();await owner.waitForFunction(()=>window.fixture.messages.length===2,{},{timeout:45000});pass('reopen same browser resumes private conversation and sends continuation');
  await call(owner,'decide',id,'blocked');await reopened.locator('#refresh').click();await reopened.waitForFunction(()=>document.getElementById('status').textContent.includes('blocked'));assert(await reopened.locator('#send').isDisabled());pass('signed block disables continued messaging');
+ await reopened.close();const storagePage=await context.newPage();await storagePage.goto('http://127.0.0.1:8766/fixture');
+ const removed=await storagePage.evaluate(async()=>{let n=0;for(const db of await indexedDB.databases()){if(db.name.includes('veil-crypto-')){await new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase(db.name);r.onsuccess=resolve;r.onerror=reject;});n++;}}return n;});assert(removed>0);
+ await storagePage.goto(saved);await storagePage.waitForFunction(()=>document.getElementById('status').textContent.includes('Encryption storage was lost'));assert(await storagePage.locator('#send').isDisabled());pass('lost SDK storage refuses to replace the saved encryption identity');
+ const deniedContext=await browser.newContext();contexts.push(deniedContext);await deniedContext.addInitScript(()=>Object.defineProperty(globalThis,'indexedDB',{get(){throw new DOMException('denied','SecurityError');}}));const deniedPage=await deniedContext.newPage();await deniedPage.goto(link);await deniedPage.waitForFunction(()=>document.getElementById('status').textContent.includes('Browser storage is unavailable'));assert(await deniedPage.locator('#send').isDisabled());pass('storage permission denial gives an actionable failure without sending');
  const emptyContext=await browser.newContext();contexts.push(emptyContext);const empty=await emptyContext.newPage();await empty.goto(saved);await empty.waitForFunction(()=>document.getElementById('status').textContent.includes('Browser data was lost'));assert(await empty.locator('#send').isDisabled());pass('lost browser storage fails without creating a replacement identity');
  const wrong=await emptyContext.newPage();await wrong.goto(link.replace(/owner=[^&]+/,'owner=urn%3Aietf%3Aparams%3Aoauth%3Ajwk-thumbprint%3Asha-256%3Ainvalid'));await wrong.waitForFunction(()=>document.getElementById('status').textContent.includes('could not be verified'));assert(await wrong.locator('#send').isDisabled());pass('controller substitution rejected against link pin');
  const paths=(await readdir(runtime)).filter(n=>/\.(db|sqlite)(-wal|-shm)?$|\.(log|jsonl)$/.test(n));

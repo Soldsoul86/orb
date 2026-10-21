@@ -10,13 +10,17 @@ const browser=await chromium.launch({headless:true,...(process.env.VEIL_TEST_CHR
 const profile=new URL('browser-profile/',new URL('../integration/runtime/',import.meta.url)).pathname;
 let context;
 try {
+ await mkdir(new URL('evidence/',import.meta.url),{recursive:true});
  const phase1=instrument('requestApprovalReply');phase1.catch(()=>{});
  const {link}=await readPublic('pilot-public.json');
  context=await chromium.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},...(process.env.VEIL_TEST_CHROMIUM?{executablePath:process.env.VEIL_TEST_CHROMIUM}:{})});
  const page=await context.newPage();const start=performance.now();await page.goto(link);await page.waitForFunction(()=>!document.getElementById('send').disabled);const usableMs=performance.now()-start;
  await page.locator('#message').fill('PILOT_REQUEST_CANARY_91f7');const sending=performance.now();await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('status').textContent.includes('Received by service'),{},{timeout:60000});const requestMs=performance.now()-sending;
+ await readPublic('pilot-arrival.json');const requestArrivalObservedMs=performance.now()-sending;
  await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'),{},{timeout:180000});const replyMs=performance.now()-sending;
  const saved=page.url();const first=await readPublic('pilot-replied.json');await phase1;
+ await page.screenshot({path:new URL('evidence/browser-reply.png',import.meta.url).pathname});
+ await writeFile(new URL('evidence/android-reply.png',import.meta.url),execFileSync('adb',['exec-out','run-as',pkg,'cat','files/pilot-reply.png']));
  await context.close();context=null;
  adb('shell','am','force-stop',pkg);
  const phase2=instrument('processRestartContinuationAndRevoke');phase2.catch(()=>{});
@@ -27,6 +31,6 @@ try {
  const runtime=new URL('../integration/runtime/',import.meta.url);
  for(const file of (await readdir(runtime)).filter(n=>/\.(db|sqlite)(-wal|-shm)?$|\.(log|jsonl)$/.test(n))){const b=await readFile(new URL(file,runtime));for(const canary of ['PILOT_REQUEST_CANARY_91f7','PILOT_REPLY_CANARY_39a2','PILOT_CONTINUE_CANARY_c3bf'])assert(!b.includes(Buffer.from(canary)));}
  await mkdir(new URL('evidence/',import.meta.url),{recursive:true});
- await writeFile(new URL('evidence/android.json',import.meta.url),JSON.stringify({commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browser:browser.version(),androidApi:adb('shell','getprop','ro.build.version.sdk').trim(),...first,...second,plaintextAbsent:true,usableMs,requestMs,requestThroughReplyMs:replyMs,measurement:'Loopback/emulator automated interaction. Human comprehension, camera and mobile data NOT TESTED.'},null,2));
+ await writeFile(new URL('evidence/android.json',import.meta.url),JSON.stringify({commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),browser:browser.version(),androidApi:adb('shell','getprop','ro.build.version.sdk').trim(),...first,...second,plaintextAbsent:true,usableMs,requestMs,requestArrivalObservedMs,requestThroughReplyMs:replyMs,measurement:'Loopback/emulator automated interaction. Human comprehension, camera and mobile data NOT TESTED.'},null,2));
  console.log('PASS actual Veil Android inbox, UI approval/reply, browser process restart, Android process restart, continuation, revocation, plaintext absence');
 }finally{await context?.close();await browser.close();}
