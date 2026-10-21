@@ -101,6 +101,34 @@ class PortableSession(
         values(contacts()).filter {it.getString("local")==id}.forEach {contacts().remove(it.getString("id"))}
         facets().remove(id);commit()
     }
+    /** Explicitly reviewed opt-in publication. Keys never leave the encrypted vault. */
+    fun signDiscovery(id:String,raw:String):String {
+        val r=org.portableidentity.core.DiscoveryPublication.request(raw)
+        val f=facet(id);val previous=payload(f);val p=PurposePolicy.from(previous.getJSONObject("policy"))
+        require(!f.optBoolean("needs_migration"))
+        require(!f.optBoolean("discovery_deleted")) {"Deleted listings cannot be reopened; choose another purpose"}
+        val visibility=r.getString("visibility");val removed=visibility in setOf("PRIVATE","DELETED")
+        require(removed || p.status!=PurposeStatus.REVOKED)
+        val mode=when(visibility){"PUBLIC"->DiscoveryMode.PUBLIC_SEARCHABLE;"LINK_ONLY"->DiscoveryMode.LINK_ONLY;else->DiscoveryMode.UNLISTED}
+        val next=p.copy(discovery=mode,status=if(r.optBoolean("pause"))PurposeStatus.PAUSED else p.status,version=p.version+1)
+        if(!removed && r.getJSONObject("profile").optBoolean("accepting"))require(next.status==PurposeStatus.ACTIVE && next.requests==RequestMode.REQUEST_APPROVAL)
+        // Existing provider authorizes the policy change; failure leaves export pending, never falsely published.
+        if(p.status!=PurposeStatus.REVOKED && (p.discovery!=mode || p.status!=next.status))updatePolicy(id,next,visibility=="PUBLIC")
+        else publish(id)
+        val now=clock();val expiry=if(p.expiresAt>0)minOf(now+30*86400,p.expiresAt) else now+30*86400
+        require(removed || expiry>now)
+        val revision=f.optLong("discovery_revision",0)+1;require(revision<=1000000)
+        val body=JSONObject().put("v",1).put("controller",id).put("revision",revision)
+            .put("created",f.optLong("discovery_created",now)).put("issued",now).put("expires",if(removed)now+30*86400 else expiry)
+            .put("visibility",visibility).put("consent",visibility=="PUBLIC").put("profile",r.getJSONObject("profile"))
+            .put("state",if(removed)JSONObject.NULL else f.getString("state"))
+        val token=org.portableidentity.core.DiscoveryPublication.sign(body,f.getJSONObject("controller"))
+        val export=JSONObject().put("publication",token).toString()
+        f.put("discovery_revision",revision).put("discovery_created",body.getLong("created")).put("discovery_export",export)
+        if(visibility=="DELETED")f.put("discovery_deleted",true)
+        commit();return export
+    }
+    fun discoveryExport(id:String):String = facet(id).optString("discovery_export")
     fun card(id:String)=JSONObject().put("v",1).put("state",facet(id).getString("state")).toString()
     fun inspectCard(card:String)=validateState(JSONObject(card).getString("state"))
     fun search(asFacet:String,origin:String,query:String):List<String> {

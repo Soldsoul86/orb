@@ -49,6 +49,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
         return
     }
     LaunchedEffect(Unit) {if(s==null && !a.busy)a.contactAction({})}
+    if(page=="discovery") { DiscoveryOwner(a,facets);return }
     val invitation=facets.firstOrNull {it.getString("id")==a.contactSelected}?.optJSONObject("invitation")
     val qrLink=invitation?.optString("link").orEmpty()
     if(page=="invitation" && qrLink.isNotBlank() && !qrDetails) {
@@ -164,6 +165,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                 }
                 1 -> {
                     Heading("Ways to reach me","Private invitations with clear boundaries.")
+                    OutlinedButton({a.contactPage="discovery"},modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Be found · discovery preview")}
                     Action("New contact",!a.busy,a::newContact)
                     facets.filter {it.has("invitation")}.forEach {f ->
                         OutlinedButton({a.contactSelected=f.getString("id");a.contactPage="invitation"},modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {

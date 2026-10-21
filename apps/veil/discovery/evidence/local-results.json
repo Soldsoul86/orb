@@ -1,0 +1,42 @@
+{
+  "integration_base": "53eee234b03fb731b434662f2bd041d3755ca843",
+  "branch": "feat/veil-discovery-v01",
+  "discovery_tests": 18,
+  "provider_postgres_tests": 20,
+  "relay_postgres_tests": 32,
+  "guest_node_tests": 11,
+  "guest_python_tests": 4,
+  "mobile_chromium": "PASS including Python and Kotlin public statements",
+  "browser_android_e2ee": "BLOCKED",
+  "android_instrumentation": "COMPILED locally; execution pending draft CI",
+  "physical_device": "NOT TESTED",
+  "identity-core": {
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "app": {
+    "tests": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 29
+  },
+  "search": {
+    "cases": 80,
+    "per_category": 20,
+    "ambiguous": 15,
+    "hard_negatives": 16,
+    "precision_at_3_fixed_denominator": 0.4635,
+    "precision_at_3_returned_results": 1.0,
+    "recall_at_5": 1.0,
+    "zero_result_precision": 1.0,
+    "hard_constraint_violation_count": 0,
+    "relevance_violation_count": 0,
+    "exact_set_passes": 80
+  }
+}

@@ -1,0 +1,881 @@
+{
+  "cases": 80,
+  "per_category": 20,
+  "ambiguous": 15,
+  "hard_negatives": 16,
+  "precision_at_3_fixed_denominator": 0.4635,
+  "precision_at_3_returned_results": 1.0,
+  "recall_at_5": 1.0,
+  "zero_result_precision": 1.0,
+  "hard_constraint_violation_count": 0,
+  "relevance_violation_count": 0,
+  "exact_set_passes": 80,
+  "details": [
+    {
+      "id": "1-01",
+      "query": "Build a small business website",
+      "expected": [
+        "web",
+        "web-budget"
+      ],
+      "actual": [
+        "web",
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-02",
+      "query": "Develop a web application",
+      "expected": [
+        "web"
+      ],
+      "actual": [
+        "web"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-03",
+      "query": "Automate spreadsheet reports",
+      "expected": [
+        "automation"
+      ],
+      "actual": [
+        "automation"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-04",
+      "query": "Integrate our CRM",
+      "expected": [
+        "automation"
+      ],
+      "actual": [
+        "automation"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-05",
+      "query": "Develop an Android app",
+      "expected": [
+        "mobile"
+      ],
+      "actual": [
+        "mobile"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-06",
+      "query": "Build an iPhone application",
+      "expected": [
+        "mobile"
+      ],
+      "actual": [
+        "mobile"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-07",
+      "query": "Create an internal dashboard",
+      "expected": [
+        "automation"
+      ],
+      "actual": [
+        "automation"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-08",
+      "query": "Add AI integration to our workflow",
+      "expected": [
+        "automation"
+      ],
+      "actual": [
+        "automation"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-09",
+      "query": "A remote website builder under $500",
+      "expected": [
+        "web-budget"
+      ],
+      "actual": [
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-10",
+      "query": "Build a website around $500",
+      "expected": [
+        "web",
+        "web-budget"
+      ],
+      "actual": [
+        "web-budget",
+        "web"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-11",
+      "query": "Website in Spanish",
+      "expected": [
+        "web-budget"
+      ],
+      "actual": [
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-12",
+      "query": "An app developer to implement an interface",
+      "expected": [
+        "mobile"
+      ],
+      "actual": [
+        "mobile"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-13",
+      "query": "Build a landing page with a logo",
+      "expected": [
+        "web",
+        "web-budget"
+      ],
+      "actual": [
+        "web",
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-14",
+      "query": "Develop an Android app with SEO",
+      "expected": [
+        "mobile"
+      ],
+      "actual": [
+        "mobile"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-15",
+      "query": "Build a website accepting new enquiries",
+      "expected": [
+        "web",
+        "web-budget"
+      ],
+      "actual": [
+        "web",
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-16",
+      "query": "Build a website can start within 7 days",
+      "expected": [
+        "web-budget"
+      ],
+      "actual": [
+        "web-budget"
+      ],
+      "pass": true
+    },
+    {
+      "id": "1-17",
+      "query": "Plumber near me",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "1-18",
+      "query": "Build a website under $100",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "1-19",
+      "query": "Android developer in French",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "1-20",
+      "query": "Urgent legal representation for an app",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "2-01",
+      "query": "Redesign the UI of my Android app",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-02",
+      "query": "Android app redesign",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-03",
+      "query": "Improve mobile user experience",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-04",
+      "query": "Interface redesign for my website",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-05",
+      "query": "Create a startup logo",
+      "expected": [
+        "brand"
+      ],
+      "actual": [
+        "brand"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-06",
+      "query": "Design a brand identity",
+      "expected": [
+        "brand"
+      ],
+      "actual": [
+        "brand"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-07",
+      "query": "Graphic design for a poster",
+      "expected": [
+        "brand"
+      ],
+      "actual": [
+        "brand"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-08",
+      "query": "Edit a short promo video",
+      "expected": [
+        "media"
+      ],
+      "actual": [
+        "media"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-09",
+      "query": "Motion animation for a product",
+      "expected": [
+        "media"
+      ],
+      "actual": [
+        "media"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-10",
+      "query": "Design a pitch deck presentation",
+      "expected": [
+        "media"
+      ],
+      "actual": [
+        "media"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-11",
+      "query": "Remote UX research in Spanish",
+      "expected": [
+        "interface"
+      ],
+      "actual": [
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-12",
+      "query": "UI redesign in person in London",
+      "expected": [
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-13",
+      "query": "Logo under $500",
+      "expected": [
+        "brand"
+      ],
+      "actual": [
+        "brand"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-14",
+      "query": "UI redesign around $500",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-15",
+      "query": "Design an interface for a Python app",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-16",
+      "query": "Redesign an app with marketing analytics",
+      "expected": [
+        "interface",
+        "interface-local"
+      ],
+      "actual": [
+        "interface-local",
+        "interface"
+      ],
+      "pass": true
+    },
+    {
+      "id": "2-17",
+      "query": "Medical diagnosis from a designer",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "2-18",
+      "query": "Logo under $200",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "2-19",
+      "query": "UI designer near me",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "2-20",
+      "query": "Logo must be certified",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "3-01",
+      "query": "Improve Google search traffic",
+      "expected": [
+        "seo",
+        "seo-local"
+      ],
+      "actual": [
+        "seo",
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-02",
+      "query": "SEO for our business",
+      "expected": [
+        "seo",
+        "seo-local"
+      ],
+      "actual": [
+        "seo",
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-03",
+      "query": "Improve search visibility",
+      "expected": [
+        "seo",
+        "seo-local"
+      ],
+      "actual": [
+        "seo",
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-04",
+      "query": "Create Instagram content",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-05",
+      "query": "Help with product positioning",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-06",
+      "query": "Write copy for a campaign",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-07",
+      "query": "Set up paid ad campaigns",
+      "expected": [
+        "ads"
+      ],
+      "actual": [
+        "ads"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-08",
+      "query": "Marketing analytics dashboard",
+      "expected": [
+        "seo",
+        "ads"
+      ],
+      "actual": [
+        "seo",
+        "ads"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-09",
+      "query": "Content strategy for an app",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-10",
+      "query": "Remote SEO consultant",
+      "expected": [
+        "seo"
+      ],
+      "actual": [
+        "seo"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-11",
+      "query": "Local SEO in London",
+      "expected": [
+        "seo-local"
+      ],
+      "actual": [
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-12",
+      "query": "Copywriting in Spanish",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-13",
+      "query": "Paid ads under $800",
+      "expected": [
+        "ads"
+      ],
+      "actual": [
+        "ads"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-14",
+      "query": "SEO around $500",
+      "expected": [
+        "seo",
+        "seo-local"
+      ],
+      "actual": [
+        "seo",
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-15",
+      "query": "SEO and website strategy",
+      "expected": [
+        "seo",
+        "seo-local"
+      ],
+      "actual": [
+        "seo",
+        "seo-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-16",
+      "query": "Brand positioning and social media",
+      "expected": [
+        "content"
+      ],
+      "actual": [
+        "content"
+      ],
+      "pass": true
+    },
+    {
+      "id": "3-17",
+      "query": "Financial advice about advertising",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "3-18",
+      "query": "SEO under $300",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "3-19",
+      "query": "SEO in German",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "3-20",
+      "query": "SEO guaranteed first place",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "4-01",
+      "query": "Learn Python from a tutor",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-02",
+      "query": "Python teacher",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-03",
+      "query": "Coding tutor",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-04",
+      "query": "Get help understanding SQL",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-05",
+      "query": "Conversational Spanish lessons",
+      "expected": [
+        "language"
+      ],
+      "actual": [
+        "language"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-06",
+      "query": "English lessons online",
+      "expected": [
+        "language"
+      ],
+      "actual": [
+        "language"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-07",
+      "query": "Learn Excel",
+      "expected": [
+        "coding",
+        "skills"
+      ],
+      "actual": [
+        "coding",
+        "skills"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-08",
+      "query": "Professional skills coaching",
+      "expected": [
+        "skills"
+      ],
+      "actual": [
+        "skills"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-09",
+      "query": "Learn Python remotely",
+      "expected": [
+        "coding"
+      ],
+      "actual": [
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-10",
+      "query": "SQL tutor in person in London",
+      "expected": [
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-11",
+      "query": "Coding lessons under $70 per hour",
+      "expected": [
+        "coding"
+      ],
+      "actual": [
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-12",
+      "query": "Spanish lessons in English",
+      "expected": [
+        "language"
+      ],
+      "actual": [
+        "language"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-13",
+      "query": "Aprender espa\u00f1ol con un profesor",
+      "expected": [
+        "language"
+      ],
+      "actual": [
+        "language"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-14",
+      "query": "Teach coding for Android apps",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-15",
+      "query": "Learn SQL for marketing analytics",
+      "expected": [
+        "coding",
+        "coding-local"
+      ],
+      "actual": [
+        "coding-local",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-16",
+      "query": "Software skills coaching for designers",
+      "expected": [
+        "coding",
+        "skills"
+      ],
+      "actual": [
+        "skills",
+        "coding"
+      ],
+      "pass": true
+    },
+    {
+      "id": "4-17",
+      "query": "Medical diagnosis lessons",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "4-18",
+      "query": "Python tutor under $10 per hour",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "4-19",
+      "query": "Coding tutor in Arabic",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    },
+    {
+      "id": "4-20",
+      "query": "Urgent legal representation",
+      "expected": [],
+      "actual": [],
+      "pass": true
+    }
+  ]
+}
