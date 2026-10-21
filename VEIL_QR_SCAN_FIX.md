@@ -6,7 +6,7 @@ v9 gives the invitation QR a dedicated layout inside the same secured Activity. 
 
 The user reports that Google Lens never recognizes the QR, rather than showing a warning after recognizing a URL. The clipping defect is established from the layout. Its role in this particular physical scanning failure is not yet confirmed.
 
-Verification to record after execution:
+Verification scope:
 - Render/decode the entire QR without any scrolling on compact portrait and landscape layouts, at 1x and 2x font scales, in light and dark themes.
 - Create a real invitation on emulator A, decode its initial Activity rendering with FLAG_SECURE still enabled, and use the decoded link on emulator B for approval, encrypted text and revocation.
 - Upgrade actual distributed v5 → v6 → v7 → v8 → v9 APKs without uninstalling, preserving keys, encrypted vaults and a continuing Signal ratchet.
@@ -28,3 +28,10 @@ If a complete, well-lit QR still cannot be recognized, record the phone/camera m
 - Tested Android source: `ef2535c1eaf35bc9a35baece00343477e6d1e96f`.
 - DEVICE REQUIRED: physical Google Lens/phone camera scanning. The exact reported red indicator was not reproduced with a physical phone.
 - Existing unrelated Orb verification failure remains outside this Android change; do not report all repository CI as green.
+
+- PASS signed public release: https://github.com/Soldsoul86/orb/actions/runs/39527936665
+- APK: https://github.com/Soldsoul86/orb/releases/download/veil-qr-v9/veil-qr-preview.apk
+- PASS landing-page browser checks: https://github.com/Soldsoul86/orb/actions/runs/39527802403
+- PASS relay suite: https://github.com/Soldsoul86/orb/actions/runs/39527802414 (32 checks with one skipped for the first backend, all 32 for PostgreSQL).
+- LIVE Render deployment `dep-dbc1dapsrm7s739adlt0`, source `17e5a630e397ee9104450d9e415766bf76f314e8`, updated invitation page to v9.
+- PASS post-deploy public APK checksum, live invitation browser behavior and HTTPS encrypted-envelope relay smoke: https://github.com/Soldsoul86/orb/actions/runs/39528280794
