@@ -3,13 +3,15 @@ import { storage, exclusive } from './storage.mjs';
 import { require, random, now, hash, hexHash, same, identity, sign, verify, card, enrollment, allowed } from './protocol.mjs';
 
 const $=id=>document.getElementById(id), params=new URLSearchParams(location.hash.slice(1));
-const pin=params.get('owner'), invite=params.get('invite'), resume=params.get('conversation');
+const pathPin=/^\/g\/([A-Za-z0-9_-]{43})$/.exec(location.pathname);
+const pin=pathPin?'urn:ietf:params:oauth:jwk-thumbprint:sha-256:'+pathPin[1]:params.get('owner'), resume=params.get('conversation');
+let invite=params.get('invite');
 let connected=false;
 let db, data, endpoint, enrollmentValue, owner, active=false, fatal=false, busy=false, saving=Promise.resolve();
 let status='Write a short introduction. The owner approves before you can continue.';
 const fail=error=>{ status=error.message || 'Failed. Check your connection and retry.'; render(); };
 async function save() {
-  saving=saving.then(()=>db.put(data.localId,structuredClone(data)));
+  saving=saving.then(()=>db.put(data.localId,structuredClone(data),"index:"+invite+pin));
   try {await saving;} catch(error) {fatal=true;throw error;}
 }
 async function api(path,method='GET',body,authenticated=true) {
@@ -143,12 +145,23 @@ function render() {
 $('send').addEventListener('click',send);
 $('refresh').addEventListener('click',async()=>{try {await metadata();if(data){await connect();if(data.outbox)await flush();}status=data?.permission==='approved'?'Approved · you can continue':data?.sent?'Awaiting approval':'Ready';render();}catch(error){fail(error);}});
 async function start() {
+  if(pathPin && !invite) {
+    const result=await api('/pilot/resolve/'+pathPin[1]);
+    const candidate=await verify(result.enrollment,pin,'pi-matrix-enrollment+jws');
+    const verified=await enrollment(result.enrollment,pin,candidate.invite);
+    const state=(await card(verified.owner,pin)).state;
+    require(['LINK_ONLY','PUBLIC_SEARCHABLE'].includes(state.policy.discovery_mode));
+    invite=verified.invite;params.set('owner',pin);params.set('invite',invite);
+    history.replaceState(null,'','/contact#'+params.toString());
+  }
   require(pin?.startsWith('urn:ietf:params:oauth:jwk-thumbprint:sha-256:') && /^[a-f0-9]{64}$/.test(invite),'This link is incomplete. Ask the owner to share it again.');
   db=await storage();
   await exclusive(invite + pin,async()=> {
-    if(resume) {
-      require(/^[a-f0-9]{64}$/.test(resume));data=await db.get(resume);
+    const localId=resume || await db.get('index:'+invite+pin);
+    if(localId) {
+      require(/^[a-f0-9]{64}$/.test(localId));data=await db.get(localId);
       require(data && data.owner===pin && data.invite===invite,'Browser data was lost. This conversation cannot be restored. Ask the owner for a new invitation.');
+      params.set('conversation',localId);history.replaceState(null,'','/contact#'+params.toString());
     }
     await metadata();active=true;render();
     if(data){await connect();status=data.outbox?'A saved message needs retry.':data.messages.some(m=>!m.mine)?'Replied':data.sent?'Awaiting approval':'Ready';render();}

@@ -37,6 +37,7 @@ jobs:
       - name: Start disposable private provider
         run: |
           python -m unittest test_boundary -v
+          python -m unittest discover -s ../pilot -p test_policy.py -v
           python start.py --pilot
       - name: Browser crypto and hostile direct API tests
         run: |

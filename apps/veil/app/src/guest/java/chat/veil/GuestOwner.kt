@@ -196,6 +196,7 @@ internal class GuestOwner(private val session:PortableSession, private val files
             val expires=minOf(now()+3600,p.getLong("expires"));val mid=random()
             val token=sign(obj("v" to 1,"iss" to data.getString("owner"),"recipient" to guest.getString("id"),"invitation" to id,"id" to mid,"expires" to expires,"text" to text),"pi-matrix-message+jws")
             val r=checkNotNull(machine.createEncryptedToDeviceRequest(e.getString("user_id"),e.getString("device_id"),"chat.veil.pilot",obj("jws" to token).toString(),CollectStrategy.ONLY_TRUSTED_DEVICES))
+            check(r is Request.ToDevice)
             c.put("outbox",obj("id" to r.requestId,"expires" to expires,"body" to obj("messages" to JSONObject(r.body))))
             c.getJSONArray("messages").put(obj("id" to mid,"text" to text,"mine" to true));c.put("receipt","Sending")
             // The SDK outgoing request is represented by our exact persisted outbox.

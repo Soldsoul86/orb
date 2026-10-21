@@ -85,6 +85,15 @@ class PilotBoundary(Boundary):
             self.db.execute('INSERT INTO challenges VALUES (?,?)', (nonce, int(time.time()) + 60))
             self.db.commit()
             return web.json_response({'nonce': nonce})
+        if path.startswith('/pilot/resolve/') and req.method == 'GET':
+            suffix = path.rsplit('/', 1)[1]
+            assert re.fullmatch('[A-Za-z0-9_-]{43}', suffix)
+            pin = 'urn:ietf:params:oauth:jwk-thumbprint:sha-256:' + suffix
+            row = self.db.execute('SELECT id FROM enrollments WHERE owner=?', (pin,)).fetchone()
+            assert row
+            token, value = self.enrollment(row[0])
+            assert card(value['owner'])[0]['policy']['discovery_mode'] in ('LINK_ONLY', 'PUBLIC_SEARCHABLE')
+            return web.json_response({'enrollment': token})
         if path.startswith('/pilot/invite/') and req.method == 'GET':
             token, _ = self.enrollment(path.rsplit('/', 1)[1])
             return web.json_response({'enrollment': token})
@@ -104,6 +113,9 @@ class PilotBoundary(Boundary):
             assert set(p) == {'v', 'iss', 'invite', 'revision', 'issued', 'expires', 'owner'}
             assert p['iss'] == body['owner'] == p['owner']['id']
             s, endpoint = card(p['owner'])
+            # Only operator-provisioned accounts can host pilot invitations.
+            accounts = strict_json((self.runtime / 'accounts.json').read_text())
+            assert endpoint['user_id'] in {'@' + a['username'] + ':veil.test' for a in accounts}
             assert who == (endpoint['user_id'], endpoint['device_id'])
             assert re.fullmatch('[a-f0-9]{64}', p['invite'])
             assert all(type(p[k]) is int for k in ('issued', 'expires', 'revision'))
@@ -120,6 +132,8 @@ class PilotBoundary(Boundary):
                 assert card(previous['owner'])[1] == endpoint  # Migration requires a new explicitly shared invitation.
                 assert s['revision'] > card(previous['owner'])[0]['revision']
             else:
+                for existing, in self.db.execute('SELECT value FROM enrollments'):
+                    assert card(strict_json(existing)['owner'])[1]['user_id'] != endpoint['user_id']
                 assert p['revision'] == 1 and p['expires'] > time.time()
             self.db.execute('INSERT OR REPLACE INTO enrollments VALUES (?,?,?,?)', (p['invite'], p['iss'], body['token'], json.dumps(p)))
             self.db.commit()

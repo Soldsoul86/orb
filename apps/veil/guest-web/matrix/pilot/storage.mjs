@@ -12,7 +12,7 @@ export async function storage() {
       t.oncomplete=()=>resolve(r?.result); t.onerror=t.onabort=()=>reject(Error('Could not save this conversation. Do not clear browser data; close other tabs and retry.'));
     });
   }
-  return { get:id=>transaction('readonly',s=>s.get(id)), put:(id,value)=>transaction('readwrite',s=>s.put(value,id)), close:()=>db.close() };
+  return { get:id=>transaction('readonly',s=>s.get(id)), put:(id,value,index)=>transaction('readwrite',s=>{s.put(value,id);if(index)s.put(id,index);}), close:()=>db.close() };
 }
 export async function exclusive(id,operation) {
   if (!navigator.locks) throw Error('This browser cannot safely save a private conversation. Use a supported browser.');

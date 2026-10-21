@@ -24,6 +24,8 @@ try {
  await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('status').textContent.includes('Received by service'));
  assert.equal(await page.locator('#send').isDisabled(),true);assert.equal(await owner.evaluate(()=>window.fixture.messages.length),1);pass('response lost after acceptance retries exact ciphertext without a second introduction');
  const other=await context.newPage();await other.goto(saved);await other.waitForFunction(()=>document.getElementById('status').textContent.includes('another tab'));assert(await other.locator('#send').isDisabled());await other.close();pass('second tab cannot open the same crypto store');
+ const suffix=new URLSearchParams(new URL(link).hash.slice(1)).get('owner').split(':').pop();
+ await page.goto('http://127.0.0.1:8766/g/'+suffix);await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REQUEST_CANARY_91f7'));pass('Discovery purpose address and QR recover the same saved conversation and crypto identity');
  await page.reload();await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REQUEST_CANARY_91f7'));pass('refresh retains identity, encrypted SDK store and conversation');
  await call(owner,'decide',id,'approved');await call(owner,'reply',id,'PILOT_REPLY_CANARY_39a2');
  await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'),{},{timeout:45000});assert(await page.locator('#install').isVisible());pass('approved encrypted reply arrives; optional install explanation appears after interaction');

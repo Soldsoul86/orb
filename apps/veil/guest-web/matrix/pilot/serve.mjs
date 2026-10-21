@@ -21,7 +21,7 @@ const server=createServer(async(req,res)=>{
     }
     if(test && req.url==='/fixture'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><script type="module" src="/fixture.js"></script>');return;}
     let file,type;
-    if(req.url==='/' || req.url.startsWith('/contact')){file=resolve(root,'index.html');type='text/html';}
+    if(req.url==='/' || req.url==='/contact' || /^\/g\/[A-Za-z0-9_-]{43}$/.test(req.url)){file=resolve(root,'index.html');type='text/html';}
     else if(req.url==='/style.css'){file=resolve(root,'style.css');type='text/css';}
     else {const name=basename(req.url);if(!/^[A-Za-z0-9_-]+\.(js|wasm)$/.test(name))throw Error();file=resolve(out,name);type=name.endsWith('.wasm')?'application/wasm':'text/javascript';}
     res.setHeader('Content-Type',type);res.end(await readFile(file));

@@ -9,7 +9,7 @@ async function init(account) {
  if(p.message.type!=='chat.veil.pilot')return;
  const cs=await api('/pilot/inbox');for(const c of cs.conversations){const g=c.policy.guest,e=(await card(g,g.id)).endpoint;if(e.user_id!==p.message.sender)continue;require(p.encryptionInfo.senderVerified);const m=await verify(p.message.content.jws,g.id,'pi-matrix-message+jws');if(!messages.some(x=>x.id===m.id))messages.push(m);}
  }});
- const policy={display_name:'TEST Alex',description:'Design help',discovery_mode:'UNLISTED',contact_request_mode:'REQUEST_APPROVAL',allowed_content_types:['text'],schedule:{timezone:'UTC',weekdays:[1,2,3,4,5,6,7],start:0,end:1440},outside_hours_behavior:'REJECT',first_contact_message_limit:1,inactivity_days:7,expires_at:now()+3600,notification_behavior:'SILENT_IN_APP',status:'ACTIVE',policy_version:1};
+ const policy={display_name:'TEST Alex',description:'Design help',discovery_mode:'LINK_ONLY',contact_request_mode:'REQUEST_APPROVAL',allowed_content_types:['text'],schedule:{timezone:'UTC',weekdays:[1,2,3,4,5,6,7],start:0,end:1440},outside_hours_behavior:'REJECT',first_contact_message_limit:1,inactivity_days:7,expires_at:now()+3600,notification_behavior:'SILENT_IN_APP',status:'ACTIVE',policy_version:1};
  const state=await sign({v:1,id:key.id,device:key.pub,revision:1,issued:now(),epoch:random().slice(0,32),route:'https://veil.test',policy},'pi-state+jws',key);
  own={id:key.id,state,binding:await sign({v:1,iss:key.id,state_hash:await hash(state),endpoint:{user_id:login.user_id,device_id:login.device_id,...client.keys}},'pi-matrix-binding+jws',key)};
  enrolled={v:1,iss:key.id,invite:random(),revision:1,issued:now(),expires:now()+3600,owner:own};

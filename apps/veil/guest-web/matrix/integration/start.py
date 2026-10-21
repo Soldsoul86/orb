@@ -57,7 +57,7 @@ async def main():
                 assert response.status == 200, 'private registration failed'
             accounts.append({'username': username, 'password': password, 'device': 'TEST' + str(i)})
     (RUNTIME / 'accounts.json').write_text(json.dumps(accounts))
-    gateway = subprocess.Popen([sys.executable, str(ROOT.parent / 'pilot' / 'provider.py') if '--pilot' in sys.argv else str(ROOT / 'provider.py'), str(RUNTIME)], stdout=(RUNTIME / 'boundary.log').open('w'), stderr=subprocess.STDOUT)
+    gateway = subprocess.Popen([sys.executable, str(ROOT.parent / 'pilot' / 'pilot_provider.py') if '--pilot' in sys.argv else str(ROOT / 'provider.py'), str(RUNTIME)], stdout=(RUNTIME / 'boundary.log').open('w'), stderr=subprocess.STDOUT)
     (RUNTIME / 'pids.json').write_text(json.dumps([hs.pid, gateway.pid]))
     async with aiohttp.ClientSession() as session:
         for _ in range(30):
