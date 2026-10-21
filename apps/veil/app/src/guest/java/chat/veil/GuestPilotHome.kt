@@ -20,12 +20,12 @@ internal const val guestPilotEnabled=true
     var user by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
     var name by remember{mutableStateOf("")};var purpose by remember{mutableStateOf("")}
     var selected by remember{mutableStateOf("")};var text by remember(selected){mutableStateOf("")};var qr by remember{mutableStateOf(false)}
-    fun action(block:GuestOwner.()->Unit={}) {
-        a.contactAction({val guest=GuestOwner(this,a.filesDir);val outcome=runCatching{guest.block()};outcome.exceptionOrNull()?.let{e->android.util.Log.w("VeilGuest","Operation incomplete at GuestOwner line "+(e.stackTrace.firstOrNull{it.className=="chat.veil.GuestOwner"}?.lineNumber ?: 0)+" ("+e.javaClass.simpleName+")")};guest.snapshot().put("action_failed",outcome.isFailure)}){snapshot=it}
+    fun action(done:(JSONObject)->Unit={},block:GuestOwner.()->Unit={}) {
+        a.contactAction({val guest=GuestOwner(this,a.filesDir);val outcome=runCatching{guest.block()};outcome.exceptionOrNull()?.let{e->android.util.Log.w("VeilGuest","Operation incomplete at GuestOwner line "+(e.stackTrace.firstOrNull{it.className=="chat.veil.GuestOwner"}?.lineNumber ?: 0)+" ("+e.javaClass.simpleName+")")};guest.snapshot().put("action_failed",outcome.isFailure)}){snapshot=it;done(it)}
     }
     LaunchedEffect(Unit){action()}
     LaunchedEffect(snapshot?.optBoolean("configured")) {
-        while(true){delay(3000);if(a.unlocked && !a.busy && snapshot?.optBoolean("configured")==true)action{refresh()}}
+        while(true){delay(3000);if(a.unlocked && !a.busy && text.isBlank() && snapshot?.optBoolean("configured")==true)action{refresh()}}
     }
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         TextButton({a.contactPage="home"}){Text("‹ Back")}
@@ -82,7 +82,7 @@ internal const val guestPilotEnabled=true
                     OutlinedButton({action{decide(selected,"blocked")}},enabled=!a.busy,modifier=Modifier.testTag("guest-block")){Text("Block this browser identity")}
                     if(status=="approved") {
                         OutlinedTextField(text,{text=it.take(4000)},label={Text("Reply")},modifier=Modifier.testTag("guest-reply"))
-                        Button({val body=text;action{reply(selected,body)}},enabled=!a.busy && text.isNotBlank() && !c.optBoolean("pending"),modifier=Modifier.testTag("guest-send")){Text("Send reply")}
+                        Button({val body=text;val count=c.getJSONArray("messages").length();action({result->if(contactEntries(result.optJSONArray("conversations")).firstOrNull{it.getString("id")==selected}?.getJSONArray("messages")?.length()?.let{it>count}==true)text=""}){reply(selected,body)}},enabled=!a.busy && text.isNotBlank() && !c.optBoolean("pending"),modifier=Modifier.testTag("guest-send")){Text("Send reply")}
                         OutlinedButton({action{decide(selected,"revoked")}},enabled=!a.busy,modifier=Modifier.testTag("guest-revoke")){Text("End access")}
                     }
                 }
