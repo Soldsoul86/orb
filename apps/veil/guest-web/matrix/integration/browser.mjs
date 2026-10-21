@@ -96,6 +96,16 @@ async function init(account, purposeOverrides = {}) {
   Object.assign(purposePolicy, purposeOverrides);
   const state = await sign({ v: 1, id, device: publicKey, revision: 1, issued: now(), epoch: hex(16), route: 'https://veil.test', policy: purposePolicy }, 'pi-state+jws');
   const keys = await client.getCrypto().getOwnDeviceKeys();
+  // PREPARED sync does not imply that the SDK's asynchronous initial key
+  // upload has finished. Wait for observed publication, never assume it.
+  let published = false;
+  for (let attempt = 0; attempt < 120; attempt++) {
+    const response = await api('/_matrix/client/v3/keys/query', 'POST', { device_keys: { [login.user_id]: [login.device_id] } });
+    const uploaded = response.device_keys?.[login.user_id]?.[login.device_id]?.keys;
+    if (uploaded?.['ed25519:' + login.device_id] === keys.ed25519 && uploaded?.['curve25519:' + login.device_id] === keys.curve25519) { published = true; break; }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  assert(published, 'SDK device-key publication timed out');
   const endpoint = { user_id: login.user_id, device_id: login.device_id, ...keys };
   const binding = await sign({ v: 1, iss: id, state_hash: await hash(state), endpoint }, 'pi-matrix-binding+jws');
   self = { id, state, binding };

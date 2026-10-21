@@ -1,5 +1,9 @@
 # Proposed contact contract — review input, NOT implemented
 
+This remains the wider product proposal. The isolated executable experiment uses
+the narrower signed bindings and Olm to-device protocol documented in
+[integration/README.md](integration/README.md); it does not claim this entire API.
+
 This document specifies the integration boundary to test. It does not change
 pi/1, register a new wire format, or make the existing browser/server accept these
 statements. No method below is a working messaging adapter.

@@ -1,7 +1,10 @@
 # Threat model and release gates
 
-All controls below are **requirements for the unimplemented Matrix channel**
-unless explicitly called existing. This is not a cryptographic audit.
+Controls below are requirements for a production Matrix channel. The isolated
+experiment implements a subset, with actual evidence in
+[integration-runs.md](evidence/integration-runs.md). Its gateway is Synapse's
+only network ingress; the upstream has a Unix listener only. Neither these
+requirements nor a passing integration test constitute a cryptographic audit.
 
 | Threat / boundary | Required control and residual risk |
 |---|---|

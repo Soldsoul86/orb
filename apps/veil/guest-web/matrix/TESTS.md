@@ -1,4 +1,11 @@
-# Verification record and resumption instructions
+# Historical Phase 0 verification record
+
+This records the initial design-only checkpoint before the executable experiment.
+Its NOT IMPLEMENTED and local BLOCKED statements apply to that checkpoint, not
+the current branch. Current Actions results and remaining product gates are in
+[integration-runs.md](evidence/integration-runs.md); reproduction is in
+[integration/README.md](integration/README.md). Historical CI is never substituted
+for a new Matrix interoperability result.
 
 Date: 2026-10-21. Branch: `feat/veil-programmable-reachability-matrix`.
 Base: `53eee234b03fb731b434662f2bd041d3755ca843` (`codex/veil-guest-gate`, PR #8).

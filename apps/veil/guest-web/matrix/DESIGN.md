@@ -1,5 +1,10 @@
 # ADR: a separate Matrix-native guest conversation
 
+Historical Phase 0 ADR. The narrower executable Olm to-device experiment,
+including its actual SDK adapters and exclusive Unix-socket gateway, is described
+in [integration/README.md](integration/README.md). Do not treat the wider planned
+room/product architecture below as shipped or tested.
+
 Decision date: 2026-10-21. **Proposed integration, not proven or enabled.**
 The user authorized evaluating this separate channel. It adds no authority to
 Orb servers and does not amend the constitution or replace any existing session.
