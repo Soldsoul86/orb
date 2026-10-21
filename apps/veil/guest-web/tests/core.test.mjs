@@ -32,7 +32,7 @@ test('ES256 state authenticates only the independently pinned controller',async(
  assert.equal((await verifyState(token,addr)).policy.display_name,'Home repairs');await assert.rejects(verifyState(token,{...addr,controller:b.id}));
  const parts=token.split('.');parts[1]=encode64(encoder.encode(JSON.stringify({...s,policy:{display_name:'Mallory'}})));await assert.rejects(verifyState(parts.join('.'),addr));
 });
-test('wrong JOSE type, algorithm, external key URL and duplicate header claims fail closed',async()=>{
+test('wrong JOSE type, algorithm, external key URL and duplicate payload claims fail closed',async()=>{
  const a=await identity(),s=state(a);
  for(const extra of [{alg:'none'},{jku:'https://evil.example/keys'},{crit:['x']},{jwk:{...a.jwk,d:ref}}])await assert.rejects(verifyStatement(await sign(a,s,'pi-state+jws',extra),a.id,'pi-state+jws'));
  await assert.rejects(verifyStatement(await sign(a,s,'pi-grant+jws'),a.id,'pi-state+jws'));
