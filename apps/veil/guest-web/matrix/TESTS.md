@@ -54,8 +54,21 @@ Historical CI was independently checked through GitHub:
 completed successfully at `21ce591afc7a9ba2f61fa68e02b66af4447c04cc`.
 PR #8's final base commit is documentation-only and has no workflow run attached.
 That historical run covered Android JVM/lint and PostgreSQL suites; it does not
-prove this new Matrix proposal. No CI workflow was added or triggered for this
-decision checkpoint. Local post-change evidence above is the actual delta validation.
+prove this new Matrix proposal. No CI workflow was added or manually dispatched.
+The existing root workflow automatically ran for the push and PR at
+`3ebac79126989c999c68b39bf59363af0733aa68`:
+[PR run 39564717501](https://github.com/Soldsoul86/orb/actions/runs/39564717501),
+[push run 39564667077](https://github.com/Soldsoul86/orb/actions/runs/39564667077).
+Both passed install, lint, build, independent package compilation and **666 tests**.
+Both then FAILED the unrelated hard-exit demonstration with
+`TypeError: event.risk.measured.toFixed is not a function` at
+`scripts/simulate-hard-exit.mjs:201:45`. The identical failure was verified in
+[baseline run 39531623756](https://github.com/Soldsoul86/orb/actions/runs/39531623756)
+at `21ce591afc7a9ba2f61fa68e02b66af4447c04cc`. The script and its dependencies are
+unchanged; no trading code was modified to make CI green. See
+[ci-excerpts.txt](evidence/ci-excerpts.txt). Root CI does not run Matrix tests.
+The final documentation/evidence-only commit uses `[skip ci]`; it does not change
+the tested executable files. Overall CI remains **FAIL**, not all-green.
 
 ## Primary acceptance scenario
 
