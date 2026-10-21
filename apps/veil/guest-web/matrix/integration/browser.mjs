@@ -1,7 +1,10 @@
 // Executed inside Chromium. Private purpose/Matrix keys stay in this context.
 import { createClient, ClientEvent } from 'matrix-js-sdk';
 import { logger } from 'matrix-js-sdk/lib/logger';
+import { UserId } from '@matrix-org/matrix-sdk-crypto-wasm';
 import { generateKeyPair, exportJWK, importJWK, CompactSign, compactVerify, calculateJwkThumbprintUri } from 'jose';
+import { strictJson } from '../../src/strict-json.mjs';
+import { publicId } from '../../src/identity.mjs';
 
 logger.setLevel('silent');
 const base = 'http://127.0.0.1:8765';
@@ -22,11 +25,11 @@ async function sign(payload, type) {
   return new CompactSign(enc.encode(JSON.stringify(payload))).setProtectedHeader({ alg: 'ES256', typ: type, jwk: publicKey }).sign(signing);
 }
 async function verify(token, id, type) {
-  const header = JSON.parse(dec.decode(Uint8Array.from(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));
+  const header = strictJson(dec.decode(Uint8Array.from(atob(token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));
   assert(header.alg === 'ES256' && header.typ === type && !header.jwk.d && Object.keys(header).sort().join() === 'alg,jwk,typ', 'JOSE domain');
-  assert(await calculateJwkThumbprintUri(header.jwk) === id, 'purpose pin mismatch');
+  assert(await publicId(header.jwk) === id, 'purpose pin mismatch');
   const result = await compactVerify(token, await importJWK(header.jwk, 'ES256'), { algorithms: ['ES256'] });
-  const value = JSON.parse(dec.decode(result.payload));
+  const value = strictJson(dec.decode(result.payload));
   assert(value.v === 1, 'version');
   return value;
 }
@@ -45,6 +48,13 @@ async function api(path, method = 'GET', body) {
 }
 async function pinPeer(value, pin) {
   const e = await verifyCard(value, pin);
+  // Version-pinned spike adapter: Matrix JS's public getUserDeviceInfo(...,true)
+  // does NOT populate the crypto store for a user outside an encrypted room.
+  // Use the same genuine SDK request/response path as its room-key bundle code.
+  // These two JS internals are an explicit product-release integration gate.
+  const rust = client.getCrypto();
+  const request = rust.olmMachine.queryKeysForUsers([new UserId(e.user_id)]);
+  await rust.outgoingRequestProcessor.makeOutgoingRequest(request);
   const devices = await client.getCrypto().getUserDeviceInfo([e.user_id], true);
   const device = devices.get(e.user_id)?.get(e.device_id);
   assert(device && device.getFingerprint() === e.ed25519 && device.getIdentityKey() === e.curve25519, 'signed Matrix device key mismatch');
