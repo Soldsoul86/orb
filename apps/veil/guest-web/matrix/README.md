@@ -1,5 +1,11 @@
 # Matrix-native guest channel: isolated integration experiment
 
+Integration follow-up: [PR #11](https://github.com/Soldsoul86/orb/pull/11) merges
+this preserved PR #9 work onto Discovery PR #10 and replaces private Matrix JS
+interfaces with the public standalone crypto SDK. See the
+[combined status](../../discovery/INTEGRATION.md). The provenance below describes
+the original experiment; it is not a claim of product guest integration.
+
 The executable [integration harness](integration/README.md) runs a disposable
 private Matrix homeserver, real Chromium SDK clients and a separate Android
 instrumentation application in GitHub Actions. It tests SDK encryption, signed

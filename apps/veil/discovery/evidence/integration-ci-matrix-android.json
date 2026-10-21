@@ -1,0 +1,29 @@
+{
+  "mode": "android",
+  "revision": "eacad99839b8df97a5868b10ab66a0ffa37e5f06",
+  "versions": {
+    "@matrix-org/matrix-sdk-crypto-wasm": "18.9.0",
+    "playwright": "1.56.0",
+    "chromium": "141.0.7390.37",
+    "adapter": "standalone-public-crypto-api",
+    "androidSdkSource": "56bc59112822e7eb25943a95e02502855cdeef2d"
+  },
+  "results": [
+    {
+      "name": "Chromium received and authenticated native Android SDK encrypted reply",
+      "status": "PASS"
+    },
+    {
+      "name": "Android instrumentation passed real SDK request decryption, identity signature, approval, reply encryption and revocation",
+      "status": "PASS"
+    },
+    {
+      "name": "browser direct API cannot bypass Android owner revocation",
+      "status": "PASS"
+    },
+    {
+      "name": "wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only",
+      "status": "PASS"
+    }
+  ]
+}

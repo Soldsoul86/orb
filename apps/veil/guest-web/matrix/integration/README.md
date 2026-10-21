@@ -40,7 +40,8 @@ The integration branch replaces the two Matrix JS private-interface calls with
 public `OlmMachine.queryKeysForUsers`, `markRequestAsSent`, device verification,
 `Device.encryptToDeviceEvent` and `DecryptedToDeviceEvent.encryptionInfo` APIs.
 The existing identity/policy tests are retained. Local Chromium 154 completed all
-14 browser checks; Android interop on this adapter still requires its CI result.
+14 browser checks; [CI run 39601869470](https://github.com/Soldsoul86/orb/actions/runs/39601869470)
+also passed both the browser and native Android jobs on commit `eacad99`.
 This removes the specific private-JS-interface dependency, not the independent
 review, durable application-state or product-enrollment gates. The adapter
 serializes SDK operations, fails closed on unexpected requests and exposes only
