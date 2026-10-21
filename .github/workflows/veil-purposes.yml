@@ -87,6 +87,14 @@ jobs:
           run-id: 39200435127
           name: veil-purposes-preview-apk
           path: apps/veil/previous-v7
+      - name: Download the distributed v8 QR preview
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: Soldsoul86/orb
+          run-id: 39467021620
+          name: veil-purposes-preview-apk
+          path: apps/veil/previous-v8
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -112,7 +120,7 @@ jobs:
             gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#flagIsSetBeforeAuthentication --stacktrace
             mkdir -p app/build/privacy-regression/flag
             cp -R app/build/outputs/androidTest-results/. app/build/privacy-regression/flag/
-            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest --stacktrace
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest,chat.veil.InvitationQrLayoutTest --stacktrace
             python scripts/upgrade_preview.py
       - name: Verify preview APK and signing identity
         run: |

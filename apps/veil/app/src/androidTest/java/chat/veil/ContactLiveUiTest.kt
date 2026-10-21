@@ -54,7 +54,7 @@ class ContactLiveUiTest {
                 ui.onNodeWithText("Create QR invitation").performScrollTo().performClick();idle()
                 assertEquals("invitation",ui.activity.contactPage)
                 assertTrue("Creating a QR stays in the focused secure app",ui.activity.unlocked && ui.activity.window.decorView.hasWindowFocus())
-                ui.onNodeWithContentDescription("Invitation QR code").performScrollTo().assertIsDisplayed()
+                ui.onNodeWithContentDescription("Invitation QR code").assertIsDisplayed()
                 assertFalse("No share chooser on creation",focusedWindow().contains("ChooserActivity"))
                 write("timing",(android.os.SystemClock.elapsedRealtime()-began).toString())
                 val f=ui.activity.portableSnapshot!!.getJSONArray("facets").getJSONObject(0)
@@ -63,6 +63,8 @@ class ContactLiveUiTest {
                 var decoded=""
                 ui.runOnIdle {
                     val view=ui.activity.window.decorView
+                    assertTrue("Whole QR is visible without scrolling",bounds.left>=0 && bounds.top>=0 && bounds.right<=view.width && bounds.bottom<=view.height)
+                    assertEquals("QR remains square",bounds.width,bounds.height,1f)
                     val screen=Bitmap.createBitmap(view.width,view.height,Bitmap.Config.ARGB_8888)
                     view.draw(Canvas(screen))
                     val qr=Bitmap.createBitmap(screen,bounds.left.toInt(),bounds.top.toInt(),bounds.width.toInt(),bounds.height.toInt())

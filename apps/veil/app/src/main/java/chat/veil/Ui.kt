@@ -42,7 +42,7 @@ private val Shape = RoundedCornerShape(22.dp)
     MaterialTheme(colorScheme=colors) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(horizontal = 22.dp)) {
-                Row(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                if(!unlocked || activity.contactPage!="invitation") Row(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("veil", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)
                     Spacer(Modifier.weight(1f)); Text("PRIVATE BY CHOICE", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
                 }
@@ -59,7 +59,7 @@ private val Shape = RoundedCornerShape(22.dp)
                 } else {
                     if (activity.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     if (activity.notice.isNotEmpty()) Text(activity.notice, color = Color(0xFFFFD5A0), fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                    if(activity.contactPage!="invitation") Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         listOf("Chats","Reach me","Settings").forEachIndexed {i,label ->
                             TextButton({activity.closeViewer();activity.section=i;activity.contactPage="home"},modifier=Modifier.heightIn(min=48.dp)) {Text(label,fontSize=14.sp,fontWeight=if(activity.section==i)FontWeight.Bold else FontWeight.Normal)}
                         }

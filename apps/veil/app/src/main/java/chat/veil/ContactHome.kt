@@ -1,14 +1,12 @@
 package chat.veil
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -43,15 +41,22 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
     val page=a.contactPage
     val scroll=rememberScrollState()
     LaunchedEffect(page,a.section){scroll.scrollTo(0)}
-    BackHandler(page!="home") {a.dismissContactLink()}
+    var qrDetails by remember(page,a.contactSelected) { mutableStateOf(false) }
+    BackHandler(page!="home") {if(qrDetails)qrDetails=false else a.dismissContactLink()}
     if(page in setOf("backup","import","advanced","migrate","address","oldchat")) {
         val advancedPage=when(page){"advanced"->"home";"address"->"card";"oldchat"->"chat";else->page}
         PortableHome(a,advancedPage,a.contactSelected){a.contactPage="home"}
         return
     }
     LaunchedEffect(Unit) {if(s==null && !a.busy)a.contactAction({})}
+    val invitation=facets.firstOrNull {it.getString("id")==a.contactSelected}?.optJSONObject("invitation")
+    val qrLink=invitation?.optString("link").orEmpty()
+    if(page=="invitation" && qrLink.isNotBlank() && !qrDetails) {
+        InvitationQrScreen(qrLink,Modifier.weight(1f).fillMaxWidth(),a::dismissContactLink) {qrDetails=true}
+        return
+    }
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        if(page!="home")TextButton({a.dismissContactLink()},modifier=Modifier.heightIn(min=48.dp)){Text("‹ Back",fontSize=16.sp)}
+        if(page!="home")TextButton({if(qrDetails)qrDetails=false else a.dismissContactLink()},modifier=Modifier.heightIn(min=48.dp)){Text("‹ Back",fontSize=16.sp)}
         if(a.portableNotice.isNotBlank())Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.medium) {
             Text(a.portableNotice,Modifier.padding(14.dp),fontSize=14.sp,color=MaterialTheme.colorScheme.onSecondaryContainer)
         }
@@ -76,9 +81,7 @@ internal fun contactEntries(a:JSONArray?):List<JSONObject> = if(a==null)emptyLis
                     Text(if(invite.optBoolean("cancel_pending"))"Cancellation waiting to send" else if(invite.optBoolean("canceled"))"Invitation canceled" else "Invitation expires ${ContactExperience.date(invite.getLong("expires"))}")
                     Text("Accepted access lasts ${invite.getLong("access_seconds")/86400} days from approval. Canceling the invitation does not end already accepted access.",fontSize=14.sp)
                     if(link.isNotBlank()) {
-                        val bitmap=remember(link){PurposeQr.renderPortable(link)}
-                        DisposableEffect(bitmap){onDispose{bitmap.recycle()}}
-                        Image(bitmap.asImageBitmap(),"Invitation QR code",Modifier.fillMaxWidth().aspectRatio(1f))
+                        Action("Show QR code") {qrDetails=false}
                         Text("No Veil yet? The QR opens a download page. After installing, return to that page and tap Continue in Veil.",fontSize=15.sp)
                         Text("Already installed? Scan to review the invitation and request contact. You approve before chatting.",fontSize=14.sp)
                         OutlinedButton(a::shareContactLink,enabled=!a.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){Text("Share link instead")}
