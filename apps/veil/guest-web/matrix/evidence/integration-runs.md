@@ -2,27 +2,24 @@
 
 Date: 2026-10-21. PR #9 remains draft. No public deployment and no guest Send enablement.
 
-This record is being updated from completed Actions jobs. The executable workflow
-is `Veil isolated Matrix interoperability`, not the unrelated root `verify` job.
-Results below do not infer PASS from source code or from historical pi/1 tests.
+**Final isolated workflow: PASS**, [run 39576585395](https://github.com/Soldsoul86/orb/actions/runs/39576585395).
+Tested executable commit: `e3790cb585a536edf07d66430448398513b4ea4f`.
+Browser job `119143492698` and Android job `119144149082` both completed with
+`success`, including cleanup. Selected actual logs and artifact digests:
+[interop-actions.txt](interop-actions.txt). The later evidence-only commit changes
+no executable files. Earlier failed attempts are retained below.
 
-**Browser job PASS**, [run 39573339196](https://github.com/Soldsoul86/orb/actions/runs/39573339196),
-commit `f338bb16f758b7584536a7cab987a7c71ae59c5d`. Completed job
-`119132686251` passed the entire real browser exchange and hostile API suite.
-Selected actual output: [browser-actions.txt](browser-actions.txt). Android job
-`119133310906` FAILED during Kotlin compilation: generated SDK bindings required
-the missing AndroidX annotation dependency. Native Rust/JNI build, binding
-generation, KVM and emulator boot passed; message exchange was NOT TESTED in that
-attempt. The annotation dependency is now added and compilation precedes boot.
+The run used private Synapse 1.163.0, Matrix JS SDK 44.0.0, crypto WASM 18.9.0,
+Chromium through Playwright 1.56.0, and Android API 35 x86_64. Android used the
+official Matrix Rust crypto SDK Kotlin/JNI bindings built from upstream commit
+`56bc59112822e7eb25943a95e02502855cdeef2d`, with the unchanged Veil identity-core.
+The protocol is real SDK **Olm to-device encryption**, not room/Megolm history.
 
-In [run 39574887852](https://github.com/Soldsoul86/orb/actions/runs/39574887852),
-the browser suite passed again. Android Kotlin compilation, emulator boot and
-the real instrumentation test **passed** (`BUILD SUCCESSFUL`; one test completed).
-Chromium authenticated the native Android encrypted reply. The overall job then
-**failed** collecting `result.json`: Gradle's automatic test-app uninstall raced
-the harness. An explicit collection acknowledgment is added before test return;
-the whole job is being rerun. Post-test direct revocation/storage checks were
-**NOT TESTED in that failed harness attempt**.
+Sanitized results: [browser artifact](https://github.com/Soldsoul86/orb/actions/runs/39576585395/artifacts/12334492787),
+[Android artifact](https://github.com/Soldsoul86/orb/actions/runs/39576585395/artifacts/12334029174).
+Runtime credentials, endpoint stores, APKs, raw databases and traffic were not
+uploaded. These are executed integration results, not a cryptographic audit or
+authorization to enable public guest Send.
 
 | Area | Status | Evidence/limit |
 |---|---|---|
@@ -34,9 +31,10 @@ the whole job is being rerun. Post-test direct revocation/storage checks were
 | Concurrent first claim / retry | PASS | One of two concurrent introductions accepted, exact transaction retry accepted, changed body refused. |
 | Purpose schedule | PASS | Signed closed weekday blocks direct encrypted submission. |
 | Server plaintext inspection | PASS (limited observation) | Actual wire ciphertext observed; known request/reply canaries absent from provider/Synapse DB, WAL and logs. No server E2EE decryption code or endpoint secrets. |
-| Android SDK request/reply | PASS in 39574887852 | Native instrumentation completed and browser decrypted/authenticated its reply. Overall job FAIL on subsequent result-file collection; final checks pending rerun. |
+| Android SDK request/reply | PASS | Native instrumentation decrypted and authenticated the browser request, signed approval, encrypted a reply, and revoked. Chromium authenticated the reply; result collection and Gradle test completion succeeded. |
+| Android-owner revocation boundary | PASS | After native revocation, a fresh genuine SDK ciphertext submitted by browser raw API was refused. |
 | Existing guest release gate | BLOCKED as required | Unchanged unconditional refusal; exit 2. This is not a feature release PASS. |
-| Root Orb CI | FAIL (pre-existing) | Run 39573339179: lint/build/independent compilation and 666 tests PASS; unchanged hard-exit demonstration throws at line 201. |
+| Root Orb CI | FAIL (pre-existing) | Run 39576585644 at the tested commit: lint/build/independent compilation and 666 tests PASS; unchanged hard-exit demonstration throws at line 201. |
 | Physical phone, live Signal, persistence/recovery, two Matrix providers | NOT TESTED | Source preservation does not prove a device/runtime regression result. |
 | Independent security review / supported production adapter | BLOCKED release gates | Version-pinned roomless browser adapter uses two SDK internals; experimental code is not enabled in production. |
 
@@ -53,10 +51,14 @@ the whole job is being rerun. Post-test direct revocation/storage checks were
 | [39573013917](https://github.com/Soldsoul86/orb/actions/runs/39573013917) | PASS genuine encrypted browser introduction and reply, signed approval, revocation both directions, rollback denial, direct API bypass tests, atomic introduction race, exact retry, changed-body rejection and server-time expiry. FAIL later schedule fixture setup because initial SDK key upload was still asynchronous; initialization now waits for observed publication. Android NOT TESTED (dependency skipped). |
 | [39573339196](https://github.com/Soldsoul86/orb/actions/runs/39573339196) | Browser job PASS, including closed-hours enforcement, SDK ciphertext inspection and no plaintext canaries in provider/Synapse databases, WAL or logs. Android native build and emulator boot PASS; Kotlin compile FAIL (missing `RequiresApi` annotation dependency), Android message exchange NOT TESTED. |
 | [39574887852](https://github.com/Soldsoul86/orb/actions/runs/39574887852) | Browser suite PASS. Android native instrumentation test and authenticated encrypted reply PASS. Overall job FAIL on result-file collection after Gradle uninstalled the completed test app; post-test boundary/storage checks NOT TESTED. Added explicit result collection handshake. |
+| [39576585395](https://github.com/Soldsoul86/orb/actions/runs/39576585395) | Complete browser and Android jobs PASS. Real SDK encrypted request/reply, signed purpose/device binding, provider policy/bypass tests, Android-owner revocation, result collection and server DB/WAL/log sentinel checks all completed successfully. |
 
 The local sandbox cannot create a socket (`EPERM`) and has no Android toolchain.
 These are local limitations, not evidence that GitHub Actions cannot run Matrix.
-Actions has already run the private homeserver and genuine browser SDK crypto.
+GitHub Actions successfully ran the private homeserver, browser SDK, native SDK
+build, KVM emulator and actual Android instrumentation. No alternative runner was
+needed. Transient Playwright mirror DNS failures recovered through its download
+fallback; they did not prevent the completed tests.
 
 Existing disabled guest gate regression rerun locally: Node 10 PASS / 1 Nimbus
 fixture skipped; Python 4 PASS. Skips remain NOT TESTED. No production Android,
