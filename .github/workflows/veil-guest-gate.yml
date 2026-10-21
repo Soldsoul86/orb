@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: pip install -r apps/veil/portable-provider/requirements.txt
       - name: Baseline identity, app JVM and lint plus public Nimbus fixture
         env:
           VEIL_PUBLIC_FIXTURE: ${{ runner.temp }}/veil-public-state.json
