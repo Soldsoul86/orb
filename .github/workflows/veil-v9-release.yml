@@ -1,0 +1,57 @@
+name: Veil v9 QR release
+on:
+  push:
+    branches: ['codex/veil-purposes']
+    paths: ['.github/workflows/veil-v9-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require both exact-source validation runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: Soldsoul86/orb
+        run: |
+          set -euo pipefail
+          for run in 39527110605 39527113050; do
+            test "$(gh api repos/Soldsoul86/orb/actions/runs/$run --jq .conclusion)" = success
+            test "$(gh api repos/Soldsoul86/orb/actions/runs/$run --jq .head_sha)" = ef2535c1eaf35bc9a35baece00343477e6d1e96f
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: Soldsoul86/orb
+          run-id: 39527110605
+          name: veil-purposes-preview-apk
+          path: incoming
+      - name: Publish the tested signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: Soldsoul86/orb
+        run: |
+          set -euo pipefail
+          (cd incoming && sha256sum -c veil-purposes-preview.apk.sha256)
+          test "$(cat incoming/veil-purposes-preview.certificate.sha256)" = e241ad4e30de7812469e70f72065960eafd5ee3f2fab089ac40a89783647f6a4
+          cp incoming/veil-purposes-preview.apk veil-qr-preview.apk
+          sha256sum veil-qr-preview.apk > veil-qr-preview.apk.sha256
+          cat > notes.txt <<'NOTES'
+          Veil v9 (0.3.4-qr-preview), Android 9+. The invitation QR now fits fully on screen, with a visible white border and sharp edges. Portrait and landscape layouts keep details separate from the QR.
+
+          Install over Veil Purposes Preview. Do not uninstall or clear data. The phone showing the QR needs the update. Package chat.veil.purposes.preview and preview signer preserved. Upgrade checks cover actual v5 → v6 → v7 → v8 → v9 APKs.
+
+          Automated checks decode the initial rendered QR without scrolling at compact sizes, 1x/2x text and light/dark themes, and exercise a two-emulator live invitation, approval, encrypted-text and revocation flow. This does not verify a physical camera or Google Lens. The reported red scanner indicator was clarified as failure to recognize the QR; its physical cause is not conclusively reproduced.
+
+          This is a debuggable development preview. After APK installation, return to the invitation tab and tap Continue in Veil; automatic post-install continuation remains unimplemented.
+          NOTES
+          if gh release view veil-qr-v9 --json tagName >/dev/null 2>&1; then
+            mkdir existing
+            gh release download veil-qr-v9 --pattern veil-qr-preview.apk --dir existing
+            (cd existing && sha256sum -c ../veil-qr-preview.apk.sha256)
+          else
+            gh release create veil-qr-v9 --target ef2535c1eaf35bc9a35baece00343477e6d1e96f --title 'Veil v9 — QR that fits the screen' --notes-file notes.txt --prerelease --latest=false veil-qr-preview.apk veil-qr-preview.apk.sha256
+          fi
