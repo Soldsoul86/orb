@@ -1,0 +1,17 @@
+{
+  "commit": "0c3a7a2f0e564dc2d1f4e47abdddd432a5160732",
+  "browser": "141.0.7390.37",
+  "androidApi": "36",
+  "actualVeilInbox": true,
+  "uiApproval": true,
+  "uiReply": true,
+  "processRestart": true,
+  "continuedRequest": true,
+  "uiRevocation": true,
+  "plaintextAbsent": true,
+  "usableMs": 306.85514799999874,
+  "requestMs": 1667.6988010000005,
+  "requestArrivalObservedMs": 6772.5523349999985,
+  "requestThroughReplyMs": 13500.674592999998,
+  "measurement": "Loopback/emulator automated interaction. Human comprehension, camera and mobile data NOT TESTED."
+}

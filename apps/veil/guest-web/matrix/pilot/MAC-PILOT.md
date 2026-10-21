@@ -10,7 +10,11 @@ This environment cannot reach your Mac merely because your phone shares its
 Wi-Fi. These commands run on the Mac. No public deployment, router port forwarding,
 public tunnel or public Send is needed or authorized.
 
-1. Check out the exact tested commit recorded in ACCEPTANCE.md. In Terminal run
+Tested build: `0c3a7a2f0e564dc2d1f4e47abdddd432a5160732`.
+[Download the Pixel ARM64 artifact](https://github.com/Soldsoul86/orb/actions/runs/39620149498/artifacts/12355960948);
+[checksums and signing status](ACCEPTANCE.md#pixel-test-apk).
+
+1. Use a separate clone/worktree at that exact tested commit. In Terminal run
    `apps/veil/guest-web/matrix/pilot/mac-start.sh` from the repository. If the
    Wi-Fi interface is not en0, pass the Mac's private IPv4 address explicitly.
    Docker publishes only port 8443 on that address. Keep the Mac firewall restricted
@@ -22,7 +26,8 @@ public tunnel or public Send is needed or authorized.
    will warn about this user-installed trust root. It is for this private pilot;
    remove it after testing. Never transfer the CA private key or the entire volume.
 3. Install the arm64 **Veil Guest Pilot** test APK from the tested workflow artifact.
-   Verify its SHA-256 against that artifact's provenance. Do not uninstall either
+   Verify its SHA-256 with `shasum -a 256 /path/to/app-debug.apk` against
+   ACCEPTANCE.md and that artifact’s provenance. Do not uninstall either
    existing Veil app. This debug-only pilot explicitly trusts user-installed CAs
    for local HTTPS; regular Veil builds retain their original trust configuration.
    Do not use this APK with sensitive real conversations.

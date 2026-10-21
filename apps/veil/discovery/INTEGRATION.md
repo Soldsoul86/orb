@@ -1,10 +1,37 @@
 # Discovery and guest integration — implementation record
 
 Status: implementation in progress; public Send remains unconditionally disabled.
-No public deployment or APK release is authorized by this change.
+No public deployment or production APK release is authorized. Disposable private
+test APKs are authorized by the controlled-pilot mission.
 Stacked draft: [PR #11](https://github.com/Soldsoul86/orb/pull/11).
 
-## Implemented increment
+## Private guest product increment
+
+The actual Veil app now contains an optional Matrix guest inbox, with owner
+controller enrollment, automatic browser claims, approve/decline/block/revoke and
+encrypted replies. This is compiled as `chat.veil.guest.pilot` for this user's
+side-by-side Pixel test; the installed `chat.veil.purposes.preview` and normal
+`chat.veil` remain untouched. It is the same Veil activity/vault/controller code,
+not the old isolated interop app.
+
+The browser has pinned QR and `/g/{controller}` Discovery-address entry, automatic
+identity creation, persistent SDK state and exact outbox retry, tab exclusion,
+truthful service receipt states and storage-loss errors. An interrupted SDK-to-app
+inbox commit locks recovery explicitly; automatic recovery is still incomplete.
+Public Discovery Send remains disabled. No public deployment occurred.
+
+Actual API 36 inbox → approval → reply → browser restart → Android force-stop →
+continuation → revocation passed at `0c3a7a2` in
+[run 39620149498](https://github.com/Soldsoul86/orb/actions/runs/39620149498).
+See [sanitized result](evidence/pilot-api36.json),
+[Android inbox](evidence/pilot-android-reply.png), and
+[browser reply](evidence/pilot-browser-reply.png). Follow-up and historical failures
+are retained in the [pilot acceptance ledger](../guest-web/matrix/pilot/ACCEPTANCE.md).
+This does not establish physical Pixel, mobile data, uncoached usability or an
+independent security review. [Mac private staging](../guest-web/matrix/pilot/MAC-PILOT.md)
+uses Docker, private-interface HTTPS and a separate debug pilot APK.
+
+## Earlier publishing increment (historical record)
 
 Android now has a private-by-default form with public name, purpose, category,
 services and remote-work scope. Review shows the disclosure and existing purpose
@@ -25,8 +52,9 @@ therefore remains partially open.
 The browser experiment now uses the public standalone Matrix crypto API, with
 SDK device-key lookup, trust, Olm encryption and authenticated decryption
 provenance behind a serialized adapter. It no longer imports Matrix JS or reaches
-into its private fields. The actual Android guest product adapter/inbox is still
-missing: the native interop test remains PR #9's separate test app.
+into its private fields. At that earlier milestone, the actual Android guest adapter/inbox was missing;
+the private guest product increment above now supplies it. PR #9's isolated
+interop application remains separate historical evidence.
 
 ## Provenance and reuse
 
