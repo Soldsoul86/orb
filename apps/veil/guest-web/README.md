@@ -2,7 +2,7 @@
 
 This adds real contact-address parsing, existing pi/1 public-signature verification and a tested, disabled browser entry surface. It does **not** deliver browser messaging. There is no approved browser Signal adapter, key/session store, encrypted send path, live guest API, app handoff, new APK or production deployment.
 
-See [DESIGN.md](DESIGN.md), [crypto research](CRYPTO_COMPATIBILITY.md), [API.md](API.md), [TESTS.md](TESTS.md) and [RUNBOOK.md](RUNBOOK.md).
+See [the final status report](STATUS.md), [DESIGN.md](DESIGN.md), [crypto research](CRYPTO_COMPATIBILITY.md), [API.md](API.md), [TESTS.md](TESTS.md) and [RUNBOOK.md](RUNBOOK.md).
 
 Quick checks (Node 24, Python 3.12):
 

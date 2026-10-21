@@ -15,7 +15,8 @@ See `.github/workflows/veil-guest-gate.yml` on `codex/veil-guest-gate`. JDK21, G
 
 ```
 export VEIL_PUBLIC_FIXTURE=/tmp/veil-public-state.json
-gradle -p apps/veil --no-daemon -PveilPurposePreview=true :identity-core:test :app:testDebugUnitTest :app:lintDebug
+python -m pip install -r apps/veil/portable-provider/requirements.txt -r apps/veil/relay/requirements.txt
+gradle -p apps/veil --no-daemon --rerun-tasks -PveilPurposePreview=true :identity-core:test :app:testDebugUnitTest :app:lintDebug
 node apps/veil/guest-web/tests/core.test.mjs
 python -m unittest discover -s apps/veil/guest-web/tests -v
 bash apps/veil/guest-web/tests/probe_official_browser.sh

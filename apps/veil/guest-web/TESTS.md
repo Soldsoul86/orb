@@ -31,3 +31,5 @@ Automated checks:
 - Official Signal browser package probe: expected inability to bundle Node-native dependencies is a BLOCKED feasibility observation, not a passing E2EE proof.
 
 Managed workspace limitations: no local Android SDK/Gradle and loopback listener denied by the execution environment. Local Node execution directly (`node tests/core.test.mjs`) runs named tests; local `node --test` wrapper emitted only a file-level result, so named-test output is used. Browser/build evidence is produced in GitHub Actions.
+
+Final observed CI: [run 39531620094](https://github.com/Soldsoul86/orb/actions/runs/39531620094) PASS at `21ce591afc7a9ba2f61fa68e02b66af4447c04cc`. 11 Node, 4 Python gate, 3 identity-core, 25 app JVM, 20 provider (including PostgreSQL), 32 relay PostgreSQL tests passed, plus lint and Chromium script. This is 95 unit/integration tests, not 95 guest acceptance criteria. T03 remains BLOCKED. The earlier skipped/missing-dependency CI configurations were fixed and rerun. See STATUS.md for evidence and limits.
