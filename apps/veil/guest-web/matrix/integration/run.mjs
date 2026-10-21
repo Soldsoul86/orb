@@ -180,7 +180,9 @@ try {
   process.exitCode = 1;
 } finally {
   const versions = {};
-  for (const pkg of ['matrix-js-sdk', '@matrix-org/matrix-sdk-crypto-wasm', 'playwright']) versions[pkg] = JSON.parse(await readFile('node_modules/' + pkg + '/package.json', 'utf8')).version;
+  for (const pkg of ['@matrix-org/matrix-sdk-crypto-wasm', 'playwright']) versions[pkg] = JSON.parse(await readFile('node_modules/' + pkg + '/package.json', 'utf8')).version;
+  versions.chromium = browser.version();
+  versions.adapter = 'standalone-public-crypto-api';
   if (mode === 'android') versions.androidSdkSource = process.env.MATRIX_RUST_REV;
   await writeFile('evidence/' + mode + '.json', JSON.stringify({ mode, revision: process.env.GITHUB_SHA ?? 'local', versions, results }, null, 2));
   await browser.close();
