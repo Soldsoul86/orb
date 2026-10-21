@@ -24,7 +24,7 @@ async def main():
                     '--config-path', str(config), '--generate-config', '--report-stats=no'], cwd=RUNTIME, check=True, stdout=subprocess.DEVNULL)
     secret = secrets.token_hex(32)
     cfg = yaml.safe_load(config.read_text())
-    cfg.update(listeners=[{'path': str(RUNTIME / 'synapse.sock'), 'type': 'http', 'resources': [{'names': ['client'], 'compress': False}]}],
+    cfg.update(listeners=[{'path': str(RUNTIME / 'synapse.sock'), 'type': 'http', 'x_forwarded': True, 'resources': [{'names': ['client'], 'compress': False}]}],
                registration_shared_secret=secret, enable_registration=False, report_stats=False,
                federation_domain_whitelist=[], trusted_key_servers=[], suppress_key_server_warning=True,
                send_federation=False, enable_media_repo=False,

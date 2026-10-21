@@ -115,7 +115,7 @@ async function androidTest() {
   await mkdir('android/app/src/androidTest/assets', { recursive: true });
   await writeFile('android/app/src/androidTest/assets/runtime.json', JSON.stringify({ account: accounts[1], guest: guest.card, guestPin: guest.card.id }));
   console.log('Android instrumentation build/run starting');
-  const gradle = spawn('../../../../gradlew', ['-p', 'android', ':app:connectedDebugAndroidTest', '--console=plain'], { stdio: 'inherit' });
+  const gradle = spawn('gradle', ['-p', 'android', ':app:connectedDebugAndroidTest', '--console=plain'], { stdio: 'inherit' });
   const completed = new Promise(resolve => gradle.on('exit', code => resolve(code)));
   let gradleExit;
   completed.then(code => { gradleExit = code; });

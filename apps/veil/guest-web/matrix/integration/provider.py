@@ -53,7 +53,9 @@ class Boundary:
         self.db.close()
 
     async def upstream(self, method, path, body=None, auth=None):
-        headers = {'Content-Type': 'application/json'}
+        # Unix sockets have no remote IP. Supply our own fixed loopback address,
+        # never a client-supplied forwarded header, for Synapse rate limiting.
+        headers = {'Content-Type': 'application/json', 'X-Forwarded-For': '127.0.0.1', 'X-Forwarded-Proto': 'http'}
         if auth:
             headers['Authorization'] = auth
         async with self.http.request(method, 'http://localhost' + path, data=body, headers=headers) as r:
