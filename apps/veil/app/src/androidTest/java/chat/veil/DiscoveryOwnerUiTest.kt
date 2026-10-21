@@ -19,11 +19,15 @@ class DiscoveryOwnerUiTest {
         ui.runOnIdle {ui.activity.contactAction({
             if(!ready())createIdentity()
             createFacet(PurposePolicy("TEST discovery UI",timezone="UTC"),"https://test-provider.example",false)
-        }){ui.activity.contactPage="discovery"}}
-        ui.waitUntil(20000){ui.activity.contactPage=="discovery"&&!ui.activity.busy}
+        }){ui.activity.contactPage="home"}}
+        ui.waitUntil(20000){!ui.activity.busy}
+        ui.onNodeWithText("Reach me").performClick()
+        ui.onNodeWithText("Be found · discovery preview").performScrollTo().performClick()
+        ui.waitUntil(20000){ui.activity.contactPage=="discovery"}
         ui.onNodeWithText("TEST discovery UI").performScrollTo().performClick()
         ui.onNodeWithText("Profile draft from discovery").performScrollTo().performTextInput("""{"v":1,"visibility":"PUBLIC","profile":{"alias":"TEST designer","purpose":"Android interface redesign","category":"DESIGN & CREATE","tags":["ui"]}}""")
         ui.onNodeWithText("Review exact disclosure").performScrollTo().performClick()
+        ui.onNodeWithText("Advanced identity details").assertExists()
         ui.onNodeWithText("Authorize signed export").performScrollTo().assertIsNotEnabled()
         ui.onAllNodes(isToggleable()).onLast().performScrollTo().performClick()
         ui.onNodeWithText("Authorize signed export").assertIsEnabled()

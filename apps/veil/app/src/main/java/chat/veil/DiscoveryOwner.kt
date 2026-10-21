@@ -15,6 +15,7 @@ import org.portableidentity.core.DiscoveryPublication
 @Composable fun ColumnScope.DiscoveryOwner(a:MainActivity,facets:List<JSONObject>) {
     var selected by remember {mutableStateOf("")};var raw by remember {mutableStateOf("")}
     var preview by remember {mutableStateOf<JSONObject?>(null)};var error by remember {mutableStateOf("")}
+    var advanced by remember(selected) {mutableStateOf(false)}
     var consent by remember {mutableStateOf(false)};var exported by remember {mutableStateOf("")}
     BackHandler {a.contactPage="home"}
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -36,7 +37,9 @@ import org.portableidentity.core.DiscoveryPublication
             Text("Existing contact rules (also public in the signed route):")
             Text(PurposePolicy.from(facet.getJSONObject("policy")).summary())
             Text("Route: ${facet.getString("route")}")
-            Text("This purpose address: ${facet.getString("id")}")
+            Text("Purpose contact link: ${facet.getString("route")}/g/${facet.getString("id").substringAfterLast(':')}")
+            TextButton({advanced=!advanced}){Text("Advanced identity details")}
+            if(advanced)Text("Purpose controller: ${facet.getString("id")}")
             Text("Visibility will change to the selected option. ${if(p.optBoolean("pause"))"This also pauses purpose access at your provider." else "Other contact permissions stay as shown."}")
             Text("Public content may be cached elsewhere. Unpublishing cannot erase copied content. The export must be submitted to each directory you used. Removing a listing does not revoke existing contact approvals.")
             Row {Checkbox(consent,{consent=it});Text("I approve these fields, existing rules, route and visibility change.")}
