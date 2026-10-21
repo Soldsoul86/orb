@@ -6,8 +6,8 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 # The CA mount is only for managed CI builds; Mac Docker builds use system roots.
 RUN --mount=type=secret,id=proxy_ca,required=false if [ -f /run/secrets/proxy_ca ]; then cp /run/secrets/proxy_ca /usr/local/share/ca-certificates/build-proxy.crt; update-ca-certificates; fi
 WORKDIR /srv/veil/guest-web/matrix/integration
-COPY guest-web/matrix/integration/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY guest-web/matrix/pilot/requirements.lock ./requirements.lock
+RUN pip install --no-cache-dir -r requirements.lock
 COPY guest-web/matrix/integration/package.json guest-web/matrix/integration/package-lock.json ./
 RUN NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt npm ci --ignore-scripts --no-audit --no-fund
 RUN rm -f /usr/local/share/ca-certificates/build-proxy.crt && update-ca-certificates

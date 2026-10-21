@@ -40,7 +40,9 @@ async function metadata() {
         require(same(p.guest,data.card) && same(p.owner,data.initialOwner));
         require(['approved','declined','blocked','revoked'].includes(p.status) && Number.isSafeInteger(p.revision) && p.revision>=2);
         if(data.decision) {const old=await verify(data.decision,pin,'pi-matrix-policy+jws');require(p.revision>=old.revision && (p.revision!==old.revision || same(p,old)));}
+        const changed=data.permission!==p.status;
         data.decision=result.decision;data.permission=p.status;
+        if(changed)status=p.status==='approved'?'Approved · you can continue':'This conversation is '+p.status+'.';
       } else require(!data.decision);
     }
     await save();
@@ -139,6 +141,7 @@ function render() {
   $('status').textContent=status;
   $('send').textContent=data?.outbox?'Retry saved message':data?.sent?'Send message':'Send request';
   $('send').disabled=!active || busy || fatal || ended || (data?.sent && data.permission!=='approved' && !data.outbox);
+  $('refresh').disabled=fatal || busy;
   $('message').disabled=!!data?.outbox || ended || fatal;
   $('messages').replaceChildren(...(data?.messages || []).map(m=>{const el=document.createElement('p');el.className=m.mine?'mine':'theirs';el.textContent=(m.mine?'You: ':'Reply: ')+m.text;return el;}));
   $('install').hidden=!(data?.messages.some(m=>!m.mine));
