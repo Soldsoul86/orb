@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Disposable emulator talks only to the runner loopback alias. No production app. -->
+    <application android:label="Veil Matrix experiment" android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>
