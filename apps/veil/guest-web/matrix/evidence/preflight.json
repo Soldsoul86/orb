@@ -1,0 +1,63 @@
+{
+  "scope": "local experiment prerequisites only",
+  "status": "BLOCKED",
+  "message_e2ee": "NOT TESTED",
+  "public_guest_send": false,
+  "checks": [
+    {
+      "check": "node",
+      "status": "PASS",
+      "detail": "Executable on PATH"
+    },
+    {
+      "check": "java",
+      "status": "PASS",
+      "detail": "Executable on PATH"
+    },
+    {
+      "check": "gradle",
+      "status": "BLOCKED",
+      "detail": "Not on PATH"
+    },
+    {
+      "check": "adb",
+      "status": "BLOCKED",
+      "detail": "Not on PATH"
+    },
+    {
+      "check": "sdkmanager",
+      "status": "BLOCKED",
+      "detail": "Not on PATH"
+    },
+    {
+      "check": "android_platform_35",
+      "status": "BLOCKED",
+      "detail": "Requires installed Android API 35; SDK path is not printed"
+    },
+    {
+      "check": "python_playwright",
+      "status": "PASS",
+      "detail": "Python package only; browser launch is a separate acceptance test"
+    },
+    {
+      "check": "loopback_listener",
+      "status": "BLOCKED",
+      "detail": "PermissionError; errno=1"
+    },
+    {
+      "check": "matrix_js_import",
+      "status": "BLOCKED",
+      "detail": "Module import exit=1; no package installation attempted"
+    },
+    {
+      "check": "npm_registry_https",
+      "status": "BLOCKED",
+      "detail": "URLError; configured-proxy request failed"
+    },
+    {
+      "check": "maven_central_https",
+      "status": "BLOCKED",
+      "detail": "URLError; configured-proxy request failed"
+    }
+  ]
+}

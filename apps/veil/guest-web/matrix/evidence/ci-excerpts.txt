@@ -1,0 +1,21 @@
+Selected real GitHub Actions log excerpts; not complete logs.
+Baseline: https://github.com/Soldsoul86/orb/actions/runs/39531623756
+Delta: https://github.com/Soldsoul86/orb/actions/runs/39564717501
+
+Baseline
+2026-10-21T02:11:44.7065790Z ℹ tests 666
+2026-10-21T02:11:44.7066295Z ℹ pass 666
+2026-10-21T02:11:44.7066506Z ℹ fail 0
+2026-10-21T02:11:44.7066933Z ℹ skipped 0
+2026-10-21T02:11:44.8531065Z TypeError: event.risk.measured.toFixed is not a function
+2026-10-21T02:11:44.8531989Z     at main (file:///home/runner/work/orb/orb/scripts/simulate-hard-exit.mjs:201:45)
+2026-10-21T02:11:44.8563960Z ##[error]Process completed with exit code 1.
+
+Delta
+2026-10-21T07:49:52.9731554Z ℹ tests 666
+2026-10-21T07:49:52.9733163Z ℹ pass 666
+2026-10-21T07:49:52.9733502Z ℹ fail 0
+2026-10-21T07:49:52.9734269Z ℹ skipped 0
+2026-10-21T07:49:53.0820961Z TypeError: event.risk.measured.toFixed is not a function
+2026-10-21T07:49:53.0821717Z     at main (file:///home/runner/work/orb/orb/scripts/simulate-hard-exit.mjs:201:45)
+2026-10-21T07:49:53.0903835Z ##[error]Process completed with exit code 1.
