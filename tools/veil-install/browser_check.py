@@ -61,8 +61,8 @@ def check(origin, live=False):
         import urllib.request
         with urllib.request.urlopen(APK_URL, timeout=120) as response:
             digest = hashlib.sha256(response.read()).hexdigest()
-        assert digest == '258e366bd00d9c3b88cf7618c7857e581bc5fa9a1c31d80c79aa78192f05d206'
-        print('PASS public APK download without authentication; SHA256 matches signed v8')
+        assert digest == 'cd8da545bf8ab8bcb461a6aecd79ff23a49d0982b15a4774a5b6520c0db8b56e'
+        print('PASS public APK download without authentication; SHA256 matches signed v9')
     print('PASS browser: QR destination, download, retained invitation, reload, invalid link, no token/referrer leakage')
     print('NOT TESTED: physical camera scan, Android installer and browser-to-app resolution; automatic post-install continuation is not implemented')
 
