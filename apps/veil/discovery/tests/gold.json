@@ -1,0 +1,1042 @@
+[
+  {
+    "id": "1-01",
+    "category_group": 0,
+    "query": "Build a small business website",
+    "relevant": [
+      "web",
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-02",
+    "category_group": 0,
+    "query": "Develop a web application",
+    "relevant": [
+      "web"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-03",
+    "category_group": 0,
+    "query": "Automate spreadsheet reports",
+    "relevant": [
+      "automation"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-04",
+    "category_group": 0,
+    "query": "Integrate our CRM",
+    "relevant": [
+      "automation"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-05",
+    "category_group": 0,
+    "query": "Develop an Android app",
+    "relevant": [
+      "mobile"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-06",
+    "category_group": 0,
+    "query": "Build an iPhone application",
+    "relevant": [
+      "mobile"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-07",
+    "category_group": 0,
+    "query": "Create an internal dashboard",
+    "relevant": [
+      "automation"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-08",
+    "category_group": 0,
+    "query": "Add AI integration to our workflow",
+    "relevant": [
+      "automation"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-09",
+    "category_group": 0,
+    "query": "A remote website builder under $500",
+    "relevant": [
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": true,
+      "max_budget_exclusive": 500,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "1-10",
+    "category_group": 0,
+    "query": "Build a website around $500",
+    "relevant": [
+      "web",
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-11",
+    "category_group": 0,
+    "query": "Website in Spanish",
+    "relevant": [
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "languages": [
+        "spanish"
+      ]
+    }
+  },
+  {
+    "id": "1-12",
+    "category_group": 0,
+    "query": "An app developer to implement an interface",
+    "relevant": [
+      "mobile"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-13",
+    "category_group": 0,
+    "query": "Build a landing page with a logo",
+    "relevant": [
+      "web",
+      "web-budget"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-14",
+    "category_group": 0,
+    "query": "Develop an Android app with SEO",
+    "relevant": [
+      "mobile"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-15",
+    "category_group": 0,
+    "query": "Build a website accepting new enquiries",
+    "relevant": [
+      "web",
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "accepting": true
+    }
+  },
+  {
+    "id": "1-16",
+    "category_group": 0,
+    "query": "Build a website can start within 7 days",
+    "relevant": [
+      "web-budget"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "lead_days": 7
+    }
+  },
+  {
+    "id": "1-17",
+    "category_group": 0,
+    "query": "Plumber near me",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "1-18",
+    "category_group": 0,
+    "query": "Build a website under $100",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "max_budget_exclusive": 100,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "1-19",
+    "category_group": 0,
+    "query": "Android developer in French",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "languages": [
+        "french"
+      ]
+    }
+  },
+  {
+    "id": "1-20",
+    "category_group": 0,
+    "query": "Urgent legal representation for an app",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-01",
+    "category_group": 1,
+    "query": "Redesign the UI of my Android app",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-02",
+    "category_group": 1,
+    "query": "Android app redesign",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-03",
+    "category_group": 1,
+    "query": "Improve mobile user experience",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-04",
+    "category_group": 1,
+    "query": "Interface redesign for my website",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-05",
+    "category_group": 1,
+    "query": "Create a startup logo",
+    "relevant": [
+      "brand"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-06",
+    "category_group": 1,
+    "query": "Design a brand identity",
+    "relevant": [
+      "brand"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-07",
+    "category_group": 1,
+    "query": "Graphic design for a poster",
+    "relevant": [
+      "brand"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-08",
+    "category_group": 1,
+    "query": "Edit a short promo video",
+    "relevant": [
+      "media"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-09",
+    "category_group": 1,
+    "query": "Motion animation for a product",
+    "relevant": [
+      "media"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-10",
+    "category_group": 1,
+    "query": "Design a pitch deck presentation",
+    "relevant": [
+      "media"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-11",
+    "category_group": 1,
+    "query": "Remote UX research in Spanish",
+    "relevant": [
+      "interface"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": true,
+      "languages": [
+        "spanish"
+      ]
+    }
+  },
+  {
+    "id": "2-12",
+    "category_group": 1,
+    "query": "UI redesign in person in London",
+    "relevant": [
+      "interface-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": false,
+      "locations": [
+        "London"
+      ]
+    }
+  },
+  {
+    "id": "2-13",
+    "category_group": 1,
+    "query": "Logo under $500",
+    "relevant": [
+      "brand"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "max_budget_exclusive": 500,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "2-14",
+    "category_group": 1,
+    "query": "UI redesign around $500",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-15",
+    "category_group": 1,
+    "query": "Design an interface for a Python app",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-16",
+    "category_group": 1,
+    "query": "Redesign an app with marketing analytics",
+    "relevant": [
+      "interface",
+      "interface-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-17",
+    "category_group": 1,
+    "query": "Medical diagnosis from a designer",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-18",
+    "category_group": 1,
+    "query": "Logo under $200",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "max_budget_exclusive": 200,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "2-19",
+    "category_group": 1,
+    "query": "UI designer near me",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "2-20",
+    "category_group": 1,
+    "query": "Logo must be certified",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-01",
+    "category_group": 2,
+    "query": "Improve Google search traffic",
+    "relevant": [
+      "seo",
+      "seo-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-02",
+    "category_group": 2,
+    "query": "SEO for our business",
+    "relevant": [
+      "seo",
+      "seo-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-03",
+    "category_group": 2,
+    "query": "Improve search visibility",
+    "relevant": [
+      "seo",
+      "seo-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-04",
+    "category_group": 2,
+    "query": "Create Instagram content",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-05",
+    "category_group": 2,
+    "query": "Help with product positioning",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-06",
+    "category_group": 2,
+    "query": "Write copy for a campaign",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-07",
+    "category_group": 2,
+    "query": "Set up paid ad campaigns",
+    "relevant": [
+      "ads"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-08",
+    "category_group": 2,
+    "query": "Marketing analytics dashboard",
+    "relevant": [
+      "seo",
+      "ads"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-09",
+    "category_group": 2,
+    "query": "Content strategy for an app",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-10",
+    "category_group": 2,
+    "query": "Remote SEO consultant",
+    "relevant": [
+      "seo"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": true
+    }
+  },
+  {
+    "id": "3-11",
+    "category_group": 2,
+    "query": "Local SEO in London",
+    "relevant": [
+      "seo-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": false,
+      "locations": [
+        "London"
+      ]
+    }
+  },
+  {
+    "id": "3-12",
+    "category_group": 2,
+    "query": "Copywriting in Spanish",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "languages": [
+        "spanish"
+      ]
+    }
+  },
+  {
+    "id": "3-13",
+    "category_group": 2,
+    "query": "Paid ads under $800",
+    "relevant": [
+      "ads"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "max_budget_exclusive": 800,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "3-14",
+    "category_group": 2,
+    "query": "SEO around $500",
+    "relevant": [
+      "seo",
+      "seo-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-15",
+    "category_group": 2,
+    "query": "SEO and website strategy",
+    "relevant": [
+      "seo",
+      "seo-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-16",
+    "category_group": 2,
+    "query": "Brand positioning and social media",
+    "relevant": [
+      "content"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-17",
+    "category_group": 2,
+    "query": "Financial advice about advertising",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "3-18",
+    "category_group": 2,
+    "query": "SEO under $300",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "max_budget_exclusive": 300,
+      "currency": "USD",
+      "unit": "project"
+    }
+  },
+  {
+    "id": "3-19",
+    "category_group": 2,
+    "query": "SEO in German",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "languages": [
+        "german"
+      ]
+    }
+  },
+  {
+    "id": "3-20",
+    "category_group": 2,
+    "query": "SEO guaranteed first place",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-01",
+    "category_group": 3,
+    "query": "Learn Python from a tutor",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-02",
+    "category_group": 3,
+    "query": "Python teacher",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-03",
+    "category_group": 3,
+    "query": "Coding tutor",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-04",
+    "category_group": 3,
+    "query": "Get help understanding SQL",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-05",
+    "category_group": 3,
+    "query": "Conversational Spanish lessons",
+    "relevant": [
+      "language"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-06",
+    "category_group": 3,
+    "query": "English lessons online",
+    "relevant": [
+      "language"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": true
+    }
+  },
+  {
+    "id": "4-07",
+    "category_group": 3,
+    "query": "Learn Excel",
+    "relevant": [
+      "coding",
+      "skills"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-08",
+    "category_group": 3,
+    "query": "Professional skills coaching",
+    "relevant": [
+      "skills"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-09",
+    "category_group": 3,
+    "query": "Learn Python remotely",
+    "relevant": [
+      "coding"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": true
+    }
+  },
+  {
+    "id": "4-10",
+    "category_group": 3,
+    "query": "SQL tutor in person in London",
+    "relevant": [
+      "coding-local"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "remote": false,
+      "locations": [
+        "London"
+      ]
+    }
+  },
+  {
+    "id": "4-11",
+    "category_group": 3,
+    "query": "Coding lessons under $70 per hour",
+    "relevant": [
+      "coding"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "max_budget_exclusive": 70,
+      "currency": "USD",
+      "unit": "hour"
+    }
+  },
+  {
+    "id": "4-12",
+    "category_group": 3,
+    "query": "Spanish lessons in English",
+    "relevant": [
+      "language"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {
+      "languages": [
+        "english"
+      ]
+    }
+  },
+  {
+    "id": "4-13",
+    "category_group": 3,
+    "query": "Aprender español con un profesor",
+    "relevant": [
+      "language"
+    ],
+    "ambiguous": false,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-14",
+    "category_group": 3,
+    "query": "Teach coding for Android apps",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-15",
+    "category_group": 3,
+    "query": "Learn SQL for marketing analytics",
+    "relevant": [
+      "coding",
+      "coding-local"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-16",
+    "category_group": 3,
+    "query": "Software skills coaching for designers",
+    "relevant": [
+      "coding",
+      "skills"
+    ],
+    "ambiguous": true,
+    "hard_negative": false,
+    "judgment": "Relevant service and explicit constraint fit in the documented TEST fixture inventory.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-17",
+    "category_group": 3,
+    "query": "Medical diagnosis lessons",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  },
+  {
+    "id": "4-18",
+    "category_group": 3,
+    "query": "Python tutor under $10 per hour",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "max_budget_exclusive": 10,
+      "currency": "USD",
+      "unit": "hour"
+    }
+  },
+  {
+    "id": "4-19",
+    "category_group": 3,
+    "query": "Coding tutor in Arabic",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {
+      "languages": [
+        "arabic"
+      ]
+    }
+  },
+  {
+    "id": "4-20",
+    "category_group": 3,
+    "query": "Urgent legal representation",
+    "relevant": [],
+    "ambiguous": false,
+    "hard_negative": true,
+    "judgment": "No supported or hard-constraint-fitting TEST supply.",
+    "hard_constraints": {}
+  }
+]

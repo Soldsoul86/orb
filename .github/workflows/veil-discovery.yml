@@ -1,0 +1,139 @@
+name: Veil discovery preview gates
+on:
+  push:
+    branches: ['feat/veil-discovery-v01*']
+    paths: ['apps/veil/**', '.github/workflows/veil-discovery.yml']
+  pull_request:
+    paths: ['apps/veil/discovery/**', 'apps/veil/identity-core/**', 'apps/veil/app/src/**', '.github/workflows/veil-discovery.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: veil-discovery-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: veil_test
+          POSTGRES_USER: veil_test
+          POSTGRES_PASSWORD: disposable-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U veil_test -d veil_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      VEIL_TEST_POSTGRES_URL: postgresql://veil_test:disposable-ci-only@localhost:5432/veil_test
+      TEST_DATABASE_URL: postgresql://veil_test:disposable-ci-only@localhost:5432/veil_test
+      DISCOVERY_TEST_DATABASE_URL: postgresql://veil_test:disposable-ci-only@localhost:5432/veil_discovery_test
+      VEIL_PUBLIC_FIXTURE: ${{ github.workspace }}/guest-public-fixture.json
+      VEIL_DISCOVERY_FIXTURE: ${{ github.workspace }}/discovery-nimbus-fixture.json
+      VEIL_DISCOVERY_OWNER_FIXTURE: ${{ github.workspace }}/discovery-owner-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          log-accepted-android-sdk-licenses: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r apps/veil/discovery/requirements.txt playwright==1.56.0
+      - run: python -m playwright install --with-deps chromium
+      - name: Create disposable discovery database
+        run: |
+          python - <<'PY'
+          import os,psycopg
+          with psycopg.connect(os.environ['VEIL_TEST_POSTGRES_URL'],autocommit=True) as db:
+              db.execute('CREATE DATABASE veil_discovery_test')
+          PY
+      - name: Identity, Android JVM/Signal/portability regressions and lint (no APK publication)
+        run: gradle -p apps/veil --no-daemon -PveilPurposePreview=true :identity-core:test :app:testDebugUnitTest :app:lintDebug
+      - name: Existing provider and relay PostgreSQL regressions
+        run: |
+          python -m unittest discover -s apps/veil/portable-provider -v
+          python -m unittest discover -s apps/veil/relay -v
+      - name: Signed publication, privacy, search and HTTP tests
+        run: python -m unittest discover -s apps/veil/discovery/tests -v
+      - name: Independent offline verifier of Kotlin and existing-wallet publications
+        run: python apps/veil/discovery/tests/independent.py
+      - name: Real mobile browser journey with TEST profiles
+        run: python apps/veil/discovery/tests/browser.py
+      - name: Search evaluation against committed judgments
+        run: python apps/veil/discovery/tests/evaluate.py
+      - name: Existing guest release gate stays disabled
+        run: |
+          node apps/veil/guest-web/tests/core.test.mjs
+          python -m unittest discover -s apps/veil/guest-web/tests -v
+          python apps/veil/guest-web/tests/browser.py
+          python apps/veil/guest-web/release_gate.py && exit 1 || test "$?" -eq 2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: veil-discovery-preview-evidence
+          path: |
+            apps/veil/discovery/evidence/
+            apps/veil/guest-web/evidence/
+            apps/veil/identity-core/build/test-results/
+            apps/veil/app/build/test-results/
+            apps/veil/app/build/reports/lint-results-debug.html
+  android-instrumentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          log-accepted-android-sdk-licenses: false
+      - name: Enable acceleration for a fresh disposable emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Existing native privacy, Signal and UI regressions plus discovery consent
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          working-directory: apps/veil
+          script: |
+            adb shell input keyevent KEYCODE_WAKEUP
+            adb shell wm dismiss-keyguard
+            adb shell settings put system screen_off_timeout 1800000
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss,chat.veil.ProtectionTest#flagIsSetBeforeAuthentication,chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest,chat.veil.InvitationQrLayoutTest,chat.veil.DiscoveryOwnerUiTest
+            mkdir -p discovery/evidence
+            adb exec-out run-as chat.veil.purposes.preview cat files/discovery-evidence/android-test-owner-review.png > discovery/evidence/android-test-owner-review.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: veil-discovery-android-test-evidence
+          path: |
+            apps/veil/discovery/evidence/android-test-owner-review.png
+            apps/veil/app/build/outputs/androidTest-results/
+            apps/veil/app/build/reports/androidTests/

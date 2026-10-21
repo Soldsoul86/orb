@@ -1,0 +1,3 @@
+-r ../portable-provider/requirements.txt
+psycopg[binary]==3.3.6
+qrcode[pil]==8.2
