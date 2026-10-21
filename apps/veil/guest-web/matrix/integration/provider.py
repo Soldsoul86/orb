@@ -157,7 +157,9 @@ class Boundary:
 
     async def handle(self, req):
         try:
-            assert '%' not in req.raw_path.split('?')[0] and '//' not in req.path and 'access_token' not in req.query
+            assert '//' not in req.path and 'access_token' not in req.query
+            if '/user/' not in req.path:
+                assert '%' not in req.raw_path.split('?')[0]
             if req.method == 'OPTIONS':
                 return web.Response(status=204)
             if req.path == '/health' and req.method == 'GET':
@@ -169,6 +171,13 @@ class Boundary:
                 status, raw = await self.upstream('POST', req.path, await req.read())
                 return web.Response(status=status, body=raw, content_type='application/json')
             who = await self.identity(req)
+            # SDK startup stores a sync filter under its own authenticated account.
+            # This is not a message-delivery or arbitrary user API exception.
+            filter_path = '/_matrix/client/v3/user/' + who[0] + '/filter'
+            if ((req.method == 'POST' and req.path == filter_path)
+                    or (req.method == 'GET' and re.fullmatch(re.escape(filter_path) + r'/[0-9]+', req.path))):
+                status, raw = await self.upstream(req.method, req.raw_path, await req.read(), req.headers['Authorization'])
+                return web.Response(status=status, body=raw, content_type='application/json')
             if req.path.startswith('/veil/policy') or '/sendToDevice/' in req.path:
                 async with self.lock:
                     if req.path.startswith('/veil/policy'):
