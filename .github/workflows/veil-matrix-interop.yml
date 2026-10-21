@@ -1,0 +1,49 @@
+name: Veil isolated Matrix interoperability
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/veil-programmable-reachability-matrix]
+    paths:
+      - '.github/workflows/veil-matrix-interop.yml'
+      - 'apps/veil/guest-web/matrix/integration/**'
+permissions:
+  contents: read
+concurrency:
+  group: veil-matrix-interop-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    working-directory: apps/veil/guest-web/matrix/integration
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned SDK and private homeserver
+        run: |
+          python -m pip install -r requirements.txt
+          npm install --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start disposable private provider
+        run: python start.py
+      - name: Browser crypto and hostile direct API tests
+        run: node run.mjs browser
+      - name: Publish sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-browser-results
+          path: apps/veil/guest-web/matrix/integration/evidence/*.json
+          if-no-files-found: ignore
+      - name: Destroy disposable accounts, keys and stores
+        if: always()
+        run: |
+          python -c "import json,os,pathlib,signal; p=pathlib.Path('runtime/pids.json'); [os.kill(pid,signal.SIGTERM) for pid in json.loads(p.read_text())] if p.exists() else None"
+          rm -rf runtime web
