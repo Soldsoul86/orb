@@ -22,6 +22,7 @@ android {
 }
 dependencies {
     implementation(project(":identity-core"))
+    implementation("androidx.annotation:annotation:1.9.1")
     implementation("net.java.dev.jna:jna:5.18.1@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     androidTestImplementation("androidx.test:runner:1.6.2")

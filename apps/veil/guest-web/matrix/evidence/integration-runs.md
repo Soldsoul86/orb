@@ -6,6 +6,31 @@ This record is being updated from completed Actions jobs. The executable workflo
 is `Veil isolated Matrix interoperability`, not the unrelated root `verify` job.
 Results below do not infer PASS from source code or from historical pi/1 tests.
 
+**Browser job PASS**, [run 39573339196](https://github.com/Soldsoul86/orb/actions/runs/39573339196),
+commit `f338bb16f758b7584536a7cab987a7c71ae59c5d`. Completed job
+`119132686251` passed the entire real browser exchange and hostile API suite.
+Selected actual output: [browser-actions.txt](browser-actions.txt). Android job
+`119133310906` FAILED during Kotlin compilation: generated SDK bindings required
+the missing AndroidX annotation dependency. Native Rust/JNI build, binding
+generation, KVM and emulator boot passed; message exchange was NOT TESTED in that
+attempt. The annotation dependency is now added and compilation precedes boot.
+
+| Area | Status | Evidence/limit |
+|---|---|---|
+| Browser SDK encrypted request and reply | PASS | Two independent Chromium contexts, real Olm SDK session, local decryption and purpose-signature verification. |
+| Purpose/device binding | PASS | Independent wrong pin and validly signed mismatched SDK key both refused. |
+| Approval and initial quota | PASS | Owner reply and concurrent second introductions refused before signed approval; approved encrypted reply succeeds. |
+| Expiration and revocation | PASS | Server-time expiry, both-direction revocation and signed-policy rollback tested through raw API calls. |
+| Direct API alternatives | PASS | Room send/create, plaintext to-device, legacy route, wildcard recipient and guest policy update refused. |
+| Concurrent first claim / retry | PASS | One of two concurrent introductions accepted, exact transaction retry accepted, changed body refused. |
+| Purpose schedule | PASS | Signed closed weekday blocks direct encrypted submission. |
+| Server plaintext inspection | PASS (limited observation) | Actual wire ciphertext observed; known request/reply canaries absent from provider/Synapse DB, WAL and logs. No server E2EE decryption code or endpoint secrets. |
+| Android SDK request/reply | NOT TESTED in first attempt | Native SDK built; Kotlin integration dependency failure is being fixed and rerun. |
+| Existing guest release gate | BLOCKED as required | Unchanged unconditional refusal; exit 2. This is not a feature release PASS. |
+| Root Orb CI | FAIL (pre-existing) | Run 39573339179: lint/build/independent compilation and 666 tests PASS; unchanged hard-exit demonstration throws at line 201. |
+| Physical phone, live Signal, persistence/recovery, two Matrix providers | NOT TESTED | Source preservation does not prove a device/runtime regression result. |
+| Independent security review / supported production adapter | BLOCKED release gates | Version-pinned roomless browser adapter uses two SDK internals; experimental code is not enabled in production. |
+
 ## Completed attempts
 
 | Run | Actual outcome |
@@ -17,6 +42,7 @@ Results below do not infer PASS from source code or from historical pi/1 tests.
 | [39572181801](https://github.com/Soldsoul86/orb/actions/runs/39572181801) | FAIL unknown crypto-store device. Public SDK lookup did not populate untracked user keys. Added documented version-pinned SDK key-query adapter. |
 | [39572691554](https://github.com/Soldsoul86/orb/actions/runs/39572691554) | PASS two Chromium SDK crypto contexts, purpose-pin rejection, signed mismatched-device rejection, modified policy rejection, preapproval reply denial. FAIL introduction submission: gateway rejected SDK's standard optional `org.matrix.msgid`; added bounded acceptance. Android NOT TESTED (dependency skipped). |
 | [39573013917](https://github.com/Soldsoul86/orb/actions/runs/39573013917) | PASS genuine encrypted browser introduction and reply, signed approval, revocation both directions, rollback denial, direct API bypass tests, atomic introduction race, exact retry, changed-body rejection and server-time expiry. FAIL later schedule fixture setup because initial SDK key upload was still asynchronous; initialization now waits for observed publication. Android NOT TESTED (dependency skipped). |
+| [39573339196](https://github.com/Soldsoul86/orb/actions/runs/39573339196) | Browser job PASS, including closed-hours enforcement, SDK ciphertext inspection and no plaintext canaries in provider/Synapse databases, WAL or logs. Android native build and emulator boot PASS; Kotlin compile FAIL (missing `RequiresApi` annotation dependency), Android message exchange NOT TESTED. |
 
 The local sandbox cannot create a socket (`EPERM`) and has no Android toolchain.
 These are local limitations, not evidence that GitHub Actions cannot run Matrix.
