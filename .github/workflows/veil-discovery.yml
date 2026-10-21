@@ -126,9 +126,10 @@ jobs:
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
             adb shell settings put system screen_off_timeout 1800000
-            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss,chat.veil.ProtectionTest#flagIsSetBeforeAuthentication,chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest,chat.veil.InvitationQrLayoutTest,chat.veil.DiscoveryOwnerUiTest
+            gradle --no-daemon -PveilPurposePreview=true :app:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true -Pandroid.testInstrumentationRunnerArguments.class=chat.veil.ProtectionTest#nativeRevealReleaseCancelAndFocusLoss,chat.veil.ProtectionTest#flagIsSetBeforeAuthentication,chat.veil.UnlockRegressionTest,chat.veil.SafetyNumberTest,chat.veil.PurposeCipherTest,chat.veil.PurposeQrTest,chat.veil.PurposeEditorTest,chat.veil.ContactUiTest,chat.veil.InvitationQrLayoutTest,chat.veil.DiscoveryOwnerUiTest
             mkdir -p discovery/evidence
             adb exec-out run-as chat.veil.purposes.preview cat files/discovery-evidence/android-test-owner-review.png > discovery/evidence/android-test-owner-review.png
+            python -c "from pathlib import Path; p=Path('discovery/evidence/android-test-owner-review.png').read_bytes(); assert len(p)>1000 and p[:8]==bytes([137,80,78,71,13,10,26,10]), 'Android capture is not a PNG'"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
