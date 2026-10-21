@@ -1,0 +1,18 @@
+[
+  {"query":"Could you build a remote web site below $450?","relevant":["web-budget"]},
+  {"query":"Need CRM integration for a remote team, can start within 2 weeks","relevant":["automation"]},
+  {"query":"Build a mobile application in Hindi","relevant":["mobile"]},
+  {"query":"Website with a guaranteed completion date","relevant":[]},
+  {"query":"Remote user research in Spanish under $900","relevant":["interface"]},
+  {"query":"Logo in London below $500","relevant":["brand"]},
+  {"query":"Pitch deck can start within 1 week","relevant":[]},
+  {"query":"Local interface redesign in London","relevant":["interface-local"]},
+  {"query":"Remote organic search below $1100","relevant":["seo"]},
+  {"query":"Instagram posts in Spanish can start within 7 days","relevant":["content"]},
+  {"query":"Paid advertising below €800","relevant":[]},
+  {"query":"Local SEO in London within 3 weeks","relevant":["seo-local"]},
+  {"query":"Teach SQL remotely below $70 per hour","relevant":["coding"]},
+  {"query":"Spanish lessons online within 3 days","relevant":["language"]},
+  {"query":"Teach Excel remotely","relevant":["coding","skills"]},
+  {"query":"Python tutor in French","relevant":[]}
+]

@@ -23,3 +23,16 @@ Fixed-denominator Precision@3 is deliberately reported rather than silently pret
 Evaluation invokes real PostgreSQL search, not an in-memory replacement. Reproduce with `DISCOVERY_TEST_DATABASE_URL` pointing to a disposable loopback `veil_discovery_test` DB and `python tests/evaluate.py`. That command resets only the discovery schema in the guarded test DB. The UI does not fabricate results when supply or hard constraints yield none.
 
 No analytics collector is implemented. If later approved, useful daily aggregate counters would be: search completed (count only), search returned any match, verified public profile opened, disabled-contact view opened, owner publish succeeded/failed. Do not include raw queries, controller IDs, cross-purpose visitor IDs, message content, phone/email, or individual response/reply behavior. Encrypted request/reply success metrics cannot exist until that channel works.
+
+## Integration holdout observation
+
+`tests/holdout.json` adds 16 queries absent from the original 80-query set,
+authored before running them against the unchanged PR #10 parser/ranker and
+existing TEST inventory. Initial observation: **15/16 exact sets, zero irrelevant
+or hard-constraint-breaking returned profiles**. The query “Instagram posts in
+Spanish can start within 7 days” incorrectly returns no results: the location
+parser absorbs the language/time phrase. This is an open false-negative defect.
+The test prints misses and fails for wrongly included profiles; it does not
+silently rewrite expected answers or label this a perfect relevance result.
+These are still developer-authored synthetic cases, not an independent market
+evaluation or evidence of real opted-in supply. The parser was not tuned on them.

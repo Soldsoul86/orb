@@ -43,6 +43,9 @@ class DiscoveryDeliveryTest {
         val restored=session(stale)
         assertThrows(DiscoveryChanged::class.java){restored.publishDiscovery(id,draft,directory)}
         val latest=hosted!!;restored.reconcileDiscovery(id,latest)
+        val expired=PortableSession(JSONObject(saved.toString()),{},::transport,{now+31*86400})
+        assertThrows(IllegalArgumentException::class.java){expired.reconcileDiscovery(id,latest)}
+        assertThrows(Exception::class.java){restored.reconcileDiscovery(id,latest.dropLast(8)+"AAAAAAAA")}
         assertEquals(2,saved.getJSONObject("facets").getJSONObject(id).getInt("discovery_revision"))
         assertThrows(IllegalArgumentException::class.java){restored.reconcileDiscovery(id,oldToken)}
         val conflict=Core.verify(latest,id,DiscoveryPublication.TYPE).put("expires",now+600)
@@ -54,7 +57,7 @@ class DiscoveryDeliveryTest {
         assertThrows(IllegalArgumentException::class.java){fresh.publishDiscovery(id,draft,directory)}
         assertFalse(attempts.joinToString().contains(controller.getString("d")))
     }
-    @Test fun unsignedCountersWrongControllerAndExpiredStateCannotRecover() {
+    @Test fun unsignedCountersAndWrongControllerCannotRecover() {
         val db=JSONObject();val session=PortableSession(db,{}, {_,_,_->error("No network in recovery")},{now})
         session.createIdentity();val id=session.createFacet(PurposePolicy("TEST",timezone="UTC"),provider,false)
         assertThrows(Exception::class.java){session.reconcileDiscovery(id,"{\"revision\":999999}")}

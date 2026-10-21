@@ -105,6 +105,27 @@ class PostgreSQL(unittest.TestCase):
         a=self.d.search('website')['results'];self.assertEqual(a,self.d.search('website')['results'])
         self.assertLessEqual(len(a),5)
         self.assertEqual(len(self.d.search('website under $500')['results']),1)
+    def test_frozen_parser_on_additional_holdout_queries(self):
+        from pathlib import Path
+        from open_verifier import public_id,strict_json
+        seed(self.d,self.now)
+        names={make(name,self.now)[0]:name for name in PEOPLE}
+        original={case['query'] for case in json.loads((Path(__file__).parent/'gold.json').read_text())}
+        cases=json.loads((Path(__file__).parent/'holdout.json').read_text())
+        exact=0;misses=[]
+        for case in cases:
+            with self.subTest(query=case['query']):
+                self.assertNotIn(case['query'],original)
+                result=self.d.search(case['query'])
+                actual={names[public_id(strict_json(decode(row['publication'].split('.')[0]))['jwk'])] for row in result['results']}
+                relevant=set(case['relevant'])
+                # No irrelevant/hard-constraint-breaking result is acceptable.
+                # False negatives remain visible evaluation results, not patched
+                # golden answers or a claim of perfect recall.
+                self.assertLessEqual(actual,relevant)
+                exact+=actual==relevant
+                if actual!=relevant:misses.append(case['query'])
+        print(json.dumps({'holdout_cases':len(cases),'exact_sets':exact,'missing_results':misses}))
     def test_deletion_terminal(self):
         i,_,_,_=self.publish();self.publish(revision=2,visibility='DELETED')
         with self.assertRaises(Conflict):self.publish(revision=3)

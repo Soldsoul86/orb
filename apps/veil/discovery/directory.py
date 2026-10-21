@@ -129,5 +129,6 @@ class Directory:
     def block(self, controller, reason):
         # Local operator command only: refuses hosting, never revokes the identity.
         if reason not in ('misleading', 'abuse', 'privacy'): raise ValueError('reason')
-        with self.lock:
+        with self.lock, self.db.transaction():
+            self.db.execute('SELECT pg_advisory_xact_lock(901715463)')
             self.db.execute('INSERT INTO veil_discovery.blocks VALUES(%s,%s) ON CONFLICT(controller) DO UPDATE SET reason=excluded.reason', (controller,reason))
