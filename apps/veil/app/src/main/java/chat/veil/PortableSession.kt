@@ -135,11 +135,16 @@ class PortableSession(
     fun reconcileDiscovery(id:String,token:String) {
         val d=org.portableidentity.core.DiscoveryPublication.verifyPublic(token,id,clock())
         val f=facet(id);val revision=d.getLong("revision");val local=f.optLong("discovery_revision",0)
-        require(!f.optBoolean("discovery_deleted") && revision>=local)
+        val pending=f.optJSONObject("discovery_pending")?.getJSONObject("body")
+        // Explicit recovery can discard an unconfirmed competing edit only if
+        // signed directory content has advanced beyond that edit's CAS baseline.
+        // Keep the highest locally signed counter when allocating the next edit.
+        val superseded=pending!=null && revision>pending.getLong("expected_revision")
+        require(!f.optBoolean("discovery_deleted") && (revision>=local || superseded))
         require(!f.has("discovery_created") || f.getLong("discovery_created")==d.getLong("created"))
         if(revision==local && f.has("discovery_export")) {
             val prior=Core.verify(JSONObject(f.getString("discovery_export")).getString("publication"),id,org.portableidentity.core.DiscoveryPublication.TYPE)
-            require(same(prior,d)) {"Conflicting publication at the same revision"}
+            require(same(prior,d) || superseded) {"Conflicting publication at the same revision"}
         }
         val current=payload(f);val remote=validateState(d.getString("state"),id)
         val oldPolicy=PurposePolicy.from(current.getJSONObject("policy"));val remotePolicy=PurposePolicy.from(remote.getJSONObject("policy"))
@@ -154,7 +159,7 @@ class PortableSession(
                 f.put("needs_migration",true)
             f.put("state",d.getString("state")).put("consent",true)
         }
-        f.put("discovery_revision",revision).put("discovery_created",d.getLong("created"))
+        f.put("discovery_revision",maxOf(revision,local)).put("discovery_created",d.getLong("created"))
             .put("discovery_export",JSONObject().put("publication",token).toString())
         f.remove("discovery_pending");commit()
     }

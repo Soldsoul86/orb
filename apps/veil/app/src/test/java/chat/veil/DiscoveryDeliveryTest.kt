@@ -51,6 +51,13 @@ class DiscoveryDeliveryTest {
         val conflict=Core.verify(latest,id,DiscoveryPublication.TYPE).put("expires",now+600)
         val controller=saved.getJSONObject("facets").getJSONObject(id).getJSONObject("controller")
         assertThrows(IllegalArgumentException::class.java){restored.reconcileDiscovery(id,DiscoveryPublication.sign(conflict,controller))}
+        val competing=JSONObject(saved.toString())
+        competing.getJSONObject("facets").getJSONObject(id).put("discovery_pending",JSONObject().put("body",JSONObject().put("expected_revision",1)))
+        val losingDevice=session(competing)
+        val winningToken=DiscoveryPublication.sign(conflict,controller)
+        losingDevice.reconcileDiscovery(id,winningToken)
+        assertFalse(saved.getJSONObject("facets").getJSONObject(id).has("discovery_pending"))
+        assertEquals(winningToken,JSONObject(losingDevice.discoveryExport(id)).getString("publication"))
         val fresh=session(JSONObject());fresh.importIdentity(backup,recoveryKey)
         fresh.reconcileDiscovery(id,latest)
         assertTrue(saved.getJSONObject("facets").getJSONObject(id).getBoolean("needs_migration"))

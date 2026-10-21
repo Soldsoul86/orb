@@ -88,7 +88,7 @@ import org.portableidentity.core.IdentityCore
             TextButton({advanced=!advanced}){Text("Advanced identity details")}
             if(advanced) {
                 Text("Purpose controller: $selected");Text("Signed contact route: ${facet.getString("route")}")
-                OutlinedTextField(raw,{raw=it.take(12000)},label={Text("Profile draft from discovery")},modifier=Modifier.fillMaxWidth(),maxLines=4)
+                OutlinedTextField(raw,{raw=it.take(12000);changed()},label={Text("Profile draft from discovery")},modifier=Modifier.fillMaxWidth(),maxLines=4)
                 TextButton({runCatching{DiscoveryPublication.request(raw)}.onSuccess{preview=it;consent=false}.onFailure{notice="Invalid publication draft."}}){Text("Review exact disclosure")}
                 if(preview!=null)OutlinedButton({a.contactAction({signDiscovery(selected,DiscoveryPublication.canonical(preview!!))}){exported=it;notice="Signed export prepared. This does not confirm directory publication."}},enabled=consent&&!a.busy){Text("Authorize signed export")}
                 TextButton({a.contactAction({discoveryExport(selected)}){exported=it}}){Text("Recover last signed export")}
