@@ -15,6 +15,15 @@ the missing AndroidX annotation dependency. Native Rust/JNI build, binding
 generation, KVM and emulator boot passed; message exchange was NOT TESTED in that
 attempt. The annotation dependency is now added and compilation precedes boot.
 
+In [run 39574887852](https://github.com/Soldsoul86/orb/actions/runs/39574887852),
+the browser suite passed again. Android Kotlin compilation, emulator boot and
+the real instrumentation test **passed** (`BUILD SUCCESSFUL`; one test completed).
+Chromium authenticated the native Android encrypted reply. The overall job then
+**failed** collecting `result.json`: Gradle's automatic test-app uninstall raced
+the harness. An explicit collection acknowledgment is added before test return;
+the whole job is being rerun. Post-test direct revocation/storage checks were
+**NOT TESTED in that failed harness attempt**.
+
 | Area | Status | Evidence/limit |
 |---|---|---|
 | Browser SDK encrypted request and reply | PASS | Two independent Chromium contexts, real Olm SDK session, local decryption and purpose-signature verification. |
@@ -25,7 +34,7 @@ attempt. The annotation dependency is now added and compilation precedes boot.
 | Concurrent first claim / retry | PASS | One of two concurrent introductions accepted, exact transaction retry accepted, changed body refused. |
 | Purpose schedule | PASS | Signed closed weekday blocks direct encrypted submission. |
 | Server plaintext inspection | PASS (limited observation) | Actual wire ciphertext observed; known request/reply canaries absent from provider/Synapse DB, WAL and logs. No server E2EE decryption code or endpoint secrets. |
-| Android SDK request/reply | NOT TESTED in first attempt | Native SDK built; Kotlin integration dependency failure is being fixed and rerun. |
+| Android SDK request/reply | PASS in 39574887852 | Native instrumentation completed and browser decrypted/authenticated its reply. Overall job FAIL on subsequent result-file collection; final checks pending rerun. |
 | Existing guest release gate | BLOCKED as required | Unchanged unconditional refusal; exit 2. This is not a feature release PASS. |
 | Root Orb CI | FAIL (pre-existing) | Run 39573339179: lint/build/independent compilation and 666 tests PASS; unchanged hard-exit demonstration throws at line 201. |
 | Physical phone, live Signal, persistence/recovery, two Matrix providers | NOT TESTED | Source preservation does not prove a device/runtime regression result. |
@@ -43,6 +52,7 @@ attempt. The annotation dependency is now added and compilation precedes boot.
 | [39572691554](https://github.com/Soldsoul86/orb/actions/runs/39572691554) | PASS two Chromium SDK crypto contexts, purpose-pin rejection, signed mismatched-device rejection, modified policy rejection, preapproval reply denial. FAIL introduction submission: gateway rejected SDK's standard optional `org.matrix.msgid`; added bounded acceptance. Android NOT TESTED (dependency skipped). |
 | [39573013917](https://github.com/Soldsoul86/orb/actions/runs/39573013917) | PASS genuine encrypted browser introduction and reply, signed approval, revocation both directions, rollback denial, direct API bypass tests, atomic introduction race, exact retry, changed-body rejection and server-time expiry. FAIL later schedule fixture setup because initial SDK key upload was still asynchronous; initialization now waits for observed publication. Android NOT TESTED (dependency skipped). |
 | [39573339196](https://github.com/Soldsoul86/orb/actions/runs/39573339196) | Browser job PASS, including closed-hours enforcement, SDK ciphertext inspection and no plaintext canaries in provider/Synapse databases, WAL or logs. Android native build and emulator boot PASS; Kotlin compile FAIL (missing `RequiresApi` annotation dependency), Android message exchange NOT TESTED. |
+| [39574887852](https://github.com/Soldsoul86/orb/actions/runs/39574887852) | Browser suite PASS. Android native instrumentation test and authenticated encrypted reply PASS. Overall job FAIL on result-file collection after Gradle uninstalled the completed test app; post-test boundary/storage checks NOT TESTED. Added explicit result collection handshake. |
 
 The local sandbox cannot create a socket (`EPERM`) and has no Android toolchain.
 These are local limitations, not evidence that GitHub Actions cannot run Matrix.

@@ -164,6 +164,7 @@ async function androidTest() {
   assert.equal(result.requestDecrypted, true);
   assert.equal(result.replyEncrypted, true);
   assert.equal(result.revoked, true);
+  execFileSync('adb', ['shell', 'run-as', 'chat.veil.matrix.interop', 'touch', 'files/collected']);
   assert.equal(await completed, 0);
   pass('Android instrumentation passed real SDK request decryption, identity signature, approval, reply encryption and revocation');
   const blocked = await call(guest.page, 'encrypted', 'revoked');

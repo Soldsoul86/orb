@@ -180,6 +180,11 @@ class InteropTest {
             check(File(files, "revoke").exists()) { "Browser did not acknowledge encrypted reply" }
             policy.put("revision", 3).put("status", "revoked"); submitPolicy()
             publish("result.json", json("requestDecrypted" to true, "replyEncrypted" to true, "revoked" to true))
+            // connectedAndroidTest uninstalls the app as soon as the test returns.
+            // Keep the public result alive until the independent harness has read it.
+            val collectedDeadline = now()+60
+            while (!File(files, "collected").exists() && now()<collectedDeadline) Thread.sleep(100)
+            check(File(files, "collected").exists()) { "Harness did not collect the public result" }
         } finally { machine.close() }
     }
 }
