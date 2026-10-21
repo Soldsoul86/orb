@@ -56,15 +56,17 @@ async function received(page, text) {
 }
 async function absence() {
   const wire = await readFile('runtime/wire.jsonl', 'utf8');
-  const database = await readFile('runtime/homeserver.db');
+  const serverFiles = (await readdir('runtime')).filter(name => /\.(db|sqlite)(-wal|-shm)?$|\.(log|jsonl)$/.test(name));
+  assert(serverFiles.includes('homeserver.db') && serverFiles.includes('policy.sqlite'));
+  const databasesAndLogs = await Promise.all(serverFiles.map(name => readFile('runtime/' + name)));
   for (const sentinel of ['VEIL_REQUEST_CANARY_8a19', 'VEIL_REPLY_CANARY_53c2']) {
     assert(!wire.includes(sentinel));
-    assert(!database.includes(Buffer.from(sentinel)));
+    assert(databasesAndLogs.every(bytes => !bytes.includes(Buffer.from(sentinel))), 'plaintext sentinel in server storage/log');
   }
   assert(wire.includes('m.olm.v1.curve25519-aes-sha2'));
   const yaml = await readFile('runtime/homeserver.yaml', 'utf8');
   assert(!/^\s+port:/m.test(yaml), 'Synapse must have no TCP listener');
-  pass('wire/server database contain SDK ciphertext, no request/reply canaries; upstream Unix-only');
+  pass('wire/server databases, WAL and logs contain no request/reply canaries; SDK ciphertext observed; upstream Unix-only');
 }
 async function browserTest() {
   const { guest, owner } = await pair(0);
@@ -176,7 +178,10 @@ try {
   console.error(error.stack);
   process.exitCode = 1;
 } finally {
-  await writeFile('evidence/' + mode + '.json', JSON.stringify({ mode, revision: process.env.GITHUB_SHA ?? 'local', results }, null, 2));
+  const versions = {};
+  for (const pkg of ['matrix-js-sdk', '@matrix-org/matrix-sdk-crypto-wasm', 'playwright']) versions[pkg] = JSON.parse(await readFile('node_modules/' + pkg + '/package.json', 'utf8')).version;
+  if (mode === 'android') versions.androidSdkSource = process.env.MATRIX_RUST_REV;
+  await writeFile('evidence/' + mode + '.json', JSON.stringify({ mode, revision: process.env.GITHUB_SHA ?? 'local', versions, results }, null, 2));
   await browser.close();
   await new Promise(r => server.close(r));
 }

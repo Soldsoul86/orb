@@ -10,6 +10,7 @@ import re
 import sqlite3
 import sys
 import time
+import traceback
 from pathlib import Path
 
 import aiohttp
@@ -129,7 +130,9 @@ class Boundary:
         identifier, p, used, os, sender, target, intro = found[0]
         assert p['status'] != 'revoked' and time.time() < p['expires']
         assert active(os['policy'], time.time()) and is_open(os['policy'], time.time())
-        assert set(content) == {'algorithm', 'sender_key', 'ciphertext'}
+        assert {'algorithm', 'sender_key', 'ciphertext'} <= set(content) <= {'algorithm', 'sender_key', 'ciphertext', 'org.matrix.msgid'}
+        if 'org.matrix.msgid' in content:
+            assert isinstance(content['org.matrix.msgid'], str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', content['org.matrix.msgid'])
         assert content['algorithm'] == 'm.olm.v1.curve25519-aes-sha2' and content['sender_key'] == sender['curve25519']
         assert set(content['ciphertext']) == {target['curve25519']}
         encrypted = content['ciphertext'][target['curve25519']]
@@ -193,9 +196,12 @@ class Boundary:
             assert allowed
             status, raw = await self.upstream(req.method, req.path_qs, await req.read(), req.headers['Authorization'])
             return web.Response(status=status, body=raw, content_type='application/json')
-        except (AssertionError, ValueError, KeyError, TypeError, StopIteration, InvalidTokenError):
+        except (AssertionError, ValueError, KeyError, TypeError, StopIteration, InvalidTokenError) as error:
             self.stats['denied'] += 1
-            return web.json_response({'errcode': 'M_FORBIDDEN', 'error': 'Veil boundary denied'}, status=403)
+            # Diagnostic is a code location only: never exception text, identity,
+            # access token, request body or decrypted data.
+            site = traceback.extract_tb(error.__traceback__)[-1]
+            return web.json_response({'errcode': 'M_FORBIDDEN', 'error': f'Veil boundary denied at {site.name}:{site.lineno}'}, status=403)
 
 
 @web.middleware
