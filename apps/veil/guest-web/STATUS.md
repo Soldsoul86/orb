@@ -1,5 +1,10 @@
 # Final milestone status: safe foundation, not guest-chat delivery
 
+Follow-up: [Matrix-native guest decision checkpoint](matrix/README.md) proposes a
+separate maintained Matrix channel and records the current environment blockers.
+It does not implement messaging or satisfy the release gate. The historical PR #8
+results and Signal-adapter investigation below remain evidence for that milestone.
+
 Implemented in draft PR #8: https://github.com/Soldsoul86/orb/pull/8
 
 ## Actually implemented
