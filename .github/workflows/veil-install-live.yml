@@ -1,4 +1,4 @@
-name: Veil QR live check
+name: Veil QR live check v8
 on:
   push:
     branches: ['codex/veil-apk']
