@@ -11,22 +11,22 @@ const profile=new URL('browser-profile/',new URL('../integration/runtime/',impor
 let context;
 try {
  await mkdir(new URL('evidence/',import.meta.url),{recursive:true});
- const phase1=instrument('requestApprovalReply');phase1.catch(()=>{});
- const {link}=await readPublic('pilot-public.json');
+ const phase1=instrument('requestApprovalReply');const failed1=phase1.then(()=>new Promise(()=>{}));failed1.catch(()=>{});
+ const {link}=await Promise.race([readPublic('pilot-public.json'),failed1]);
  context=await chromium.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},...(process.env.VEIL_TEST_CHROMIUM?{executablePath:process.env.VEIL_TEST_CHROMIUM}:{})});
  const page=await context.newPage();const start=performance.now();await page.goto(link);await page.waitForFunction(()=>!document.getElementById('send').disabled);const usableMs=performance.now()-start;
  await page.locator('#message').fill('PILOT_REQUEST_CANARY_91f7');const sending=performance.now();await page.locator('#send').click();await page.waitForFunction(()=>document.getElementById('status').textContent.includes('Received by service'),{},{timeout:60000});const requestMs=performance.now()-sending;
- await readPublic('pilot-arrival.json');const requestArrivalObservedMs=performance.now()-sending;
- await page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'),{},{timeout:180000});const replyMs=performance.now()-sending;
+ await Promise.race([readPublic('pilot-arrival.json'),failed1]);const requestArrivalObservedMs=performance.now()-sending;
+ await Promise.race([page.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'),{},{timeout:180000}),failed1]);const replyMs=performance.now()-sending;
  const saved=page.url();const first=await readPublic('pilot-replied.json');await phase1;
  await page.screenshot({path:new URL('evidence/browser-reply.png',import.meta.url).pathname});
  await writeFile(new URL('evidence/android-reply.png',import.meta.url),execFileSync('adb',['exec-out','run-as',pkg,'cat','files/pilot-reply.png']));
  await context.close();context=null;
  adb('shell','am','force-stop',pkg);
- const phase2=instrument('processRestartContinuationAndRevoke');phase2.catch(()=>{});
+ const phase2=instrument('processRestartContinuationAndRevoke');const failed2=phase2.then(()=>new Promise(()=>{}));failed2.catch(()=>{});
  context=await chromium.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},...(process.env.VEIL_TEST_CHROMIUM?{executablePath:process.env.VEIL_TEST_CHROMIUM}:{})});
  const reopened=await context.newPage();await reopened.goto(saved);await reopened.waitForFunction(()=>document.getElementById('messages').textContent.includes('PILOT_REPLY_CANARY_39a2'));await reopened.waitForFunction(()=>!document.getElementById('send').disabled);
- await reopened.locator('#message').fill('PILOT_CONTINUE_CANARY_c3bf');await reopened.locator('#send').click();const second=await readPublic('pilot-result.json');await phase2;
+ await reopened.locator('#message').fill('PILOT_CONTINUE_CANARY_c3bf');await reopened.locator('#send').click();const second=await Promise.race([readPublic('pilot-result.json'),failed2]);await phase2;
  await reopened.locator('#refresh').click();await reopened.waitForFunction(()=>document.getElementById('status').textContent.includes('revoked'));assert(await reopened.locator('#send').isDisabled());
  const runtime=new URL('../integration/runtime/',import.meta.url);
  for(const file of (await readdir(runtime)).filter(n=>/\.(db|sqlite)(-wal|-shm)?$|\.(log|jsonl)$/.test(n))){const b=await readFile(new URL(file,runtime));for(const canary of ['PILOT_REQUEST_CANARY_91f7','PILOT_REPLY_CANARY_39a2','PILOT_CONTINUE_CANARY_c3bf'])assert(!b.includes(Buffer.from(canary)));}

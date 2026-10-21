@@ -15,10 +15,11 @@ For the automated browser test only, select `node serve.mjs --test` then
 Build the official pinned Kotlin/JNI SDK using the existing interop workflow,
 then build the real app from `apps/veil` with
 `gradle -PveilPurposePreview=true -PveilGuestPilot=true :app:assembleDebug`.
-The existing preview application ID is `chat.veil.purposes.preview`, not the
-production `chat.veil`. A default debug certificate cannot upgrade an app signed
-by a different certificate. Do not uninstall an existing identity to work around
-this; use a disposable emulator/profile. The first CI APK targets x86_64 only.
+The guest pilot application ID is `chat.veil.guest.pilot`, separate from existing
+`chat.veil.purposes.preview` and production `chat.veil`. This preserves the user’s
+installed preview and vault. The debug pilot does not establish upgrade/signing
+continuity. CI builds x86_64 for the emulator and arm64 for the Pixel; use only
+the artifact associated with a passing tested commit. See [Mac + Pixel setup](MAC-PILOT.md).
 
 Configure an existing purpose in Browser messages using operator-supplied private
 service origin, browser origin and a pre-provisioned disposable technical owner

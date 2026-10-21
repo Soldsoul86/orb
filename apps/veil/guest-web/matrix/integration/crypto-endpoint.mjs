@@ -11,14 +11,14 @@ const quiet = { debug() {}, info() {}, warn() {}, error() {} };
 
 export class CryptoEndpoint {
   #machine; #request; #queue = Promise.resolve(); #stopped = false;
-  #since = ''; #poll; #failure; #onMessage; #checkpoint; #onError;
+  #since = ''; #poll; #failure; #onMessage; #checkpoint; #onError; #beforeSync;
 
-  static async open({ userId, deviceId, request, onMessage, storeName, storePassphrase, expectedKeys, since = '', checkpoint = async () => {}, onError }) {
+  static async open({ userId, deviceId, request, onMessage, storeName, storePassphrase, expectedKeys, since = '', checkpoint = async () => {}, beforeSync = async () => {}, onError }) {
     await initAsync();
     const endpoint = new CryptoEndpoint();
     endpoint.#request = request;
     endpoint.#onMessage = onMessage;
-    endpoint.#since = since; endpoint.#checkpoint = checkpoint; endpoint.#onError = onError;
+    endpoint.#since = since; endpoint.#checkpoint = checkpoint; endpoint.#beforeSync = beforeSync; endpoint.#onError = onError;
     endpoint.#machine = await OlmMachine.initialize(new UserId(userId), new DeviceId(deviceId), storeName, storePassphrase, quiet);
     if (expectedKeys && (endpoint.keys.ed25519 !== expectedKeys.ed25519 || endpoint.keys.curve25519 !== expectedKeys.curve25519)) {
       endpoint.#machine.close(); throw Error('Encryption storage was lost. This conversation cannot be resumed.');
@@ -110,6 +110,7 @@ export class CryptoEndpoint {
     const result = await this.#request('/_matrix/client/v3/sync?timeout=1000' + (this.#since ? '&since=' + encodeURIComponent(this.#since) : ''));
     if (this.#stopped) return;
     await this.#exclusive(async () => {
+      await this.#beforeSync((result.to_device?.events?.length ?? 0) > 0);
       const lists = result.device_lists ?? {};
       const processed = await this.#machine.receiveSyncChanges(JSON.stringify(result.to_device?.events ?? []),
         new DeviceLists((lists.changed ?? []).map(id => new UserId(id)), (lists.left ?? []).map(id => new UserId(id))),

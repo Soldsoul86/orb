@@ -60,7 +60,8 @@ async function connect() {
   }
   if(!endpoint)endpoint=await CryptoEndpoint.open({userId:data.login.user_id,deviceId:data.login.device_id,request:api,
     storeName:'veil-crypto-'+data.localId,storePassphrase:data.passphrase,expectedKeys:data.keys,since:data.since,
-    checkpoint:async since=>{data.since=since;await save();},
+    beforeSync:async hasEvents=>{if(hasEvents){data.cryptoPending=true;await save();}},
+    checkpoint:async since=>{data.since=since;data.cryptoPending=false;await save();},
     onError:error=>{status=fatal?error.message:'Connection interrupted. Keep this page open or return here later.';render();},
     onMessage:async payload=>{
       try {
@@ -161,6 +162,7 @@ async function start() {
     if(localId) {
       require(/^[a-f0-9]{64}$/.test(localId));data=await db.get(localId);
       require(data && data.owner===pin && data.invite===invite,'Browser data was lost. This conversation cannot be restored. Ask the owner for a new invitation.');
+      require(!data.cryptoPending,'Saving an encrypted message was interrupted. This session is locked to prevent silent message loss. Keep browser data and contact the pilot operator.');
       params.set('conversation',localId);history.replaceState(null,'','/contact#'+params.toString());
     }
     await metadata();active=true;render();

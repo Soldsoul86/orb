@@ -26,6 +26,9 @@ before network access and becomes locally effective immediately.
 The browser holds a Web Lock for the invitation, uses the official SDK's persistent
 IndexedDB store, and persists the exact outbox before HTTP. Conversation URLs
 contain a local recovery ID, never private keys. App storage and SDK IndexedDB
-currently have separate transactions: abrupt browser death between SDK decryption
-and app inbox persistence remains a critical crash-consistency test/review gate.
+have separate transactions. A durable in-flight marker is saved before SDK
+decryption and cleared only after the app inbox/cursor commit. If browser death
+interrupts this window, reopen locks the session with an explicit error rather
+than silently losing a message or replacing identity. Automatic recovery from
+this state remains a critical crash-consistency implementation/review gate.
 Do not equate ordinary reload/reopen success with arbitrary crash safety.
